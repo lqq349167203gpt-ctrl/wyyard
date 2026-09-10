@@ -480,14 +480,14 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
 }
 
 export const serviceTeacherCustomerApi = {
-  recordExport: (content: string) => request('/api/service-teacher-customers/export-audit', {
+  recordExport: (content: string, courses = false) => request(`/api/service-teacher-customers/${courses ? 'course-export-audit' : 'export-audit'}`, {
     method: 'POST', body: JSON.stringify({ content }),
   }),
-  metadata: () => request<{
+  metadata: (courses = false) => request<{
     current_teacher: string
     teachers: string[]
     teacher_options: Array<{ name: string; customer_id: string }>
-  }>("/api/service-teacher-customers/metadata"),
+  }>(`/api/service-teacher-customers/${courses ? 'course-metadata' : 'metadata'}`),
   list: (params: {
     service_teacher?: string
     follow_up_filter?: ServiceTeacherFollowUpFilter
@@ -3248,6 +3248,8 @@ export interface CourseStatistics {
     end_time: string
     class_hours: number
     teachers: string[]
+    owner_name: string
+    body_part_count: number | null
     participant_count: number
     new_count: number
     old_count: number

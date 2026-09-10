@@ -4,6 +4,57 @@ from types import SimpleNamespace
 from app.services import service_teacher_customer_service
 
 
+def test_payment_log_uses_settlement_label_without_changing_course_labels(monkeypatch):
+    from app.middleware.operation_logging import build_log_content
+    from app.services import organization_service
+
+    monkeypatch.setattr(organization_service, "get_organization", lambda _: SimpleNamespace(name="小院"))
+    body = {"nickname": "小安", "organization_id": "org-1"}
+    assert "成交归属：小院" in build_log_content("POST", "/api/membership-cards", body)
+    assert "成交归属" in build_log_content("PATCH", "/api/group-cases/p1", body, {"organization_id": ""})
+    assert "成交归属" not in build_log_content("PATCH", "/api/courses/c1", body, {"organization_id": ""})
+    assert body["organization_id"] == "org-1"
+
+
+def test_course_export_audit_uses_course_page_and_usage_source(client):
+    response = client.post("/api/service-teacher-customers/course-export-audit", json={"content": "课程老师测试导出"}, headers={"X-Client-Type": "miniprogram"})
+    assert response.status_code == 200
+    from app.services import operation_log_service
+
+    log = next(item for item in operation_log_service.list_logs(section="课程记录") if "课程老师测试导出" in item.content)
+    assert log.content == "导出课程记录：课程老师测试导出"
+    assert log.source == "miniprogram"
+
+
+def test_course_teacher_options_use_teaching_ids_and_preserve_same_names(monkeypatch):
+    from starlette.requests import Request
+
+    from app.api import service_teacher_customers, statistics
+
+    customers = [
+        SimpleNamespace(id="a", nickname="同名老师", name="", positions=[], service_teacher="客户服务人"),
+        SimpleNamespace(id="b", nickname="同名老师", name="", positions=["课程老师"], service_teacher=""),
+        SimpleNamespace(id="c", nickname="普通客户", name="", positions=[], service_teacher="客户服务人"),
+    ]
+    monkeypatch.setattr(service_teacher_customers.customer_service, "list_customers", lambda: customers)
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
+        ("class", "沙龙", lambda: [SimpleNamespace(teacher_ids=["a"], achiever_id="")]),
+    ))
+    request = Request({"type": "http", "path": "/api/service-teacher-customers/course-metadata", "headers": []})
+    result = service_teacher_customers.get_metadata(request)
+    assert result["teacher_options"] == [
+        {"name": "同名老师", "customer_id": "a"},
+        {"name": "同名老师", "customer_id": "b"},
+    ]
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
+        ("class", "沙龙", lambda: [
+            SimpleNamespace(teacher_ids=["a", "b"], achiever_id="b"),
+            SimpleNamespace(teacher_ids=["b"], achiever_id=""),
+        ]),
+    ))
+    assert [item["customer_id"] for item in service_teacher_customers.get_metadata(request)["teacher_options"]] == ["b", "a"]
+
+
 def _customer(customer_id: str, teacher: str):
     return SimpleNamespace(
         id=customer_id,
@@ -179,11 +230,11 @@ def test_follow_up_definition_filters_each_note_category_independently(monkeypat
 
 def test_available_teachers_includes_current_account_owner():
     teachers = service_teacher_customer_service.available_teachers(
-        [_customer("c1", "婷婷"), _customer("c2", "潘潘")],
+        [_customer("c1", "婷婷"), _customer("c2", "潘潘"), _customer("c3", "潘潘")],
         "娟娟",
     )
 
-    assert teachers == ["娟娟", "婷婷", "潘潘"]
+    assert teachers == ["潘潘", "婷婷", "娟娟"]
 
 
 def test_teacher_options_prefers_customer_with_course_teacher_position():

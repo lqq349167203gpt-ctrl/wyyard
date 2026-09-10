@@ -8,7 +8,7 @@
         <text class="page-subtitle">按自己的条件找出客户，查看邀约、到店和成交情况</text>
       </view>
       <view class="header-actions">
-        <button class="save-button" bindtap="onSaveTemplate">保存模板</button>
+        <view class="save-button" bindtap="onSaveTemplate">保存模板</view>
       </view>
     </view>
 

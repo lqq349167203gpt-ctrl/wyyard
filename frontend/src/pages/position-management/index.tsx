@@ -30,7 +30,7 @@ const ALL_PAGES = [
   { key: "service-teacher", label: "服务老师" },
   { key: "referral-statistics", label: "引流统计" },
   { key: "member-statistics", label: "会员情况" },
-  { key: "course-statistics", label: "课程" },
+  { key: "course-statistics", label: "课程记录" },
   { key: "product-sales", label: "产品销售" },
   { key: "statistics", label: "服务数据" },
   { key: "financial-overview", label: "财务数据" },

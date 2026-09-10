@@ -47,7 +47,7 @@ PERMISSION_PAGE_MAP = {
     "custom-analysis": ("自定义筛选", "/custom-analysis"),
     "referral-statistics": ("引流统计", "/referral-statistics"),
     "member-statistics": ("会员情况", "/member-statistics"),
-    "course-statistics": ("课程", "/course-statistics"),
+    "course-statistics": ("课程记录", "/course-statistics"),
     "product-sales": ("产品销售", "/product-sales"),
     "statistics": ("服务数据", "/statistics"),
     "daily-report": ("每日报表", "/daily-report"),

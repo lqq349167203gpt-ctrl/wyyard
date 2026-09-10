@@ -1,4 +1,5 @@
 """统计 API — 客户经营指标 / 邀约到访 / 实际到访 / 成交人数 / 会员情况"""
+import json
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
@@ -1596,7 +1597,7 @@ def _course_participant_ids(activity_type: str, activity) -> set[str]:
 
 
 def _course_activity_teacher_ids(activity) -> set[str]:
-    """课程负责人包含老师；未配置老师的专项活动使用成就君。"""
+    """按课程上记录的老师及成就君匹配授课人，不使用客户服务老师归属。"""
     teacher_ids = set(getattr(activity, "teacher_ids", []) or [])
     achiever_id = getattr(activity, "achiever_id", "")
     if achiever_id:
@@ -1811,6 +1812,36 @@ def _course_activity_hours(activity_type: str, activity) -> int:
         return max(0, int(getattr(activity, "membership_deduction_count", 1) or 0))
     except (TypeError, ValueError):
         return 1
+
+
+def _course_owner_details(activity_type, activity, customer_map, visible_customer_ids):
+    """案主沿用客户可见范围；能量结兼容多案主及历史部位记录。"""
+    if activity_type not in {"gcs", "ers", "eks"}:
+        return {"owner_name": "", "body_part_count": None}
+    owners = []
+    if activity_type == "eks":
+        try:
+            details = json.loads(getattr(activity, "description", "") or "[]")
+        except (ValueError, TypeError):
+            details = []
+        if isinstance(details, list):
+            owners = [item for item in details if isinstance(item, dict)]
+    if not owners:
+        owners = [{"id": getattr(activity, "owner_id", ""), "name": getattr(activity, "owner_name", ""), "count": 1}]
+    names = []
+    count = 0
+    for owner in owners:
+        owner_id = owner.get("id") or getattr(activity, "owner_id", "")
+        if owner_id in visible_customer_ids:
+            customer = customer_map.get(owner_id)
+            name = getattr(customer, "nickname", "") or getattr(customer, "name", "") or owner.get("name") or getattr(activity, "owner_name", "")
+            if name and name not in names:
+                names.append(name)
+        try:
+            count += max(1, int(owner.get("count", 1) or 1))
+        except (ValueError, TypeError):
+            count += 1
+    return {"owner_name": "、".join(names), "body_part_count": count if activity_type == "eks" else None}
 
 
 def _course_teacher_hours(activities_by_type: dict[str, list]) -> dict[str, int]:
@@ -2115,6 +2146,7 @@ def get_course_statistics(
                 "end_time": getattr(activity, "end_time", "") or "",
                 "class_hours": activity_hours,
                 "teachers": teacher_names,
+                **_course_owner_details(type_key, activity, customer_map, visible_customer_ids),
                 "participant_count": activity_participants,
                 "new_count": sum(
                     item["identity_group"] == "新人"
@@ -2209,7 +2241,7 @@ def get_course_statistics(
     for transaction_teacher_id, amount in teacher_transaction_amounts.items():
         teacher_statistics[transaction_teacher_id]["transaction_amount"] = round(amount, 2)
 
-    if request and "service-teachers" in request.headers.get("x-page-path", ""):
+    if request and any(page in request.headers.get("x-page-path", "") for page in ("service-teachers", "course-statistics", "course-records")):
         from app.api.service_teacher_customers import record_service_teacher_action
         selected_teacher = customer_map.get(teacher_id)
         teacher_name = getattr(selected_teacher, "nickname", "") or getattr(selected_teacher, "name", "") or "全部"

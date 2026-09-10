@@ -400,8 +400,11 @@ def _build_purchase_summary(customer_id: str) -> list:
             "voided": False,
         })
 
-    def _earliest_expiry(purchases):
+    def _earliest_expiry(purchases, project_type):
         """返回最早到期日期和该日期对应的次数，仅统计有效且有到期日的购买。"""
+        from app.services.project_refund_service import exclude_refunded
+
+        purchases = exclude_refunded(project_type, purchases)
         today = datetime.now().strftime("%Y-%m-%d")
         valid = [p for p in purchases if p.expiry_date and p.expiry_date >= today
                  and (not p.effective_date or p.effective_date <= today)]
@@ -411,11 +414,13 @@ def _build_purchase_summary(customer_id: str) -> list:
         cnt = sum(p.purchase_count for p in valid if p.expiry_date == earliest)
         return earliest, cnt
 
-    def _current_purchase_total(purchases):
+    def _current_purchase_total(purchases, project_type):
         """仅汇总当前已生效且未过期的购买次数。"""
+        from app.services.project_refund_service import exclude_refunded
+
         return sum(
             purchase.purchase_count
-            for purchase in purchases
+            for purchase in exclude_refunded(project_type, purchases)
             if (not purchase.effective_date or purchase.effective_date <= today)
             and (not purchase.expiry_date or purchase.expiry_date >= today)
         )
@@ -429,7 +434,7 @@ def _build_purchase_summary(customer_id: str) -> list:
     gc_effective = group_case_session_service.get_usable_remaining_count(customer_id)
     gc_debt = group_case_session_service.get_debt_record(customer_id)
     gc_used = gc_session_used if gc_purchased == 0 else gc_purchased - gc_effective
-    gc_earliest, gc_earliest_cnt = _earliest_expiry(gc_cases)
+    gc_earliest, gc_earliest_cnt = _earliest_expiry(gc_cases, "group-cases")
     if gc_purchased > 0 or gc_session_used > 0:
         summary.append({
             "type": "觉醒游戏",
@@ -440,7 +445,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "remaining": gc_remaining,
             "effective_remaining": gc_effective,
             "current_remaining": gc_effective,
-            "current_total": _current_purchase_total(gc_cases),
+            "current_total": _current_purchase_total(gc_cases, "group-cases"),
             "debt_count": gc_debt["debt_count"],
             "debt_activities": gc_debt["debt_activities"],
             "effective_date": gc_cases[0].effective_date if gc_cases else "",
@@ -469,7 +474,7 @@ def _build_purchase_summary(customer_id: str) -> list:
     er_effective = emotional_release_session_service.get_usable_remaining_count(customer_id)
     er_debt = emotional_release_session_service.get_debt_record(customer_id)
     er_used = er_session_used if er_purchased == 0 else er_purchased - er_effective
-    er_earliest, er_earliest_cnt = _earliest_expiry(er_releases)
+    er_earliest, er_earliest_cnt = _earliest_expiry(er_releases, "emotional-releases")
     if er_purchased > 0 or er_session_used > 0:
         summary.append({
             "type": "情绪释放",
@@ -480,7 +485,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "remaining": er_remaining,
             "effective_remaining": er_effective,
             "current_remaining": er_effective,
-            "current_total": _current_purchase_total(er_releases),
+            "current_total": _current_purchase_total(er_releases, "emotional-releases"),
             "debt_count": er_debt["debt_count"],
             "debt_activities": er_debt["debt_activities"],
             "effective_date": er_releases[0].effective_date if er_releases else "",
@@ -509,7 +514,7 @@ def _build_purchase_summary(customer_id: str) -> list:
     ek_effective = energy_knot_session_service.get_usable_remaining_count(customer_id)
     ek_debt = energy_knot_session_service.get_debt_record(customer_id)
     ek_used = ek_session_used if ek_purchased == 0 else ek_purchased - ek_effective
-    ek_earliest, ek_earliest_cnt = _earliest_expiry(ek_knots)
+    ek_earliest, ek_earliest_cnt = _earliest_expiry(ek_knots, "energy-knots")
     if ek_purchased > 0 or ek_session_used > 0:
         summary.append({
             "type": "能量结",
@@ -520,7 +525,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             "remaining": ek_remaining,
             "effective_remaining": ek_effective,
             "current_remaining": ek_effective,
-            "current_total": _current_purchase_total(ek_knots),
+            "current_total": _current_purchase_total(ek_knots, "energy-knots"),
             "debt_count": ek_debt["debt_count"],
             "debt_activities": ek_debt["debt_activities"],
             "effective_date": ek_knots[0].effective_date if ek_knots else "",

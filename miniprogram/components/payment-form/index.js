@@ -246,7 +246,7 @@ Component({
           { label: '课程所属', value: courseOrganization ? courseOrganization.name : '-' },
           { label: '所扣课程', value: course ? course._label : '-' },
           { label: '抵扣次数', value: course ? `${course.deduction_count}次` : '-' },
-          { label: '所属组织', value: settlementOrganization ? settlementOrganization.name : '-' },
+          { label: '成交归属', value: settlementOrganization ? settlementOrganization.name : '-' },
           { label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' },
           { label: '备注', value: formData.notes || '-' },
         ]
@@ -290,7 +290,7 @@ Component({
       rows.push({ label: '结束日期', value: validity.expiryDate })
       if (!hidePaymentDetails) rows.push(amountRow)
       const organization = organizations[orgIndex]
-      rows.push({ label: '所属组织', value: organization ? organization.name : '-' })
+      rows.push({ label: '成交归属', value: organization ? organization.name : '-' })
       rows.push({ label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' })
       if (!hidePaymentDetails) {
         rows.push({ label: '成交人合计', value: '¥' + formatMoney(closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)) })
@@ -777,7 +777,7 @@ Component({
       }
       if (type === 'coarse_door_card') {
         if (this.data.orgIndex < 0) {
-          wx.showToast({ title: '请选择所属组织', icon: 'none' })
+          wx.showToast({ title: '请选择成交归属', icon: 'none' })
           return
         }
         if (this.data.coarseCourseOrganizationIndex < 0) {

@@ -4,6 +4,7 @@ from app.models.base import StrictBaseModel
 from app.models.project_refund import ProjectRefundCreate
 from app.services import customer_access_service, project_refund_service
 from app.utils.pagination import paginate
+from app.utils.record_ownership import get_request_actor
 
 router = APIRouter(prefix="/api/project-refunds", tags=["project-refunds"])
 
@@ -23,6 +24,7 @@ def create_refund(data: ProjectRefundCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="退费")
     try:
+        data = data.model_copy(update={"created_by": get_request_actor(request)[1]})
         return project_refund_service.create_refund(data).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -44,7 +46,7 @@ def update_refund(refund_id: str, data: RefundUpdate, request: Request):
         raise HTTPException(status_code=404, detail="退费记录不存在")
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     try:
-        return project_refund_service.update_refund(refund_id, data.refund_amount, data.updated_by).model_dump(mode="json")
+        return project_refund_service.update_refund(refund_id, data.refund_amount, get_request_actor(request)[1]).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

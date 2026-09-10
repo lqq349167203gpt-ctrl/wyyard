@@ -89,7 +89,7 @@ function coursePresetRange(preset: Exclude<CourseRangePreset, "custom">) {
 }
 
 function initialCourseRange() {
-  return coursePresetRange("month")
+  return coursePresetRange("all")
 }
 
 function formatCourseTime(course: CourseRow): string {
@@ -129,11 +129,16 @@ function NoteContent({ author, content, expanded }: { author: string; content: s
 }
 
 export default function ServiceTeachersPage() {
+  return <ServiceTeacherRecords mode="follow-ups" />
+}
+
+export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const initialRange = useMemo(initialCourseRange, [])
-  const [activeTab, setActiveTab] = useState<ServiceTeacherTab>("courses")
+  const activeTab = mode
   const [teacher, setTeacher] = useState(currentOwner)
   const [teacherNames, setTeacherNames] = useState<string[]>([])
   const [teacherOptions, setTeacherOptions] = useState<Array<{ name: string; customer_id: string }>>([])
+  const [courseTeacherId, setCourseTeacherId] = useState("")
   const [metadataLoaded, setMetadataLoaded] = useState(false)
   const [followUpFilter, setFollowUpFilter] = useState<ServiceTeacherFollowUpFilter>("inactive")
   const [followUpDays, setFollowUpDays] = useState(30)
@@ -148,8 +153,10 @@ export default function ServiceTeachersPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [courseDateFrom, setCourseDateFrom] = useState(initialRange.from)
   const [courseDateTo, setCourseDateTo] = useState(initialRange.to)
-  const [courseRangePreset, setCourseRangePreset] = useState<CourseRangePreset>("month")
+  const [courseRangePreset, setCourseRangePreset] = useState<CourseRangePreset>("all")
   const [courseActivityType, setCourseActivityType] = useState("all")
+  const showCourseOwner = !["class", "ics"].includes(courseActivityType)
+  const showCourseBodyParts = courseActivityType === "all" || courseActivityType === "eks"
   const [courseData, setCourseData] = useState<CourseStatistics | null>(null)
   const [courseLoading, setCourseLoading] = useState(false)
   const [courseError, setCourseError] = useState("")
@@ -160,20 +167,25 @@ export default function ServiceTeachersPage() {
     : includeCustomerInfo ? "customer_info" : includeFollowUp ? "follow_up" : "none"
 
   useEffect(() => {
-    serviceTeacherCustomerApi.metadata()
+    serviceTeacherCustomerApi.metadata(mode === "courses")
       .then(metadata => {
         setTeacherNames(metadata.teachers)
         setTeacherOptions(metadata.teacher_options || [])
-        setTeacher(current => current || metadata.current_teacher)
+        if (mode === "courses") {
+          const selected = metadata.teacher_options[0]
+          setCourseTeacherId(selected?.customer_id || "")
+          setTeacher(selected?.name || "")
+        } else setTeacher(current => current || metadata.current_teacher)
         setMetadataLoaded(true)
       })
       .catch(error => {
         setMetadataError(error instanceof Error ? error.message : "服务老师列表加载失败")
         setMetadataLoaded(true)
       })
-  }, [])
+  }, [mode])
 
   const fetchCustomers = useCallback(async (page: number, pageSize: number) => {
+    if (mode === "courses") return { items: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 }
     const result = await serviceTeacherCustomerApi.list({
       service_teacher: teacher,
       follow_up_filter: followUpFilter,
@@ -184,7 +196,7 @@ export default function ServiceTeachersPage() {
     })
     setSummary(result.summary)
     return result
-  }, [followUpDays, followUpDefinition, followUpFilter, teacher])
+  }, [mode, followUpDays, followUpDefinition, followUpFilter, teacher])
 
   const pagination = useServerPagination<ServiceTeacherCustomerItem>(fetchCustomers, { pageSize: PAGE_SIZE })
 
@@ -193,14 +205,15 @@ export default function ServiceTeachersPage() {
   }, [teacher, followUpDays, followUpDefinition, followUpFilter, pagination.resetPage])
 
   const teacherSelectOptions = useMemo(() => {
+    if (mode === "courses") return teacherOptions.map(option => ({ value: option.customer_id, label: option.name }))
     const names = new Set(teacherNames)
     if (teacher) names.add(teacher)
     return [...names].map(name => ({ value: name, label: name }))
-  }, [teacher, teacherNames])
+  }, [mode, teacherOptions, teacher, teacherNames])
 
   const selectedTeacherId = useMemo(
-    () => teacherOptions.find(option => option.name === teacher)?.customer_id || "",
-    [teacher, teacherOptions],
+    () => mode === "courses" ? courseTeacherId : teacherOptions.find(option => option.name === teacher)?.customer_id || "",
+    [mode, courseTeacherId, teacher, teacherOptions],
   )
 
   useEffect(() => {
@@ -284,6 +297,8 @@ export default function ServiceTeachersPage() {
         { header: "课程类型", key: "activityType", width: 16 },
         { header: "课时", key: "classHours", width: 10 },
         { header: "老师/成就君", key: "teachers", width: 24 },
+        ...(showCourseOwner ? [{ header: "案主", key: "owner", width: 20 }] : []),
+        ...(showCourseBodyParts ? [{ header: "部位数", key: "bodyParts", width: 12 }] : []),
         { header: "参与人数", key: "participantCount", width: 12 },
         { header: "新人名单", key: "newNames", width: 32 },
         { header: "老人名单", key: "oldNames", width: 32 },
@@ -295,6 +310,8 @@ export default function ServiceTeachersPage() {
         activityType: course.activity_type_label || "-",
         classHours: course.class_hours,
         teachers: course.teachers.join("、") || "-",
+        owner: course.owner_name || "-",
+        bodyParts: course.body_part_count ?? "-",
         participantCount: course.participant_count,
         newNames: courseParticipantNames(course, "new") || "-",
         oldNames: courseParticipantNames(course, "old") || "-",
@@ -319,7 +336,7 @@ export default function ServiceTeachersPage() {
       anchor.href = url
       const rangeLabel = courseRangePreset === "all" ? "全部时间" : `${courseDateFrom} 至 ${courseDateTo}`
       anchor.download = `服务老师课程记录_${teacher.replace(/[\\/:*?"<>|]/g, "-")}_${courseRangePreset === "all" ? "全部" : `${courseDateFrom}_${courseDateTo}`}.xlsx`
-      await serviceTeacherCustomerApi.recordExport(`课程记录；老师 ${teacher}；课程类型 ${courseData?.activity_types.find(item => item.value === courseActivityType)?.label || "全部课程"}；${rangeLabel}；共${courseRows.length}场`)
+      await serviceTeacherCustomerApi.recordExport(`课程记录；老师 ${teacher}；课程类型 ${courseData?.activity_types.find(item => item.value === courseActivityType)?.label || "全部课程"}；${rangeLabel}；共${courseRows.length}场`, true)
       anchor.click()
       URL.revokeObjectURL(url)
     } finally {
@@ -433,43 +450,25 @@ export default function ServiceTeachersPage() {
   return (
     <div className="min-h-full bg-[#f7f8fa] px-2.5 pb-6 pt-2.5">
       <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
-        <h1 className="mb-4 text-lg font-medium text-[#1f2329]">服务老师</h1>
-
-        <div className="flex min-h-[39px] items-center border-b border-[#e8e8e8]">
-          <div className="flex items-center gap-6">
-            {([
-              { value: "courses", label: "课程记录" },
-              { value: "follow-ups", label: "跟进记录" },
-            ] as const).map(tab => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setActiveTab(tab.value)}
-                className={`relative px-1 pb-2 text-[14px] transition-colors ${
-                  activeTab === tab.value ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
-                }`}
-              >
-                {tab.label}
-                {activeTab === tab.value && (
-                  <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        <h1 className="mb-4 text-lg font-medium text-[#1f2329]">{mode === "courses" ? "课程记录" : "服务老师"}</h1>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
             <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
-            服务老师
+            {mode === "courses" ? "课程老师" : "服务老师"}
           </span>
           <SelectDropdown
             size="sm"
             className="w-[160px]"
             options={teacherSelectOptions}
-            value={teacher}
-            onChange={setTeacher}
-            placeholder="请选择服务老师"
+            value={mode === "courses" ? courseTeacherId : teacher}
+            onChange={value => {
+              if (mode === "courses") {
+                setCourseTeacherId(value)
+                setTeacher(teacherOptions.find(option => option.customer_id === value)?.name || "")
+              } else setTeacher(value)
+            }}
+            placeholder={mode === "courses" ? "请选择课程老师" : "请选择服务老师"}
             buttonClassName="border-[#dee0e3] bg-white"
           />
           {activeTab === "courses" ? (
@@ -638,9 +637,9 @@ export default function ServiceTeachersPage() {
             {metadataError || courseError ? (
               <div className="py-16 text-center text-sm text-muted-foreground">{metadataError || courseError}</div>
             ) : !teacher ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">当前账号未关联所属人，请先选择服务老师</div>
+              <div className="py-16 text-center text-sm text-muted-foreground">请选择课程老师</div>
             ) : metadataLoaded && !selectedTeacherId ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">该服务老师尚未关联课程老师客户身份</div>
+              <div className="py-16 text-center text-sm text-muted-foreground">暂无可选课程老师</div>
             ) : courseLoading ? (
               <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
             ) : courseRows.length === 0 ? (
@@ -655,6 +654,8 @@ export default function ServiceTeachersPage() {
                     <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">课程类型</TableHead>
                     <TableHead className="h-9 w-[56px] px-3 text-right text-[11px] font-normal">课时</TableHead>
                     <TableHead className="h-9 w-[130px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
+                    {showCourseOwner && <TableHead className="h-9 w-[100px] px-3 text-[11px] font-normal">案主</TableHead>}
+                    {showCourseBodyParts && <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">部位数</TableHead>}
                     <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
                     <TableHead className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
                     <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">老人名单</TableHead>
@@ -681,6 +682,8 @@ export default function ServiceTeachersPage() {
                       <TableCell className="h-11 max-w-[130px] truncate px-3 py-0 text-[12px] text-[#4e535a]" title={course.teachers.join("、") || undefined}>
                         {course.teachers.join("、") || <EmptyDash />}
                       </TableCell>
+                      {showCourseOwner && <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.owner_name || <EmptyDash />}</TableCell>}
+                      {showCourseBodyParts && <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.body_part_count ?? <EmptyDash />}</TableCell>}
                       <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.participant_count}人</TableCell>
                       <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{newNames || <EmptyDash />}</TableCell>
                       <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{oldNames || <EmptyDash />}</TableCell>

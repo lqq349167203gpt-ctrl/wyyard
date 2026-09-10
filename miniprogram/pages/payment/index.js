@@ -1,4 +1,4 @@
-const { customerApi, paymentApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
+const { customerApi, paymentApi, organizationApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
 const { canEditRecord } = require('../../utils/record-ownership')
 
 const TABS = [
@@ -141,7 +141,7 @@ function buildFilterOptions(items, field, selectedValues) {
     .map(name => ({ name, selected: selected.has(name) }))
 }
 
-function decorateItems(raw, type) {
+function decorateItems(raw, type, organizations) {
   const isHealing = ['group_case', 'emotional_release', 'energy_knot'].includes(type)
   const isOhCard = type === 'oh_card_reading'
   const isTeaSeat = type === 'tea_seat_fee'
@@ -161,6 +161,7 @@ function decorateItems(raw, type) {
     }
     return Object.assign({}, item, {
       _detail: detail,
+      _organizationName: (organizations.find(org => org.id === item.organization_id) || {}).name || '',
       _price: price,
       _priceText: formatPrice(price),
       _metaPrimary: buildMetaPrimary(item, type, detail),
@@ -297,10 +298,10 @@ Page({
       }
       const api = paymentApi.getByType(type)
       // 获取当前类型的完整可见记录，搜索和筛选均在前端完成，避免只筛到第一页。
-      const [res] = await Promise.all([api.list(), this.loadCustomerSearchIndex()])
+      const [res, organizations] = await Promise.all([api.list(), organizationApi.list(), this.loadCustomerSearchIndex()])
       if (requestVersion !== this._loadRequestVersion) return
       const raw = res.items || res.data || res || []
-      const sourceItems = decorateItems(Array.isArray(raw) ? raw : [], type)
+      const sourceItems = decorateItems(Array.isArray(raw) ? raw : [], type, Array.isArray(organizations) ? organizations : (organizations.items || []))
       this._sourceItems = sourceItems
       this.updateFilterOptions(() => this.applyFilters({ loading: false }))
     } catch (e) {

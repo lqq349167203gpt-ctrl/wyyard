@@ -15,6 +15,7 @@
     "pages/customer-tags/index",
     "pages/custom-analysis/index",
     "pages/service-teachers/index",
+    "pages/course-records/index",
     "pages/payment/index",
     "pages/payment-create/index",
     "pages/payment-detail/index",

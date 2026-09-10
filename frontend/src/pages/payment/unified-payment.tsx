@@ -966,7 +966,7 @@ export function UnifiedPaymentContent({
       { header: "有效期单位", key: "duration_type", width: 10, example: "月" },
       { header: "有效期时长", key: "duration_value", width: 10, example: "6" },
       { header: "次数（不填则无限次数）", key: "remaining_count", width: 16, example: "" },
-      { header: "所属组织", key: "organization", width: 12, example: "" },
+      { header: "成交归属", key: "organization", width: 12, example: "" },
     ],
   }
 
@@ -1023,7 +1023,7 @@ export function UnifiedPaymentContent({
         }
       }
 
-      // 所属组织下拉（仅其他项目）
+      // 成交归属下拉（仅其他项目）
       if (type === "other" && organizations.length > 0) {
         const orgCol = cols.findIndex(c => c.key === "organization") + 1
         if (orgCol > 0) {
@@ -1056,7 +1056,7 @@ export function UnifiedPaymentContent({
     const nickname = get("用户昵称")
     const amountStr = get("金额")
     const closerNickname = get("成交人昵称（多个成交人请去页面内录入）") || get("成交人昵称")
-    const orgName = get("所属组织")
+    const orgName = get("成交归属") || get("所属组织")
     const cardType = type === "membership_card" ? get("会员卡类型") : ""
     const omitPaymentDetails = true
 
@@ -1426,7 +1426,7 @@ export function UnifiedPaymentContent({
       rows.push({ label: formType === "energy_knot" ? "部位数" : "购买场次", value: `${formPurchaseCount || "0"} ${formType === "energy_knot" ? "个" : "次"}` })
       if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
     }
-    rows.push({ label: "所属组织", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
+    rows.push({ label: "成交归属", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
     rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => c.name).join("、") : "-" })
     if (!hidePaymentDetails) {
       rows.push({ label: "成交人合计", value: `¥${formClosers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0).toLocaleString()}` })
@@ -1520,6 +1520,7 @@ export function UnifiedPaymentContent({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4" style={{ width: "90px" }}>成交日期</TableHead>
+                <TableHead style={{ width: "110px" }}>成交归属</TableHead>
                 <TableHead style={{ width: "100px" }}>用户</TableHead>
                 {activeType === "oh_card_reading" && <TableHead style={{ width: "100px" }}>诊断老师</TableHead>}
                 {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && <TableHead style={{ width: "120px" }}>项目名称</TableHead>}
@@ -1528,9 +1529,7 @@ export function UnifiedPaymentContent({
                 {activeType !== "oh_card_reading" && activeType !== "tea_seat_fee" && <TableHead style={{ width: "80px" }}>到期日期</TableHead>}
                 <TableHead style={{ width: "60px" }}>状态</TableHead>
                 {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && <TableHead style={{ width: "70px" }}>{activeType === "energy_knot" ? "剩余部位" : "剩余次数"}</TableHead>}
-                <TableHead style={{ width: "70px" }}>金额</TableHead>
                 <TableHead style={{ width: "100px" }}>成交人</TableHead>
-                <TableHead style={{ width: "70px" }}>支付方式</TableHead>
                 <TableHead style={{ width: "100px" }}>备注</TableHead>
                 <TableHead style={{ width: "60px" }}>创建人</TableHead>
                 <TableHead className="text-right pr-4" style={{ width: "80px" }}>操作</TableHead>
@@ -1540,6 +1539,9 @@ export function UnifiedPaymentContent({
                 {paginatedItems.map((item) => (
                   <TableRow key={`${item.type}-${item.id}`} className="group hover:bg-[#f7f8fa]">
                     <TableCell className="pl-4 text-[#2b2f36] truncate">{item.deal_date || <EmptyValue />}</TableCell>
+                    <TableCell className="text-[#2b2f36] truncate" title={organizations.find(org => org.id === item.organization_id)?.name}>
+                      {organizations.find(org => org.id === item.organization_id)?.name || <EmptyValue />}
+                    </TableCell>
                     <TableCell className="text-[#2b2f36] truncate" title={item.nickname}>{item.nickname}</TableCell>
                     {activeType === "oh_card_reading" && <TableCell className="text-[#2b2f36] truncate" title={item.diagnosis_teacher}>{item.diagnosis_teacher || <EmptyValue />}</TableCell>}
                     {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "other") && (
@@ -1600,13 +1602,11 @@ export function UnifiedPaymentContent({
                           : <EmptyValue />
                       )}
                     </TableCell>}
-                    <TableCell className="text-[#2b2f36] truncate">¥{item.price.toLocaleString()}</TableCell>
-                    <TableCell className="text-[#2b2f36] truncate" title={item.closers?.length ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、") : (item.closer_name || "")}>
+                    <TableCell className="text-[#2b2f36] truncate" title={item.closers?.length ? item.closers.map(c => c.name).join("、") : (item.closer_name || "")}>
                       {item.closers?.length
-                        ? item.closers.map(c => `${c.name} ¥${c.amount.toLocaleString()}`).join("、")
+                        ? item.closers.map(c => c.name).join("、")
                         : (item.closer_name || <EmptyValue />)}
                     </TableCell>
-                    <TableCell className="text-[#2b2f36] truncate">{item.payment_method || <EmptyValue />}</TableCell>
                     <TableCell className="text-[#2b2f36] truncate" title={item.notes}>{item.notes || <EmptyValue />}</TableCell>
                     <TableCell className="text-[#8f959e] truncate">{item.created_by || <EmptyValue />}</TableCell>
                     <TableCell className="text-right pr-4">
@@ -1698,13 +1698,13 @@ export function UnifiedPaymentContent({
             </div>
           ) : (
           <div className="px-6 py-5 space-y-4 max-h-[calc(65vh+120px)] overflow-y-auto" {...enterToNext}>
-            {/* 成交日期 + 所属组织（顶部） */}
+            {/* 成交日期 + 成交归属（顶部） */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交日期</span>
               <Input type="date" value={formDealDate} onChange={(e) => setFormDealDate(e.target.value)} />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">所属组织</span>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交归属</span>
               <SelectDropdown
                 value={formOrganizationId}
                 options={organizations.map(o => ({ value: o.id, label: o.name }))}

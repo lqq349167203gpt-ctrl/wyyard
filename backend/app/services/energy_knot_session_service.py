@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 from app.models.energy_knot_session import EnergyKnotSession, EnergyKnotSessionCreate
 from app.services import customer_service, energy_knot_service
+from app.services.project_refund_service import exclude_refunded
 from app.services.storage import load_data, save_data, save_item
 from app.utils.activity_withdrawal import ensure_withdrawn_customers_retained
 
@@ -222,7 +223,7 @@ def get_session_deduction_count(session, customer_id: str | None = None) -> int:
 
 def get_remaining_count(customer_id: str) -> int:
     """计算某用户的能量结剩余次数；仅已到场案主按部位数扣除。"""
-    knots = energy_knot_service.list_knots()
+    knots = exclude_refunded("energy-knots", energy_knot_service.list_knots())
     total_purchased = sum(k.purchase_count for k in knots if k.customer_id == customer_id)
     used = sum(item["count"] for item in _get_session_deductions_for_customer(customer_id))
     from app.services import project_deduction_service
@@ -233,7 +234,7 @@ def get_remaining_count(customer_id: str) -> int:
 def get_usable_remaining_count(customer_id: str, on_date: str = "") -> int:
     """返回当前有效购买中真正可用的部位数，并保留预支扣卡形成的负数。"""
     reference_date = on_date or datetime.now().strftime("%Y-%m-%d")
-    purchases = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
+    purchases = [k for k in exclude_refunded("energy-knots", energy_knot_service.list_knots()) if k.customer_id == customer_id]
     purchase_data = [
         {
             "id": p.id,
@@ -270,7 +271,7 @@ def get_debt_record(customer_id: str) -> dict:
 
     customer = customer_service.get_customer(customer_id)
     remaining = get_remaining_count(customer_id)
-    knots = energy_knot_service.list_knots()
+    knots = exclude_refunded("energy-knots", energy_knot_service.list_knots())
     total = sum(knot.purchase_count for knot in knots if knot.customer_id == customer_id)
     sessions = sorted(
         [
@@ -393,7 +394,7 @@ def get_purchase_remaining(purchase_id: str) -> int:
         return 0
 
     customer_id = purchase.customer_id
-    all_purchases = energy_knot_service.list_knots()
+    all_purchases = exclude_refunded("energy-knots", energy_knot_service.list_knots())
     customer_purchases = [
         {
             "id": p.id,

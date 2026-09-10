@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
+
 from dateutil.relativedelta import relativedelta
-from typing import List, Optional, Dict
 
 from app.models.other_project import OtherProject, OtherProjectCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "other_projects.json"
 _projects: Dict[str, OtherProject] = {}
@@ -132,6 +133,9 @@ def get_effective_remaining(project_id: str) -> Optional[int]:
     """该的真实剩余次数：total_count - 销卡流水。None 表示不限次。"""
     project = _projects.get(project_id)
     if not project:
+        return 0
+    from app.services.project_refund_service import is_project_refunded
+    if project.is_deleted or is_project_refunded("other-projects", project_id):
         return 0
     if project.total_count is None:
         return None

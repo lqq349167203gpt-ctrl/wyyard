@@ -332,6 +332,9 @@ def auto_deduct(
 
 def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
     with _deduct_lock:
+        from app.services.payment_project_validation import require_deductible_project
+
+        require_deductible_project(data.project_type, data.project_id, data.customer_id)
         reason = data.reason.strip()
         if not reason:
             raise ValueError("请填写销卡内容")
@@ -743,6 +746,18 @@ def update_deduction(
             raise ValueError("次数必须大于 0")
         if reason is not None and not reason.strip():
             raise ValueError("请填写销卡内容")
+
+        if deduction.project_name == COARSE_DOOR_CARD_TYPE and count != deduction.count:
+            raise ValueError("粗门抵扣次数由课程决定，请撤销抵扣后重新选择课程，不能直接修改次数")
+        if count != deduction.count:
+            from app.services.payment_project_validation import available_count, require_deductible_project
+
+            require_deductible_project(deduction.project_type, deduction.project_id, deduction.customer_id)
+            remaining = available_count(deduction.project_type, deduction.project_id)
+            if remaining is None:
+                raise ValueError("不限次项目无法修改销卡次数")
+            if count > deduction.count + remaining:
+                raise ValueError(f"剩余次数不足（最多可改为 {deduction.count + remaining} 次）")
 
         deduction.count = count
         deduction.remaining_after = None  # 重算剩余次数

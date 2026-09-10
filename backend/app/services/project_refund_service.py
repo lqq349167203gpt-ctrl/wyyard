@@ -1,11 +1,12 @@
-import uuid
+import math
 import threading
+import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.project_refund import ProjectRefund, ProjectRefundCreate
-from app.services.storage import load_data, save_data, save_item
 from app.services import customer_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "project_refunds.json"
 _refunds: Dict[str, ProjectRefund] = {}
@@ -51,11 +52,20 @@ def is_project_refunded(project_type: str, project_id: str) -> bool:
     )
 
 
+def exclude_refunded(project_type: str, records: list) -> list:
+    """权益计算排除已退费购买；交易记录依然使用原始完整列表。"""
+    refunded_ids = {r.project_id for r in _refunds.values() if not r.is_deleted and r.project_type == project_type}
+    return [record for record in records if record.id not in refunded_ids]
+
+
 def get_available_items(customer_id: str, project_type: str) -> list:
     """返回用户可退费的项目列表（已退费的不返回）"""
     from app.services import (
-        membership_card_service, group_case_service, emotional_release_service,
-        oh_card_reading_service, energy_knot_service,
+        emotional_release_service,
+        energy_knot_service,
+        group_case_service,
+        membership_card_service,
+        oh_card_reading_service,
     )
 
     if project_type == "membership-cards":
@@ -154,13 +164,16 @@ def get_available_items(customer_id: str, project_type: str) -> list:
 
 def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
     with _refund_lock:
+        from app.services.payment_project_validation import require_project
+
+        project = require_project(data.project_type, data.project_id, data.customer_id)
         customer = customer_service.get_customer(data.customer_id)
         if not customer:
             raise ValueError("客户不存在")
 
         # 获取项目信息和已付金额
         project_name = ""
-        paid_amount = data.refund_amount  # fallback
+        paid_amount = float(getattr(project, "price", getattr(project, "amount", getattr(project, "fee", 0))) or 0)
 
         if data.project_type == "membership-cards":
             from app.services import membership_card_service
@@ -214,8 +227,10 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
                 raise ValueError("该项目已退费")
 
             from app.services import (
-                group_case_service, emotional_release_service,
-                oh_card_reading_service, energy_knot_service,
+                emotional_release_service,
+                energy_knot_service,
+                group_case_service,
+                oh_card_reading_service,
                 tea_seat_fee_service,
             )
             svc_map = {
@@ -235,6 +250,8 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
                 if hasattr(item, "amount"):
                     paid_amount = item.amount
 
+        if not math.isfinite(data.refund_amount) or not math.isfinite(paid_amount):
+            raise ValueError("退费金额必须是有效数字")
         if data.refund_amount > paid_amount:
             raise ValueError(f"退费金额不能超过已付金额（¥{paid_amount}）")
         if data.refund_amount <= 0:
@@ -272,7 +289,7 @@ def update_refund(refund_id: str, refund_amount: float, updated_by: str = "") ->
         refund = _refunds.get(refund_id)
         if not refund or refund.is_deleted:
             raise ValueError("记录不存在")
-        if refund_amount <= 0:
+        if not math.isfinite(refund_amount) or refund_amount <= 0:
             raise ValueError("退费金额必须大于 0")
         if refund_amount > refund.paid_amount:
             raise ValueError(f"退费金额不能超过已付金额（¥{refund.paid_amount}）")

@@ -1428,7 +1428,7 @@ export default function DetailView({
                             </div>
                             <div className="mt-0.5 flex max-w-[260px] flex-wrap gap-x-2 text-[11px] text-[#8f959e]">
                               <span className="truncate" title={r.settlement_organization_name || ""}>
-                                所属组织：{r.settlement_organization_name || "-"}
+                                成交归属：{r.settlement_organization_name || "-"}
                               </span>
                               <span className="truncate" title={r.course_organization_name || ""}>
                                 课程所属：{r.course_organization_name || "-"}

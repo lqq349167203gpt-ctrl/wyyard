@@ -333,3 +333,33 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
     assert energy_result["trend"][0]["class_hours"] == 4
     assert energy_result["teacher_statistics"][0]["class_hours"] == 4
     assert energy_result["courses"][0]["class_hours"] == 4
+    assert energy_result["courses"][0]["body_part_count"] == 4
+
+    # 全部时间跨课程类型按授课 ID 匹配，同名或其他老师的课程不能混入。
+    sources = []
+    for kind in ("class", "gcs", "ers", "eks", "ics"):
+        taught = _activity(id=f"{kind}-taught", date="2025-01-02", description="[]")
+        other = _activity(id=f"{kind}-other", teacher_ids=["teacher-2"], description="[]")
+        sources.append((kind, kind, lambda taught=taught, other=other: [taught, other]))
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", tuple(sources))
+    all_result = statistics.get_course_statistics(
+        all_dates=True, activity_type="all", teacher_id="teacher-1",
+        organization_id=None, course_subtype=None, granularity="month",
+    )
+    assert {row["id"] for row in all_result["courses"]} == {
+        f"{kind}:{kind}-taught" for kind in ("class", "gcs", "ers", "eks", "ics")
+    }
+
+
+def test_course_owners_include_emotional_release_and_multiple_energy_owners():
+    from app.api.statistics import _course_owner_details
+
+    customers = {"a": SimpleNamespace(nickname="小安"), "b": SimpleNamespace(nickname="小白")}
+    for activity_type in ("gcs", "ers"):
+        result = _course_owner_details(activity_type, _activity(owner_id="a"), customers, {"a"})
+        assert result == {"owner_name": "小安", "body_part_count": None}
+    activity = _activity(owner_id="a", description='[{"id":"a","count":2},{"id":"b","count":3}]')
+    assert _course_owner_details("eks", activity, customers, {"a", "b"}) == {
+        "owner_name": "小安、小白", "body_part_count": 5,
+    }
+    assert _course_owner_details("eks", activity, customers, {"a"})["owner_name"] == "小安"

@@ -769,7 +769,7 @@ const expenseApi = {
 
 // 服务老师
 const serviceTeacherApi = {
-  metadata: () => request('/api/service-teacher-customers/metadata'),
+  metadata: (courses = false) => request(`/api/service-teacher-customers/${courses ? 'course-metadata' : 'metadata'}`),
   list: (params = {}) => {
     const qs = Object.entries(params)
       .filter(([_, value]) => value !== undefined && value !== null && value !== '')

@@ -374,7 +374,7 @@
           </view>
           <view class="rec-sub" wx:if="{{item.type === '粗门扣卡'}}">
             <text>抵扣日期 {{item.deal_date || item.effective_date || '-'}}</text>
-            <text wx:if="{{item.settlement_organization_name}}"> · 所属组织：{{item.settlement_organization_name}}</text>
+            <text wx:if="{{item.settlement_organization_name}}"> · 成交归属：{{item.settlement_organization_name}}</text>
             <text wx:if="{{item.course_organization_name}}"> · 课程所属：{{item.course_organization_name}}</text>
             <text wx:if="{{item.closer_name}}"> · {{item.closer_name}}录入</text>
           </view>

@@ -428,7 +428,7 @@ async def access_customer_contact(customer_id: str, data: ContactAccessRequest, 
         customer_id=customer.id,
         customer_name=customer.nickname or customer.name or "未命名客户",
         operator=(getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", "")),
-        operator_role=role,
+        operator_role="、".join(role),
         source=getattr(request.state, "source", "pc"),
         ip=get_client_ip(request),
     )

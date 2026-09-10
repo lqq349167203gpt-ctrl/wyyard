@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 
 from app.models.emotional_release_session import EmotionalReleaseSession, EmotionalReleaseSessionCreate
 from app.services import customer_service, emotional_release_service
+from app.services.project_refund_service import exclude_refunded
 from app.services.storage import load_data, save_data, save_item
 from app.utils.activity_withdrawal import ensure_withdrawn_customers_retained
 
@@ -225,7 +226,7 @@ def search_customers(keyword: str, date: str = "") -> list:
 
 def get_remaining_count(customer_id: str) -> int:
     """计算某用户的情绪释放剩余次数；仅已到场案主扣除。"""
-    releases = emotional_release_service.list_releases()
+    releases = exclude_refunded("emotional-releases", emotional_release_service.list_releases())
     total_purchased = sum(r.purchase_count for r in releases if r.customer_id == customer_id)
     used = sum(item["count"] for item in _get_session_deductions_for_customer(customer_id))
     from app.services import project_deduction_service
@@ -236,7 +237,7 @@ def get_remaining_count(customer_id: str) -> int:
 def get_usable_remaining_count(customer_id: str, on_date: str = "") -> int:
     """返回当前有效购买中真正可用的次数，并保留预支扣卡形成的负数。"""
     reference_date = on_date or datetime.now().strftime("%Y-%m-%d")
-    purchases = [r for r in emotional_release_service.list_releases() if r.customer_id == customer_id]
+    purchases = [r for r in exclude_refunded("emotional-releases", emotional_release_service.list_releases()) if r.customer_id == customer_id]
     purchase_data = [
         {
             "id": p.id,
@@ -273,7 +274,7 @@ def get_debt_record(customer_id: str) -> dict:
 
     customer = customer_service.get_customer(customer_id)
     remaining = get_remaining_count(customer_id)
-    releases = emotional_release_service.list_releases()
+    releases = exclude_refunded("emotional-releases", emotional_release_service.list_releases())
     total = sum(release.purchase_count for release in releases if release.customer_id == customer_id)
     arrived_dates = {item["date"] for item in _get_session_deductions_for_customer(customer_id)}
     sessions = sorted(
@@ -377,7 +378,7 @@ def get_purchase_remaining(purchase_id: str) -> int:
         return 0
 
     customer_id = purchase.customer_id
-    all_purchases = emotional_release_service.list_releases()
+    all_purchases = exclude_refunded("emotional-releases", emotional_release_service.list_releases())
     customer_purchases = [
         {
             "id": p.id,

@@ -1,12 +1,8 @@
 <view class="page">
   <view class="top-card">
-    <view class="tabs">
-      <view class="tab {{activeTab === 'courses' ? 'active' : ''}}" data-tab="courses" bindtap="onTabTap">课程记录</view>
-      <view class="tab {{activeTab === 'follow-ups' ? 'active' : ''}}" data-tab="follow-ups" bindtap="onTabTap">跟进记录</view>
-    </view>
 
     <view class="filter-row">
-      <text class="filter-label">服务老师</text>
+      <text class="filter-label">{{activeTab === 'courses' ? '课程老师' : '服务老师'}}</text>
       <picker class="filter-picker" mode="selector" range="{{teachers}}" range-key="name" value="{{teacherIndex}}" bindchange="onTeacherChange">
         <view class="picker-value">{{teacherName || '请选择'}}<text class="picker-arrow">⌄</text></view>
       </picker>
@@ -81,8 +77,8 @@
     <view class="records-head">
       <text class="records-title">{{activeTab === 'courses' ? '课程列表' : '客户列表'}}</text>
       <view class="records-actions">
-        <button class="outline-button" loading="{{exporting}}" disabled="{{exporting}}" bindtap="onExport">导出</button>
-        <button class="outline-button" wx:if="{{activeTab === 'follow-ups'}}" bindtap="onToggleContent">{{contentExpanded ? '缩略' : '展开'}}</button>
+        <view class="outline-button {{exporting ? 'disabled' : ''}}" bindtap="onExport">导出</view>
+        <view class="outline-button" wx:if="{{activeTab === 'follow-ups'}}" bindtap="onToggleContent">{{contentExpanded ? '缩略' : '展开'}}</view>
       </view>
     </view>
 
@@ -98,6 +94,8 @@
         </view>
         <view class="record-meta"><text>{{item.date}}</text><text>{{item.timeText}}</text><text>{{item.class_hours}}课时</text></view>
         <view class="teacher-line"><text class="detail-label">老师/成就君</text><text class="detail-value">{{item.teacherText}}</text></view>
+        <view class="teacher-line" wx:if="{{item.activity_type === 'gcs' || item.activity_type === 'ers' || item.activity_type === 'eks'}}"><text class="detail-label">案主</text><text class="detail-value">{{item.owner_name || '—'}}</text></view>
+        <view class="teacher-line" wx:if="{{item.activity_type === 'eks'}}"><text class="detail-label">部位数</text><text class="detail-value">{{item.body_part_count}}</text></view>
         <view class="participant-summary"><text>参与 {{item.participant_count}}人</text><text>新人 {{item.new_count}}人</text><text>老人 {{item.old_count}}人</text></view>
         <view class="name-line">
           <text class="detail-label">新人名单</text>

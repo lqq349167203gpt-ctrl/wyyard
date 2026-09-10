@@ -30,7 +30,7 @@ const PAGE_LABELS: Record<string, string> = {
   "followup-records": "回访记录",
   "referral-statistics": "引流统计",
   "member-statistics": "会员情况",
-  "course-statistics": "课程",
+  "course-statistics": "课程记录",
   "product-sales": "产品销售",
   "statistics": "服务数据",
   "daily-report": "每日报表",
@@ -229,6 +229,7 @@ const API_PATH_LABELS: Array<[string, string]> = [
 ]
 
 const SECTION_OPTIONS = [
+  "课程记录", "服务老师",
   "自定义筛选", "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
@@ -237,6 +238,7 @@ const SECTION_OPTIONS = [
 const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
 
 const getOperationLocation = (path: string, section: string) => {
+  if (path.includes("/course-export-audit") || path.includes("/export-courses")) return "课程记录"
   if (path.includes("/withdrawals") || path.includes("/activity-withdrawals")) return "退课"
   return API_PATH_LABELS.find(([prefix]) => path.startsWith(prefix))?.[1] || formatSectionLabel(section)
 }
@@ -583,6 +585,10 @@ export default function OperationLogsPage() {
   }
 
   const getFieldLabel = (key: string, section?: string, path?: string) => {
+    const recordPath = path || selectedLog?.path || ""
+    const paymentPaths = ["membership-cards", "group-cases", "emotional-releases", "energy-knots", "oh-card-readings", "tea-seat-fees", "offline-courses", "internal-courses", "other-projects", "project-deductions"]
+    if (["settlement_organization_id", "settlement_organization_name"].includes(key)) return "成交归属"
+    if (["organization_id", "organization_name"].includes(key) && paymentPaths.some(resource => recordPath === `/api/${resource}` || recordPath.startsWith(`/api/${resource}/`))) return "成交归属"
     if (key === "name") return getEntityLabel(section, path) || FIELD_CN.name
     return FIELD_CN[key] || "其他信息"
   }

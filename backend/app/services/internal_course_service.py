@@ -64,10 +64,12 @@ def list_courses() -> List[InternalCourse]:
 def get_active_course(customer_id: str, usage_date: Optional[str] = None) -> Optional[InternalCourse]:
     """返回客户指定日期生效的内部课程权益，多个权益时优先使用最早到期的一项。"""
     target_date = usage_date or datetime.now().strftime("%Y-%m-%d")
+    from app.services.project_refund_service import is_project_refunded
     active = [
         course
         for course in _courses.values()
         if not course.is_deleted
+        and not is_project_refunded("internal-courses", course.id)
         and course.customer_id == customer_id
         and course.effective_date
         and course.expiry_date

@@ -294,8 +294,9 @@
   line-height: 54rpx;
 }
 
-.outline-button::after {
-  border: none;
+.outline-button.disabled {
+  color: #b7bdc6;
+  opacity: 0.7;
 }
 
 .course-record,

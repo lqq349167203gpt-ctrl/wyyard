@@ -53,9 +53,9 @@ type SidebarItem = {
 const businessItems = [
   { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
   { title: "服务老师", icon: IconSparkles, path: "/service-teachers", permission: "service-teacher" },
+  { title: "课程记录", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
   { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "referral-statistics" },
   { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "member-statistics" },
-  { title: "课程", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
   { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "product-sales" },
   { title: "服务数据", icon: IconStar, path: "/statistics", permission: "statistics" },
 ]

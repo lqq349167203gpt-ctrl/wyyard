@@ -70,7 +70,7 @@
         </view>
       </view>
       <text class="coarse-record-course">{{item.source_activity_name || item.reason}}</text>
-      <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}<text wx:if="{{item.source_activity_date}}"> · 课程日期：{{item.source_activity_date}}</text><text wx:if="{{item.organization_name}}"> · 所属组织：{{item.organization_name}}</text><text wx:if="{{item.source_organization_name}}"> · 课程所属：{{item.source_organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
+      <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}<text wx:if="{{item.source_activity_date}}"> · 课程日期：{{item.source_activity_date}}</text><text wx:if="{{item.organization_name}}"> · 成交归属：{{item.organization_name}}</text><text wx:if="{{item.source_organization_name}}"> · 课程所属：{{item.source_organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
     </view>
     <view class="empty" wx:if="{{!loading && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
   </view>
@@ -155,8 +155,8 @@
         <view class="card-row1">
           <text class="card-name">{{item.nickname}}</text>
           <text class="card-status" wx:if="{{item._status}}" style="color: {{item._statusColor}}; background-color: {{item._statusBg}}">{{item._status}}</text>
-          <text class="card-price"><text class="card-currency">¥</text>{{item._priceText}}</text>
         </view>
+        <view class="card-meta"><text class="card-meta-item">成交归属：{{item._organizationName || '—'}}</text></view>
         <view class="card-meta" wx:if="{{item._metaPrimary || item._creator}}">
           <text class="card-meta-item" wx:if="{{item._metaPrimary}}">{{item._metaPrimary}}</text>
           <text class="card-meta-separator" wx:if="{{item._metaPrimary && item._creator}}">·</text>

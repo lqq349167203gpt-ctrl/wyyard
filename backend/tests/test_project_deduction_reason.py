@@ -114,7 +114,7 @@ def test_manual_deduction_appears_in_client_records(client, created_customer):
         if item["source"] == "manual" and item["project_name"] == card["card_type"]
     )
     assert manual["reason"] == "前台临时手工销卡"
-    assert manual["created_by"] == "测试管理员"
+    assert manual["created_by"] == "不闹"  # 以真实登录账号为准，不接受请求伪造录入人
     project = next(
         item
         for item in response.json()["projects"]

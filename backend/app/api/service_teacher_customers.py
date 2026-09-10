@@ -1,5 +1,6 @@
 import io
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -22,7 +23,6 @@ from app.utils.request_context import get_client_ip, get_client_source
 router = APIRouter(
     prefix="/api/service-teacher-customers",
     tags=["service-teacher-customers"],
-    dependencies=[Depends(require_page_permission("service-teacher"))],
 )
 
 
@@ -39,9 +39,12 @@ def record_service_teacher_action(request: Request, content: str, export: bool =
     if not account:
         return
     source = get_client_source(request)
+    is_course = request.url.path.endswith(("/courses", "/export-courses", "/course-export-audit"))
+    page_name = "课程记录" if is_course else "服务老师"
+    page_path = ("/pages/course-records/index" if source == "miniprogram" else "/course-statistics") if is_course else ("/pages/service-teachers/index" if source == "miniprogram" else "/service-teachers")
     if export:
         # 使用统计的业务操作直接读取操作日志，避免重复写入两条。
-        operation_log_service.create_log(OperationLogCreate(section="服务老师", content=content), extra={
+        operation_log_service.create_log(OperationLogCreate(section=page_name, content=content), extra={
             "operator": account.owner or account.username,
             "operator_role": "、".join(account.roles or [account.role]),
             "source": source, "method": "EXPORT", "path": request.url.path,
@@ -52,16 +55,18 @@ def record_service_teacher_action(request: Request, content: str, export: bool =
             id=str(uuid.uuid4()), event_type="page_view", account_id=account.id,
             username=account.username, owner=account.owner or "", role=account.role,
             source=source, ip=get_client_ip(request),
-            page_path="/pages/service-teachers/index" if source == "miniprogram" else "/service-teachers",
-            page_name="服务老师", content=content, created_at=datetime.now(timezone.utc),
+            page_path=page_path,
+            page_name=page_name, content=content, created_at=datetime.now(timezone.utc),
         ))
 
 
-@router.post("/export-audit")
+@router.post("/course-export-audit", dependencies=[Depends(require_page_permission("course-statistics"))])
+@router.post("/export-audit", dependencies=[Depends(require_page_permission("service-teacher"))])
 def record_pc_export(data: dict, request: Request):
     request.state.skip_operation_log = True
     content = str(data.get("content", ""))[:1000]
-    record_service_teacher_action(request, f"导出服务老师记录：{content}", export=True)
+    label = "课程记录" if request.url.path.endswith("/course-export-audit") else "服务老师记录"
+    record_service_teacher_action(request, f"导出{label}：{content}", export=True)
     return {"success": True}
 
 
@@ -98,9 +103,30 @@ def _xlsx_response(sheet_name: str, headers: list[str], rows: list[list], filena
     )
 
 
-@router.get("/metadata")
+@router.get("/course-metadata", dependencies=[Depends(require_page_permission("course-statistics"))])
+@router.get("/metadata", dependencies=[Depends(require_page_permission("service-teacher"))])
 def get_metadata(request: Request):
     all_customers = customer_service.list_customers()
+    if request.url.path.endswith("/course-metadata"):
+        from app.api.statistics import COURSE_ACTIVITY_TYPES, _course_activity_teacher_ids
+
+        teaching_counts = Counter(
+            teacher_id
+            for _, _, loader in COURSE_ACTIVITY_TYPES
+            for activity in loader()
+            for teacher_id in _course_activity_teacher_ids(activity)
+        )
+        options = [
+            {"name": customer.nickname or customer.name or customer.id, "customer_id": customer.id}
+            for customer in all_customers
+            if customer.id in teaching_counts or service_teacher_customer_service.TEACHER_POSITIONS.intersection(customer.positions or [])
+        ]
+        options.sort(key=lambda item: (-teaching_counts[item["customer_id"]], item["name"], item["customer_id"]))
+        return {
+            "current_teacher": options[0]["name"] if options else "",
+            "teachers": [item["name"] for item in options],
+            "teacher_options": options,
+        }
     customers = customer_access_service.filter_customers(request, all_customers)
     current_teacher = _actor_name(request)
     teachers = service_teacher_customer_service.available_teachers(customers, current_teacher)
@@ -111,7 +137,7 @@ def get_metadata(request: Request):
     }
 
 
-@router.get("/export-follow-ups")
+@router.get("/export-follow-ups", dependencies=[Depends(require_page_permission("service-teacher"))])
 def export_follow_ups(
     request: Request,
     service_teacher: str | None = Query(None),
@@ -163,7 +189,7 @@ def export_follow_ups(
     )
 
 
-@router.get("/export-courses")
+@router.get("/export-courses", dependencies=[Depends(require_page_permission("course-statistics"))])
 def export_courses(
     request: Request,
     service_teacher: str | None = Query(None),
@@ -209,20 +235,26 @@ def export_courses(
             course["activity_type_label"] or "-",
             course["class_hours"],
             "、".join(course["teachers"]) or "-",
+            course["owner_name"] or "-",
+            course["body_part_count"] if course["body_part_count"] is not None else "-",
             course["participant_count"],
             newcomers,
             existing,
         ])
     record_service_teacher_action(request, f"导出课程记录：服务老师 {teacher}；{result['date_from']} 至 {result['date_to']}；共{len(rows)}场", export=True)
+    headers = ["上课日期", "上课时间", "课程", "课程类型", "课时", "老师/成就君", "案主", "部位数", "参与人数", "新人名单", "老人名单"]
+    hidden_columns = {6, 7} if activity_type in {"class", "ics"} else {7} if activity_type in {"gcs", "ers"} else set()
+    headers = [label for index, label in enumerate(headers) if index not in hidden_columns]
+    rows = [[value for index, value in enumerate(row) if index not in hidden_columns] for row in rows]
     return _xlsx_response(
         "课程记录",
-        ["上课日期", "上课时间", "课程", "课程类型", "课时", "老师/成就君", "参与人数", "新人名单", "老人名单"],
+        headers,
         rows,
         f"服务老师课程记录_{teacher or '未选择'}_{result['date_from']}_{result['date_to']}.xlsx",
     )
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_page_permission("service-teacher"))])
 def list_customers(
     request: Request,
     service_teacher: str | None = Query(None),

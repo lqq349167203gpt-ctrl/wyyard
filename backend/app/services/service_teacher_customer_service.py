@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
@@ -24,16 +25,16 @@ def _note_author(note: Any) -> str:
 
 
 def available_teachers(customers: Iterable[Any], current_teacher: str = "") -> list[str]:
-    names = {
+    counts = Counter(
         str(getattr(customer, "service_teacher", "") or "").strip()
         for customer in customers
         if str(getattr(customer, "service_teacher", "") or "").strip()
-    }
+    )
     current = current_teacher.strip()
+    names = set(counts)
     if current:
-        names.discard(current)
-    ordered = sorted(names, key=lambda value: value.casefold())
-    return [current, *ordered] if current else ordered
+        names.add(current)
+    return sorted(names, key=lambda value: (-counts[value], value.casefold()))
 
 
 def teacher_options(teacher_names: Iterable[str], customers: Iterable[Any]) -> list[dict[str, str]]:

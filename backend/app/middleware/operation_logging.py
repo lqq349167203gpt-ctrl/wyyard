@@ -142,7 +142,7 @@ PAGE_LABELS: dict[str, str] = {
     "followup-records": "回访记录",
     "referral-statistics": "引流统计",
     "member-statistics": "会员情况",
-    "course-statistics": "课程",
+    "course-statistics": "课程记录",
     "product-sales": "产品销售",
     "statistics": "服务数据",
     "daily-report": "每日报表",
@@ -314,6 +314,7 @@ FIELD_NAMES = {
     "source_activity_type": "来源课程类型", "source_activity_id": "来源课程编号",
     "source_activity_key": "来源课程标识", "source_activity_name": "来源课程",
     "organization_name": "所属组织",
+    "settlement_organization_id": "成交归属", "settlement_organization_name": "成交归属",
     "source_organization_id": "课程所属 ID", "source_organization_name": "课程所属",
     "source_activity_date": "来源课程日期", "source_space_id": "来源空间编号",
     "source_space_name": "来源空间",
@@ -626,6 +627,10 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
 def _format_value(val, field_name: str = "") -> str:
     if val is None or val == "" or val == []:
         return ""
+    if field_name == "settlement_organization_id":
+        from app.services import organization_service
+        organization = organization_service.get_organization(str(val))
+        return organization.name if organization else str(val)
     if field_name == "diagnosis_duration":
         try:
             return f"{float(val) * 0.5:g}小时"
@@ -897,7 +902,7 @@ def _build_create_summary(body: dict) -> str:
     for key in [
         "member_type", "card_type", "course_type", "purchase_count",
         "diagnosis_duration", "quantity", "amount", "price", "closer_name",
-        "deal_date", "effective_date", "record_date",
+        "deal_date", "effective_date", "record_date", "settlement_organization_id",
         "role", "username", "referrer", "positions",
     ]:
         val = body.get(key)
@@ -944,6 +949,25 @@ def _build_financial_record_content(method: str, record_type: str, body: dict, b
 
 
 def build_log_content(method: str, path: str, body: dict, before: dict = None) -> str:
+    payment_paths = (
+        "/api/membership-cards", "/api/group-cases", "/api/emotional-releases",
+        "/api/energy-knots", "/api/oh-card-readings", "/api/tea-seat-fees",
+        "/api/offline-courses", "/api/internal-courses", "/api/other-projects",
+        "/api/project-deductions",
+    )
+    if any(path == prefix or path.startswith(prefix + "/") for prefix in payment_paths):
+        # 只在付费订单日志中改称成交归属，不影响课程配置的所属组织。
+        def settlement_snapshot(data):
+            if data is None:
+                return None
+            result = dict(data)
+            for key in ("organization_id", "organization_name"):
+                if key in result:
+                    result[f"settlement_{key}"] = result.pop(key)
+            return result
+
+        body = settlement_snapshot(body)
+        before = settlement_snapshot(before)
     entity_name = get_entity_name(body) if body else ""
     if not entity_name and before:
         entity_name = get_entity_name(before)

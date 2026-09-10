@@ -82,7 +82,7 @@ export function ProjectDeductionTab() {
 
   // 扣次记录（分页）
   const fetchDeductions = useCallback(async (page: number, pageSize: number) => {
-    const params: Record<string, string> = {}
+    const params: Record<string, string> = { manual_only: "true" }
     if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
     if (appliedProjectTypeRef.current) params.project_type = appliedProjectTypeRef.current
     if (appliedCardTypeRef.current) params.card_type = appliedCardTypeRef.current

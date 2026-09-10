@@ -259,6 +259,15 @@ def test_coarse_door_card_returns_all_original_card_deductions(client, created_c
     assert response.status_code == 200
     deduction = response.json()
     assert deduction["count"] == 2
+    manual_records = client.get("/api/project-deductions", params={
+        "customer_id": created_customer["id"], "manual_only": True, "page": 1, "page_size": 10,
+    })
+    assert manual_records.status_code == 200
+    assert all(item["project_name"] != "粗门次卡" for item in manual_records.json()["items"])
+    dedicated_records = client.get("/api/project-deductions", params={
+        "customer_id": created_customer["id"], "card_type": "粗门次卡",
+    })
+    assert any(item["id"] == deduction["id"] for item in dedicated_records.json())
     assert membership_card_service.get_card_effective_remaining(normal_card["id"]) == 5
     detail = client.get(f"/api/customer-detail/{created_customer['id']}")
     activity_row = next(

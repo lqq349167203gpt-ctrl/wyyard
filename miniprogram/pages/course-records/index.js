@@ -1,2 +1,2 @@
 const createRecordsPage = require('../../utils/service-teacher-records')
-Page(createRecordsPage('follow-ups'))
+Page(createRecordsPage('courses'))

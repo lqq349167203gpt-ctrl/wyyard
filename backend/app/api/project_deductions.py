@@ -62,7 +62,7 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
             "content": (
                 f"{deduction.nickname} · 粗门次卡抵扣："
                 f"成交日期{deduction.deduction_date} · {course_summary or '所选课程'} · "
-                f"所属组织{deduction.organization_name or '-'} · "
+                f"成交归属{deduction.organization_name or '-'} · "
                 f"抵扣{deduction.count}次，原会员卡返还{deduction.count}次"
             ),
             "entity_id": deduction.id,
@@ -74,10 +74,12 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
 
 
 @router.get("")
-def list_deductions(request: Request, customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), card_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
+def list_deductions(request: Request, customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), card_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), manual_only: bool = Query(False)):
     customer_access_service.require_transaction_access(request, detail=True)
     items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id, nickname, project_type)]
     items = customer_access_service.filter_record_dicts(request, items)
+    if manual_only:
+        items = [i for i in items if i.get("project_name") != project_deduction_service.COARSE_DOOR_CARD_TYPE]
     if card_type:
         items = [i for i in items if i.get("project_name") == card_type]
     if card_type == project_deduction_service.COARSE_DOOR_CARD_TYPE:
@@ -95,6 +97,8 @@ def create_deduction(data: ProjectDeductionCreate, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, data.customer_id, action="销卡")
     try:
+        _, actor = get_request_actor(request)
+        data = data.model_copy(update={"created_by": actor})
         return project_deduction_service.create_deduction(data).model_dump(mode="json")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -121,7 +125,7 @@ def update_deduction(deduction_id: str, data: DeductionUpdate, request: Request)
         return project_deduction_service.update_deduction(
             deduction_id,
             data.count,
-            data.updated_by,
+            get_request_actor(request)[1],
             data.reason,
         ).model_dump(mode="json")
     except ValueError as e:
@@ -173,7 +177,7 @@ def auto_deduct(data: AutoDeductRequest, request: Request):
             data.nickname,
             data.project_type,
             data.count,
-            data.created_by,
+            get_request_actor(request)[1],
             data.name_filter,
             "Excel批量导入销卡",
         ).model_dump(mode="json")

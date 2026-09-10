@@ -199,14 +199,14 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
           <DialogTitle className="text-base">新增粗门次卡</DialogTitle>
         </DialogHeader>}
         <div className="space-y-4 px-6 py-5">
-          <p className="text-[12px] text-[#8f959e]">所属组织记录本次结算归属，课程所属用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
+          <p className="text-[12px] text-[#8f959e]">成交归属记录本次结算归属，课程所属用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交日期</span>
             <Input type="date" value={dealDate} onChange={event => setDealDate(event.target.value)} className="h-8 text-[12px]" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-            <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">所属组织</span>
-            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={setSettlementOrganizationId} disabled={loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "选择所属组织"} />
+            <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交归属</span>
+            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={setSettlementOrganizationId} disabled={loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "选择成交归属"} />
           </div>
           <div className="ml-[19px] border-b border-[#ebedf0]" style={{ borderBottomWidth: "0.5px" }} />
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -250,7 +250,7 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-[105px] pl-4">成交日期</TableHead>
               <TableHead className="w-[110px]">用户</TableHead>
-              <TableHead className="w-[130px]">所属组织</TableHead>
+              <TableHead className="w-[130px]">成交归属</TableHead>
               <TableHead className="w-[130px]">课程所属</TableHead>
               <TableHead>所扣课程</TableHead>
               <TableHead className="w-[105px]">课程日期</TableHead>

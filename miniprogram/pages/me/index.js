@@ -42,6 +42,7 @@ Page({
       canCustomerTags: app.checkPagePermission('customer-tags'),
       canCustomAnalysis: app.checkPagePermission('custom-analysis'),
       canServiceTeacher: app.checkPagePermission('service-teacher'),
+      canCourseRecords: app.checkPagePermission('course-statistics'),
     })
   },
 
@@ -71,6 +72,9 @@ Page({
 
   onServiceTeacherTap() {
     wx.navigateTo({ url: '/pages/service-teachers/index' })
+  },
+  onCourseRecordsTap() {
+    wx.navigateTo({ url: '/pages/course-records/index' })
   },
 
   onLogout() {
