@@ -39,7 +39,7 @@ export function TeaGuestLayout() {
 
   const syncPagePermissions = useCallback(() => {
     if (!userRole || userRole === "超级管理员") return
-    positionPermissionApi.get(userRole)
+    positionPermissionApi.getMine()
       .then(result => storePagePermissions(result.pages || []))
       .catch(() => {})
   }, [userRole])

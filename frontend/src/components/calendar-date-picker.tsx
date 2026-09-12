@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, memo } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
+import { onOtherPopoverOpen } from "@/lib/popover"
+
 const today = new Date().toLocaleDateString("sv-SE")
 
 function formatDateChinese(d: string): string {
@@ -38,7 +40,12 @@ export const CalendarDatePicker = memo(function CalendarDatePicker({ detailDate,
     if (open) {
       document.addEventListener("mousedown", handler)
     }
-    return () => document.removeEventListener("mousedown", handler)
+    // 旁边的下拉打开时，这个日历也收起来
+    const unsubscribe = open ? onOtherPopoverOpen(ref.current, () => setOpen(false)) : () => {}
+    return () => {
+      document.removeEventListener("mousedown", handler)
+      unsubscribe()
+    }
   }, [open])
 
   const displayMonth = month || today.substring(0, 7)

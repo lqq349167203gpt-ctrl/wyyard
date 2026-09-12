@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "rea
 import { useMemo } from "react"
 import { AppLayout } from "@/components/layout/app-layout"
 import { TeaGuestLayout } from "@/components/layout/tea-guest-layout"
+import { ConfirmHost } from "@/components/confirm-dialog"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import LoginPage from "@/pages/login"
 
@@ -33,19 +34,16 @@ import ArrivalFeedbackPage from "@/pages/arrival-feedback"
 import ChangePasswordPage from "@/pages/change-password"
 import DisabledCustomersPage from "@/pages/disabled-customers"
 import ChatHistoryPage from "@/pages/chat-history"
-import StatisticsPage from "@/pages/statistics"
 import ServiceTeachersPage from "@/pages/service-teachers"
-import ProductSalesPage from "@/pages/product-sales"
 import DailyReportPage from "@/pages/daily-report"
-import MemberStatisticsPage from "@/pages/member-statistics"
 import CourseStatisticsPage from "@/pages/course-statistics"
 import PrincipalPage from "@/pages/principal"
-import ReferralStatisticsPage from "@/pages/referral-statistics"
 import CommunicationRecordsPage from "@/pages/communication-records"
 import FollowupRecordsPage from "@/pages/followup-records"
 import OfflineCourseRecordsPage from "@/pages/offline-course-records"
 import DebtRecordsPage from "@/pages/debt-records"
 import CustomerTagsPage from "@/pages/customer-tags"
+import UpsellConfigPage from "@/pages/upsell-config"
 import CustomAnalysisPage from "@/pages/custom-analysis"
 import AnalysisLogsPage from "@/pages/analysis-logs"
 import TeaGuestConsumptionRecordsPage from "@/pages/tea-guest-consumption-records"
@@ -82,12 +80,8 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/courses/spaces": "spaces",
   "/organizations": "organizations",
   "/healing-identities": "healing-identities",
-  "/referral-statistics": "referral-statistics",
   "/chat-history": "chat-history",
-  "/statistics": "statistics",
   "/service-teachers": "service-teacher",
-  "/product-sales": "product-sales",
-  "/member-statistics": "member-statistics",
   "/course-statistics": "course-statistics",
   "/principal": "principal",
   "/communication-records": "communication-records",
@@ -161,6 +155,7 @@ function App() {
   return (
     <TooltipProvider>
       <BrowserRouter>
+        <ConfirmHost />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/arrival-feedback/:visitId" element={<ArrivalFeedbackPage />} />
@@ -188,6 +183,7 @@ function App() {
               <Route path="/custom-analysis" element={<CustomAnalysisPage />} />
               <Route path="/analysis-logs" element={<AnalysisLogsPage />} />
               <Route path="/config/customer-tags" element={<CustomerTagsPage />} />
+              <Route path="/config/upsell" element={<UpsellConfigPage />} />
               <Route path="/healing-records" element={<HealingRecordsPage />} />
               <Route path="/healing-records/new" element={<CustomerFormPage />} />
               <Route path="/healing-records/:id/edit" element={<CustomerFormPage />} />
@@ -200,12 +196,11 @@ function App() {
               <Route path="/login-records" element={<LoginRecordsPage />} />
               <Route path="/config/reminders" element={<Navigate to="/custom-analysis" replace />} />
               <Route path="/business-reminders" element={<Navigate to="/custom-analysis" replace />} />
-              <Route path="/referral-statistics" element={<ReferralStatisticsPage />} />
+              {/* 旧「会员情况」「服务数据」页面已下线，保留地址跳转到对应承接页面 */}
+              <Route path="/member-statistics" element={<Navigate to="/custom-analysis" replace />} />
+              <Route path="/statistics" element={<Navigate to="/course-statistics" replace />} />
               <Route path="/chat-history" element={<ChatHistoryPage />} />
-              <Route path="/statistics" element={<StatisticsPage />} />
               <Route path="/service-teachers" element={<ServiceTeachersPage />} />
-              <Route path="/product-sales" element={<ProductSalesPage />} />
-              <Route path="/member-statistics" element={<MemberStatisticsPage />} />
               <Route path="/course-statistics" element={<CourseStatisticsPage />} />
               <Route path="/principal" element={<PrincipalPage />} />
               <Route path="/communication-records" element={<CommunicationRecordsPage />} />

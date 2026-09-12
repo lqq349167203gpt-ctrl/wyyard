@@ -2,14 +2,12 @@ import { Link, useLocation } from "react-router-dom"
 import { useMemo, useState, useEffect } from "react"
 import {
   IconBasket,
-  IconStar,
   IconCalendarEvent,
   IconCalendar,
   IconCreditCard,
   IconShieldCheck,
   IconSparkles,
   IconUser,
-  IconUsersGroup,
   IconSettings,
   IconLock,
   IconUserOff,
@@ -23,6 +21,7 @@ import {
   IconBook,
   IconAlertTriangle,
   IconTags,
+  IconTrendingUp,
   IconLogin,
   IconChartDots,
 } from "@tabler/icons-react"
@@ -52,11 +51,7 @@ const businessItems = [
   { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
   { title: "服务老师", icon: IconSparkles, path: "/service-teachers", permission: "service-teacher" },
   { title: "课程记录", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
-  { title: "主理人", icon: IconSchool, path: "/principal", permission: "principal" },
-  { title: "引流统计", icon: IconAffiliate, path: "/referral-statistics", permission: "referral-statistics" },
-  { title: "会员情况", icon: IconUsersGroup, path: "/member-statistics", permission: "member-statistics" },
-  { title: "产品销售", icon: IconBasket, path: "/product-sales", permission: "product-sales" },
-  { title: "服务数据", icon: IconStar, path: "/statistics", permission: "statistics" },
+  { title: "组织/俱乐部", icon: IconSchool, path: "/principal", permission: "principal" },
 ]
 
 const reportItems = [
@@ -78,6 +73,7 @@ const communicationItems = [
 const configItems = [
   { title: "会员身份", icon: IconShieldCheck, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
   { title: "客户标签", icon: IconTags, path: "/config/customer-tags", permission: "customer-tags" },
+  { title: "升单配置", icon: IconTrendingUp, path: "/config/upsell", permission: "upsell-config" },
   { title: "疗愈老师", icon: IconSparkles, path: "/healing-identities", permission: "healing-identities" },
   { title: "组织信息", icon: IconUser, path: "/organizations", permission: "organizations" },
   { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },

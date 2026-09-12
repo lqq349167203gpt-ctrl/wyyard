@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, useCallback, useRef } from "react"
+import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { Plus, Trash2, Edit, ArrowUp, ArrowDown, CircleAlert, ImagePlus, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -32,6 +32,9 @@ export default function OrganizationsPage() {
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
   const [saving, setSaving] = useState(false)
   const [orgName, setOrgName] = useState("")
+  const [orgReferrerMode, setOrgReferrerMode] = useState<"member" | "all" | "selected">("member")
+  const [orgReferrerIds, setOrgReferrerIds] = useState<string[]>([])
+  const [orgIncludeUnassigned, setOrgIncludeUnassigned] = useState(true)
   const [nameError, setNameError] = useState("")
   const [memberNames, setMemberNames] = useState<string[]>([])
   const [memberIdMap, setMemberIdMap] = useState<Map<string, string>>(new Map())
@@ -39,6 +42,10 @@ export default function OrganizationsPage() {
   const [errorMessage, setErrorMessage] = useState("")
   const [memberAddOpen, setMemberAddOpen] = useState(false)
   const [memberName, setMemberName] = useState("")
+  const [dataViewerAddOpen, setDataViewerAddOpen] = useState(false)
+  const [dataViewerName, setDataViewerName] = useState("")
+  const [dataViewerIds, setDataViewerIds] = useState<string[]>([])
+  const [removingDataViewer, setRemovingDataViewer] = useState<{ customerId: string; nickname: string } | null>(null)
   const [deleteMemberDialogOpen, setDeleteMemberDialogOpen] = useState(false)
   const [deletingMember, setDeletingMember] = useState<{ id: string; nickname: string; organizationId: string } | null>(null)
   const [deleteMemberInput, setDeleteMemberInput] = useState("")
@@ -77,6 +84,10 @@ export default function OrganizationsPage() {
     try {
       const types = await courseTypeApi.list().catch(() => [] as CourseType[])
       setCourseTypes(types)
+    } catch {}
+    try {
+      const viewers = await organizationApi.listDataViewers().catch(() => ({ data_viewer_ids: [] }))
+      setDataViewerIds(viewers.data_viewer_ids || [])
     } catch {}
     setLoading(false)
   }, [])
@@ -148,14 +159,44 @@ export default function OrganizationsPage() {
     }
   }
 
+  // 成员/引流人信息优先用服务端解析好的数据：不受当前账号「客户资料可见范围」影响，
+  // 否则范围窄的账号（如沁桐）会把成员全部显示成「已删除」。
+  const memberDirectory = useMemo(() => {
+    const map = new Map<string, Customer>()
+    for (const org of organizations) {
+      for (const item of [...(org.members ?? []), ...(org.referrers ?? []), ...(org.data_viewers ?? [])]) {
+        if (item.missing || map.has(item.id)) continue
+        map.set(item.id, {
+          id: item.id,
+          nickname: item.nickname,
+          name: item.name,
+          member_type: item.member_type,
+          visit_count: item.visit_count,
+        } as Customer)
+      }
+    }
+    for (const customer of customers) {
+      if (!map.has(customer.id)) map.set(customer.id, customer)
+    }
+    return map
+  }, [organizations, customers])
+
+  const customerById = (id: string) => memberDirectory.get(id)
+
   const getMemberDisplayNames = (org: Organization) =>
     org.member_ids
-      .map(id => customers.find(c => c.id === id)?.nickname || `[已删除:${id.slice(0, 6)}]`)
+      .map(id => customerById(id)?.nickname || `[已删除:${id.slice(0, 6)}]`)
 
   const getValidMembers = (org: Organization) =>
     org.member_ids
-      .map(id => customers.find(c => c.id === id))
+      .map(id => customerById(id))
       .filter((c): c is Customer => !!c)
+
+  const getDataViewers = () =>
+    dataViewerIds.map(id => {
+      const customer = customerById(id)
+      return { id, label: customer?.nickname || customer?.name || `[已删除:${id.slice(0, 6)}]` }
+    })
 
   const handleAddMember = async (nickname: string) => {
     if (!activeOrg || !nickname) return
@@ -171,34 +212,73 @@ export default function OrganizationsPage() {
     }
   }
 
+  const handleAddDataViewer = async (nickname: string) => {
+    if (!nickname) return
+    const customerId = memberIdMap.get(nickname)
+    if (!customerId) return
+    if (dataViewerIds.includes(customerId)) return
+    try {
+      const result = await organizationApi.setDataViewers([...dataViewerIds, customerId])
+      setDataViewerIds(result.data_viewer_ids || [])
+      loadData()
+    } catch (error) {
+      console.error("添加整体数据查阅人失败:", error)
+    }
+  }
+
+  const handleRemoveDataViewer = async () => {
+    if (!removingDataViewer) return
+    try {
+      const result = await organizationApi.setDataViewers(
+        dataViewerIds.filter(id => id !== removingDataViewer.customerId),
+      )
+      setDataViewerIds(result.data_viewer_ids || [])
+      loadData()
+    } catch (error) {
+      console.error("移除整体数据查阅人失败:", error)
+    } finally {
+      setRemovingDataViewer(null)
+    }
+  }
+
   const handleOpenCreate = () => {
     setEditingOrg(null)
     setOrgName("")
+    setOrgReferrerMode("member")
+    setOrgReferrerIds([])
+    setOrgIncludeUnassigned(true)
     setNameError("")
     setMemberNames([])
     setDialogOpen(true)
   }
 
   const handleOpenEdit = (org: Organization) => {
-    if (isFixedOrganization(org.name)) return
+    const fixed = isFixedOrganization(org.name)
     setEditingOrg(org)
-    setOrgName(org.name)
+    // 系统核心组织不允许改名，弹窗里只保留名称展示，配置项仍可修改。
+    setOrgName(fixed ? FIXED_ORG_NAME : org.name)
+    setOrgReferrerMode(org.referrer_mode ?? "member")
+    setOrgReferrerIds(org.referrer_ids ?? [])
+    setOrgIncludeUnassigned(org.include_unassigned_referrers !== false)
     setNameError("")
     setMemberNames(getMemberDisplayNames(org))
     setDialogOpen(true)
   }
 
   const handleSaveOrg = async () => {
-    if (!orgName.trim()) return
+    const fixedOrg = !!editingOrg && isFixedOrganization(editingOrg.name)
+    if (!fixedOrg && !orgName.trim()) return
     const trimmedName = orgName.trim()
-    const comparableName = isFixedOrganization(trimmedName) ? FIXED_ORG_NAME : trimmedName
-    const duplicate = organizations.find(
-      o => (isFixedOrganization(o.name) ? FIXED_ORG_NAME : o.name) === comparableName
-        && (!editingOrg || o.id !== editingOrg.id)
-    )
-    if (duplicate) {
-      setNameError("组织名称已存在")
-      return
+    if (!fixedOrg) {
+      const comparableName = isFixedOrganization(trimmedName) ? FIXED_ORG_NAME : trimmedName
+      const duplicate = organizations.find(
+        o => (isFixedOrganization(o.name) ? FIXED_ORG_NAME : o.name) === comparableName
+          && (!editingOrg || o.id !== editingOrg.id)
+      )
+      if (duplicate) {
+        setNameError("组织名称已存在")
+        return
+      }
     }
     setNameError("")
     setSaving(true)
@@ -217,9 +297,21 @@ export default function OrganizationsPage() {
         return null
       }).filter((id): id is string => !!id)
       if (editingOrg) {
-        await organizationApi.update(editingOrg.id, { name: trimmedName, member_ids: memberIds })
+        await organizationApi.update(editingOrg.id, {
+          ...(isFixedOrganization(editingOrg.name) ? {} : { name: trimmedName }),
+          member_ids: memberIds,
+          referrer_mode: orgReferrerMode,
+          referrer_ids: orgReferrerMode === "selected" ? orgReferrerIds : [],
+          include_unassigned_referrers: orgIncludeUnassigned,
+        })
       } else {
-        await organizationApi.create({ name: trimmedName, member_ids: memberIds, sort_order: organizations.length })
+        await organizationApi.create({
+          name: trimmedName, member_ids: memberIds,
+          referrer_mode: orgReferrerMode,
+          referrer_ids: orgReferrerMode === "selected" ? orgReferrerIds : [],
+          include_unassigned_referrers: orgIncludeUnassigned,
+          sort_order: organizations.length,
+        })
       }
       setDialogOpen(false)
       setEditingOrg(null)
@@ -247,12 +339,25 @@ export default function OrganizationsPage() {
   }
 
   const handleRemoveMember = (org: Organization, memberId: string) => {
-    const member = customers.find(c => c.id === memberId)
+    const member = customerById(memberId)
     const nickname = member?.nickname || memberId
     setDeletingMember({ id: memberId, nickname, organizationId: org.id })
     setDeleteMemberInput("")
     setDeleteMemberError("")
     setDeleteMemberDialogOpen(true)
+  }
+
+  // 成员表里直接移除引流人（只改引流归属配置，不动组织成员）
+  const handleRemoveReferrer = async (org: Organization, customerId: string) => {
+    try {
+      await organizationApi.update(org.id, {
+        referrer_mode: org.referrer_mode ?? "selected",
+        referrer_ids: (org.referrer_ids ?? []).filter(id => id !== customerId),
+      })
+      loadData()
+    } catch (error) {
+      console.error("移除引流人失败:", error)
+    }
   }
 
   // 内置的其他活动与普通活动合并展示，但保留不可改名、不可删除的约束。
@@ -536,11 +641,36 @@ export default function OrganizationsPage() {
 
       <div className="overflow-hidden rounded-[6px] border border-[#e8eaed] bg-white">
         {activeTab === "members" ? (
-          loading ? (
+          <>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[#f0f0f0] bg-[#fafbfc] px-4 py-2.5">
+              <span className="text-[12px] font-medium text-[#4e535a]">整体数据查阅人</span>
+              <span className="text-[11px] text-[#8f959e]">默认属于每个组织，可查看所有组织的数据</span>
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                {getDataViewers().map(item => (
+                  <span key={item.id} className="inline-flex items-center gap-1 rounded-[3px] border border-[#e8eaed] bg-white px-2 py-0.5 text-[12px] text-[#2b2f36]">
+                    {item.label}
+                    <button
+                      className="text-[#8f959e] hover:text-[#d14343]"
+                      onClick={() => setRemovingDataViewer({ customerId: item.id, nickname: item.label })}
+                      title="移除整体数据查阅人"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <button
+                  className="text-[12px] text-[#3370ff] hover:text-[#245be8]"
+                  onClick={() => { setDataViewerName(""); setDataViewerAddOpen(true) }}
+                >
+                  + 添加
+                </button>
+              </div>
+            </div>
+            {loading ? (
             <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
-          ) : sortedOrganizations.length === 0 ? (
+            ) : sortedOrganizations.length === 0 ? (
             <div className="py-14 text-center text-[12px] text-[#8f959e]">暂无组织，请先新增组织</div>
-          ) : (
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow className="h-10 bg-[#f7f8fa] hover:bg-[#f7f8fa]">
@@ -556,15 +686,30 @@ export default function OrganizationsPage() {
               <TableBody>
                 {sortedOrganizations.map((org, orgIndex) => {
                   const rows = org.member_ids.length > 0 ? org.member_ids : [""]
+                  // 引流归属配置也直接显示在成员表里：所有人占一行，指定人员一人一行
+                  const referrerRows: Array<{ key: string; all?: boolean; customer?: Customer; name: string }> =
+                    org.referrer_mode === "all"
+                      ? [{ key: `${org.id}-referrer-all`, all: true, name: "所有人" }]
+                      : org.referrer_mode === "selected"
+                        ? (org.referrer_ids ?? []).map(id => {
+                          const customer = customerById(id)
+                          return {
+                            key: `${org.id}-referrer-${id}`,
+                            customer,
+                            name: customer?.nickname || customer?.name || `[已删除:${id.slice(0, 6)}]`,
+                          }
+                        })
+                        : []
+                  const totalRows = rows.length + referrerRows.length
                   return (
                     <Fragment key={org.id}>
                       {rows.map((memberId, memberIndex) => {
-                        const member = customers.find(customer => customer.id === memberId)
+                        const member = customerById(memberId)
                         return (
                           <TableRow key={memberId || `${org.id}-empty`} className="group min-h-12 hover:bg-[#fafbfc]">
                             {memberIndex === 0 && (
                               <TableCell
-                                rowSpan={rows.length}
+                                rowSpan={totalRows}
                                 className="border-r border-[#f0f1f2] py-3 pl-4 align-top"
                               >
                                 <div className="flex items-start gap-2">
@@ -595,8 +740,18 @@ export default function OrganizationsPage() {
                                       <span className="truncate text-[13px] font-medium text-[#2b2f36]">
                                         {isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name}
                                       </span>
+                                      {org.referrer_mode && org.referrer_mode !== "member" && (
+                                        <span className="shrink-0 rounded-[3px] bg-[#eef4ff] px-1.5 py-0.5 text-[11px] text-[#3370ff]">
+                                          引流：{org.referrer_mode === "all"
+                                            ? "所有人"
+                                            : (org.referrer_ids ?? []).length ? `${(org.referrer_ids ?? []).length} 人` : "未选择"}
+                                        </span>
+                                      )}
                                       <span className="shrink-0 text-[11px] text-[#8f959e]">{getValidMembers(org).length} 人</span>
                                     </div>
+                                    {org.include_unassigned_referrers === false && (
+                                      <div className="mt-1 max-w-[170px] text-[11px] leading-4 text-[#8f959e]">不含未配置引流人的客户</div>
+                                    )}
                                     <div className="mt-2 flex items-center gap-2 text-[12px]">
                                       <button
                                         className="text-[#3370ff] hover:text-[#245be8]"
@@ -610,7 +765,6 @@ export default function OrganizationsPage() {
                                       </button>
                                       {!isFixedOrganization(org.name) && (
                                         <>
-                                          <button className="text-[#8f959e] hover:text-[#2b2f36]" onClick={() => handleOpenEdit(org)}>编辑</button>
                                           <button
                                             className="text-[#8f959e] hover:text-[#d14343]"
                                             onClick={() => {
@@ -627,6 +781,7 @@ export default function OrganizationsPage() {
                                           </button>
                                         </>
                                       )}
+                                      <button className="text-[#8f959e] hover:text-[#2b2f36]" onClick={() => handleOpenEdit(org)}>编辑</button>
                                     </div>
                                   </div>
                                 </div>
@@ -679,12 +834,37 @@ export default function OrganizationsPage() {
                           </TableRow>
                         )
                       })}
+                      {referrerRows.map(row => (
+                        <TableRow key={row.key} className="group min-h-12 bg-[#fbfcff] hover:bg-[#f5f8ff]">
+                          <TableCell className="px-0 text-center"><EmptyValue /></TableCell>
+                          <TableCell className="text-[13px] text-[#2b2f36]">
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <span className="truncate">{row.name}</span>
+                              <span className="shrink-0 rounded-[3px] bg-[#eef4ff] px-1.5 py-0.5 text-[11px] text-[#3370ff]">引流人</span>
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-[12px] text-[#4e535a]">{row.all ? "全部人员" : (row.customer?.name || <EmptyValue />)}</TableCell>
+                          <TableCell className="text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (row.customer?.member_type || <EmptyValue />)}</TableCell>
+                          <TableCell className="text-center text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (row.customer?.visit_count ?? <EmptyValue />)}</TableCell>
+                          <TableCell className="pr-4 text-right">
+                            {org.referrer_mode === "selected" && row.customer && (
+                              <button
+                                className="text-[12px] text-[#8f959e] opacity-0 transition-opacity hover:text-[#d14343] group-hover:opacity-100"
+                                onClick={() => handleRemoveReferrer(org, row.customer!.id)}
+                              >
+                                移除
+                              </button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </Fragment>
                   )
                 })}
               </TableBody>
             </Table>
-          )
+            )}
+          </>
         ) : loading ? (
           <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
         ) : activityGroups.length === 0 ? (
@@ -844,9 +1024,104 @@ export default function OrganizationsPage() {
             <div className="grid grid-cols-[70px_1fr] items-start gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">组织名称</span>
               <div className="w-full">
-                <Input value={orgName} onChange={(e) => { setOrgName(e.target.value); setNameError("") }} placeholder="请输入组织名称" />
+                <Input
+                  value={orgName}
+                  onChange={(e) => { setOrgName(e.target.value); setNameError("") }}
+                  placeholder="请输入组织名称"
+                  disabled={!!editingOrg && isFixedOrganization(editingOrg.name)}
+                />
+                {editingOrg && isFixedOrganization(editingOrg.name) && (
+                  <p className="mt-1 text-[11px] text-[#8f959e]">系统核心组织，不允许改名</p>
+                )}
                 {nameError && <p className="text-[12px] text-red-500 mt-1">{nameError}</p>}
               </div>
+            </div>
+            <div className="rounded-[6px] border border-[#f0f1f3] bg-[#fafbfc] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[12px] font-medium text-[#2b2f36]">引流人</span>
+                {orgReferrerMode === "selected" && (
+                  <span className="text-[11px] text-[#8f959e]">已选 {orgReferrerIds.length} 人</span>
+                )}
+              </div>
+              <div className="mt-2 flex items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+                {([
+                  { value: "member" as const, label: "按组织成员" },
+                  { value: "all" as const, label: "所有人" },
+                  { value: "selected" as const, label: "指定人员" },
+                ]).map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setOrgReferrerMode(option.value)}
+                    className={`h-7 flex-1 rounded-[3px] px-2 text-[12px] transition-colors ${
+                      orgReferrerMode === option.value ? "bg-[#1f2329] text-white" : "text-[#646a73] hover:bg-[#f5f6f7]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] leading-4 text-[#8f959e]">
+                {orgReferrerMode === "member"
+                  ? "按组织成员算引流：成员列表里的人带来的客户都算这个组织。"
+                  : orgReferrerMode === "all"
+                    ? "所有人的引流都算这个组织带来的；课程与交易仍按各自组织归属。"
+                    : "搜索姓名或昵称，点选即添加；只有这些人带来的引流计入该组织。"}
+              </p>
+              {orgReferrerMode === "selected" && (
+                <div className="mt-2.5 space-y-2">
+                  {orgReferrerIds.length > 0 && (
+                  <div className="flex max-h-[96px] flex-wrap gap-1.5 overflow-y-auto rounded-[4px] border border-[#f0f1f3] bg-white p-2">
+                    {orgReferrerIds.map(id => {
+                      const customer = customerById(id)
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 rounded-[3px] bg-[#f5f6f7] py-0.5 pl-2 pr-1 text-[12px] text-[#2b2f36]">
+                          {customer?.nickname || customer?.name || `[已删除:${id.slice(0, 6)}]`}
+                          <button
+                            type="button"
+                            className="text-[#8f959e] hover:text-[#d14343]"
+                            onClick={() => setOrgReferrerIds(prev => prev.filter(item => item !== id))}
+                            title="移除引流人"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                  )}
+                  <CustomerSearchInput
+                    customers={customers}
+                    value=""
+                    onChange={() => {}}
+                    onSelectItem={(customer) => {
+                      const id = customer?.id
+                      if (!id || orgReferrerIds.includes(id)) return
+                      setOrgReferrerIds(prev => [...prev, id])
+                    }}
+                    excludeIds={orgReferrerIds}
+                    placeholder="搜索姓名或昵称…"
+                    selectionOnly
+                  />
+                  {!orgReferrerIds.length && (
+                    <p className="text-[11px] text-[#c9cdd4]">还没有选择引流人</p>
+                  )}
+                </div>
+              )}
+              <label className="mt-2.5 flex cursor-pointer items-start gap-2 border-t border-[#f0f1f3] pt-2.5">
+                <input
+                  type="checkbox"
+                  checked={orgIncludeUnassigned}
+                  onChange={(e) => setOrgIncludeUnassigned(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-[#dee0e3] accent-[#3370ff]"
+                />
+                <span className="min-w-0 text-[12px] text-[#4e535a]">
+                  包含未配置引流人的客户
+                  <span className="mt-0.5 block text-[11px] leading-4 text-[#8f959e]">
+                    客户资料里没填引流人的客户，归到「未配置」并计入这个组织的引流统计；取消勾选则不统计这部分。
+                  </span>
+                </span>
+              </label>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => { setDialogOpen(false); setEditingOrg(null) }}>取消</Button>
@@ -884,6 +1159,49 @@ export default function OrganizationsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 新增整体数据查阅人 */}
+      <Dialog open={dataViewerAddOpen} onOpenChange={setDataViewerAddOpen}>
+        <DialogContent className="max-w-md p-0 gap-0 max-h-none overflow-visible" initialFocus={false}>
+          <DialogHeader className="px-6 pt-5 pb-4 border-b">
+            <DialogTitle className="text-base">新增整体数据查阅人</DialogTitle>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-5">
+            <p className="text-[12px] text-[#8f959e]">整体数据查阅人默认属于每个组织，可查看所有组织的数据。</p>
+            <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">搜索用户</span>
+              <CustomerSearchInput
+                customers={customers}
+                value={dataViewerName}
+                onChange={(v) => setDataViewerName(typeof v === "string" ? v : "")}
+                excludeIds={dataViewerIds}
+                placeholder="输入姓名或昵称搜索..."
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setDataViewerAddOpen(false)}>取消</Button>
+              <Button size="sm" onClick={() => { handleAddDataViewer(dataViewerName); setDataViewerAddOpen(false) }} disabled={!dataViewerName}>
+                添加
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!removingDataViewer} onOpenChange={(open) => { if (!open) setRemovingDataViewer(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>移除整体数据查阅人</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定将「{removingDataViewer?.nickname}」从整体数据查阅人移除吗？移除后该账号只能查看本人所在组织的经营数据。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveDataViewer}>确认移除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* 删除组织确认弹窗 */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

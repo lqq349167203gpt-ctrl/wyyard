@@ -25,6 +25,7 @@ const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑�
 const PAYMENT_CATEGORIES = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "OH卡诊断", "内部课程", "其他项目"]
 
 const TYPE_LABELS: Record<string, string> = {
+  invitation: "邀约情况",
   arrival: "到店情况",
   activity: "活动参与",
   payment: "付费项目",
@@ -47,6 +48,12 @@ function getPaymentCategories(c: IdentityCondition): string[] {
 }
 
 function conditionSummary(c: IdentityCondition): string {
+  if (c.type === "invitation") {
+    const label = c.invitation_scope === "cancelled" ? "取消邀约" : "邀约情况"
+    if (c.count_value === 0 && c.count_op === "=") return c.invitation_scope === "cancelled" ? "没有取消记录" : "未被邀约"
+    if (c.count_value === 0 && c.count_op === ">") return `${label} ≥ 1 次`
+    return `${label} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`
+  }
   if (c.type === "arrival" || c.type === "activity") {
     const isWelfare = c.type === "activity" && c.activity_scope === "welfare"
     const label = c.type === "arrival" ? "到店情况" : (isWelfare ? "公益活动" : "活动参与")
@@ -84,7 +91,7 @@ function conditionSummary(c: IdentityCondition): string {
 }
 
 function defaultCondition(): IdentityCondition {
-  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: "" as any, validity: "active", activity_scope: "all" }
+  return { type: "" as any, items: [], payment_categories: [], count_op: ">", count_value: "" as any, validity: "active", activity_scope: "all", invitation_scope: "active" }
 }
 
 export default function MemberIdentitiesPage() {
@@ -462,7 +469,7 @@ export default function MemberIdentitiesPage() {
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
-                          options={[{value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}, {value: "amount", label: "消费金额"}]}
+                          options={[{value: "invitation", label: "邀约情况"}, {value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}, {value: "amount", label: "消费金额"}]}
                           placeholder="请选择条件类型"
                           onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
                         />
@@ -479,8 +486,8 @@ export default function MemberIdentitiesPage() {
                         )}
                       </div>
 
-                      {/* 到店/活动 → 按次数 */}
-                      {cond.type && (cond.type === "arrival" || cond.type === "activity") && (
+                      {/* 邀约/到店/活动 → 按次数 */}
+                      {cond.type && (cond.type === "invitation" || cond.type === "arrival" || cond.type === "activity") && (
                         <>
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">次数</span>
@@ -508,6 +515,17 @@ export default function MemberIdentitiesPage() {
                             />
                             <span className="text-[12px] text-[#4e535a]">仅公益活动</span>
                           </label>
+                        )}
+                        {cond.type === "invitation" && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">口径</span>
+                            <SelectDropdown
+                              value={cond.invitation_scope || "active"}
+                              options={[{ value: "active", label: "正常邀约" }, { value: "cancelled", label: "已取消邀约" }]}
+                              onChange={(v) => updateCondition(ci, { invitation_scope: v as "active" | "cancelled" })}
+                            />
+                            <span className="text-[12px] text-[#8f959e]">与是否到店无关</span>
+                          </div>
                         )}
                         </>
                       )}

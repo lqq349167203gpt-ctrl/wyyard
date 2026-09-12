@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Download } from "lucide-react"
 import ExcelJS from "exceljs"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -30,8 +30,15 @@ const DEFAULT_ACTIVITY_TYPES = [
   { value: "ics", label: "内部课程" },
 ]
 type ServiceTeacherTab = "courses" | "follow-ups"
+type CourseViewTab = "courses" | "reviews"
+
+const EMPTY_ID_LIST: string[] = []
 type CourseRangePreset = "today" | "week" | "month" | "year" | "all" | "custom"
 type CourseRow = CourseStatistics["courses"][number]
+const COURSE_VIEW_TABS: Array<{ key: CourseViewTab; label: string }> = [
+  { key: "courses", label: "课程记录" },
+  { key: "reviews", label: "复盘记录" },
+]
 const COURSE_RANGE_PRESETS: Array<{ value: Exclude<CourseRangePreset, "custom">; label: string }> = [
   { value: "today", label: "当天" },
   { value: "week", label: "本周" },
@@ -89,7 +96,7 @@ function coursePresetRange(preset: Exclude<CourseRangePreset, "custom">) {
 }
 
 function initialCourseRange() {
-  return coursePresetRange("all")
+  return coursePresetRange("month")
 }
 
 function formatCourseTime(course: CourseRow): string {
@@ -153,7 +160,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [courseDateFrom, setCourseDateFrom] = useState(initialRange.from)
   const [courseDateTo, setCourseDateTo] = useState(initialRange.to)
-  const [courseRangePreset, setCourseRangePreset] = useState<CourseRangePreset>("all")
+  const [courseRangePreset, setCourseRangePreset] = useState<CourseRangePreset>("month")
   const [courseActivityType, setCourseActivityType] = useState("all")
   const showCourseOwner = !["class", "ics"].includes(courseActivityType)
   const showCourseBodyParts = courseActivityType === "all" || courseActivityType === "eks"
@@ -161,6 +168,12 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [courseLoading, setCourseLoading] = useState(false)
   const [courseError, setCourseError] = useState("")
   const [courseExporting, setCourseExporting] = useState(false)
+  const [courseViewTab, setCourseViewTab] = useState<CourseViewTab>("courses")
+  const [reviewContentExpanded, setReviewContentExpanded] = useState(false)
+  // 复盘记录里真正被截断的行（按渲染宽度测量，不靠字数猜）；只有这些行会被「展开」撑开
+  const [truncatedReviewIds, setTruncatedReviewIds] = useState<string[]>([])
+  const reviewRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
+  const [reviewMeasureTick, setReviewMeasureTick] = useState(0)
 
   const followUpDefinition: ServiceTeacherFollowUpDefinition = includeCustomerInfo && includeFollowUp
     ? "both"
@@ -245,9 +258,43 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
 
   const courseRows = useMemo(() => courseData?.courses || [], [courseData?.courses])
   const coursePagination = usePagination(courseRows, { pageSize: COURSE_PAGE_SIZE })
+  const reviewRows = useMemo(
+    () => courseRows.filter(course => (course.course_review || "").trim()),
+    [courseRows],
+  )
+  // 表格列宽变化时重新测量
+  useEffect(() => {
+    const onResize = () => setReviewMeasureTick(current => current + 1)
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
+  const reviewPagination = usePagination(reviewRows, { pageSize: COURSE_PAGE_SIZE })
+  const activeCoursePagination = courseViewTab === "reviews" ? reviewPagination : coursePagination
+
+  // 折叠状态下测量：内容宽度超过可视宽度就算这条需要展开；展开中的行沿用上一次判定
+  useLayoutEffect(() => {
+    if (courseViewTab !== "reviews") return
+    setTruncatedReviewIds(previous => {
+      const isExpanded = () => reviewContentExpanded
+      const next = previous.filter(isExpanded)
+      for (const [id, row] of Object.entries(reviewRowRefs.current)) {
+        if (!row || isExpanded()) continue
+        const clamped = Array.from(row.querySelectorAll<HTMLElement>("[data-clamp]"))
+        if (clamped.some(node => node.scrollWidth > node.clientWidth + 1)) next.push(id)
+      }
+      const same = next.length === previous.length && next.every(id => previous.includes(id))
+      return same ? previous : next
+    })
+  }, [reviewPagination.paginatedItems, reviewContentExpanded, courseViewTab, reviewMeasureTick])
+
+  const courseListTitle = courseViewTab === "reviews" ? "复盘记录" : "课程列表"
+  const courseListCount = courseViewTab === "reviews" ? reviewRows.length : courseRows.length
+  const courseListUnit = courseViewTab === "reviews" ? "条" : "场"
 
   useEffect(() => {
     coursePagination.goToPage(1)
+    reviewPagination.goToPage(1)
   }, [courseActivityType, courseDateFrom, courseDateTo, selectedTeacherId])
 
   const courseSummary = useMemo(() => (courseData?.statistics || []).reduce(
@@ -448,11 +495,33 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       ]
 
   return (
-    <div className="min-h-full bg-[#f7f8fa] px-2.5 pb-6 pt-2.5">
-      <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
-        <h1 className="mb-4 text-lg font-medium text-[#1f2329]">{mode === "courses" ? "课程记录" : "服务老师"}</h1>
+    <div className="flex min-h-full min-w-0 max-w-full flex-col gap-3 overflow-x-hidden bg-[#f4f5f6] p-4">
+      {activeTab === "courses" ? (
+        <div className="flex h-[52px] items-center rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
+          <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {COURSE_VIEW_TABS.map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setCourseViewTab(tab.key)}
+                className={`relative whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${courseViewTab === tab.key ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
+              >
+                {tab.label}
+                {courseViewTab === tab.key && <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex h-[52px] flex-wrap items-center gap-2 rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
+          <span className="whitespace-nowrap text-[15px] font-medium text-[#212631]">服务老师</span>
+          <span className="ml-2.5 whitespace-nowrap text-[11.5px] text-[#a8b1bd]">跟进服务老师名下客户的录入情况</span>
+        </div>
+      )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+      {activeTab === "courses" ? (
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#f0f0f0] px-4 py-2.5">
           <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
             <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
             {mode === "courses" ? "课程老师" : "服务老师"}
@@ -573,33 +642,41 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             </>
           )}
         </div>
-      </section>
 
-      <section className="mb-1.5 rounded-[4px] bg-white px-[22px] py-4">
-        <div className="mb-3 text-[12px] font-medium text-[#4e535a]">
-          {activeTab === "courses" ? "课程概览" : "跟进概览"}
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {summaryItems.map(item => (
-            <div key={item.label} className="rounded-[2px] border border-[#e8eaed] bg-white px-3 py-2">
-              <div className="mb-1 text-[12px] text-[#4e535a]">{item.label}</div>
-              <span className="text-lg font-medium tabular-nums text-[#1f2329]">
-                {item.value.toLocaleString()}
-                <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{item.unit}</span>
-              </span>
-              <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>
+        {courseViewTab !== "reviews" && (
+          <div className="border-b border-[#f0f0f0] px-4 py-3">
+            <div className="mb-2 text-[12px] font-medium text-[#4e535a]">课程概览</div>
+            <div className="grid grid-cols-3 gap-2">
+              {summaryItems.map(item => (
+                <div key={item.label} className="rounded-[2px] border border-[#e8eaed] bg-white px-3 py-2">
+                  <div className="mb-1 text-[12px] text-[#4e535a]">{item.label}</div>
+                  <span className="text-lg font-medium tabular-nums text-[#1f2329]">
+                    {item.value.toLocaleString()}
+                    <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{item.unit}</span>
+                  </span>
+                  <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-[4px] bg-white px-[22px] py-4">
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <div className="text-[12px] font-medium text-[#4e535a]">
-            {activeTab === "courses" ? "课程列表" : "客户列表"}
-            <span className="font-normal text-[#8f959e]">（{activeTab === "courses" ? courseRows.length : pagination.totalItems}{activeTab === "courses" ? "场" : "人"}）</span>
           </div>
-          {activeTab === "courses" ? (
+        )}
+
+        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-4 border-b border-[#f0f0f0] px-4 py-2.5">
+          <div className="text-[12px] font-medium text-[#4e535a]">
+            {courseListTitle}
+            <span className="font-normal text-[#8f959e]">（{courseListCount}{courseListUnit}）</span>
+          </div>
+          {courseViewTab === "reviews" ? (
+            <button
+              type="button"
+              onClick={() => setReviewContentExpanded(current => !current)}
+              disabled={reviewRows.length === 0}
+              className="h-7 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:text-[#b7bdc6]"
+            >
+              {reviewContentExpanded ? "缩略" : "展开"}
+            </button>
+          ) : (
             <button
               type="button"
               onClick={exportCourseRecords}
@@ -609,161 +686,323 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
               <Download className="h-3.5 w-3.5" />
               {courseExporting ? "导出中" : "导出"}
             </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={exportFollowUpRecords}
-                disabled={!teacher || followUpExporting}
-                className="flex h-7 items-center gap-1 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:text-[#b7bdc6]"
-              >
-                <Download className="h-3.5 w-3.5" />
-                {followUpExporting ? "导出中" : "导出"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setFollowUpContentExpanded(current => !current)}
-                className="h-7 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
-              >
-                {followUpContentExpanded ? "缩略" : "展开"}
-              </button>
-              {followUpExportError && <span className="max-w-[140px] truncate text-[12px] text-[#c4506a]" title={followUpExportError}>{followUpExportError}</span>}
-            </div>
           )}
         </div>
 
-        {activeTab === "courses" ? (
-          <>
-            {metadataError || courseError ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">{metadataError || courseError}</div>
-            ) : !teacher ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">请选择课程老师</div>
-            ) : metadataLoaded && !selectedTeacherId ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">暂无可选课程老师</div>
-            ) : courseLoading ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-            ) : courseRows.length === 0 ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无课程记录</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+          {metadataError || courseError ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">{metadataError || courseError}</div>
+          ) : !teacher ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">请选择课程老师</div>
+          ) : metadataLoaded && !selectedTeacherId ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">暂无可选课程老师</div>
+          ) : courseLoading ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+          ) : courseViewTab === "reviews" ? (
+            reviewRows.length === 0 ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无复盘记录</div>
             ) : (
+              <div className="overflow-x-auto">
               <Table className="min-w-[1080px] table-fixed">
                 <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
                   <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
                     <TableHead className="h-9 w-[92px] px-3 pl-4 text-[11px] font-normal">上课日期</TableHead>
                     <TableHead className="h-9 w-[105px] px-3 text-[11px] font-normal">上课时间</TableHead>
-                    <TableHead className="h-9 w-[200px] px-3 text-[11px] font-normal">课程</TableHead>
+                    <TableHead className="h-9 w-[160px] px-3 text-[11px] font-normal">课程</TableHead>
                     <TableHead className="h-9 w-[80px] px-3 text-[11px] font-normal">课程类型</TableHead>
-                    <TableHead className="h-9 w-[56px] px-3 text-right text-[11px] font-normal">课时</TableHead>
                     <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
                     {showCourseOwner && <TableHead className="h-9 w-[60px] px-3 text-[11px] font-normal">案主</TableHead>}
-                    {showCourseBodyParts && <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">部位数</TableHead>}
                     <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
-                    <TableHead className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
-                    <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">老人名单</TableHead>
+                    <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">新人名单</TableHead>
+                    <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">老人名单</TableHead>
+                    <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">复盘内容</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {coursePagination.paginatedItems.map(course => {
+                  {reviewPagination.paginatedItems.map(course => {
+                    const reviewText = course.course_review || ""
                     const newNames = courseParticipantNames(course, "new")
                     const oldNames = courseParticipantNames(course, "old")
+                    // 由实际渲染宽度判定：复盘内容 / 新人名单 / 老人名单 任一放不下才需要展开
+                    const needsReviewExpand = truncatedReviewIds.includes(course.id)
+                    const rowExpanded = needsReviewExpand && reviewContentExpanded
+                    // 展开行不再固定 h-11，其余单元格保持垂直居中；只有复盘内容那一格顶对齐
+                    const cellBase = rowExpanded ? "px-3 py-1.5" : "h-11 px-3 py-0"
+                    const wrapText = rowExpanded ? "whitespace-pre-wrap break-words" : "truncate"
                     return (
-                    <TableRow key={course.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
-                      <TableCell className="h-11 px-3 py-0 pl-4 text-[12px] tabular-nums text-[#8f959e]">{course.date || <EmptyDash />}</TableCell>
-                      <TableCell className="h-11 px-3 py-0 text-[12px] tabular-nums text-[#8f959e]">{formatCourseTime(course) || <EmptyDash />}</TableCell>
-                      <TableCell className="h-11 overflow-hidden px-3 py-0">
-                        <span
-                          className="block truncate text-[12px] font-medium text-[#2b2f36]"
-                          title={course.name || undefined}
-                        >
+                    <TableRow
+                      key={course.id}
+                      ref={node => { reviewRowRefs.current[course.id] = node }}
+                      className="group border-[#f0f0f0] last:border-b-0 hover:bg-[#f7f8fa]"
+                    >
+                      <TableCell className={`${cellBase} pl-4 text-[12px] tabular-nums text-[#8f959e]`}>{course.date || <EmptyDash />}</TableCell>
+                      <TableCell className={`${cellBase} text-[12px] tabular-nums text-[#8f959e]`}>{formatCourseTime(course) || <EmptyDash />}</TableCell>
+                      <TableCell className={`${cellBase} overflow-hidden`}>
+                        <span className={`block ${wrapText} text-[12px] font-medium text-[#2b2f36]`} title={course.name || undefined}>
                           {course.name || <EmptyDash />}
                         </span>
                       </TableCell>
-                      <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.activity_type_label || <EmptyDash />}</TableCell>
-                      <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.class_hours}</TableCell>
-                      <TableCell className="h-11 max-w-[90px] truncate px-3 py-0 text-[12px] text-[#4e535a]" title={course.teachers.join("、") || undefined}>
-                        {course.teachers.join("、") || <EmptyDash />}
+                      <TableCell className={`${cellBase} text-[12px] text-[#8f959e]`}>{course.activity_type_label || <EmptyDash />}</TableCell>
+                      <TableCell className={`${cellBase} overflow-hidden text-[12px] text-[#8f959e]`} title={course.teachers.join("、") || undefined}>
+                        <span className={`block ${wrapText}`}>{course.teachers.join("、") || <EmptyDash />}</span>
                       </TableCell>
-                      {showCourseOwner && <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.owner_name || <EmptyDash />}</TableCell>}
-                      {showCourseBodyParts && <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.body_part_count ?? <EmptyDash />}</TableCell>}
-                      <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.participant_count}人</TableCell>
-                      <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{newNames || <EmptyDash />}</TableCell>
-                      <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{oldNames || <EmptyDash />}</TableCell>
+                      {showCourseOwner && <TableCell className={`${cellBase} text-[12px] text-[#8f959e]`}>{course.owner_name || <EmptyDash />}</TableCell>}
+                      <TableCell className={`${cellBase} text-right text-[12px] tabular-nums text-[#8f959e]`}>{course.participant_count}人</TableCell>
+                      <TableCell className={`${cellBase} overflow-hidden text-[12px]`}>
+                        <span data-clamp className={`block ${wrapText} text-[#8f959e]`} title={newNames || undefined}>
+                          {newNames || <EmptyDash />}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`${cellBase} overflow-hidden text-[12px]`}>
+                        <span data-clamp className={`block ${wrapText} text-[#8f959e]`} title={oldNames || undefined}>
+                          {oldNames || <EmptyDash />}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`${cellBase} ${rowExpanded ? "align-top" : ""} pr-4 text-[12px] text-[#4e535a]`}>
+                        <span data-clamp className={`block ${wrapText}`} title={reviewText || undefined}>
+                          {reviewText || <EmptyDash />}
+                        </span>
+                      </TableCell>
                     </TableRow>
                     )
                   })}
                 </TableBody>
               </Table>
-            )}
-            <PaginationBar
-              currentPage={coursePagination.currentPage}
-              totalPages={coursePagination.totalPages}
-              totalItems={coursePagination.totalItems}
-              startIndex={coursePagination.startIndex}
-              endIndex={coursePagination.endIndex}
-              onPageChange={coursePagination.goToPage}
-              unit="场"
-            />
-          </>
-        ) : (
-          <>
-            {metadataError || pagination.error ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">{metadataError || pagination.error}</div>
-            ) : pagination.loading ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-            ) : pagination.paginatedItems.length === 0 ? (
-              <div className="py-16 text-center text-sm text-muted-foreground">
-                {teacher ? "当前筛选下暂无客户" : "当前账号未关联所属人，请先选择服务老师"}
               </div>
-            ) : (
-              <Table className="w-full table-fixed border-collapse text-left">
-                <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
-                  <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
-                    <TableHead className="h-9 w-[110px] px-3 pl-4 text-[11px] font-normal">客户昵称</TableHead>
-                    <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">会员身份</TableHead>
-                    <TableHead className="h-9 w-[120px] px-3 text-[11px] font-normal">跟进阶段</TableHead>
-                    <TableHead className="h-9 px-3 text-[11px] font-normal">最近客户信息</TableHead>
-                    <TableHead className="h-9 px-3 text-[11px] font-normal">最近跟进点</TableHead>
-                    <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">最近录入时间</TableHead>
-                    <TableHead className="h-9 w-[80px] px-3 pr-4 text-right text-[11px] font-normal">距今</TableHead>
+            )
+          ) : courseRows.length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无课程记录</div>
+          ) : (
+            <div className="overflow-x-auto">
+            <Table className="min-w-[1080px] table-fixed">
+              <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
+                <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
+                  <TableHead className="h-9 w-[92px] px-3 pl-4 text-[11px] font-normal">上课日期</TableHead>
+                  <TableHead className="h-9 w-[105px] px-3 text-[11px] font-normal">上课时间</TableHead>
+                  <TableHead className="h-9 w-[200px] px-3 text-[11px] font-normal">课程</TableHead>
+                  <TableHead className="h-9 w-[80px] px-3 text-[11px] font-normal">课程类型</TableHead>
+                  <TableHead className="h-9 w-[56px] px-3 text-right text-[11px] font-normal">课时</TableHead>
+                  <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
+                  {showCourseOwner && <TableHead className="h-9 w-[60px] px-3 text-[11px] font-normal">案主</TableHead>}
+                  {showCourseBodyParts && <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">部位数</TableHead>}
+                  <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
+                  <TableHead className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
+                  <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">老人名单</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {coursePagination.paginatedItems.map(course => {
+                  const newNames = courseParticipantNames(course, "new")
+                  const oldNames = courseParticipantNames(course, "old")
+                  return (
+                  <TableRow key={course.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
+                    <TableCell className="h-11 px-3 py-0 pl-4 text-[12px] tabular-nums text-[#8f959e]">{course.date || <EmptyDash />}</TableCell>
+                    <TableCell className="h-11 px-3 py-0 text-[12px] tabular-nums text-[#8f959e]">{formatCourseTime(course) || <EmptyDash />}</TableCell>
+                    <TableCell className="h-11 overflow-hidden px-3 py-0">
+                      <span
+                        className="block truncate text-[12px] font-medium text-[#2b2f36]"
+                        title={course.name || undefined}
+                      >
+                        {course.name || <EmptyDash />}
+                      </span>
+                    </TableCell>
+                    <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.activity_type_label || <EmptyDash />}</TableCell>
+                    <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.class_hours}</TableCell>
+                    <TableCell className="h-11 max-w-[90px] truncate px-3 py-0 text-[12px] text-[#4e535a]" title={course.teachers.join("、") || undefined}>
+                      {course.teachers.join("、") || <EmptyDash />}
+                    </TableCell>
+                    {showCourseOwner && <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.owner_name || <EmptyDash />}</TableCell>}
+                    {showCourseBodyParts && <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.body_part_count ?? <EmptyDash />}</TableCell>}
+                    <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.participant_count}人</TableCell>
+                    <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{newNames || <EmptyDash />}</TableCell>
+                    <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{oldNames || <EmptyDash />}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagination.paginatedItems.map(item => (
-                    <TableRow key={item.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
-                      <TableCell className="h-11 px-3 py-0 pl-4">
-                        <button type="button" onClick={() => setSelectedCustomerId(item.id)} className="text-[12px] font-medium text-[#2b2f36] hover:text-[#3370ff]">
-                          {item.nickname || item.name || <EmptyDash />}
-                        </button>
-                      </TableCell>
-                      <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.member_type || undefined}>{item.member_type || <EmptyDash />}</TableCell>
-                      <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.follow_up_status || undefined}>{item.follow_up_status || <EmptyDash />}</TableCell>
-                      <TableCell className={followUpContentExpanded ? "whitespace-normal px-3 py-2 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
-                        <NoteContent author={item.latest_customer_info_by} content={item.latest_customer_info_content} expanded={followUpContentExpanded} />
-                      </TableCell>
-                      <TableCell className={followUpContentExpanded ? "whitespace-normal px-3 py-2 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
-                        <NoteContent author={item.latest_follow_up_by} content={item.latest_follow_up_content} expanded={followUpContentExpanded} />
-                      </TableCell>
-                      <TableCell className="h-11 px-3 py-0 text-[12px] text-[#8f959e]">{item.last_follow_up_at ? formatDateTime(item.last_follow_up_at) : <EmptyDash />}</TableCell>
-                      <TableCell className={`h-11 px-3 py-0 pr-4 text-right text-[12px] tabular-nums ${item.is_active ? "text-[#8f959e]" : "text-[#c4506a]"}`}>
-                        {daysSince(item.last_follow_up_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-            <PaginationBar
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              totalItems={pagination.totalItems}
-              startIndex={pagination.startIndex}
-              endIndex={pagination.endIndex}
-              onPageChange={pagination.goToPage}
-              unit="人"
-            />
-          </>
-        )}
+                  )
+                })}
+              </TableBody>
+            </Table>
+            </div>
+          )}
+        </div>
+        <PaginationBar
+          currentPage={activeCoursePagination.currentPage}
+          totalPages={activeCoursePagination.totalPages}
+          totalItems={activeCoursePagination.totalItems}
+          startIndex={activeCoursePagination.startIndex}
+          endIndex={activeCoursePagination.endIndex}
+          onPageChange={activeCoursePagination.goToPage}
+          unit={courseListUnit}
+        />
+        </div>
       </section>
+      ) : (
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#f0f0f0] px-4 py-2.5">
+          <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]">
+            <span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]" />
+            服务老师
+          </span>
+          <SelectDropdown
+            size="sm"
+            className="w-[160px]"
+            options={teacherSelectOptions}
+            value={teacher}
+            onChange={setTeacher}
+            placeholder="请选择服务老师"
+            buttonClassName="border-[#dee0e3] bg-white"
+          />
+          <span className="ml-1 text-[12px] text-[#8f959e]">包含</span>
+          <div className="flex h-7 items-center gap-3 rounded-[4px] border border-[#dee0e3] px-2.5">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[#646a73]">
+              <input
+                type="checkbox"
+                checked={includeCustomerInfo}
+                onChange={event => toggleFollowUpDefinition("customer_info", event.target.checked)}
+                className="h-3.5 w-3.5 accent-[#3370ff]"
+              />
+              客户信息
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[#646a73]">
+              <input
+                type="checkbox"
+                checked={includeFollowUp}
+                onChange={event => toggleFollowUpDefinition("follow_up", event.target.checked)}
+                className="h-3.5 w-3.5 accent-[#3370ff]"
+              />
+              跟进点
+            </label>
+          </div>
+          <span className="ml-1 text-[12px] text-[#8f959e]">范围</span>
+          <div className="flex h-8 items-center rounded-[4px] border border-[#dee0e3] bg-white">
+            <input
+              type="number"
+              min={1}
+              max={3650}
+              value={followUpDaysInput}
+              onChange={event => setFollowUpDaysInput(event.target.value)}
+              onBlur={commitFollowUpDays}
+              onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur() }}
+              className="h-full w-[58px] border-0 bg-transparent px-2 text-right text-[12px] tabular-nums text-[#2b2f36] outline-none"
+              aria-label="跟进范围天数"
+            />
+            <span className="pr-2 text-[12px] text-[#8f959e]">天</span>
+          </div>
+          <SelectDropdown
+            size="sm"
+            className="w-[108px]"
+            value={followUpFilter}
+            options={[
+              { value: "inactive", label: "未录入" },
+              { value: "active", label: "已录入" },
+              { value: "all", label: "全部客户" },
+            ]}
+            onChange={value => setFollowUpFilter(value as ServiceTeacherFollowUpFilter)}
+            buttonClassName="border-[#dee0e3] bg-white"
+          />
+        </div>
 
+        <div className="border-b border-[#f0f0f0] px-4 py-3">
+          <div className="mb-2 text-[12px] font-medium text-[#4e535a]">跟进概览</div>
+          <div className="grid grid-cols-3 gap-2">
+            {summaryItems.map(item => (
+              <div key={item.label} className="rounded-[2px] border border-[#e8eaed] bg-white px-3 py-2">
+                <div className="mb-1 text-[12px] text-[#4e535a]">{item.label}</div>
+                <span className="text-lg font-medium tabular-nums text-[#1f2329]">
+                  {item.value.toLocaleString()}
+                  <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{item.unit}</span>
+                </span>
+                <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-4 border-b border-[#f0f0f0] px-4 py-2.5">
+          <div className="text-[12px] font-medium text-[#4e535a]">
+            客户列表
+            <span className="font-normal text-[#8f959e]">（{pagination.totalItems}人）</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exportFollowUpRecords}
+              disabled={!teacher || followUpExporting}
+              className="flex h-7 items-center gap-1 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:text-[#b7bdc6]"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {followUpExporting ? "导出中" : "导出"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowUpContentExpanded(current => !current)}
+              className="h-7 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+            >
+              {followUpContentExpanded ? "缩略" : "展开"}
+            </button>
+            {followUpExportError && <span className="max-w-[140px] truncate text-[12px] text-[#c4506a]" title={followUpExportError}>{followUpExportError}</span>}
+          </div>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {metadataError || pagination.error ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">{metadataError || pagination.error}</div>
+        ) : pagination.loading ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+        ) : pagination.paginatedItems.length === 0 ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">
+            {teacher ? "当前筛选下暂无客户" : "当前账号未关联所属人，请先选择服务老师"}
+          </div>
+        ) : (
+          <Table className="w-full table-fixed border-collapse text-left">
+            <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
+              <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
+                <TableHead className="h-9 w-[110px] px-3 pl-4 text-[11px] font-normal">客户昵称</TableHead>
+                <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">会员身份</TableHead>
+                <TableHead className="h-9 w-[120px] px-3 text-[11px] font-normal">跟进阶段</TableHead>
+                <TableHead className="h-9 px-3 text-[11px] font-normal">最近客户信息</TableHead>
+                <TableHead className="h-9 px-3 text-[11px] font-normal">最近跟进点</TableHead>
+                <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">最近录入时间</TableHead>
+                <TableHead className="h-9 w-[80px] px-3 pr-4 text-right text-[11px] font-normal">距今</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagination.paginatedItems.map(item => (
+                <TableRow key={item.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
+                  <TableCell className="h-11 px-3 py-0 pl-4">
+                    <button type="button" onClick={() => setSelectedCustomerId(item.id)} className="text-[12px] font-medium text-[#2b2f36] hover:text-[#3370ff]">
+                      {item.nickname || item.name || <EmptyDash />}
+                    </button>
+                  </TableCell>
+                  <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.member_type || undefined}>{item.member_type || <EmptyDash />}</TableCell>
+                  <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.follow_up_status || undefined}>{item.follow_up_status || <EmptyDash />}</TableCell>
+                  <TableCell className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
+                    <NoteContent author={item.latest_customer_info_by} content={item.latest_customer_info_content} expanded={followUpContentExpanded} />
+                  </TableCell>
+                  <TableCell className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
+                    <NoteContent author={item.latest_follow_up_by} content={item.latest_follow_up_content} expanded={followUpContentExpanded} />
+                  </TableCell>
+                  <TableCell className="h-11 px-3 py-0 text-[12px] text-[#8f959e]">{item.last_follow_up_at ? formatDateTime(item.last_follow_up_at) : <EmptyDash />}</TableCell>
+                  <TableCell className={`h-11 px-3 py-0 pr-4 text-right text-[12px] tabular-nums ${item.is_active ? "text-[#8f959e]" : "text-[#c4506a]"}`}>
+                    {daysSince(item.last_follow_up_at)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        </div>
+        <PaginationBar
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          onPageChange={pagination.goToPage}
+          unit="人"
+        />
+        </div>
+      </section>
+      )}
       <Dialog open={!!selectedCustomerId} onOpenChange={open => { if (!open) setSelectedCustomerId(null) }}>
         <DialogContent className="max-h-[90vh] max-w-[1180px] gap-0 overflow-y-auto p-0">
           <DetailView selectedCustomerId={selectedCustomerId} onClearSelection={() => setSelectedCustomerId(null)} hideSearch />

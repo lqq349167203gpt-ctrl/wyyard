@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { CloserInput, type Closer } from "@/components/closer-input"
@@ -32,6 +32,7 @@ const EmptyValue = () => <span className="text-[#d0d3d6]">-</span>
 const today = new Date().toLocaleDateString("sv-SE")
 
 interface CoarseDoorCardTabProps {
+  editRecord?: ProjectDeduction | null
   presetCustomer?: Pick<CustomerLight, "id" | "nickname"> | null
   formOnly?: boolean
   showHeader?: boolean
@@ -39,7 +40,7 @@ interface CoarseDoorCardTabProps {
   onCancel?: () => void
 }
 
-export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader = true, onSaved, onCancel }: CoarseDoorCardTabProps = {}) {
+export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false, showHeader = true, onSaved, onCancel }: CoarseDoorCardTabProps = {}) {
   const editPermissions = useEditPermissions()
   const { organizations: settlementOrganizations, loading: loadingOrganizations } = useOrganizations()
   const currentUser = useMemo(() => {
@@ -48,13 +49,13 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
   }, [])
   const currentActorName = String(currentUser.owner || currentUser.username || "")
   const [customers, setCustomers] = useState<CustomerLight[]>([])
-  const [customerId, setCustomerId] = useState(presetCustomer?.id || "")
-  const [nickname, setNickname] = useState(presetCustomer?.nickname || "")
-  const [dealDate, setDealDate] = useState(today)
-  const [closers, setClosers] = useState<Closer[]>([])
-  const [notes, setNotes] = useState("")
+  const [customerId, setCustomerId] = useState(editRecord?.customer_id || presetCustomer?.id || "")
+  const [nickname, setNickname] = useState(editRecord?.nickname || presetCustomer?.nickname || "")
+  const [dealDate, setDealDate] = useState(editRecord?.deduction_date || today)
+  const [closers, setClosers] = useState<Closer[]>(editRecord?.closers || [])
+  const [notes, setNotes] = useState(editRecord?.notes || "")
   const [courseOrganizationId, setCourseOrganizationId] = useState("")
-  const [settlementOrganizationId, setSettlementOrganizationId] = useState("")
+  const [settlementOrganizationId, setSettlementOrganizationId] = useState(editRecord?.organization_id || "")
   const [courseKey, setCourseKey] = useState("")
   const [courseOrganizations, setCourseOrganizations] = useState<{ id: string; name: string }[]>([])
   const [courses, setCourses] = useState<CoarseDoorCourseOption[]>([])
@@ -62,18 +63,20 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
+  const [orgMissing, setOrgMissing] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ProjectDeduction | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState("")
   const [entryOpen, setEntryOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<ProjectDeduction | null>(null)
 
   const canDeleteRecord = (record: ProjectDeduction) => (
-    currentUser.role === "超级管理员"
+    !record.cancelled && (currentUser.role === "超级管理员"
     || editPermissions.payments === "all"
     || (
       editPermissions.payments === "own"
       && Boolean(record.created_by && currentActorName && record.created_by === currentActorName)
-    )
+    ))
   )
 
   const loadRecords = async () => {
@@ -110,22 +113,23 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
     setMessage(null)
     if (!customerId) return
     setLoadingOptions(true)
-    projectDeductionApi.getCoarseDoorOptions(customerId)
+    let active = true
+    projectDeductionApi.getCoarseDoorOptions(customerId, editRecord?.id)
       .then(data => {
+        if (!active) return
         const nextCourseOrganizations = data.course_organizations || data.organizations
         setCourseOrganizations(nextCourseOrganizations)
         setCourses(data.courses)
         if (nextCourseOrganizations.length === 1) setCourseOrganizationId(nextCourseOrganizations[0].id)
+        if (editRecord) {
+          setCourseOrganizationId(editRecord.source_organization_id || "")
+          setCourseKey(`${editRecord.source_activity_type}:${editRecord.source_activity_id}`)
+        }
       })
-      .catch(error => setMessage({ text: error instanceof Error ? error.message : "课程加载失败", error: true }))
-      .finally(() => setLoadingOptions(false))
-  }, [customerId])
-
-  useEffect(() => {
-    if (!settlementOrganizationId && settlementOrganizations.length > 0) {
-      setSettlementOrganizationId(settlementOrganizations[0].id)
-    }
-  }, [settlementOrganizationId, settlementOrganizations])
+      .catch(error => { if (active) setMessage({ text: error instanceof Error ? error.message : "课程加载失败", error: true }) })
+      .finally(() => { if (active) setLoadingOptions(false) })
+    return () => { active = false }
+  }, [customerId, editRecord])
 
   const visibleCourses = useMemo(
     () => courses.filter(course => course.organization_ids.includes(courseOrganizationId)),
@@ -135,7 +139,11 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
   const selectedCourse = visibleCourses.find(course => `${course.record_type}:${course.record_id}` === courseKey)
 
   const handleSubmit = async () => {
-    if (!customerId || !selectedCourse || !settlementOrganizationId || saving) return
+    if (saving) return
+    // 成交归属必填：只有点了保存又没选时才提示
+    if (!settlementOrganizationId) { setOrgMissing(true); return }
+    setOrgMissing(false)
+    if (!customerId || !selectedCourse) return
     setSaving(true)
     setMessage(null)
     try {
@@ -148,7 +156,7 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
         deal_date: dealDate,
         closers,
         notes,
-      })
+      }, editRecord?.id)
       const data = await projectDeductionApi.getCoarseDoorOptions(customerId)
       const nextCourseOrganizations = data.course_organizations || data.organizations
       setCourseOrganizations(nextCourseOrganizations)
@@ -196,7 +204,7 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {formOnly && <div className="bg-white">
         {showHeader && <DialogHeader className="border-b px-6 pb-4 pt-5">
-          <DialogTitle className="text-base">新增粗门次卡</DialogTitle>
+          <DialogTitle className="text-base">{editRecord ? "编辑粗门次卡" : "新增粗门次卡"}</DialogTitle>
         </DialogHeader>}
         <div className="space-y-4 px-6 py-5">
           <p className="text-[12px] text-[#8f959e]">成交归属记录本次结算归属，课程所属用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
@@ -206,8 +214,15 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交归属</span>
-            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={setSettlementOrganizationId} disabled={loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "选择成交归属"} />
+            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={value => { setSettlementOrganizationId(value); setOrgMissing(false) }} disabled={loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "请选择成交归属"} />
           </div>
+          {/* 成交归属是业绩归属依据：默认不预选，点了保存又没选时才提示 */}
+          {orgMissing && !settlementOrganizationId && (
+            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              <span />
+              <span className="text-[11px] text-[#c4506a]">{settlementOrganizations.length === 0 ? "暂无可选组织，请先到组织管理里添加" : "成交归属为必填，请选择本次结算归属的组织"}</span>
+            </div>
+          )}
           <div className="ml-[19px] border-b border-[#ebedf0]" style={{ borderBottomWidth: "0.5px" }} />
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">用户</span>
@@ -232,7 +247,7 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
           {message && <div className={`pl-[78px] text-[12px] ${message.error ? "text-[#c4506a]" : "text-[#2f855a]"}`}>{message.text}</div>}
           <div className="flex justify-end gap-2 border-t pt-2">
             <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>取消</Button>
-            <Button size="sm" disabled={!dealDate || !selectedCourse || !settlementOrganizationId || saving} onClick={handleSubmit}>
+            <Button size="sm" disabled={!dealDate || !selectedCourse || saving} onClick={handleSubmit}>
               {saving ? "保存中..." : selectedCourse ? `抵扣 ${selectedCourse.deduction_count} 次` : "保存"}
             </Button>
           </div>
@@ -270,7 +285,7 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
                 <TableCell className="truncate text-[12px]" title={record.source_organization_name}>{record.source_organization_name || <EmptyValue />}</TableCell>
                 <TableCell className="truncate text-[12px]" title={record.source_activity_name}>{record.source_activity_name || record.reason}</TableCell>
                 <TableCell className="text-[12px]">{record.source_activity_date || <EmptyValue />}</TableCell>
-                <TableCell className="text-[12px]">{record.count} 次</TableCell>
+                <TableCell className="text-[12px]">{record.count} 次{record.cancelled && <div className="text-[12px] text-[#8f959e]">已取消｜已从课程移除</div>}</TableCell>
                 <TableCell className="truncate text-[12px]" title={(record.closers || []).map(item => item.name).join("、") || record.closer_name}>
                   {(record.closers || []).map(item => item.name).join("、") || record.closer_name || <EmptyValue />}
                 </TableCell>
@@ -278,7 +293,8 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
                 <TableCell className="truncate text-[12px] text-[#8f959e]">{record.created_by || <EmptyValue />}</TableCell>
                 <TableCell className="pr-4 text-right">
                   {canDeleteRecord(record) && (
-                    <div className="flex justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex justify-end">
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="编辑" aria-label={`编辑${record.nickname}的粗门抵扣`} onClick={() => { setEditTarget(record); setEntryOpen(true) }}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -299,13 +315,15 @@ export function CoarseDoorCardTab({ presetCustomer, formOnly = false, showHeader
         {records.length === 0 && <div className="py-16 text-center text-[12px] text-[#8f959e]">暂无粗门次卡抵扣记录</div>}
       </div>}
 
-      {!formOnly && <Dialog open={entryOpen} onOpenChange={setEntryOpen}>
+      {!formOnly && <Dialog open={entryOpen} onOpenChange={open => { setEntryOpen(open); if (!open) setEditTarget(null) }}>
         <DialogContent className="max-w-sm gap-0 p-0" initialFocus={false}>
           <CoarseDoorCardTab
             formOnly
-            onCancel={() => setEntryOpen(false)}
+            editRecord={editTarget}
+            onCancel={() => { setEntryOpen(false); setEditTarget(null) }}
             onSaved={() => {
               setEntryOpen(false)
+              setEditTarget(null)
               loadRecords()
               onSaved?.()
             }}

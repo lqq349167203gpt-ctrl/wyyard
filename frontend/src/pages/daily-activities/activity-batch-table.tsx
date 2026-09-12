@@ -8,6 +8,7 @@ import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
   courseTypeApi, organizationApi, activityOrderApi,
+  isOperationCancelled,
   type CustomerLight, type Space, type MemberIdentity, type CourseType, type Organization,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -56,8 +57,9 @@ function resolveIcsCourseKey(courseName: string): string {
   return ""
 }
 
-function getTypeSelectValue(type: ActivityType, courseName: string, classCourseType?: string): string {
-  if (type === "ics") return resolveIcsCourseKey(courseName)
+function getTypeSelectValue(type: ActivityType, courseName: string, classCourseType?: string, icsCourseKey?: string): string {
+  // ics 的类型取已保存的课程类型，避免活动名称自定义后类型选项跟着名称漂移。
+  if (type === "ics") return icsCourseKey || resolveIcsCourseKey(courseName)
   if (type === "class") {
     if (classCourseType) return `class:${classCourseType}`
     // 如果没有指定课程类型，返回 "class"（用于显示默认值）
@@ -184,7 +186,7 @@ function recordToRow(type: ActivityType, data: any, courses: {id: string, name: 
     key, record_id: data.id, record_type: type,
     created_by_id: data.created_by_id || "",
     created_by: data.created_by || "",
-    ics_course_key: type === "ics" ? resolveIcsCourseKey(name) : "",
+    ics_course_key: type === "ics" ? (resolveIcsCourseKey(data.course_type || "") || resolveIcsCourseKey(name)) : "",
     class_course_type: type === "class" ? classCourseType : "",
     start_time: data.start_time || "", end_time: data.end_time || "",
     name, course_id: type === "class" ? (data.course_id || "") : "",
@@ -646,6 +648,8 @@ export function ActivityBatchTable({
   const rowsRef = useRef(rows)
   rowsRef.current = rows
   const timersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+  // 每一行最近一次「服务端已保存」的样子：保存被用户取消时用它把这一行还原回去
+  const savedRowsRef = useRef<Record<number, ActivityRow>>({})
 
   const fetchRemaining = useCallback(async (type: string, customerId: string) => {
     if (!customerId) return
@@ -695,6 +699,9 @@ export function ActivityBatchTable({
         items = [fresh]
       }
       setRows(items)
+      savedRowsRef.current = Object.fromEntries(
+        items.filter(item => item.record_id).map(item => [item.key, { ...item }]),
+      )
       const statuses: Record<number, RowStatus> = {}
       items.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
       setRowStatus(statuses)
@@ -877,6 +884,7 @@ export function ActivityBatchTable({
 
       rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+      savedRowsRef.current[row.key] = { ...row }
       onParticipantsSaved?.(
         row.record_type,
         row.record_id,
@@ -905,6 +913,30 @@ export function ActivityBatchTable({
       if (row.record_id && !row.pendingCreate && (msg.includes("404") || msg.includes("不存在"))) {
         await deleteRecordFromBackend(row).catch(() => {})
         return await saveRowInner({ ...row, record_id: "", pendingCreate: true }, conversion)
+      }
+      // 用户在确认弹窗里点了取消：服务端什么都没改，把这一行还原回服务端的样子，不用再手动刷新
+      if (isOperationCancelled(e) && row.record_id) {
+        const snapshot = savedRowsRef.current[row.key]
+        if (snapshot) {
+          setRows(prev => prev.map(item => item.key === row.key ? { ...snapshot } : item))
+          rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
+          setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
+          historyPushedRef.current.delete(row.key)
+          onParticipantsSaved?.(
+            snapshot.record_type,
+            snapshot.record_id,
+            [...snapshot.participant_ids],
+            snapshot.participant_ids.map(id => {
+              const customer = customers.find(item => item.id === id)
+              return {
+                id,
+                nickname: customer?.nickname || customer?.name || id,
+                withdrawn: snapshot.withdrawn_participant_ids.includes(id),
+              }
+            }),
+          )
+          return snapshot
+        }
       }
       console.error("[SAVE] error", { key: row.key, type: row.record_type, id: row.record_id, error: e?.message })
       rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "error" }
@@ -1075,7 +1107,8 @@ export function ActivityBatchTable({
     // 存 pre-change 快照用于 undo
     const preRows = rowsRef.current.map(r => ({ ...r }))
 
-    // 保留已有数据，只更新活动名称和类型相关字段
+    // 保留已有数据，只更新类型相关字段；活动名称不随类型调整，已填写的名称原样保留，
+    // 仅在没有名称时按类型补默认值（ics 的名称即 course_name，留空会显示不出活动名）。
     const updatesExistingSubtype = ["class", "ics"].includes(type)
       && type === row.record_type
       && Boolean(row.record_id)
@@ -1087,7 +1120,7 @@ export function ActivityBatchTable({
       class_course_type: type === "class" ? parsedCourse : "",
       record_id: updatesExistingSubtype ? row.record_id : "",
       pendingCreate: !updatesExistingSubtype,
-      name: parsedCourse || TYPE_NAMES[type] || "",
+      name: row.name || parsedCourse || TYPE_NAMES[type] || "",
       course_id: "",
       raw: updatesExistingSubtype ? row.raw : {},
       membership_deduction_count: updatesExistingSubtype
@@ -1641,7 +1674,7 @@ export function ActivityBatchTable({
                     ) : (
                       <SelectDropdown rounded="[2px]"
                         size="sm"
-                        value={getTypeSelectValue(row.record_type, row.name, row.class_course_type)}
+                        value={getTypeSelectValue(row.record_type, row.name, row.class_course_type, row.ics_course_key)}
                         options={typeOptions}
                         onChange={(v) => handleTypeChange(row.key, v)}
                         disabled={isLocked || rowStatus[row.key] === "saving"}

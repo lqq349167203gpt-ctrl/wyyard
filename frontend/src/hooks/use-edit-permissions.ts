@@ -11,6 +11,7 @@ const DEFAULT_PERMISSIONS: PositionEditPermissions = {
   activity_lock: false,
   visit_lock: false,
   payments: "all",
+  course_records: "all",
   contacts: {
     phone: { view: false, copy: false, edit: false },
     wechat: { view: false, copy: false, edit: false },
@@ -49,6 +50,7 @@ function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>
     activity_lock: permissions?.activity_lock === true,
     visit_lock: permissions?.visit_lock === true,
     payments: ["own", "all"].includes(permissions?.payments || "") ? permissions!.payments! : "all",
+    course_records: ["own", "all"].includes(permissions?.course_records || "") ? permissions!.course_records! : "all",
     contacts: {
       phone: {
         view: permissions?.contacts?.phone?.view === true,

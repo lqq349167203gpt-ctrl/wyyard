@@ -41,6 +41,11 @@ function isTemplateLog(log: AnalysisLog) {
   return log.log_type.startsWith("template_")
 }
 
+/** 转化分析（组织/俱乐部）记录：模板、范围、规则、结果都在 config 里 */
+function isConversionLog(log: AnalysisLog) {
+  return log.config.分析模式 === "转化分析"
+}
+
 interface ComparisonGroupLog {
   名称: string
   时间范围?: string
@@ -61,9 +66,17 @@ function isComparisonLog(log: AnalysisLog) {
 }
 
 function recordSummary(log: AnalysisLog) {
+  // 模板记录：内容里必须带上模板名称（简介可能是空）
   if (isTemplateLog(log)) {
+    const name = log.config.模板名称 || "未命名"
     const description = log.config.模板简介
-    return description && description !== "—" ? description : "未填写模板简介"
+    return description && description !== "—" ? `模板「${name}」· ${description}` : `模板「${name}」`
+  }
+  if (isConversionLog(log)) {
+    // 转化分析：先写这次筛的范围，再写附加条件；规则名放进详情，不当作筛选条件
+    const scope = [log.config["组织/俱乐部"], log.config.时间范围].filter(Boolean).join(" · ")
+    const extra = log.config.附加条件数 ? ` · 附加条件 ${log.config.附加条件数} 个` : ""
+    return `${scope}${extra}`
   }
   if (isComparisonLog(log)) {
     const names = comparisonGroups(log).map(group => group.名称).filter(Boolean)
@@ -73,6 +86,11 @@ function recordSummary(log: AnalysisLog) {
 }
 
 function recordResult(log: AnalysisLog) {
+  if (isConversionLog(log)) {
+    if (isTemplateLog(log)) return log.config.模板名称 || "-"
+    if (log.log_type === "analysis_exported") return "导出表格"
+    return `${log.config.结果人数 ?? 0} ${log.config.结果单位 || "人"}`
+  }
   if (isTemplateLog(log)) return log.config.模板名称 || "-"
   if (isComparisonLog(log)) {
     const groups = comparisonGroups(log)
@@ -127,6 +145,7 @@ function ComparisonLogDetail({ log }: { log: AnalysisLog }) {
 }
 
 export default function AnalysisLogsPage() {
+  const [kind, setKind] = useState<"custom" | "conversion">("custom")
   const [operator, setOperator] = useState("")
   const [source, setSource] = useState<"" | "pc" | "miniprogram">("")
   const [recordType, setRecordType] = useState<"" | "analysis" | "export" | "template">("")
@@ -134,11 +153,19 @@ export default function AnalysisLogsPage() {
   const [dateTo, setDateTo] = useState("")
   const [operators, setOperators] = useState<string[]>([])
   const [selectedLog, setSelectedLog] = useState<AnalysisLog | null>(null)
-  const filtersRef = useRef({ operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" })
+  const filtersRef = useRef<{
+    kind: "custom" | "conversion"
+    operator: string
+    source: "" | "pc" | "miniprogram"
+    recordType: "" | "analysis" | "export" | "template"
+    dateFrom: string
+    dateTo: string
+  }>({ kind: "custom", operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" })
 
   const fetchLogs = useCallback(async (page: number, pageSize: number) => {
     const filters = filtersRef.current
     const response = await analysisLogApi.list({
+      kind: filters.kind,
       operator: filters.operator || undefined,
       source: (filters.source || undefined) as "pc" | "miniprogram" | undefined,
       record_type: (filters.recordType || undefined) as "analysis" | "export" | "template" | undefined,
@@ -178,18 +205,46 @@ export default function AnalysisLogsPage() {
     setRecordType("")
     setDateFrom("")
     setDateTo("")
-    filtersRef.current = { operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" }
+    filtersRef.current = { ...filtersRef.current, operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" }
+    goToPage(1)
+  }
+
+  // 两个页签：自定义分析 / 转化分析
+  const changeKind = (next: "custom" | "conversion") => {
+    if (next === kind) return
+    setKind(next)
+    setOperator("")
+    setSource("")
+    setRecordType("")
+    setDateFrom("")
+    setDateTo("")
+    filtersRef.current = { kind: next, operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" }
     goToPage(1)
   }
 
   return (
-    <div className="space-y-4 px-6 pb-6 pt-12">
-      <div>
-        <h1 className="text-lg font-medium text-[#1f2329]">分析日志</h1>
-        <p className="mt-1.5 text-[12px] text-[#8f959e]">查看每位使用者执行或导出过的筛选，以及保存、更新或删除过的模板</p>
+    <div className="min-h-full space-y-3 bg-[#f4f5f6] p-4 pb-6">
+      {/* 与「付费项目」一致的顶部 tab 栏：白条 + 3px 蓝色下划线贴底 */}
+      <div className="flex h-[52px] items-center rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
+        <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="分析类型">
+          {([{ value: "custom", label: "自定义分析" }, { value: "conversion", label: "转化分析" }] as const).map(item => (
+            <button
+              key={item.value}
+              type="button"
+              role="tab"
+              aria-selected={kind === item.value}
+              onClick={() => changeKind(item.value)}
+              className={`relative whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${kind === item.value ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
+            >
+              {item.label}
+              {kind === item.value && <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
+            </button>
+          ))}
+        </div>
+        <span className="ml-4 shrink-0 text-[12px] text-[#8f959e]">共 {totalItems} 条</span>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl bg-white px-[22px] py-4 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         <div className="space-y-1">
           <div className="text-[12px] text-[#8f959e]">使用者</div>
           <SelectDropdown value={operator} options={[{ value: "", label: "全部" }, ...operators.map(item => ({ value: item, label: item }))]} onChange={value => updateFilter("operator", value)} className="w-32" />
@@ -213,7 +268,7 @@ export default function AnalysisLogsPage() {
         <button type="button" onClick={clearFilters} className="flex h-8 items-center gap-1 rounded-[4px] border border-input px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"><X className="h-3.5 w-3.5" />清空</button>
       </div>
 
-      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">
+      <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         {loading ? <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div> : paginatedItems.length === 0 ? <div className="py-16 text-center text-sm text-muted-foreground">暂无分析日志</div> : (
           <Table>
             <TableHeader><TableRow className="hover:bg-transparent"><TableHead className="pl-4">记录时间</TableHead><TableHead>使用者</TableHead><TableHead>使用端</TableHead><TableHead>记录类型</TableHead><TableHead className="w-[38%]">记录内容</TableHead><TableHead className="text-right pr-4">结果 / 模板</TableHead></TableRow></TableHeader>

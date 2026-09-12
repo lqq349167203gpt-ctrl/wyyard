@@ -1,18 +1,48 @@
+import { confirmDialog } from "@/components/confirm-dialog"
+
 const API_BASE = ""
+
+/** 用户在确认弹窗里点了「取消」：本次请求没有提交，服务端数据未变 */
+export class OperationCancelledError extends Error {
+  readonly cancelled = true
+  constructor(message = "已取消操作") {
+    super(message)
+    this.name = "OperationCancelledError"
+  }
+}
+
+export function isOperationCancelled(error: unknown): boolean {
+  return error instanceof OperationCancelledError || Boolean((error as { cancelled?: boolean } | null)?.cancelled)
+}
+
+// 后端（Pydantic）校验失败会带 "Value error, " 英文前缀，展示给用户前去掉
+function cleanValidationMessage(value: unknown, fallback: string): string {
+  const text = typeof value === "string" ? value.replace(/^Value error,\s*/i, "") : ""
+  return text || fallback
+}
 
 export interface ConversionAction {
   kind: "attendance" | "purchase" | "coarse_usage"
   product: string
   subtype: string
   occurrence: "first" | "any" | "repeat"
+  // 附加筛选条件：字段/规则/取值与自定义筛选一致（「从」筛人，「到」筛事件）
+  conditions: AnalysisCondition[]
 }
 export interface ConversionRule {
   name: string
+  // 保存规则时使用：说明与可见范围不影响计算口径
+  description: string
+  scope: "private" | "shared"
   source: ConversionAction
   targets: ConversionAction[]
   target_mode: "any" | "all"
   window_days: number
   same_organization: boolean
+  // 规则一起记住的筛选范围（组织/俱乐部 + 统计周期）
+  organization_id: string
+  date_from: string
+  date_to: string
 }
 export interface PrincipalQuery {
   organization_id: string
@@ -20,9 +50,24 @@ export interface PrincipalQuery {
   date_to: string | null
   tab: "overview" | "courses" | "orders" | "conversion"
   product: string
+  activity_type: string
+  course_subtype: string
   order_filter: "" | "first" | "repeat" | "cross"
+  /** 课程列表：只看当日有成交 / 有关联成交的课程 */
+  course_deal?: "" | "same_day" | "related"
   status: "" | "converted" | "unconverted" | "observing"
+  breakdown?: string[]
+  customer_id?: string
+  /** 交易列表口径：order＝每笔交易一行；customer＝同一人只显示一行 */
+  list_view?: "order" | "customer"
+  course_view?: "course" | "participant"
+  participant_scope?: "" | "internal" | "external"
+  /** 排序整批数据（不是只排当前页），字段名用列的 key */
+  sort_by?: string
+  sort_order?: "asc" | "desc"
   rule: ConversionRule
+  /** 只在主动点「查询」时带上：让后端把这次转化分析写进分析日志 */
+  log_analysis?: boolean
 }
 export interface PrincipalOption { key: string; label: string; subtypes: string[] }
 export interface PrincipalMetadata {
@@ -33,14 +78,91 @@ export interface PrincipalMetadata {
   transaction_access: "none" | "summary" | "detail"
 }
 export interface PrincipalRow { id: string; details: string[]; [key: string]: string | number | string[] }
+export interface PrincipalBreakdownCustomer {
+  id?: string
+  name: string
+  /** 引流日期 */
+  referral_date?: string
+  deals: number
+  products?: PrincipalBreakdownItem[]
+  /** 会员卡卡种成交（其他付费项目没有子类） */
+  subtypes?: PrincipalBreakdownItem[]
+  /** 会员身份（未到店 / 398卡 / 30次卡 …） */
+  identity?: string
+  /** 承接人 */
+  referrer_handler?: string
+  follow_up_status?: string
+  traffic_source?: string
+  tags?: string[]
+  // 以下五项是隐私字段：没有权限的角色后端不下发（前端也不出现在列表设置里）
+  /** 到访目的 */
+  visit_purpose?: string
+  /** 创伤经历 */
+  trauma_history?: string
+  /** 当下卡点 */
+  current_block?: string
+  /** 工作情况 */
+  work_info?: string
+  /** 其他信息 */
+  other_info?: string
+  /** 统计区间内的邀约人次（不含已取消） */
+  invite_count?: number
+  /** 统计区间内的取消邀约人次 */
+  cancel_count?: number
+  /** 统计区间内的到店人次 */
+  arrive_count?: number
+  /** 平均到店间隔，如 "12天"，无到店时为 "-" */
+  visit_interval?: string
+  /** 统计区间内到场参与的活动场次 */
+  activity_count?: number
+}
+export interface PrincipalBreakdownItem {
+  key: string
+  label: string
+  count: number
+  hours?: number
+  deal_count?: number
+  buyers?: number
+  people?: number
+  visits?: number
+  same_day?: number
+  related?: number
+  subtypes?: PrincipalBreakdownItem[]
+  products?: PrincipalBreakdownItem[]
+  customers?: PrincipalBreakdownCustomer[]
+}
+export interface PrincipalBreakdown {
+  deals?: PrincipalBreakdownItem[]
+  buys?: PrincipalBreakdownItem[]
+  courses?: { by_type: PrincipalBreakdownItem[]; by_teacher: PrincipalBreakdownItem[] }
+  traffic?: PrincipalBreakdownItem[]
+  // 引流客户还能按这三个维度继续筛
+  traffic_filters?: {
+    stage?: PrincipalBreakdownItem[]
+    source?: PrincipalBreakdownItem[]
+    tag?: PrincipalBreakdownItem[]
+    /** 会员身份人数（跟着当前所有筛选走，本身不是筛选项） */
+    identity?: PrincipalBreakdownItem[]
+  }
+  /** 当前角色能看到哪些客户档案隐私字段（到访目的 / 创伤经历 / 当下卡点 / 工作情况 / 其他信息） */
+  traffic_profile_fields?: string[]
+}
 export interface PrincipalResult extends PaginatedResponse<PrincipalRow> {
   summary: Record<string, string | number>
+  /** 明细列表这一批的口径（已应用二级勾选）：成交量 / 成交人数 / 付费项目 */
+  list_summary?: Record<string, number>
+  breakdown?: PrincipalBreakdown
   columns: { key: string; label: string }[]
   notice: string
 }
-export interface SavedConversionRule { id: string; rule: ConversionRule; updated_at: string }
+export interface SavedConversionRule { id: string; rule: ConversionRule; updated_at: string; owner_name?: string; can_manage?: boolean }
+export interface PrincipalRuleFields {
+  fields: AnalysisMetadata["fields"]
+  operators: AnalysisMetadata["operators"]
+}
 export const principalApi = {
   metadata: () => request<PrincipalMetadata>("/api/principal/metadata"),
+  ruleFields: () => request<PrincipalRuleFields>("/api/principal/rule-fields"),
   query: (query: PrincipalQuery, page: number, page_size: number) => request<PrincipalResult>("/api/principal/query", { method: "POST", body: JSON.stringify({ ...query, page, page_size }) }),
   rules: () => request<SavedConversionRule[]>("/api/principal/rules"),
   saveRule: (rule: ConversionRule, id?: string) => request<SavedConversionRule>(`/api/principal/rules${id ? "/" + id : ""}`, { method: id ? "PATCH" : "POST", body: JSON.stringify(rule) }),
@@ -131,8 +253,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (res.status === 401) { handle401(); throw new Error("登录已过期") }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
+    if (res.status === 409 && data.coarse_cancellation_required && !path.includes("confirm_coarse_cancellation=1")) {
+      // 用应用内弹窗（不是浏览器自带那种）：逐条列出是谁的抵扣，避免看不清楚
+      const rows: { nickname?: string; activity?: string; count?: number }[] =
+        Array.isArray(data.coarse_cancellation_items) ? data.coarse_cancellation_items : []
+      const confirmed = await confirmDialog(rows.length ? {
+        title: "取消关联抵扣",
+        description: "取消参与后，会同时撤销下面这些粗门次卡支付记录。",
+        items: rows.map(row => `${row.nickname || "未命名客户"} · ${row.activity || "课程"} · ${row.count ?? 0} 次`),
+        hint: "是否继续？",
+        confirmText: "确认继续",
+      } : {
+        title: "取消关联抵扣",
+        description: String(data.detail || ""),
+        confirmText: "确认继续",
+      })
+      if (confirmed) return request<T>(`${path}${path.includes("?") ? "&" : "?"}confirm_coarse_cancellation=1`, options)
+      throw new OperationCancelledError("已取消操作，名单和抵扣记录未改变")
+    }
     const detail = data.detail
-    const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ") : (detail || `请求失败: ${res.status}`)
+    const msg = Array.isArray(detail) ? detail.map((d: any) => cleanValidationMessage(d.msg, JSON.stringify(d))).join("; ") : (detail || `请求失败: ${res.status}`)
     throw new Error(msg)
   }
   return res.json()
@@ -228,7 +368,7 @@ export const systemHelperApi = {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       const detail = data.detail
-      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ") : (detail || `请求失败: ${res.status}`)
+      const msg = Array.isArray(detail) ? detail.map((d: any) => cleanValidationMessage(d.msg, JSON.stringify(d))).join("; ") : (detail || `请求失败: ${res.status}`)
       throw new Error(msg)
     }
 
@@ -577,6 +717,15 @@ export const followUpStatusApi = {
   update: (id: string, data: Partial<{ name: string; description: string; enabled: boolean }>) => request<FollowUpStatusConfig>(`/api/follow-up-statuses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
 }
 
+// 升单配置：若干「大类」（名字 + 一组付费项目），数组顺序＝升单先后
+export interface UpsellLevel { id: string; name: string; products: string[] }
+export interface UpsellConfig { levels: UpsellLevel[]; products: { key: string; label: string }[] }
+export const upsellConfigApi = {
+  get: () => request<UpsellConfig>("/api/upsell-config"),
+  save: (levels: UpsellLevel[]) =>
+    request<UpsellConfig>("/api/upsell-config", { method: "PUT", body: JSON.stringify({ levels }) }),
+}
+
 // AI Config
 export interface AIConfig {
   id: string
@@ -917,6 +1066,18 @@ export interface Organization {
   id: string
   name: string
   member_ids: string[]
+  /** 服务端解析好的成员信息（不受客户可见范围影响） */
+  members?: Array<{ id: string; nickname: string; name: string; member_type: string; visit_count: number; missing?: boolean }>
+  /** 服务端解析好的引流人信息 */
+  referrers?: Array<{ id: string; nickname: string; name: string; member_type: string; visit_count: number; missing?: boolean }>
+  /** 服务端解析好的整体数据查阅人信息 */
+  data_viewers?: Array<{ id: string; nickname: string; name: string; member_type: string; visit_count: number; missing?: boolean }>
+  /** 引流归属：member＝按组织成员（默认）、all＝所有人、selected＝指定人员 */
+  referrer_mode?: "member" | "all" | "selected"
+  /** referrer_mode = selected 时的引流人客户 ID */
+  referrer_ids?: string[]
+  /** 没填引流人的客户是否算这个组织带来的（默认算） */
+  include_unassigned_referrers?: boolean
   sort_order: number
   created_at: string
   updated_at: string
@@ -925,11 +1086,19 @@ export interface Organization {
 export interface OrganizationCreate {
   name: string
   member_ids?: string[]
+  referrer_mode?: "member" | "all" | "selected"
+  referrer_ids?: string[]
+  include_unassigned_referrers?: boolean
   sort_order?: number
 }
 
 export const organizationApi = {
   list: () => request<Organization[]>("/api/organizations"),
+  /** 全局整体数据查阅人：配置后默认属于每个组织 */
+  listDataViewers: () => request<{ data_viewer_ids: string[] }>("/api/organizations/data-viewers"),
+  setDataViewers: (data_viewer_ids: string[]) => request<{ data_viewer_ids: string[] }>("/api/organizations/data-viewers", {
+    method: "PUT", body: JSON.stringify({ data_viewer_ids }),
+  }),
   create: (data: OrganizationCreate) => request<Organization>("/api/organizations", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<OrganizationCreate>) => request<Organization>(`/api/organizations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/organizations/${id}`, { method: "DELETE" }),
@@ -964,7 +1133,7 @@ export const uploadApi = {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       const detail = data.detail
-      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ") : (detail || `服务器返回错误（${res.status}）`)
+      const msg = Array.isArray(detail) ? detail.map((d: any) => cleanValidationMessage(d.msg, JSON.stringify(d))).join("; ") : (detail || `服务器返回错误（${res.status}）`)
       throw new Error(msg)
     }
     return res.json()
@@ -1863,6 +2032,8 @@ export interface OtherProjectDeduction {
 }
 
 export interface ProjectDeduction {
+  cancelled?: boolean
+  cancellation_reason?: string
   id: string
   customer_id: string
   nickname: string
@@ -1933,8 +2104,8 @@ export const projectDeductionApi = {
     ),
   autoDeduct: (data: { nickname: string; project_type: string; count: number; created_by?: string; name_filter?: string }) =>
     request<ProjectDeduction>("/api/project-deductions/auto", { method: "POST", body: JSON.stringify(data) }),
-  getCoarseDoorOptions: (customerId: string) =>
-    request<CoarseDoorOptions>(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}`),
+  getCoarseDoorOptions: (customerId: string, editingId = "") =>
+    request<CoarseDoorOptions>(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}&editing_id=${encodeURIComponent(editingId)}`),
   createCoarseDoorCourse: (data: {
     customer_id: string
     record_type: string
@@ -1944,8 +2115,8 @@ export const projectDeductionApi = {
     deal_date: string
     closers: Array<{ id: string; name: string; amount: number }>
     notes: string
-  }) =>
-    request<ProjectDeduction>("/api/project-deductions/coarse-door-course", { method: "POST", body: JSON.stringify(data) }),
+  }, editingId = "") =>
+    request<ProjectDeduction>(`/api/project-deductions/coarse-door-course${editingId ? '/' + encodeURIComponent(editingId) : ''}`, { method: editingId ? "PATCH" : "POST", body: JSON.stringify(data) }),
 }
 
 export interface ProjectRefund {
@@ -2008,7 +2179,7 @@ export const paymentExportApi = {
       const data = await res.json().catch(() => ({}))
       const detail = data.detail
       const message = Array.isArray(detail)
-        ? detail.map((item: { msg?: string }) => item.msg || "参数错误").join("；")
+        ? detail.map((item: { msg?: string }) => cleanValidationMessage(item.msg, "参数错误")).join("；")
         : (detail || "导出失败，请稍后再试")
       throw new Error(message)
     }
@@ -2206,13 +2377,15 @@ export const reminderApi = {
 
 // Member Identity
 export interface IdentityCondition {
-  type: "arrival" | "activity" | "card" | "course" | "payment" | "teacher" | "fixed" | "amount"
+  type: "invitation" | "arrival" | "activity" | "card" | "course" | "payment" | "teacher" | "fixed" | "amount"
   payment_categories: string[]
   items: string[]
   count_op: ">" | "=" | "<" | ">=" | "<="
   count_value: number
   validity: "active" | "all"
   activity_scope: "all" | "welfare"
+  /** 邀约情况：active＝正常邀约；cancelled＝已取消的邀约 */
+  invitation_scope?: "active" | "cancelled"
 }
 
 export interface MemberIdentity {
@@ -2371,6 +2544,8 @@ export interface ActivityFollowup {
 }
 
 export interface PaymentRecord {
+  cancelled?: boolean
+  cancellation_reason?: string
   type: string
   name: string
   activity_name?: string
@@ -2389,6 +2564,7 @@ export interface PaymentRecord {
 }
 
 export interface CustomerDetail {
+  communication_records?: CommunicationRecord[]
   customer: Customer
   purchase_summary: PurchaseSummaryItem[]
   activities: ActivityRecord[]
@@ -2401,7 +2577,7 @@ export interface CustomerDetail {
 }
 
 export const customerDetailApi = {
-  get: (customerId: string, date?: string) => request<CustomerDetail>(`/api/customer-detail/${customerId}${date ? `?date=${date}` : ''}`),
+  get: (customerId: string, date?: string, principalParticipant = false, principalCourse = "") => request<CustomerDetail>(`/api/customer-detail/${customerId}?${new URLSearchParams({ ...(date ? { date } : {}), ...(principalParticipant ? { principal_participant: "true", principal_course: principalCourse } : {}) })}`),
 }
 
 // System Logs
@@ -2684,6 +2860,7 @@ export interface CustomerAccessPermissions {
   transaction_access: TransactionAccess
 }
 export interface PositionEditPermissions {
+  principal_external_access?: CustomerAccessPermissions
   principal_scope?: "own" | "all"
   customers: "view" | "all"
   visits: PositionEditScope
@@ -2693,12 +2870,16 @@ export interface PositionEditPermissions {
   activity_lock: boolean
   visit_lock: boolean
   payments: "own" | "all"
+  /** 课程记录查看范围：own = 与本人相关，all = 全部记录 */
+  course_records?: "own" | "all"
   contacts: ContactPermissions
   customer_access: CustomerAccessPermissions
 }
 
 export const positionPermissionApi = {
   getAll: () => request<Record<string, string[]>>("/api/position-permissions"),
+  /** 当前登录账号的有效权限（多角色并集），避免按单个角色刷新时丢掉其它角色的页面 */
+  getMine: () => request<{ pages: string[]; edit_permissions: PositionEditPermissions }>("/api/accounts/me/permissions"),
   get: (position: string) => request<{ position: string; pages: string[]; edit_permissions: PositionEditPermissions }>(`/api/position-permissions/${position}`),
   set: (position: string, pages: string[]) => request<{ message: string }>("/api/position-permissions", { method: "PUT", body: JSON.stringify({ position, pages }) }),
   setFull: (position: string, pages: string[], editPermissions: PositionEditPermissions) => request<{ message: string }>("/api/position-permissions/full", { method: "PUT", body: JSON.stringify({ position, pages, edit_permissions: editPermissions }) }),
@@ -3031,98 +3212,6 @@ export const activityHistoryApi = {
     request<{ message: string }>(`/api/activity-history/${id}`, { method: "DELETE" }),
 }
 
-export interface StatisticsData {
-  date: string
-  invited: number
-  arrived: number
-  converted: number
-  converted_amount?: number
-}
-
-export interface StatisticsDetail {
-  nickname?: string
-  customer_id?: string
-  date: string
-  status: string
-  arrived?: boolean
-  cancelled?: boolean
-  type?: string
-  name?: string
-  quantity?: number | string
-  remaining?: number | string
-  member_type?: string
-  referrer_handler?: string
-  invited_count?: number
-  cancelled_count?: number
-  visit_count?: number
-  activity_count?: number
-  total_consumption?: number
-  visit_interval?: string
-  amount?: number
-}
-
-export interface StatisticsProducts {
-  total_amount: number
-  type_amounts: Record<string, number>
-  total_count: number
-  type_counts: Record<string, number>
-  total_purchase_count: number
-  total_persons: number
-  type_persons: Record<string, number>
-  chart_amount: Record<string, string | number>[]
-  chart_count: Record<string, string | number>[]
-  chart_persons: Record<string, string | number>[]
-  daily_table: { date: string; invited: number; cancelled: number; arrived: number; converted_persons: number; converted_amount: number; converted_count: number; purchase_count: number }[]
-  card_type_names: string[]
-  card_type_amounts: Record<string, number>
-  card_type_counts: Record<string, number>
-  card_type_persons: Record<string, number>
-  card_type_chart_amount: Record<string, string | number>[]
-  card_type_chart_count: Record<string, string | number>[]
-  card_type_chart_persons: Record<string, string | number>[]
-  course_type_names: string[]
-  course_type_amounts: Record<string, number>
-  course_type_counts: Record<string, number>
-  course_type_persons: Record<string, number>
-  course_type_chart_amount: Record<string, string | number>[]
-  course_type_chart_count: Record<string, string | number>[]
-  course_type_chart_persons: Record<string, string | number>[]
-  other_project_names: string[]
-  other_project_amounts: Record<string, number>
-  other_project_counts: Record<string, number>
-  other_project_persons: Record<string, number>
-  other_project_chart_amount: Record<string, string | number>[]
-  other_project_chart_count: Record<string, string | number>[]
-  other_project_chart_persons: Record<string, string | number>[]
-  referrer_names: string[]
-  teachers: { id: string; name: string }[]
-}
-
-export interface MemberStatistics {
-  total_members: number
-  type_totals: Record<string, number>
-  total_members_all: number
-  type_totals_all: Record<string, number>
-  type_names: string[]
-  referrer_names: string[]
-  chart_new: Record<string, string | number>[]
-  chart_total: Record<string, string | number>[]
-  members: Array<{
-    id: string
-    nickname: string
-    member_type: string
-    created_date: string
-    referral_date: string
-    first_visit_date: string
-    invited_count: number
-    cancelled_count: number
-    visit_count: number
-    visit_interval: string
-    activity_count: number
-    total_consumption: number
-  }>
-}
-
 export interface CourseStatistics {
   date_from: string
   date_to: string
@@ -3176,6 +3265,7 @@ export interface CourseStatistics {
     start_time: string
     end_time: string
     class_hours: number
+    course_review: string
     teachers: string[]
     owner_name: string
     body_part_count: number | null
@@ -3270,6 +3360,8 @@ export type AnalysisField =
   | "purchased_projects"
   | "created_by"
   | "inviter_names"
+  | "invitation_creators"
+  | "schedule_creators"
   | "invitation_count_period"
   | "visit_count_period"
   | "cancelled_count_period"
@@ -3335,15 +3427,21 @@ export interface AnalysisMetadata {
     value_type: "text" | "number" | "date" | "select" | "multi_select"
     operators: AnalysisOperator[]
     options: string[]
+    /** 仅用于历史模板回显，不再作为候选项 */
+    legacy_only?: boolean
   }>
   column_fields?: Array<{
     value: AnalysisField
     label: string
     group: string
+    /** 仅用于历史模板回显，不再作为候选项 */
+    legacy_only?: boolean
   }>
   operators: Array<{ value: AnalysisOperator; label: string }>
   card_dimensions: Array<{ value: AnalysisCardDimension; label: string }>
-  metrics: Array<{ value: AnalysisMetric; label: string; unit: string; format: "number" | "currency" }>
+  metrics: Array<{ value: AnalysisMetric; label: string; unit: string; format: "number" | "currency"; /** 仅用于历史模板回显，不再作为候选项 */ legacy_only?: boolean }>
+  /** 拆分指标候选（不包含成交金额）；老模板若已选中成交金额，前端仍保留当前项显示 */
+  dimension_metrics?: Array<{ value: AnalysisMetric; label: string; unit: string; format: "number" | "currency" }>
 }
 
 export interface AnalysisResult {
@@ -3391,6 +3489,8 @@ export interface AnalysisTemplate {
 export interface AnalysisLog {
   id: string
   operator: string
+  /** 登录账号（显示名可能重名，账号名唯一） */
+  account?: string
   source: "pc" | "miniprogram"
   ip: string
   content: string
@@ -3406,6 +3506,7 @@ export interface AnalysisLog {
     时间范围?: string
     条件关系?: string
     筛选条件?: Array<{ 字段: string; 规则: string; 值: unknown }>
+    附加条件数?: number
     统计指标?: string[]
     拆分指标?: string
     拆分维度?: string
@@ -3416,6 +3517,13 @@ export interface AnalysisLog {
     结果人数?: number
     结果数量?: number
     结果单位?: string
+    /** 转化分析（组织/俱乐部）：筛选范围、规则与结果 */
+    "组织/俱乐部"?: string
+    起点?: string
+    目标?: string
+    状态筛选?: string
+    转化结果?: Record<string, string | number>
+    规则?: Record<string, unknown>
     对比组?: Array<string | {
       名称: string
       时间范围?: string
@@ -3454,7 +3562,7 @@ export const customAnalysisApi = {
       const data = await res.json().catch(() => ({}))
       const detail = data.detail
       const message = Array.isArray(detail)
-        ? detail.map((item: { msg?: string }) => item.msg || "参数错误").join("；")
+        ? detail.map((item: { msg?: string }) => cleanValidationMessage(item.msg, "参数错误")).join("；")
         : (detail || "导出失败，请稍后再试")
       throw new Error(message)
     }
@@ -3484,6 +3592,8 @@ export const analysisLogApi = {
     operator?: string
     source?: "pc" | "miniprogram"
     record_type?: "analysis" | "export" | "template"
+    /** custom＝自定义筛选；conversion＝转化分析 */
+    kind?: "custom" | "conversion"
     date_from?: string
     date_to?: string
     page?: number
@@ -3499,52 +3609,6 @@ export const analysisLogApi = {
 
 export const statisticsApi = {
   dashboard: () => request<DashboardSummary>("/api/statistics/dashboard"),
-  overview: (params: { date_from?: string; date_to?: string; granularity?: string; member_types?: string; referrer?: string }) => {
-    const searchParams = new URLSearchParams()
-    if (params.date_from) searchParams.set("date_from", params.date_from)
-    if (params.date_to) searchParams.set("date_to", params.date_to)
-    if (params.granularity) searchParams.set("granularity", params.granularity)
-    if (params.member_types) searchParams.set("member_types", params.member_types)
-    if (params.referrer) searchParams.set("referrer", params.referrer)
-    return request<{ data: StatisticsData[] }>(`/api/statistics/overview?${searchParams.toString()}`)
-  },
-  details: (params: { date_from?: string; date_to?: string; status?: string; total?: boolean; member_types?: string; referrer?: string }) => {
-    const searchParams = new URLSearchParams()
-    if (params.date_from) searchParams.set("date_from", params.date_from)
-    if (params.date_to) searchParams.set("date_to", params.date_to)
-    if (params.status) searchParams.set("status", params.status)
-    if (params.total) searchParams.set("total", "true")
-    if (params.member_types) searchParams.set("member_types", params.member_types)
-    if (params.referrer) searchParams.set("referrer", params.referrer)
-    return request<{ invited: StatisticsDetail[]; arrived: StatisticsDetail[]; converted: StatisticsDetail[]; member_type_names?: string[]; referrer_names?: string[] }>(`/api/statistics/details?${searchParams.toString()}`)
-  },
-  products: (params: { date_from?: string; date_to?: string; product_type?: string; name_filter?: string; granularity?: string; referrer?: string; teacher_id?: string }) => {
-    const searchParams = new URLSearchParams()
-    if (params.date_from) searchParams.set("date_from", params.date_from)
-    if (params.date_to) searchParams.set("date_to", params.date_to)
-    if (params.product_type) searchParams.set("product_type", params.product_type)
-    if (params.name_filter) searchParams.set("name_filter", params.name_filter)
-    if (params.granularity) searchParams.set("granularity", params.granularity)
-    if (params.referrer) searchParams.set("referrer", params.referrer)
-    if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
-    return request<StatisticsProducts>(`/api/statistics/products?${searchParams.toString()}`)
-  },
-  productDetails: (params: { date: string; type: string; product_type?: string; referrer?: string; teacher_id?: string }) => {
-    const searchParams = new URLSearchParams({ date: params.date, type: params.type })
-    if (params.product_type) searchParams.set("product_type", params.product_type)
-    if (params.referrer) searchParams.set("referrer", params.referrer)
-    if (params.teacher_id) searchParams.set("teacher_id", params.teacher_id)
-    return request<{ data: Record<string, unknown>[] }>(`/api/statistics/products/details?${searchParams.toString()}`)
-  },
-  members: (params: { date_from?: string; date_to?: string; granularity?: string; referrer?: string; time_by?: string }) => {
-    const searchParams = new URLSearchParams()
-    if (params.date_from) searchParams.set("date_from", params.date_from)
-    if (params.date_to) searchParams.set("date_to", params.date_to)
-    if (params.granularity) searchParams.set("granularity", params.granularity)
-    if (params.referrer) searchParams.set("referrer", params.referrer)
-    if (params.time_by) searchParams.set("time_by", params.time_by)
-    return request<MemberStatistics>(`/api/statistics/members?${searchParams.toString()}`)
-  },
   courses: (params: { date_from?: string; date_to?: string; all_dates?: boolean; granularity?: string; organization_id?: string; activity_type?: string; course_subtype?: string; teacher_id?: string }) => {
     const searchParams = new URLSearchParams()
     if (params.date_from) searchParams.set("date_from", params.date_from)

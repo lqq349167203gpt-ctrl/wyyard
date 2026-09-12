@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, GripVertical, Plus, Save, Trash2, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Copy, Download, GripVertical, Plus, Save, Trash2, X } from "lucide-react"
 
+import { AnalysisDatePicker } from "@/components/analysis-date-picker"
+import { AnalysisPeriodFilter } from "@/components/analysis-period-filter"
+import { monthRange, selectedMonthRange, selectedPeriodValue, todayRange, weekRange } from "@/lib/date-ranges"
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Button } from "@/components/ui/button"
@@ -49,6 +51,7 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   invitation_dates: "邀约日期",
   invitation_created_dates: "邀约创建日期",
   inviter_names: "邀约人",
+  invitation_creators: "邀约创建人",
   invitation_count_period: "期间邀约次数",
   visit_count_period: "期间到场次数",
   activity_count_period: "期间参与活动",
@@ -58,6 +61,7 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   payment_amount_period: "期间成交金额",
   payment_dates: "成交日期",
   course_teachers: "课程老师",
+  schedule_creators: "课表创建人",
   visit_purpose: "到访目的",
   trauma_history: "创伤经历",
   current_block: "当下卡点",
@@ -65,158 +69,7 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   other_info: "其他信息",
 }
 
-function monthRange() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const lastDay = String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, "0")
-  return { date_from: `${year}-${month}-01`, date_to: `${year}-${month}-${lastDay}` }
-}
 
-function weekRange() {
-  const now = new Date()
-  const mondayOffset = (now.getDay() + 6) % 7
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset)
-  const formatLocalDate = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`
-  return { date_from: formatLocalDate(monday), date_to: formatLocalDate(now) }
-}
-
-function todayRange() {
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-  return { date_from: today, date_to: today }
-}
-
-function selectedMonthRange(value: string) {
-  const [year, month] = value.split("-").map(Number)
-  if (!year || !month) return null
-  const lastDay = new Date(year, month, 0).getDate()
-  return {
-    date_from: `${year}-${String(month).padStart(2, "0")}-01`,
-    date_to: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
-  }
-}
-
-function selectedPeriodValue(dateFrom: string, dateTo: string) {
-  const selectedMonth = dateFrom && dateFrom.slice(0, 7) === dateTo.slice(0, 7)
-    && selectedMonthRange(dateFrom.slice(0, 7))?.date_from === dateFrom
-    && selectedMonthRange(dateFrom.slice(0, 7))?.date_to === dateTo
-    ? dateFrom.slice(0, 7)
-    : ""
-  const selectedYear = dateFrom && dateTo
-    && dateFrom === `${dateFrom.slice(0, 4)}-01-01`
-    && dateTo === `${dateFrom.slice(0, 4)}-12-31`
-    ? dateFrom.slice(0, 4)
-    : ""
-  return selectedYear ? `year-${selectedYear}` : selectedMonth ? `month-${selectedMonth}` : ""
-}
-
-function AnalysisDatePicker({ value, onChange, ariaLabel }: { value: string; onChange: (value: string) => void; ariaLabel: string }) {
-  const today = new Date()
-  const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
-  const [open, setOpen] = useState(false)
-  const [viewMonth, setViewMonth] = useState(() => value.slice(0, 7) || todayValue.slice(0, 7))
-  const [position, setPosition] = useState<React.CSSProperties>({})
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) setViewMonth(value.slice(0, 7) || todayValue.slice(0, 7))
-  }, [open, todayValue, value])
-
-  useEffect(() => {
-    if (!open) return
-    const updatePosition = () => {
-      const trigger = triggerRef.current
-      if (!trigger) return
-      const rect = trigger.getBoundingClientRect()
-      const width = 280
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
-      const spaceBelow = window.innerHeight - rect.bottom
-      setPosition(spaceBelow >= 330
-        ? { left, top: rect.bottom + 4, width }
-        : { bottom: window.innerHeight - rect.top + 4, left, width })
-    }
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      const clickedDropdown = event.composedPath().some(node => node instanceof HTMLElement && node.hasAttribute("data-dropdown"))
-      if (clickedDropdown) return
-      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return
-      setOpen(false)
-    }
-    updatePosition()
-    document.addEventListener("mousedown", closeOnOutsideClick)
-    window.addEventListener("resize", updatePosition)
-    window.addEventListener("scroll", updatePosition, true)
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick)
-      window.removeEventListener("resize", updatePosition)
-      window.removeEventListener("scroll", updatePosition, true)
-    }
-  }, [open])
-
-  const [year, month] = viewMonth.split("-").map(Number)
-  const firstWeekday = new Date(year, month - 1, 1).getDay()
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const cells = [...Array.from({ length: firstWeekday }, () => null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
-  const yearOptions = useMemo(
-    () => Array.from({ length: 26 }, (_, index) => today.getFullYear() + 1 - index).map(item => ({ value: String(item), label: `${item}年` })),
-    [today],
-  )
-  const calendarMonthOptions = useMemo(
-    () => Array.from({ length: 12 }, (_, index) => ({ value: String(index + 1).padStart(2, "0"), label: `${index + 1}月` })),
-    [],
-  )
-  const moveMonth = (offset: number) => {
-    const next = new Date(year, month - 1 + offset, 1)
-    setViewMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
-  }
-  const displayValue = value
-    ? `${value.slice(0, 4)}年${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日`
-    : "选择日期"
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-label={ariaLabel}
-        onClick={() => setOpen(current => !current)}
-        className={`flex h-7 w-[132px] shrink-0 items-center gap-1 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-left text-[11px] ${value ? "text-[#2b2f36]" : "text-[#8f959e]"}`}
-      >
-        <CalendarDays className="h-3.5 w-3.5 shrink-0 text-[#8f959e]" />
-        <span className="min-w-0 flex-1 truncate">{displayValue}</span>
-        <ChevronDown className={`h-3 w-3 shrink-0 text-[#8f959e] transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && typeof document !== "undefined" && createPortal(
-        <div ref={panelRef} className="fixed z-[2147483646] rounded-[6px] border border-[#e1e4e7] bg-white p-3 shadow-[0_8px_24px_rgba(31,35,41,0.14)]" style={position}>
-          <div className="mb-2.5 flex items-center gap-1.5">
-            <button type="button" onClick={() => moveMonth(-1)} className="flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7]" aria-label="上个月"><ChevronLeft className="h-3.5 w-3.5" /></button>
-            <SelectDropdown value={String(year)} options={yearOptions} onChange={next => setViewMonth(`${next}-${String(month).padStart(2, "0")}`)} size="sm" className="w-[92px]" buttonClassName="!h-7 !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={104} menuMaxHeight={260} />
-            <SelectDropdown value={String(month).padStart(2, "0")} options={calendarMonthOptions} onChange={next => setViewMonth(`${year}-${next}`)} size="sm" className="w-[72px]" buttonClassName="!h-7 !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={80} menuMaxHeight={260} />
-            <button type="button" onClick={() => moveMonth(1)} className="ml-auto flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7]" aria-label="下个月"><ChevronRight className="h-3.5 w-3.5" /></button>
-          </div>
-          <div className="grid grid-cols-7 gap-0.5 border-b border-[#f0f0f0] pb-1">
-            {["日", "一", "二", "三", "四", "五", "六"].map(weekday => <div key={weekday} className="flex h-6 items-center justify-center text-[10px] text-[#8f959e]">{weekday}</div>)}
-          </div>
-          <div className="mt-1 grid grid-cols-7 gap-0.5">
-            {cells.map((day, index) => {
-              if (!day) return <span key={`empty-${index}`} className="h-7" />
-              const dateValue = `${viewMonth}-${String(day).padStart(2, "0")}`
-              const selected = dateValue === value
-              const isToday = dateValue === todayValue
-              return <button key={dateValue} type="button" onClick={() => { onChange(dateValue); setOpen(false) }} className={`flex h-7 items-center justify-center rounded-[3px] text-[11px] ${selected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36] hover:bg-[#f5f6f7]"}`}>{day}</button>
-            })}
-          </div>
-          <div className="mt-2 flex justify-end border-t border-[#f0f0f0] pt-2">
-            <button type="button" onClick={() => { onChange(todayValue); setOpen(false) }} className="h-6 px-2 text-[11px] text-[#3370ff] hover:text-[#285dcc]">今天</button>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
-  )
-}
 
 function defaultPlan(): AnalysisPlan {
   return {
@@ -230,7 +83,7 @@ function defaultPlan(): AnalysisPlan {
     card_dimension: "none",
     columns: [
       "nickname", "member_type", "follow_up_status", "referrer", "inviter_names",
-      "invitation_count_period", "visit_count_period", "payment_projects", "payment_amount_period",
+      "invitation_count_period", "visit_count_period", "payment_projects",
     ],
     sort_by: "referral_date",
     sort_order: "desc",
@@ -258,7 +111,7 @@ function createComparisonGroup(name: string, source?: AnalysisPlan["comparison_g
   }
 }
 
-const EmptyLine = () => <span className="inline-block h-[2px] w-[8px] rounded-full bg-[#e5e8eb] align-middle" />
+const EmptyLine = () => <span className="inline-block h-[2px] w-[4px] rounded-full bg-[#e5e8eb] align-middle" />
 
 function clonePlan(plan: AnalysisPlan, allowedColumns?: Set<AnalysisField>): AnalysisPlan {
   const metrics = plan.metrics.filter(metric => metric !== "created_customers")
@@ -298,6 +151,7 @@ function conditionValueText(condition: AnalysisCondition): string {
 }
 
 function renderValue(field: AnalysisField, value: unknown) {
+  if (field === "follow_up_status" && value === "未配置") return <EmptyLine />
   if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) return <EmptyLine />
   if (field === "total_consumption" || field === "payment_amount_period") {
     return `¥${Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`
@@ -425,18 +279,16 @@ export default function CustomAnalysisPage() {
   const operatorLabels = useMemo(() => Object.fromEntries((metadata?.operators ?? []).map(item => [item.value, item.label])) as Partial<Record<AnalysisOperator, string>>, [metadata])
   const fieldByName = useMemo(() => new Map((metadata?.fields ?? []).map(field => [field.value, field])), [metadata])
   const groupedFieldOptions = useMemo(() => {
-    const groups = new Map<string, Array<{ value: string; label: string }>>()
-    for (const field of metadata?.fields ?? []) {
-      const items = groups.get(field.group) ?? []
-      items.push({ value: field.value, label: field.label })
-      groups.set(field.group, items)
-    }
-    return [...groups.entries()].map(([group, children]) => ({ value: `group-${group}`, label: group, children }))
+    // 平铺 + 分组小标题：不用悬停的二级菜单，点一下就选中
+    return (metadata?.fields ?? []).map(field => ({ value: field.value, label: field.label, groupLabel: field.group }))
   }, [metadata])
   const allowedColumnFields = useMemo(() => new Set(
     (metadata?.column_fields ?? metadata?.fields ?? []).map(field => field.value),
   ), [metadata])
-  const columnOptions = useMemo(() => (metadata?.column_fields ?? metadata?.fields ?? []).map(field => ({ value: field.value, label: field.label })), [metadata])
+  // 已停用的字段（消费金额）只保留给历史模板回显，不再出现在显示字段的候选里
+  const columnOptions = useMemo(() => (metadata?.column_fields ?? metadata?.fields ?? [])
+    .filter(field => !field.legacy_only)
+    .map(field => ({ value: field.value, label: field.label })), [metadata])
   const periodOptions = useMemo(() => {
     const currentYear = new Date().getFullYear()
     return Array.from({ length: 10 }, (_, index) => currentYear + 1 - index).flatMap(year => [
@@ -529,14 +381,20 @@ export default function CustomAnalysisPage() {
     const conditionGroups = nextPlan.analysis_mode === "comparison"
       ? nextPlan.comparison_groups.map(group => ({ name: group.name, conditions: group.conditions }))
       : [{ name: "当前筛选", conditions: nextPlan.conditions }]
-    const incompleteGroup = conditionGroups.find(group => group.conditions.some(condition => !condition.inherit_period && !VALUELESS_OPERATORS.has(condition.operator) && (
-      condition.value === "" || condition.value === null || (Array.isArray(condition.value) && condition.value.some(item => !item))
-    )))
-    const incomplete = incompleteGroup?.conditions.find(condition => !condition.inherit_period && !VALUELESS_OPERATORS.has(condition.operator) && (
-      condition.value === "" || condition.value === null || (Array.isArray(condition.value) && condition.value.some(item => !item))
-    ))
+    // 漏填的情况比想象中多：旧模板里可能没有 value 字段（undefined）、「属于」可能一个都没选（空数组）
+    const isBlank = (condition: AnalysisCondition) => !condition.inherit_period
+      && !VALUELESS_OPERATORS.has(condition.operator)
+      && (
+        condition.value === undefined
+        || condition.value === null
+        || condition.value === ""
+        || (Array.isArray(condition.value) && (condition.value.length === 0 || condition.value.some(item => !item)))
+      )
+    const incompleteGroup = conditionGroups.find(group => group.conditions.some(isBlank))
+    const incomplete = incompleteGroup?.conditions.find(isBlank)
     if (incomplete) {
-      setError(`${incompleteGroup?.name}：请填写“${fieldLabels[incomplete.field]}”的筛选值`)
+      const verb = incomplete.operator === "in" ? "请选择" : "请填写"
+      setError(`${incompleteGroup?.name}：“${fieldLabels[incomplete.field]}”的筛选值还没填，${verb}后再查询`)
       return
     }
     setExecuting(true)
@@ -656,34 +514,6 @@ export default function CustomAnalysisPage() {
     }
   }
 
-  const setDatePreset = (preset: "today" | "week" | "month" | "year" | "all") => {
-    const now = new Date()
-    if (preset === "today") setPlan(current => ({ ...current, ...todayRange() }))
-    if (preset === "week") setPlan(current => ({ ...current, ...weekRange() }))
-    if (preset === "month") setPlan(current => ({ ...current, ...monthRange() }))
-    if (preset === "year") setPlan(current => ({ ...current, date_from: `${now.getFullYear()}-01-01`, date_to: `${now.getFullYear()}-12-31` }))
-    if (preset === "all") setPlan(current => ({ ...current, date_from: "", date_to: "" }))
-  }
-
-  const setSelectedMonth = (value: string) => {
-    const range = selectedMonthRange(value)
-    if (range) setPlan(current => ({ ...current, ...range }))
-  }
-
-  const setSelectedYear = (value: string) => {
-    const year = Number(value)
-    if (!year) return
-    setPlan(current => ({ ...current, date_from: `${year}-01-01`, date_to: `${year}-12-31` }))
-  }
-
-  const setSelectedPeriod = (value: string) => {
-    if (value.startsWith("year-")) {
-      setSelectedYear(value.slice(5))
-      return
-    }
-    if (value.startsWith("month-")) setSelectedMonth(value.slice(6))
-  }
-
   const setComparisonPeriod = (groupIndex: number, value: string) => {
     if (value.startsWith("year-")) {
       const year = value.slice(5)
@@ -791,27 +621,20 @@ export default function CustomAnalysisPage() {
   const startIndex = totalItems ? (currentPage - 1) * 20 + 1 : 0
   const endIndex = Math.min(currentPage * 20, totalItems)
 
-  const datePreset = (() => {
-    const currentDay = todayRange()
-    const currentWeek = weekRange()
-    const currentMonth = monthRange()
-    const now = new Date()
-    if (!plan.date_from && !plan.date_to) return "all"
-    if (plan.date_from === currentDay.date_from && plan.date_to === currentDay.date_to) return "today"
-    if (plan.date_from === currentWeek.date_from && plan.date_to === currentWeek.date_to) return "week"
-    if (plan.date_from === currentMonth.date_from && plan.date_to === currentMonth.date_to) return "month"
-    if (plan.date_from === `${now.getFullYear()}-01-01` && plan.date_to === `${now.getFullYear()}-12-31`) return "year"
-    return "custom"
-  })()
   const dateSummary = plan.date_from && plan.date_to ? `${plan.date_from.replaceAll("-", ".")}–${plan.date_to.replaceAll("-", ".")}` : "全部时间"
-  const selectedPeriod = selectedPeriodValue(plan.date_from, plan.date_to)
   const querySummary = plan.analysis_mode === "comparison"
     ? `${plan.comparison_groups.length} 个对比组 · ${plan.metrics.length} 项共用指标`
     : `${dateSummary} · ${plan.conditions.length} 个条件 · ${plan.metrics.length} 项总数 · ${plan.columns.length} 列 · ${ROW_DISPLAY_OPTIONS.find(item => item.value === plan.row_display_mode)?.label ?? "每人显示一次"}`
   const metricCards = result?.cards.filter(card => !card.key.startsWith("dimension-")) ?? []
+  // 跟进阶段里没有配置的客户，卡片标题直接显示「未配置」；列表行内不显示（行内仍是空）
   const dimensionCards = result?.cards.filter(card => card.key.startsWith("dimension-")) ?? []
   const dimensionLabel = metadata?.card_dimensions.find(item => item.value === result?.plan.card_dimension)?.label ?? "分组"
   const dimensionMetricLabel = metadata?.metrics.find(item => item.value === result?.plan.card_metric)?.label ?? "符合条件人数"
+  // 拆分指标不再提供成交金额（历史模板即使存过该值，也不再作为选项出现）
+  const cardMetricOptions = useMemo(() => {
+    const allMetrics = metadata?.metrics ?? []
+    return metadata?.dimension_metrics ?? allMetrics.filter(item => item.value !== "payment_amount")
+  }, [metadata])
   const splitHint = plan.card_dimension === "purchased_projects"
     ? plan.card_metric === "payment_amount" || plan.card_metric === "payment_orders"
       ? "每笔成交只归入对应项目，各项目合计与总数一致"
@@ -826,7 +649,7 @@ export default function CustomAnalysisPage() {
         <div className="flex flex-wrap items-start justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-[22px] py-4">
           <div>
             <h1 className="text-[16px] font-medium leading-6 text-[#1f2329]">自定义筛选</h1>
-            <p className="mt-1 text-[12px] leading-5 text-[#8f959e]">找出符合条件的客户，看他们的邀约、到店和成交情况</p>
+            <p className="mt-1 text-[12px] leading-5 text-[#8f959e]">按自己的条件筛选客户信息</p>
           </div>
           <div className="flex min-h-8 flex-wrap items-center justify-end gap-2">
             <span className="text-[12px] text-[#8f959e]">模板</span>
@@ -835,9 +658,9 @@ export default function CustomAnalysisPage() {
               options={templates.map(template => ({ value: template.id, label: template.name, rightLabel: `${template.created_by_name || "未知"} · ${template.scope === "shared" ? "共享" : "个人"} · 使用过 ${template.use_count} 次` }))}
               onChange={loadTemplate}
               placeholder={templates.length ? "选择已保存模板" : "还没有保存过"}
-              className="w-[180px]"
+              className="w-[150px]"
               buttonClassName="!h-8 !rounded-[4px] !border !border-[#dee0e3] !bg-white !shadow-none"
-              dropdownWidth={330}
+              dropdownWidth={240}
               clearable
             />
             {canManageSelectedTemplate && <Button variant="outline" size="sm" onClick={updateSelectedTemplate} disabled={savingTemplate} className="h-8 rounded-[4px] border border-[#dee0e3] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7]">更新模板</Button>}
@@ -864,33 +687,13 @@ export default function CustomAnalysisPage() {
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
               <span className="text-[12px] font-medium text-[#3370ff]">① 筛选客户</span>
             </div>
-            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-[4px] bg-[#f7f8fa] px-2.5 py-2">
-              <div className="mr-1 min-w-[190px]">
-                <div className="text-[12px] font-medium text-[#4e535a]">统计周期</div>
-                <div className="mt-0.5 text-[10px] text-[#8f959e]">限定期间邀约、到场、活动和成交指标</div>
-              </div>
-              <SelectDropdown
-                value={selectedPeriod}
-                options={periodOptions}
-                onChange={setSelectedPeriod}
-                placeholder="选择年份或月份"
-                size="sm"
-                className="w-[156px]"
-                buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none"
-                dropdownWidth={176}
-                menuMaxHeight={320}
+            <div className="mb-2">
+              <AnalysisPeriodFilter
+                dateFrom={plan.date_from}
+                dateTo={plan.date_to}
+                hint="限定期间邀约、到场、活动和成交指标"
+                onChange={range => setPlan(current => ({ ...current, ...range }))}
               />
-              <span className="text-[10px] text-[#b0b5bb]">或自定义</span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <AnalysisDatePicker value={plan.date_from} onChange={value => setPlan(current => ({ ...current, date_from: value }))} ariaLabel="统计周期开始日期" />
-                <span className="text-[11px] text-[#8f959e]">至</span>
-                <AnalysisDatePicker value={plan.date_to} onChange={value => setPlan(current => ({ ...current, date_to: value }))} ariaLabel="统计周期结束日期" />
-              </div>
-              <button type="button" onClick={() => setDatePreset("today")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "today" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>当天</button>
-              <button type="button" onClick={() => setDatePreset("week")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "week" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>本周</button>
-              <button type="button" onClick={() => setDatePreset("month")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "month" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>本月</button>
-              <button type="button" onClick={() => setDatePreset("year")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "year" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>本年</button>
-              <button type="button" onClick={() => setDatePreset("all")} className={`h-6 rounded-[3px] px-2 text-[11px] ${datePreset === "all" ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}>全部</button>
             </div>
 
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -909,7 +712,7 @@ export default function CustomAnalysisPage() {
                   const operatorOptions = (definition?.operators ?? []).map(operator => ({ value: operator, label: operatorLabels[operator] ?? operator }))
                   return (
                     <div key={`${condition.field}-${index}`} className="flex min-w-0 items-center gap-2 rounded-[4px] border border-[#eceef0] bg-[#fbfcfd] px-2 py-1">
-                      <SelectDropdown value={condition.field} options={groupedFieldOptions} onChange={value => updateConditionField(index, value as AnalysisField)} size="sm" className="w-[140px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[12px] !font-medium hover:!border-[#e1e4e7]" dropdownWidth={180} menuMaxHeight={300} />
+                      <SelectDropdown value={condition.field} options={groupedFieldOptions} onChange={value => updateConditionField(index, value as AnalysisField)} size="sm" className="w-[140px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[12px] !font-medium hover:!border-[#e1e4e7]" dropdownWidth={200} menuMaxHeight={320} />
                       <SelectDropdown value={condition.operator} options={operatorOptions} onChange={value => {
                         const operator = value as AnalysisOperator
                         const nextValue = VALUELESS_OPERATORS.has(operator) ? null : operator === "between" ? ["", ""] : operator === "in" ? [] : Array.isArray(condition.value) ? condition.value[0] ?? "" : condition.value
@@ -969,7 +772,7 @@ export default function CustomAnalysisPage() {
                               const nextDefinition = fieldByName.get(field)
                               const operator = nextDefinition?.operators[0] ?? "eq"
                               updateComparisonCondition(groupIndex, conditionIndex, { field, operator, value: VALUELESS_OPERATORS.has(operator) ? null : "", inherit_period: false })
-                            }} size="sm" className="w-[130px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[11px] !font-medium hover:!border-[#e1e4e7]" dropdownWidth={180} menuMaxHeight={300} />
+                            }} size="sm" className="w-[130px] shrink-0" buttonClassName="!h-7 !border-transparent !bg-transparent !px-1.5 !text-[11px] !font-medium hover:!border-[#e1e4e7]" dropdownWidth={200} menuMaxHeight={320} />
                             <SelectDropdown value={condition.operator} options={operatorOptions} onChange={value => {
                               const operator = value as AnalysisOperator
                               const nextValue = VALUELESS_OPERATORS.has(operator) ? null : operator === "between" ? ["", ""] : operator === "in" ? [] : Array.isArray(condition.value) ? condition.value[0] ?? "" : condition.value
@@ -990,12 +793,13 @@ export default function CustomAnalysisPage() {
           <div>
             <div className="mb-1.5 flex items-baseline gap-2"><span className="text-[12px] font-medium text-[#3370ff]">② 统计指标</span><span className="text-[11px] text-[#8f959e]">勾选后显示在结果上方</span></div>
             <div className="flex flex-wrap gap-1">
-              {(metadata?.metrics ?? []).map(metric => {
+              {/* legacy_only 的指标（成交金额）不再作为候选项，只用于历史模板回显 */}
+              {(metadata?.metrics ?? []).filter(metric => !metric.legacy_only).map(metric => {
                 const selected = plan.metrics.includes(metric.value)
                 return <button key={metric.value} type="button" onClick={() => toggleMetric(metric.value)} className={`flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px] ${selected ? "border-[#b9cdf8] bg-[#f7faff] text-[#2b2f36]" : "border-[#e5e7ea] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}><span className={`flex h-3 w-3 items-center justify-center rounded-[2px] border text-[9px] ${selected ? "border-[#3370ff] bg-[#3370ff] text-white" : "border-[#c9cdd4]"}`}>{selected ? "✓" : ""}</span>{metric.label}</button>
               })}
             </div>
-            {plan.analysis_mode === "single" && <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={metadata?.metrics ?? []} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">{splitHint}</span></div>}
+            {plan.analysis_mode === "single" && <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={cardMetricOptions} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">{splitHint}</span></div>}
             {plan.analysis_mode === "comparison" && <div className="mt-2 text-[11px] text-[#8f959e]">所有对比组共用以上统计指标，便于横向比较。</div>}
           </div>
 
@@ -1020,7 +824,7 @@ export default function CustomAnalysisPage() {
         <div className="flex items-center gap-3 border-t border-[#f0f0f0] bg-[#fafbfc] px-[22px] py-2.5">
           <span className="min-w-0 flex-1 truncate text-[12px] text-[#79838f]" title={querySummary}>当前：{querySummary}</span>
           <button type="button" onClick={() => { setPlan(defaultPlan()); setResult(null); setSelectedTemplateId(""); setError("") }} className="h-8 px-2 text-[12px] text-[#8f959e] hover:text-[#4e535a]">重置</button>
-          <Button size="sm" onClick={() => execute(plan, 1)} disabled={executing} className="h-8 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-5 text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{executing ? "查询中" : result ? "更新结果" : "查询"}</Button>
+          <Button size="sm" onClick={() => execute(plan, 1)} disabled={executing} className="h-8 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-5 text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{executing ? "查询中" : "查询"}</Button>
         </div>
 
         {result?.comparison_groups?.length ? <div className="border-t-[0.5px] border-[#f0f0f0] px-[22px] py-4">
@@ -1059,12 +863,12 @@ export default function CustomAnalysisPage() {
         </div> : result && <div className="border-t-[0.5px] border-[#f0f0f0]">
           <div className="px-[22px] pt-4">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              {metricCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] bg-white px-3 py-2.5 ${card.is_total ? "border-[#cfdcf5]" : "border-[#eceef0]"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[20px] font-medium leading-none text-[#212631] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}
+              {metricCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] bg-white px-3 py-2.5 ${card.is_total ? "border-[#cfdcf5]" : "border-[#eceef0]"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[18px] font-normal leading-none text-[#1f2329] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}
             </div>
             {dimensionCards.length > 0 && <div className="mt-4 border-t border-[#f0f0f0] pt-3">
               <div className="mb-2 text-[12px] font-medium text-[#4e535a]">{dimensionMetricLabel} · 按{dimensionLabel}拆分</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                {dimensionCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] px-3 py-2.5 ${card.title === "未配置" ? "border-[#e5e7ea] bg-[#fafbfc]" : "border-[#eceef0] bg-white"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[20px] font-medium leading-none text-[#212631] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}
+                {dimensionCards.map(card => <div key={card.key} className={`min-w-0 border-[0.5px] px-3 py-2.5 ${card.title === "未配置" ? "border-[#e5e7ea] bg-[#fafbfc]" : "border-[#eceef0] bg-white"}`}><div className="truncate text-[12px] text-[#8f959e]" title={card.title}>{card.title}</div><div className="mt-1 text-[18px] font-normal leading-none text-[#1f2329] tabular-nums">{card.format === "currency" ? `¥${Number(card.count).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}` : Number(card.count).toLocaleString("zh-CN")}{card.format !== "currency" && <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{card.unit}</span>}</div></div>)}
               </div>
             </div>}
           </div>
@@ -1072,7 +876,7 @@ export default function CustomAnalysisPage() {
             <div className="flex items-center justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5">
               <div className="flex min-w-0 items-baseline gap-2"><div className="truncate text-[13px] font-medium text-[#2b2f36]">{result.plan.title === "自助分析结果" ? `${dateSummary} · 符合条件客户` : result.plan.title}</div><span className="shrink-0 text-[12px] text-[#8f959e]">共 {result.total} {totalUnit}</span></div>
               <div className="flex shrink-0 items-center gap-3">
-                <span className="text-[12px] text-[#8f959e]">{executing ? "正在更新..." : "修改条件后点击“更新结果”"}</span>
+                <span className="text-[12px] text-[#8f959e]">{executing ? "正在更新..." : "修改条件后点击“查询”"}</span>
                 <Button variant="outline" size="sm" onClick={exportResult} disabled={exporting} className="h-7 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f5f6f7] disabled:text-[#b7bdc6]"><Download className="mr-1 h-3.5 w-3.5" />{exporting ? "导出中" : "导出"}</Button>
                 <button type="button" onClick={() => setContentExpanded(current => !current)} aria-pressed={contentExpanded} className="h-7 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]">{contentExpanded ? "缩略" : "展开"}</button>
               </div>
@@ -1141,7 +945,8 @@ export default function CustomAnalysisPage() {
               <SelectDropdown value={templateScope} options={[{ value: "private", label: "仅自己可见" }, { value: "shared", label: "团队共享" }]} onChange={value => setTemplateScope(value as "private" | "shared")} className="flex-1" buttonClassName="!h-8 !rounded-[4px] !border-[0.5px] !border-[#e1e4e7] !bg-white !shadow-none" />
             </div>
           </div>
-          <DialogFooter className="border-t-[0.5px] border-[#f0f0f0] px-5 py-3">
+          {/* p-0 弹窗不能用 DialogFooter 默认的 -mx-4 -mb-4 和灰底，否则会比弹窗宽出一圈 */}
+          <DialogFooter className="!mx-0 !mb-0 !rounded-b-none !bg-transparent border-t-[0.5px] border-[#f0f0f0] px-5 py-3">
             <Button variant="outline" size="sm" onClick={() => {
               setSaveOpen(false)
               setTemplateName("")
@@ -1152,7 +957,16 @@ export default function CustomAnalysisPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!templateToDelete} onOpenChange={open => { if (!open) setTemplateToDelete(null) }}><DialogContent className="w-[360px] max-w-[90vw] gap-0 rounded-[10px] border-[0.5px] border-[#e8eaed] p-0"><DialogHeader className="border-b-[0.5px] border-[#f0f0f0] px-6 pb-2 pt-3"><DialogTitle className="text-[14px] font-normal">删除模板</DialogTitle></DialogHeader><div className="px-5 py-5 text-[12px] text-[#4e535a]">确认删除“{templateToDelete?.name}”吗？删除后无法恢复。</div><DialogFooter className="border-t-[0.5px] border-[#f0f0f0] px-5 py-3"><Button variant="outline" size="sm" onClick={() => setTemplateToDelete(null)} className="h-8 rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white px-4 text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">取消</Button><Button variant="destructive" size="sm" onClick={confirmDeleteTemplate} className="h-8 rounded-[4px] border-[0.5px] border-[#efc9cc] bg-[#fff5f5] px-4 text-[12px] font-normal text-[#c94b55] shadow-none hover:bg-[#ffeded]">删除</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!templateToDelete} onOpenChange={open => { if (!open) setTemplateToDelete(null) }}>
+        <DialogContent className="w-[360px] max-w-[90vw] gap-0 rounded-[10px] border-[0.5px] border-[#e8eaed] p-0">
+          <DialogHeader className="border-b-[0.5px] border-[#f0f0f0] px-6 pb-2 pt-3"><DialogTitle className="text-[14px] font-normal">删除模板</DialogTitle></DialogHeader>
+          <div className="px-5 py-5 text-[12px] text-[#4e535a]">确认删除“{templateToDelete?.name}”吗？删除后无法恢复。</div>
+          <DialogFooter className="!mx-0 !mb-0 !rounded-b-none !bg-transparent border-t-[0.5px] border-[#f0f0f0] px-5 py-3">
+            <Button variant="outline" size="sm" onClick={() => setTemplateToDelete(null)} className="h-8 rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white px-4 text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">取消</Button>
+            <Button variant="destructive" size="sm" onClick={confirmDeleteTemplate} className="h-8 rounded-[4px] border-[0.5px] border-[#efc9cc] bg-[#fff5f5] px-4 text-[12px] font-normal text-[#c94b55] shadow-none hover:bg-[#ffeded]">删除</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedCustomerId} onOpenChange={open => { if (!open) setSelectedCustomerId(null) }}><DialogContent className="flex max-h-[90vh] max-w-[1180px] flex-col overflow-hidden p-0"><DetailView selectedCustomerId={selectedCustomerId} onClearSelection={() => setSelectedCustomerId(null)} hideSearch defaultTab="healing" /></DialogContent></Dialog>
     </div>

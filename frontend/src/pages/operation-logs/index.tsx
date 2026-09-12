@@ -31,7 +31,7 @@ const PAGE_LABELS: Record<string, string> = {
   "referral-statistics": "引流统计",
   "member-statistics": "会员情况",
   "course-statistics": "课程记录",
-  "principal": "主理人",
+  "principal": "组织/俱乐部",
   "product-sales": "产品销售",
   "statistics": "服务数据",
   "daily-report": "每日报表",
@@ -230,14 +230,17 @@ const API_PATH_LABELS: Array<[string, string]> = [
 ]
 
 const SECTION_OPTIONS = [
-  "主理人",
+  "组织/俱乐部",
   "课程记录", "服务老师",
   "自定义筛选", "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
 
-const formatSectionLabel = (section: string) => section === "组织管理" ? "组织信息" : section
+// 主理人已更名为「组织/俱乐部」：历史日志里存的是旧名，显示时统一成新名
+const formatSectionLabel = (section: string) => (
+  section === "组织管理" ? "组织信息" : section === "主理人" ? "组织/俱乐部" : section
+)
 
 const getOperationLocation = (path: string, section: string) => {
   if (path.includes("/course-export-audit") || path.includes("/export-courses")) return "课程记录"
@@ -351,7 +354,11 @@ const EDIT_SCOPE_LABELS: Record<string, string> = {
 }
 
 const getEditScopeLabel = (scope: string, area: string) => (
-  area === "customers" && scope === "all" ? "可编辑" : (EDIT_SCOPE_LABELS[scope] || scope)
+  area === "customers" && scope === "all"
+    ? "可编辑"
+    : area === "course_records"
+      ? (scope === "all" ? "全部记录" : "与本人相关")
+      : (EDIT_SCOPE_LABELS[scope] || scope)
 )
 
 const getPermissionLogDisplayContent = (log: OperationLog) => {
@@ -382,6 +389,7 @@ const getPermissionLogDisplayContent = (log: OperationLog) => {
     { key: "customers", label: "客户资料操作范围", defaultScope: "all" },
     { key: "visits", label: "邀约编辑范围", defaultScope: "own" },
     { key: "activities", label: "课表编辑范围", defaultScope: "own" },
+    { key: "course_records", label: "课程记录查看范围", defaultScope: "all" },
   ] as const).forEach(({ key, label, defaultScope }) => {
     const oldScope = String(oldEdit[key] || defaultScope)
     const newScope = String(newEdit[key] || defaultScope)

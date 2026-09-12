@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { visitNoteApi, type PreviousVisitNeed, type VisitNote, type VisitNoteCategory } from "@/lib/api"
+import { customerApi, visitNoteApi, type PreviousVisitNeed, type VisitNote, type VisitNoteCategory } from "@/lib/api"
 
 interface VisitNoteCellProps {
   visitId: string
@@ -53,6 +53,10 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
   const [previousNeed, setPreviousNeed] = useState<PreviousVisitNeed | null>(null)
   const [previousLoading, setPreviousLoading] = useState(false)
   const [showPrevious, setShowPrevious] = useState(false)
+  const [visitPurpose, setVisitPurpose] = useState<string | null>(null)
+  const [showVisitPurpose, setShowVisitPurpose] = useState(false)
+  const [visitPurposeLoading, setVisitPurposeLoading] = useState(false)
+  const [visitPurposeError, setVisitPurposeError] = useState("")
   const savingRef = useRef(false)
 
   const categoryNotes = useMemo(() => {
@@ -86,6 +90,9 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
     setSavedValue(initialValue)
     setShowPrevious(false)
     setPreviousNeed(null)
+    setShowVisitPurpose(false)
+    setVisitPurpose(null)
+    setVisitPurposeError("")
     try {
       const [latestNotes, previous] = await Promise.all([
         refreshNotes(),
@@ -127,6 +134,40 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
       if (!normalized) return previousNeed.content
       if (normalized.includes(previousNeed.content.trim())) return current
       return `${normalized}\n${previousNeed.content}`
+    })
+  }
+
+  const loadVisitPurpose = async () => {
+    if (!customerId || visitPurposeLoading) return
+    setVisitPurposeLoading(true)
+    setVisitPurposeError("")
+    try {
+      const customer = await customerApi.get(customerId)
+      setVisitPurpose((customer.tags || "").trim())
+    } catch (reason) {
+      setVisitPurpose(null)
+      setVisitPurposeError(reason instanceof Error ? reason.message : "加载到访目的失败")
+    } finally {
+      setVisitPurposeLoading(false)
+    }
+  }
+
+  const toggleVisitPurpose = async () => {
+    if (showVisitPurpose) {
+      setShowVisitPurpose(false)
+      return
+    }
+    setShowVisitPurpose(true)
+    if (visitPurpose !== null || visitPurposeLoading) return
+    await loadVisitPurpose()
+  }
+
+  const appendVisitPurpose = () => {
+    if (!visitPurpose) return
+    setDraft((current) => {
+      const normalized = current.trim()
+      if (normalized.includes(visitPurpose)) return current
+      return normalized ? `${normalized}\n${visitPurpose}` : visitPurpose
     })
   }
 
@@ -248,15 +289,46 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
                 )}
               </span>
               {category === "visit_need" && customerId && (
-                <button
-                  type="button"
-                  className="ml-auto text-[11px] text-[#3370ff] hover:text-[#245bdb]"
-                  onClick={() => void togglePrevious()}
-                >
-                  {showPrevious ? "收起上次需求" : "引用上次需求"}
-                </button>
+                <div className="ml-auto flex shrink-0 items-center gap-3">
+                  <button
+                    type="button"
+                    className="text-[11px] text-[#3370ff] hover:text-[#245bdb]"
+                    onClick={() => void toggleVisitPurpose()}
+                  >
+                    {showVisitPurpose ? "收起到访目的" : "引用到访目的"}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-[11px] text-[#3370ff] hover:text-[#245bdb]"
+                    onClick={() => void togglePrevious()}
+                  >
+                    {showPrevious ? "收起上次需求" : "引用上次需求"}
+                  </button>
+                </div>
               )}
             </div>
+            {category === "visit_need" && showVisitPurpose && (
+              <div className="mb-3 rounded-[4px] border-[0.5px] border-[#dce5f8] bg-[#f7f9fc] px-2.5 py-2">
+                {visitPurposeLoading ? (
+                  <div className="text-[11px] text-[#8f959e]">正在加载到访目的…</div>
+                ) : visitPurposeError ? (
+                  <button type="button" className="flex w-full items-center justify-between text-left text-[11px] text-[#c4506a]" onClick={() => void loadVisitPurpose()}>
+                    <span>{visitPurposeError}</span>
+                    <span className="shrink-0 text-[#3370ff]">点击重试</span>
+                  </button>
+                ) : visitPurpose ? (
+                  <>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <span className="text-[11px] text-[#8f959e]">客户详情中的到访目的</span>
+                      <button type="button" className="shrink-0 text-[11px] text-[#3370ff] hover:text-[#245bdb]" onClick={appendVisitPurpose}>带入本次</button>
+                    </div>
+                    <div className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{visitPurpose}</div>
+                  </>
+                ) : (
+                  <div className="text-[11px] text-[#8f959e]">暂无可引用的到访目的</div>
+                )}
+              </div>
+            )}
             {category === "visit_need" && showPrevious && (
               <div className="mb-3 rounded-[4px] border-[0.5px] border-[#dce5f8] bg-[#f7f9fc] px-2.5 py-2">
                 {previousLoading ? (

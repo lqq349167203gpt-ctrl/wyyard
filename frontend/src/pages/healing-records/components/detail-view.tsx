@@ -70,10 +70,14 @@ export default function DetailView({
   onClearSelection,
   hideSearch = false,
   defaultTab = "healing",
+  principalParticipant = false,
+  principalCourse = "",
 }: {
   selectedCustomerId: string | null
   onClearSelection: () => void
   hideSearch?: boolean
+  principalParticipant?: boolean
+  principalCourse?: string
   defaultTab?: "activities" | "healing" | "payment" | "purchase"
 }) {
   const navigate = useNavigate()
@@ -90,7 +94,7 @@ export default function DetailView({
   const [loading, setLoading] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
-  const [activeTab, setActiveTab] = useState<"activities" | "healing" | "communication" | "followups" | "payment" | "purchase" | "offline_course">(defaultTab)
+  const [activeTab, setActiveTab] = useState<"" | "activities" | "healing" | "communication" | "followups" | "payment" | "purchase" | "offline_course">(defaultTab)
   const [activitiesPage, setActivitiesPage] = useState(1)
   const [healingPage, setHealingPage] = useState(1)
   const [paymentPage, setPaymentPage] = useState(1)
@@ -154,7 +158,7 @@ export default function DetailView({
     setCommDeleteTarget(null)
     setActivitiesPage(1); setHealingPage(1); setPaymentPage(1); setPurchasePage(1); setFollowupsPage(1); setOfflineCoursePage(1)
     try {
-      const data = await customerDetailApi.get(cid)
+      const data = await customerDetailApi.get(cid, undefined, principalParticipant, principalCourse)
       if (seq !== loadSeqRef.current) return
       setDetail(data)
       customerTagApi.listForCustomer(cid).then(tags => {
@@ -175,8 +179,10 @@ export default function DetailView({
         access?.detail_tabs.offline_courses !== false && "offline_course",
         access?.transaction_access === "detail" && "payment",
       ].filter(Boolean) as (typeof activeTab)[]
-      setActiveTab(current => availableTabs.includes(current) ? current : (availableTabs[0] || "healing"))
-      if (nickname && communicationAllowed) {
+      setActiveTab(current => availableTabs.includes(current) ? current : (availableTabs[0] || ""))
+      if (principalParticipant) {
+        setCommRecords(communicationAllowed ? data.communication_records || [] : [])
+      } else if (nickname && communicationAllowed) {
         communicationRecordApi.list(nickname).then(records => {
           if (seq === loadSeqRef.current) setCommRecords(records)
         }).catch(() => {
@@ -202,7 +208,7 @@ export default function DetailView({
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }
-  }, [])
+  }, [principalParticipant, principalCourse])
 
   useEffect(() => {
     if (selectedCustomerId) loadDetail(selectedCustomerId)
@@ -457,7 +463,7 @@ export default function DetailView({
               <div className="flex items-center gap-2.5 pb-1 pt-[7px]">
                 <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">跟进阶段</span>
                 <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={followUpStatuses.find(status => status.name === c.follow_up_status)?.description || c.follow_up_status || undefined}>
-                  {c.follow_up_status || <DvEmpty />}
+                  {c.follow_up_status && c.follow_up_status !== "未配置" ? c.follow_up_status : <DvEmpty />}
                 </span>
                 <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">人工设置</span>
               </div>
@@ -1392,8 +1398,8 @@ export default function DetailView({
                     let status: React.ReactNode = <span className="text-[#d0d3d6]">-</span>
                     let statusClass = ""
                     if (isCoarseDoorDeduction) {
-                      status = "已抵扣"
-                      statusClass = "text-[#3370ff]"
+                      status = r.cancelled ? "已取消｜已从课程移除" : "已抵扣"
+                      statusClass = r.cancelled ? "text-[#8f959e]" : "text-[#3370ff]"
                     } else if (r.voided) {
                       status = "已退费"
                       statusClass = "text-[#c4506a]"

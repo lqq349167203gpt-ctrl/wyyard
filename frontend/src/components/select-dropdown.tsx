@@ -2,12 +2,16 @@ import { useRef, useCallback, useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown, X, ChevronRight } from "lucide-react"
 
+import { broadcastPopoverOpen } from "@/lib/popover"
+
 interface Option {
   value: string
   label: string
   rightLabel?: string  // 右侧标签，用于左对齐名称右对齐价格
   groupLabel?: string  // 子菜单分组标题，仅在该组第一项上设置
   children?: Option[]  // 子选项，用于级联菜单
+  /** 弱化显示（如「未配置」） */
+  muted?: boolean
 }
 
 interface SelectDropdownSingleProps {
@@ -26,6 +30,10 @@ interface SelectDropdownSingleProps {
   hideSelectedStyle?: boolean
   hideChevron?: boolean
   textColor?: string
+  /** 没选值时的文字颜色（默认 #c0c4cc），用于和旁边的日期框等控件保持一致 */
+  placeholderColor?: string
+  /** 触发器里只显示选项名称，不带右侧数量（数量留在菜单里看） */
+  hideRightLabelInTrigger?: boolean
   portalContainer?: HTMLElement | null
   dropdownWidth?: number
   menuMaxHeight?: number
@@ -49,6 +57,8 @@ interface SelectDropdownMultiProps {
   hideSelectedStyle?: boolean
   hideChevron?: boolean
   textColor?: string
+  placeholderColor?: string
+  hideRightLabelInTrigger?: boolean
   portalContainer?: HTMLElement | null
   dropdownWidth?: number
   menuMaxHeight?: number
@@ -76,6 +86,8 @@ export function SelectDropdown({
   hideSelectedStyle = false,
   hideChevron = false,
   textColor,
+  placeholderColor,
+  hideRightLabelInTrigger = false,
   portalContainer,
   dropdownWidth,
   menuMaxHeight = 200,
@@ -124,8 +136,11 @@ export function SelectDropdown({
   const calcSubMenuPos = useCallback((optEl: HTMLElement, opt: Option) => {
     const menuEl = menuRef.current
     const menuRect = menuEl?.getBoundingClientRect()
-    const subMenuWidth = 120
-    const h = 200
+    const optRect = optEl.getBoundingClientRect()
+    // 宽度按最长标签估算，避免「沟通次数」这类标签被截断
+    const longest = (opt.children || []).reduce((max, child) => Math.max(max, child.label.length), 0)
+    const subMenuWidth = Math.min(260, Math.max(148, longest * 13 + 32))
+    const maxHeight = 260
 
     const s: React.CSSProperties = {
       position: "fixed",
@@ -133,29 +148,24 @@ export function SelectDropdown({
       width: subMenuWidth,
     }
 
-    // 二级菜单紧挨着一级菜单右侧，垂直位置与一级菜单顶部对齐
+    // 二级菜单紧贴一级菜单右侧（重叠 1px，避免中间留缝导致鼠标一移就离开）
     if (menuRect) {
       const spaceRight = window.innerWidth - menuRect.right - 8
       const spaceLeft = menuRect.left - 8
 
       if (spaceRight >= subMenuWidth) {
-        s.left = menuRect.right - 0.5
+        s.left = menuRect.right - 1
       } else if (spaceLeft >= subMenuWidth) {
-        s.left = menuRect.left - subMenuWidth + 0.5
+        s.left = menuRect.left - subMenuWidth + 1
       } else {
-        s.left = menuRect.right - 0.5
+        s.left = Math.max(8, window.innerWidth - subMenuWidth - 8)
       }
 
-      // 垂直位置与一级菜单顶部对齐
-      const below = window.innerHeight - menuRect.top
-      const above = menuRect.bottom
-      if (below >= h || below >= above) {
-        s.top = menuRect.top
-        s.maxHeight = Math.min(h, below - 8)
-      } else {
-        s.bottom = window.innerHeight - menuRect.bottom
-        s.maxHeight = Math.min(h, above - 8)
-      }
+      // 与鼠标正在悬停的那一项对齐：靠下的分组不用跨过其他项就能碰到子菜单
+      let top = optRect.top
+      if (window.innerHeight - top - 8 < 140) top = Math.max(8, window.innerHeight - maxHeight - 8)
+      s.top = top
+      s.maxHeight = Math.min(maxHeight, window.innerHeight - top - 8)
     }
 
     setSubMenuPos(s)
@@ -168,6 +178,8 @@ export function SelectDropdown({
     } else {
       activeClose?.()
       activeClose = close
+      // 通知页面上的其它浮层（比如日期日历）先收起来，避免两个浮层叠着
+      broadcastPopoverOpen(rootRef.current)
       calcPos()
       setOpen(true)
     }
@@ -232,7 +244,7 @@ export function SelectDropdown({
   const handleMouseLeave = useCallback(() => {
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredOption(null)
-    }, 150)
+    }, 260)
   }, [])
 
   const handleSubMenuMouseEnter = useCallback(() => {
@@ -245,7 +257,7 @@ export function SelectDropdown({
   const handleSubMenuMouseLeave = useCallback(() => {
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredOption(null)
-    }, 150)
+    }, 260)
   }, [])
 
   const currentLabels = multi && Array.isArray(value)
@@ -254,7 +266,7 @@ export function SelectDropdown({
   // 查找当前值的标签（可能在子选项中）
   const findLabel = (opts: Option[], val: string): string | undefined => {
     for (const opt of opts) {
-      if (opt.value === val) return opt.rightLabel ? `${opt.label} ${opt.rightLabel}` : opt.label
+      if (opt.value === val) return !opt.rightLabel || hideRightLabelInTrigger ? opt.label : `${opt.label} ${opt.rightLabel}`
       if (opt.children) {
         const found = findLabel(opt.children, val)
         if (found) return found
@@ -294,7 +306,7 @@ export function SelectDropdown({
             ))}
           </div>
         ) : (
-          <span className={`truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : "text-[#c0c4cc] font-normal")}`}>
+          <span className={`truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : `${placeholderColor || "text-[#c0c4cc]"} font-normal`)}`}>
             {currentLabel || (multi ? placeholder : placeholder)}
           </span>
         )}
@@ -314,13 +326,17 @@ export function SelectDropdown({
 
       {open && createPortal(
         <>
-          <div ref={menuRef} data-dropdown className="bg-white border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
-            {options.map((opt) => {
+          {/* overscroll-contain：菜单滚到底不要把滚动传给页面 */}
+          <div ref={menuRef} data-dropdown className="overscroll-contain bg-white border border-[#e8e8e8] shadow-lg overflow-y-auto" style={{ ...pos, borderRadius: radiusValue, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}>
+            {options.map((opt, index) => {
               const isSelected = multi && Array.isArray(value) ? value.includes(opt.value) : false
               const hasChildren = opt.children && opt.children.length > 0
               const isHovered = hoveredOption?.value === opt.value
+              const groupTitle = opt.groupLabel && opt.groupLabel !== options[index - 1]?.groupLabel ? opt.groupLabel : ""
               return (
-                <div key={opt.value}
+                <div key={opt.value}>
+                {groupTitle && <div className="bg-[#f7f8fa] px-2 py-1 text-[11px] text-[#8f959e]">{groupTitle}</div>}
+                <div
                   className={`flex items-center justify-between w-full text-left truncate ${sm ? "px-2 py-1.5 text-[12px]" : "px-2 py-2 text-[12px]"} ${isSelected && !hideSelectedStyle ? "bg-[#f0f5ff] text-[#3370ff]" : ""} ${isHovered ? "bg-[#f7f8fa]" : "hover:bg-[#f7f8fa]"} cursor-pointer`}
                   onMouseDown={hasChildren ? undefined : () => select(opt.value)}
                   onMouseEnter={(e) => handleMouseEnter(opt, e)}
@@ -333,20 +349,21 @@ export function SelectDropdown({
                   )}
                   {opt.rightLabel ? (
                     <>
-                      <span className="truncate">{opt.label}</span>
+                      <span className={`truncate ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
                       <span className="text-[#8f959e] ml-2 shrink-0">{opt.rightLabel}</span>
                     </>
                   ) : (
-                    <span className="flex-1 truncate">{opt.label}</span>
+                    <span className={`flex-1 truncate ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
                   )}
                   {hasChildren && <ChevronRight className="h-3 w-3 text-[#8f959e] ml-1 shrink-0" />}
+                </div>
                 </div>
               )
             })}
           </div>
           {hoveredOption?.children && hoveredOption.children.length > 0 && (
             <div ref={subMenuRef} data-dropdown
-              className="bg-white rounded-r-md border border-l-0 border-[#e8e8e8] overflow-y-auto"
+              className="overscroll-contain bg-white rounded-r-md border border-l-0 border-[#e8e8e8] overflow-y-auto"
               style={{ ...subMenuPos, scrollbarColor: "rgba(0,0,0,0.15) transparent" }}
               onMouseEnter={handleSubMenuMouseEnter}
               onMouseLeave={handleSubMenuMouseLeave}

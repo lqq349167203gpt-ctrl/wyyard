@@ -93,8 +93,15 @@ export default function LoginRecordsPage() {
   const [accountId, setAccountId] = useState("")
   const [eventType, setEventType] = useState("")
   const [source, setSource] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  // 默认只看最近 7 天：全部时间要扫两万多条操作日志，加载很慢
+  const defaultDateRange = (() => {
+    const today = new Date()
+    const from = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
+    const toText = (value: Date) => value.toLocaleDateString("sv-SE")
+    return { from: toText(from), to: toText(today) }
+  })()
+  const [dateFrom, setDateFrom] = useState(defaultDateRange.from)
+  const [dateTo, setDateTo] = useState(defaultDateRange.to)
   const [keyword, setKeyword] = useState("")
   const filtersRef = useRef({ accountId, eventType, source, dateFrom, dateTo, keyword })
 

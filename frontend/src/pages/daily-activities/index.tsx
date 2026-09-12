@@ -17,6 +17,7 @@ import {
   energyKnotSessionApi, energyKnotApi,
   internalCourseSessionApi, courseTypeApi, customerApi, uploadApi, spaceApi,
   activityThemeApi, memberIdentityApi,
+  isOperationCancelled,
   type ClassRecord, type GroupCaseSession, type EmotionalReleaseSession,
   type EnergyKnotSession, type InternalCourseSession,
   type CourseType, type CustomerLight, type Space,
@@ -2108,6 +2109,8 @@ export default function DailyActivitiesPage() {
 
   // ===== Helpers =====
   const handleApiError = (error: any) => {
+    // 用户在「取消关联抵扣」里点了取消：不算失败，也不用再弹一次
+    if (isOperationCancelled(error)) return
     const detail = error?.response?.data?.detail
     if (typeof detail === "string" && detail.includes("已无剩余活动次数")) {
       setWarningMsg(detail)
