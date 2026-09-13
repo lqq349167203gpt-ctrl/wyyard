@@ -1,6 +1,6 @@
 <!-- 弹层打开时锁住页面滚动，避免上下滑动带动背景 -->
 <page-meta page-style="{{condSheet || showSaveRule || detail ? 'overflow:hidden;height:100vh;' : ''}}" />
-<view class="page">
+<view class="page {{query.tab === 'conversion' ? 'conversion-compact' : ''}}">
   <!-- 顶部 tab：白条 + 蓝字下划线（和课表/付费项目一致），放在筛选项上面 -->
   <view class="seg-tabs"><view wx:for="{{tabs}}" wx:key="key" class="seg-tab {{query.tab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onTab">{{item.label}}</view></view>
   <view class="card filter-card">
@@ -16,9 +16,9 @@
     </view>
     <view class="filter-row">
       <text class="filter-label">自定义</text>
-      <picker mode="date" value="{{query.date_from}}" data-field="date_from" bindchange="onDate"><view class="control date-control">{{query.date_from || '开始日期'}}</view></picker>
+      <picker class="filter-date" mode="date" value="{{query.date_from}}" data-field="date_from" bindchange="onDate"><view class="control date-control">{{query.date_from || '开始日期'}}</view></picker>
       <text class="muted">~</text>
-      <picker mode="date" value="{{query.date_to}}" data-field="date_to" bindchange="onDate"><view class="control date-control">{{query.date_to || '结束日期'}}</view></picker>
+      <picker class="filter-date" mode="date" value="{{query.date_to}}" data-field="date_to" bindchange="onDate"><view class="control date-control">{{query.date_to || '结束日期'}}</view></picker>
     </view>
     <view class="filter-foot">
       <text class="muted">{{metadata.scope === 'all' ? '全部组织权限' : '仅本人所属组织'}} · 客户及交易权限同时生效</text>
@@ -29,14 +29,14 @@
     <view class="section-card">
       <view class="conv-head">
         <text class="conv-title">转化规则</text>
+        <picker class="conv-picker" range="{{ruleOptions}}" value="{{ruleIndex}}" bindchange="onRule">
+          <view class="control"><text class="control-text">{{ruleOptions[ruleIndex]}}</text><view class="chevron"></view></view>
+        </picker>
         <view class="conv-head-actions">
           <text class="conv-btn" bindtap="openSaveRule">保存规则</text>
           <text class="conv-btn danger" wx:if="{{ruleId && canManageRule}}" bindtap="removeRule">删除规则</text>
         </view>
       </view>
-      <picker class="conv-picker" range="{{ruleOptions}}" value="{{ruleIndex}}" bindchange="onRule">
-        <view class="control"><text class="control-text">{{ruleOptions[ruleIndex]}}</text><view class="chevron"></view></view>
-      </picker>
       <view class="conv-tips">
         <text class="conv-desc" wx:if="{{query.rule.description}}">规则说明：{{query.rule.description}}</text>
         <text class="conv-note">决定什么算转化；改完点「查询」重算，要长期使用请点「保存规则」</text>
@@ -44,27 +44,31 @@
 
       <view class="rule-line" wx:for="{{actionEditors}}" wx:key="index" wx:for-item="act">
         <view class="rule-line-head">
-          <text class="rule-line-label">{{act.title}}</text>
+          <text class="rule-line-label">{{act.index + 1}}　{{act.index === 0 ? '起始客户' : act.index === 1 ? '转化目标' : act.title + ' · 转化目标'}}</text>
           <text class="rule-line-remove" wx:if="{{act.index > 0 && canRemoveTarget}}" data-index="{{act.index}}" bindtap="removeTarget">✕</text>
         </view>
         <view class="rule-line-body">
           <view class="rule-controls">
+            <text class="rule-field-label">行为</text>
             <picker class="rule-pick" range="{{kindLabels}}" value="{{act.kindIndex}}" data-index="{{act.index}}" data-field="kind" bindchange="onAction">
               <view class="control"><text class="control-text">{{kindLabels[act.kindIndex]}}</text><view class="chevron"></view></view>
             </picker>
+            <text class="rule-field-label" wx:if="{{act.products.length > 1}}">产品</text>
             <picker class="rule-pick" wx:if="{{act.products.length > 1}}" range="{{act.products}}" range-key="label" value="{{act.productIndex}}" data-index="{{act.index}}" data-field="product" bindchange="onAction">
               <view class="control"><text class="control-text">{{act.products[act.productIndex].label}}</text><view class="chevron"></view></view>
             </picker>
+            <text class="rule-field-label" wx:if="{{act.subtypes.length > 1}}">类型</text>
             <picker class="rule-pick" wx:if="{{act.subtypes.length > 1}}" range="{{act.subtypeLabels}}" value="{{act.subtypeIndex}}" data-index="{{act.index}}" data-field="subtype" bindchange="onAction">
               <view class="control"><text class="control-text">{{act.subtypeLabels[act.subtypeIndex]}}</text><view class="chevron"></view></view>
             </picker>
+            <text class="rule-field-label">次数</text>
             <picker class="rule-pick" range="{{act.occurrenceLabels}}" value="{{act.occurrenceIndex}}" data-index="{{act.index}}" data-field="occurrence" bindchange="onAction">
               <view class="control"><text class="control-text">{{act.occurrenceLabels[act.occurrenceIndex]}}</text><view class="chevron"></view></view>
             </picker>
           </view>
 
           <!-- 附加条件：字段 / 规则 / 值与自定义筛选同一套，可以加多条 -->
-          <view class="cond-card" wx:for="{{act.conditions}}" wx:key="index" wx:for-item="cond" wx:for-index="ci">
+          <view class="cond-card {{cond.isBetween ? 'cond-range' : ''}} {{cond.noValue ? 'cond-no-value' : ''}}" wx:for="{{act.conditions}}" wx:key="index" wx:for-item="cond" wx:for-index="ci">
             <view class="cond-head">
               <view class="cond-choice" data-index="{{act.index}}" data-ci="{{ci}}" data-sheet="field" bindtap="onConditionPick">
                 <text class="cond-choice-text">{{cond.fieldLabel}}</text>
@@ -108,7 +112,7 @@
           <view class="control"><text class="control-text">{{modeLabels[targetModeIndex]}}</text><view class="chevron"></view></view>
         </picker>
         <view class="conv-days">
-          <text class="conv-days-label">转化间隔期限</text>
+          <text class="conv-days-label">转化期限</text>
           <input class="control days" type="digit" value="{{query.rule.window_days}}" data-field="window_days" data-number="1" bindinput="onRuleField" />
           <text class="conv-days-unit">天</text>
         </view>
