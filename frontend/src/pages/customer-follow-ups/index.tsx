@@ -12,6 +12,16 @@ import { customerFollowUpApi, type CustomerFollowUpNote, type CustomerFollowUpRo
 
 const PAGE_SIZE = 20
 /** 三类内容都能改：来访需求 / 客户信息 / 跟进点 */
+/** 列表列（列标题与每张日期卡片共用同一套宽度，保证上下对齐） */
+const LIST_COLUMNS = [
+  { key: "customer", label: "客户", width: "10%" },
+  { key: "identity", label: "客户身份", width: "8%" },
+  { key: "activities", label: "当天参加的活动", width: "13%" },
+  { key: "visit_need", label: "来访需求", width: "19%" },
+  { key: "customer_info", label: "客户信息", width: "19%" },
+  { key: "follow_up", label: "跟进点", width: "19%" },
+  { key: "updated", label: "更新时间", width: "12%" },
+]
 const NOTE_FIELDS = [
   { key: "visit_need" as const, label: "来访需求" },
   { key: "customer_info" as const, label: "客户信息" },
@@ -169,99 +179,79 @@ export default function CustomerFollowUpsPage() {
             <button type="button" onClick={() => { setDateFrom(""); setDateTo("") }} className="text-[12px] text-[#3370ff] hover:underline">清除</button>
           )}
         </div>
-        <Table className="w-full table-fixed [&_td]:min-w-0 [&_th]:min-w-0">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[9%] !pl-4">客户</TableHead>
-              <TableHead className="w-[7%]">客户身份</TableHead>
-              <TableHead className="w-[11%]">当天参加的活动</TableHead>
-              <TableHead className="w-[21%]">来访需求</TableHead>
-              <TableHead className="w-[21%]">客户信息</TableHead>
-              <TableHead className="w-[22%]">跟进点</TableHead>
-              <TableHead className="w-[9%] pr-4">更新时间</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {dateGroups.map(group => (
-              <Fragment key={group.date}>
-                {/* 日期做成分隔行：整行铺满，下面的人属于这一天 */}
-                <TableRow className="border-0 bg-white hover:bg-white">
-                  <TableCell colSpan={7} className="!pl-4 pt-3 pb-1">
-                    <div className="flex items-center justify-between rounded-[4px] bg-[#f5f6f7] px-3 py-1.5">
-                      <span className="text-[12.5px] font-medium text-[#2b2f36]">{group.date || "未记录日期"}</span>
-                      <span className="text-[11px] text-[#9aa1a9]">{group.items.length} 人</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-                {group.items.map(row => (
-              <TableRow key={row.id} className="align-top">
-                <TableCell className="align-top whitespace-normal">
-                  <button
-                    type="button"
-                    onClick={() => setDetailCustomerId(row.customer_id)}
-                    className="break-words text-left text-[12.5px] text-[#2b2f36] hover:underline"
-                    title="查看客户详情"
-                  >
-                    {row.customer_name || "未命名"}
-                  </button>
-                </TableCell>
-                <TableCell className="align-top whitespace-normal text-[12.5px] text-[#4e535a]">
-                  {row.customer_identity || <EmptyValue />}
-                </TableCell>
-                <TableCell className="align-top whitespace-normal text-[12.5px] text-[#4e535a]">
-                  {(row.activities || []).length ? (
-                    <span className="block break-words" title={(row.activities || []).join("、")}>{row.activities.join("、")}</span>
-                  ) : (
-                    <EmptyValue />
-                  )}
-                </TableCell>
-                {NOTE_FIELDS.map(({ key }) => {
-                  const note = row[key]
-                  return (
-                    <TableCell key={key} className="align-top whitespace-normal">
-                      {note ? (
-                        <button
-                          type="button"
-                          onClick={() => openEditor(row, key)}
-                          className="block w-full break-words text-left text-[12.5px] leading-5 text-[#2b2f36] hover:text-[#3370ff]"
-                          title="点击修改（内容过长时只显示前三行）"
-                        >
-                          <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                            {note.content}
-                          </span>
-                        </button>
-                      ) : (
-                        /* 没填过的位置直接做成输入框的样子，点一下就能填 */
-                        <button
-                          type="button"
-                          onClick={() => openEditor(row, key)}
-                          className="flex h-8 w-full items-center rounded-[4px] border border-[#e1e4e7] bg-white px-2.5 text-left text-[12px] text-[#9aa1a9] transition-colors hover:border-[#b9cdf8] hover:bg-white hover:text-[#4e535a]"
-                        >
-                          点击填写
-                        </button>
-                      )}
-                    </TableCell>
-                  )
-                })}
-                <TableCell className="align-top whitespace-normal pr-4 text-[12px] text-[#8f959e]">{formatTime(row.updated_at)}</TableCell>
-              </TableRow>
+        {/* 列标题只出现一次，每个日期一张卡片 */}
+        <div className="px-4 pt-3">
+          <table className="w-full table-fixed border-collapse text-[11px] text-[#9aa1a9]">
+            <colgroup>{LIST_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
+            <thead>
+              <tr>
+                {LIST_COLUMNS.map((column, index) => (
+                  <th key={column.key} className={`py-2 text-left font-normal ${index === 0 ? "pl-3" : ""}`}>{column.label}</th>
                 ))}
-              </Fragment>
-            ))}
-            {!rows.length && !loading && (
-              <TableRow>
-                <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">
-                  {searchKeyword ? "没有匹配的跟进记录" : "你还没有填写过来访需求、客户信息或跟进点"}
-                </TableCell>
-              </TableRow>
-            )}
-            {loading && !rows.length && (
-              <TableRow>
-                <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">加载中…</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              </tr>
+            </thead>
+          </table>
+        </div>
+        <div className="space-y-3 px-4 pb-3">
+          {!rows.length && !loading && (
+            <div className="py-14 text-center text-[13px] text-[#8f959e]">
+              {searchKeyword ? "没有匹配的跟进记录" : "你还没有填写过来访需求、客户信息或跟进点"}
+            </div>
+          )}
+          {loading && !rows.length && <div className="py-14 text-center text-[13px] text-[#8f959e]">加载中…</div>}
+          {dateGroups.map(group => (
+            <div key={group.date} className="overflow-hidden rounded-[6px] border border-[#eceef0]">
+              <div className="flex items-center justify-between gap-3 bg-[#fafbfc] px-3 py-2">
+                <span className="text-[12.5px] font-medium text-[#2b2f36]">{group.date || "未记录日期"}</span>
+                <span className="text-[11px] text-[#9aa1a9]">{group.items.length} 人</span>
+              </div>
+              <table className="w-full table-fixed border-collapse">
+                <colgroup>{LIST_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
+                <tbody>
+                  {group.items.map(row => (
+                    <tr key={row.id} className="border-t border-[#f5f6f7] align-top">
+                      <td className="break-words px-3 py-2.5 pl-3 text-[12px] text-[#2b2f36]">
+                        <button type="button" onClick={() => setDetailCustomerId(row.customer_id)} className="text-left hover:underline" title="查看客户详情">
+                          {row.customer_name || "未命名"}
+                        </button>
+                      </td>
+                      <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.customer_identity || <EmptyValue />}</td>
+                      <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">
+                        {(row.activities || []).length ? row.activities.join("、") : <EmptyValue />}
+                      </td>
+                      {NOTE_FIELDS.map(({ key }) => {
+                        const note = row[key]
+                        return (
+                          <td key={key} className="px-3 py-2.5">
+                            {note ? (
+                              <button
+                                type="button"
+                                onClick={() => openEditor(row, key)}
+                                className="block w-full break-words text-left text-[12px] leading-5 text-[#4e535a] hover:text-[#3370ff]"
+                                title="点击修改（内容过长时只显示前三行）"
+                              >
+                                <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{note.content}</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openEditor(row, key)}
+                                className="flex h-8 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[12px] text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
+                              >
+                                点击填写
+                              </button>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td className="break-words px-3 py-2.5 text-[12px] text-[#8f959e]">{formatTime(row.updated_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
         <div className="px-4 pb-3">
           <PaginationBar
             currentPage={page}
