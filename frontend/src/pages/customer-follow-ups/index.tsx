@@ -184,9 +184,10 @@ export default function CustomerFollowUpsPage() {
           <TableBody>
             {dateGroups.map(group => (
               <Fragment key={group.date}>
-                <TableRow className="h-0 border-0 hover:bg-transparent">
-                  <TableCell colSpan={7} className="border-0 p-0">
-                    <div className="mx-4 mt-3 flex items-center justify-between rounded-t-[6px] border border-b-0 border-[#eceef0] bg-[#fafbfc] px-3 py-2">
+                {/* 日期做成分隔行：整行铺满，下面的人属于这一天 */}
+                <TableRow className="border-0 bg-white hover:bg-white">
+                  <TableCell colSpan={7} className="!pl-4 pt-3 pb-1">
+                    <div className="flex items-center justify-between rounded-[4px] bg-[#f5f6f7] px-3 py-1.5">
                       <span className="text-[12.5px] font-medium text-[#2b2f36]">{group.date || "未记录日期"}</span>
                       <span className="text-[11px] text-[#9aa1a9]">{group.items.length} 人</span>
                     </div>
