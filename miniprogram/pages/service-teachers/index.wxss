@@ -603,8 +603,3 @@
 .p-group-course { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24rpx; font-weight: 500; color: #2b2f36; }
 .p-group-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
 .p-same-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
-/* 参与者：日期分组 */
-.p-date-group { margin-bottom: 20rpx; }
-.p-date-head { display: flex; align-items: baseline; gap: 12rpx; padding: 8rpx 0; border-left: 6rpx solid #3370ff; padding-left: 12rpx; }
-.p-date-title { font-size: 25rpx; font-weight: 500; color: #1f2329; }
-.p-date-meta { font-size: 21rpx; color: #9aa1a9; }

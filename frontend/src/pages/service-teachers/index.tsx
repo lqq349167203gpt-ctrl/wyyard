@@ -365,19 +365,6 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     return () => clearTimeout(timer)
   }, [participantKeyword])
 
-  // 先按日期分组，日期下面再放当天的每堂课
-  const participantDateGroups = useMemo(() => {
-    const map = new Map<string, { date: string; groups: CourseParticipantGroup[]; people: number }>()
-    for (const group of participantGroups) {
-      const key = group.course_date || ""
-      if (!map.has(key)) map.set(key, { date: key, groups: [], people: 0 })
-      const entry = map.get(key)!
-      entry.groups.push(group)
-      entry.people += group.participants.length
-    }
-    return [...map.values()]
-  }, [participantGroups])
-
   const openParticipantEditor = async (row: CourseParticipantRow, field: "visit_need" | "customer_info" | "follow_up") => {
     setParticipantEditing({ row, field })
     setParticipantMyNoteId("")
@@ -865,18 +852,11 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                       </tr>
                     </thead>
                   </table>
-                  {participantDateGroups.map(entry => (
-                    <div key={entry.date} className="space-y-2">
-                      <div className="flex items-baseline gap-2 pt-1">
-                        <span className="h-3 w-[3px] self-center rounded-[1px] bg-[#3370ff]" />
-                        <span className="text-[12.5px] font-medium text-[#2b2f36]">{entry.date || "未记录日期"}</span>
-                        <span className="text-[11px] text-[#9aa1a9]">{entry.groups.length} 场课 · {entry.people} 人</span>
-                      </div>
-                    {entry.groups.map(group => (
+                  {participantGroups.map(group => (
                     <div key={group.course_id} className="overflow-hidden rounded-[6px] border border-[#eceef0]">
                       <div className="flex items-center justify-between gap-3 bg-[#fafbfc] px-3 py-2">
-                        <span className="min-w-0 truncate text-[12px] font-medium text-[#2b2f36]">
-                          {group.course_name || "未命名课程"}
+                        <span className="min-w-0 truncate text-[12.5px] font-medium text-[#2b2f36]">
+                          {group.course_date || ""} · {group.course_name || "未命名课程"}
                         </span>
                         <span className="shrink-0 text-[11px] text-[#9aa1a9]">{group.participants.length} 人</span>
                       </div>
@@ -916,8 +896,6 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                           ))}
                         </tbody>
                       </table>
-                    </div>
-                    ))}
                     </div>
                   ))}
                 </div>

@@ -144,15 +144,10 @@
     <block wx:elif="{{activeTab === 'courses' && courseViewTab === 'participants'}}">
       <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 场课 · {{participantTotalParticipants}} 人</view>
 
-      <!-- 先按日期分组，日期下面再放当天的每堂课 -->
-      <view class="p-date-group" wx:for="{{participantDateGroups}}" wx:key="date" wx:for-item="day" wx:for-index="di">
-        <view class="p-date-head">
-          <text class="p-date-title">{{day.date}}</text>
-          <text class="p-date-meta">{{day.groups.length}} 场课 · {{day.people}} 人</text>
-        </view>
-      <view class="p-group" wx:for="{{day.groups}}" wx:key="course_id" wx:for-item="group" wx:for-index="gi">
+      <!-- 按课程分组：一组 = 一堂课，下面是这堂课的参与者 -->
+      <view class="p-group" wx:for="{{participantGroups}}" wx:key="course_id" wx:for-item="group" wx:for-index="gi">
         <view class="p-group-head">
-          <text class="p-group-course">{{group.course_name || '未命名课程'}}</text>
+          <text class="p-group-course">{{group.dateText}} · {{group.course_name || '未命名课程'}}</text>
           <text class="p-group-count">{{group.participants.length}} 人</text>
         </view>
         <view class="p-record" wx:for="{{group.participants}}" wx:key="id" wx:for-item="item" wx:for-index="index">
@@ -179,7 +174,6 @@
             <view class="p-field-input" wx:else>点击填写</view>
           </view>
         </view>
-      </view>
       </view>
       <view class="loading" wx:if="{{participantLoading}}">加载中...</view>
       <view class="empty" wx:elif="{{!participantGroups.length}}">所选条件下暂无参与者</view>
