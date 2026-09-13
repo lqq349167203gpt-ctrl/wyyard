@@ -847,7 +847,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                     <thead>
                       <tr>
                         {PARTICIPANT_COLUMNS.map((column, index) => (
-                          <th key={column.key} className={`py-2 text-left font-normal ${index === 0 ? "pl-3" : ""}`}>{column.label}</th>
+                          <th key={column.key} className={`px-3 py-2 text-left font-normal ${index === 0 ? "pl-3" : ""}`}>{column.label}</th>
                         ))}
                       </tr>
                     </thead>
