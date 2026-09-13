@@ -375,7 +375,21 @@ module.exports = function createRecordsPage(mode) { return {
         page,
         page_size: 20,
       })
-      const groups = (result.items || []).map(group => this.formatParticipantGroup(group))
+      // 兼容旧后端：返回的是「一行一个参与者」的平铺结构时，按课程重新包成分组
+      const rawItems = result.items || []
+      const grouped = rawItems.length && rawItems[0] && rawItems[0].participants
+        ? rawItems
+        : (() => {
+            const map = {}
+            const list = []
+            rawItems.forEach(row => {
+              const key = row.course_id || `${row.course_date}|${row.course_name}`
+              if (!map[key]) { map[key] = { course_id: key, course_date: row.course_date, course_name: row.course_name, activity_type_label: row.activity_type_label, participants: [] }; list.push(map[key]) }
+              map[key].participants.push(row)
+            })
+            return list
+          })()
+      const groups = grouped.map(group => this.formatParticipantGroup(group))
       const records = reset ? groups : this.data.participantGroups.concat(groups)
       this.setData({
         participantGroups: records,
