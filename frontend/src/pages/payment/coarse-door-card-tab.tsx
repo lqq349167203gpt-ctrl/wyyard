@@ -166,7 +166,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
       setNotes("")
       if (!nextCourseOrganizations.some(item => item.id === courseOrganizationId)) setCourseOrganizationId("")
       if (!formOnly) await loadRecords()
-      setMessage({ text: `已抵扣 ${selectedCourse.deduction_count} 次，原会员卡已返还对应次数`, error: false })
+      setMessage({ text: editRecord ? "修改已保存，课程抵扣已同步" : `已抵扣 ${selectedCourse.deduction_count} 次，原会员卡已返还对应次数`, error: false })
       onSaved?.()
     } catch (error) {
       setMessage({ text: error instanceof Error ? error.message : "扣卡失败", error: true })
@@ -214,7 +214,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交归属</span>
-            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={value => { setSettlementOrganizationId(value); setOrgMissing(false) }} disabled={loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "请选择成交归属"} />
+            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={value => { setSettlementOrganizationId(value); setOrgMissing(false) }} disabled={!!editRecord || loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "请选择成交归属"} />
           </div>
           {/* 成交归属是业绩归属依据：默认不预选，点了保存又没选时才提示 */}
           {orgMissing && !settlementOrganizationId && (
@@ -226,7 +226,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
           <div className="ml-[19px] border-b border-[#ebedf0]" style={{ borderBottomWidth: "0.5px" }} />
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">用户</span>
-            <CustomerSearchInput customers={customers} value={nickname} onChange={value => { const next = typeof value === "string" ? value : ""; setNickname(next); if (!next) setCustomerId("") }} onSelectItem={customer => { setNickname(customer.nickname); setCustomerId(customer.id) }} selectionOnly disabled={!!presetCustomer} placeholder="搜索姓名或昵称" />
+            <CustomerSearchInput customers={customers} value={nickname} onChange={value => { const next = typeof value === "string" ? value : ""; setNickname(next); if (!next) setCustomerId("") }} onSelectItem={customer => { setNickname(customer.nickname); setCustomerId(customer.id) }} selectionOnly disabled={!!presetCustomer || !!editRecord} placeholder="搜索姓名或昵称" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">课程所属</span>
@@ -248,7 +248,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
           <div className="flex justify-end gap-2 border-t pt-2">
             <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>取消</Button>
             <Button size="sm" disabled={!dealDate || !selectedCourse || saving} onClick={handleSubmit}>
-              {saving ? "保存中..." : selectedCourse ? `抵扣 ${selectedCourse.deduction_count} 次` : "保存"}
+              {saving ? "保存中..." : editRecord ? "保存修改" : selectedCourse ? `抵扣 ${selectedCourse.deduction_count} 次` : "保存"}
             </Button>
           </div>
         </div>

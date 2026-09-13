@@ -1,7 +1,12 @@
 {
   "description": "无忧茶院邀约小程序",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "previews" },
+      { "type": "folder", "value": "outputs" },
+      { "type": "suffix", "value": ".html" },
+      { "type": "suffix", "value": ".md" }
+    ],
     "include": []
   },
   "setting": {

@@ -200,15 +200,15 @@
     <!-- 工具按钮放在列表白卡里面（和课程记录页一致），不再浮在灰底上 -->
     <view class="list-head">
       <text class="list-count">共 {{total}} 条</text>
-      <view class="list-actions" wx:if="{{sortFields.length}}">
+      <view class="list-actions">
         <picker wx:if="{{overviewGroup === 'deals'}}" range="{{listViewOptions}}" value="{{listViewIndex}}" bindchange="onListView"><view class="tool-btn tool-btn-flex"><text class="control-text">{{listViewOptions[listViewIndex]}}</text><view class="chevron"></view></view></picker>
         <picker wx:if="{{query.tab === 'overview' && overviewGroup === 'courses' && query.course_view === 'participant'}}" range="{{participantOptions}}" value="{{participantIndex}}" bindchange="onParticipantScope">
           <view class="tool-btn tool-btn-flex"><text class="control-text">{{participantOptions[participantIndex]}}</text><view class="chevron"></view></view>
         </picker>
-        <text class="tool-btn" bindtap="openSortSheet">排序</text>
+        <text class="tool-btn" wx:if="{{sortFields.length}}" bindtap="openSortSheet">排序</text>
         <!-- 列表设置只给引流客户列表用（课程/交易列表按固定列展示） -->
         <text class="tool-btn" wx:if="{{overviewGroup === 'traffic'}}" bindtap="openColumnSheet">列表设置</text>
-        <text class="tool-btn" bindtap="exportData">导出</text>
+        <text class="tool-btn" bindtap="exportData">{{busy ? '导出中' : '导出'}}</text>
       </view>
     </view>
     <view wx:for="{{list}}" wx:key="id" class="record-row" data-index="{{index}}" bindtap="showDetails">

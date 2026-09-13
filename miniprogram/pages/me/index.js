@@ -41,6 +41,7 @@ Page({
       canCustomAnalysis: app.checkPagePermission('custom-analysis'),
       canServiceTeacher: app.checkPagePermission('service-teacher'),
       canCourseRecords: app.checkPagePermission('course-statistics'),
+      canCustomerFollowUps: app.checkPagePermission('customer-follow-ups'),
       canPrincipal: app.checkPagePermission('principal'),
       canOrganizations: app.checkPagePermission('organizations'),
     })
@@ -71,6 +72,9 @@ Page({
   },
   onCourseRecordsTap() {
     wx.navigateTo({ url: '/pages/course-records/index' })
+  },
+  onCustomerFollowUpsTap() {
+    wx.navigateTo({ url: '/pages/customer-follow-ups/index' })
   },
   onPrincipalTap() {
     wx.navigateTo({ url: '/pages/principal/index' })

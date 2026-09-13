@@ -1,7 +1,8 @@
 <view class="page">
-  <!-- 课程记录 / 复盘记录：放到页面顶部（与组织/俱乐部页面的 tab 一致） -->
+  <!-- 课程记录 / 参与者 / 复盘记录：放到页面顶部（与组织/俱乐部页面的 tab 一致） -->
   <view class="course-view-tabs" wx:if="{{activeTab === 'courses'}}">
-    <view class="course-view-tab {{courseViewTab !== 'reviews' ? 'active' : ''}}" data-tab="courses" bindtap="onCourseViewTab">课程记录</view>
+    <view class="course-view-tab {{courseViewTab === 'courses' ? 'active' : ''}}" data-tab="courses" bindtap="onCourseViewTab">课程记录</view>
+    <view class="course-view-tab {{courseViewTab === 'participants' ? 'active' : ''}}" data-tab="participants" bindtap="onCourseViewTab">参与者</view>
     <view class="course-view-tab {{courseViewTab === 'reviews' ? 'active' : ''}}" data-tab="reviews" bindtap="onCourseViewTab">复盘记录</view>
   </view>
   <view class="top-card">
@@ -18,6 +19,23 @@
         <text class="filter-label">课程类型</text>
         <picker class="filter-picker" mode="selector" range="{{courseTypes}}" range-key="label" value="{{courseTypeIndex}}" bindchange="onCourseTypeChange">
           <view class="picker-value"><text class="picker-text">{{courseTypes[courseTypeIndex].label}}</text><view class="picker-arrow"></view></view>
+        </picker>
+      </view>
+      <!-- 参与者页签的筛选跟上面的课程筛选同一套样式 -->
+      <view class="filter-row" wx:if="{{courseViewTab === 'participants'}}">
+        <text class="filter-label">昵称</text>
+        <input class="filter-input" value="{{participantKeyword}}" placeholder="昵称或姓名" placeholder-class="filter-input-placeholder" confirm-type="search" bindinput="onParticipantKeywordDebounced" bindconfirm="onParticipantSearch" />
+      </view>
+      <view class="filter-row" wx:if="{{courseViewTab === 'participants'}}">
+        <text class="filter-label">客户身份</text>
+        <picker class="filter-picker" mode="selector" range="{{participantMemberTypes}}" range-key="label" value="{{participantMemberTypeIndex}}" bindchange="onParticipantMemberType">
+          <view class="picker-value"><text class="picker-text">{{participantMemberTypes[participantMemberTypeIndex].label}}</text><view class="picker-arrow"></view></view>
+        </picker>
+      </view>
+      <view class="filter-row" wx:if="{{courseViewTab === 'participants'}}">
+        <text class="filter-label">人员</text>
+        <picker class="filter-picker" mode="selector" range="{{participantIdentityOptions}}" range-key="label" value="{{participantIdentityIndex}}" bindchange="onParticipantIdentity">
+          <view class="picker-value"><text class="picker-text">{{participantIdentityOptions[participantIdentityIndex].label}}</text><view class="picker-arrow"></view></view>
         </picker>
       </view>
       <view class="filter-row align-start">
@@ -72,7 +90,7 @@
   </view>
 
   <!-- 复盘记录只看复盘内容，不需要课程数/课时数/参与人次这三张汇总卡 -->
-  <view class="summary-card" wx:if="{{summaryCards.length && !(activeTab === 'courses' && courseViewTab === 'reviews')}}">
+  <view class="summary-card" wx:if="{{summaryCards.length && !(activeTab === 'courses' && courseViewTab !== 'courses')}}">
     <view class="summary-item" wx:for="{{summaryCards}}" wx:key="label">
       <text class="summary-label">{{item.label}}</text>
       <view><text class="summary-value">{{item.value}}</text><text class="summary-unit">{{item.unit}}</text></view>
@@ -121,6 +139,38 @@
           <text class="review-text {{reviewExpanded[item.id] ? 'expanded' : ''}}">{{item.reviewText}}</text>
         </view>
       </view>
+    </block>
+
+    <block wx:elif="{{activeTab === 'courses' && courseViewTab === 'participants'}}">
+      <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 人（含其他人填写的内容，点内容可以填自己那份）</view>
+
+      <view class="p-record" wx:for="{{participantRecords}}" wx:key="id">
+        <view class="p-head">
+          <text class="p-date">{{item.dateText}}</text>
+          <view class="p-title">
+            <text class="p-name" data-id="{{item.customer_id}}" bindtap="onParticipantCustomer">{{item.nickname || '未命名'}}</text>
+            <text class="p-identity" wx:if="{{item.identityText}}">{{item.identityText}}</text>
+          </view>
+        </view>
+        <text class="p-course">{{item.course_name || '—'}}</text>
+        <view class="p-field" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
+          <text class="p-field-label">当天来访需求</text>
+          <text class="p-field-value" wx:if="{{item.visit_need}}">{{item.visit_need}}</text>
+          <view class="p-field-input" wx:else>点击填写</view>
+        </view>
+        <view class="p-field" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
+          <text class="p-field-label">客户信息</text>
+          <text class="p-field-value" wx:if="{{item.customer_info}}">{{item.customer_info}}</text>
+          <view class="p-field-input" wx:else>点击填写</view>
+        </view>
+        <view class="p-field" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
+          <text class="p-field-label">跟进点</text>
+          <text class="p-field-value" wx:if="{{item.follow_up}}">{{item.follow_up}}</text>
+          <view class="p-field-input" wx:else>点击填写</view>
+        </view>
+      </view>
+      <view class="loading" wx:if="{{participantLoading}}">加载中...</view>
+      <view class="empty" wx:elif="{{!participantRecords.length}}">所选条件下暂无参与者</view>
     </block>
 
     <block wx:elif="{{activeTab === 'courses'}}">
@@ -175,5 +225,27 @@
       </view>
       <view class="load-more" wx:if="{{followUpHasMore}}">继续上拉加载</view>
     </block>
+  </view>
+
+  <!-- 参与者：填写 / 修改自己那一条（上面显示所有人填写的内容做参考） -->
+  <view class="sheet-mask" wx:if="{{participantEditing}}" catchtouchmove="noop" bindtap="closeParticipantEdit"></view>
+  <view class="edit-sheet" wx:if="{{participantEditing}}">
+    <view class="sheet-head">
+      <text class="sheet-title">填写{{participantEditing.title}}</text>
+      <text class="sheet-close" bindtap="closeParticipantEdit">关闭</text>
+    </view>
+    <scroll-view class="edit-body" scroll-y>
+      <text class="edit-subtitle">{{participantEditing.dateText}} · {{participantEditing.nickname}} · {{participantEditing.courseName}}</text>
+      <view class="edit-reference" wx:if="{{participantEditing.all}}">
+        <text class="edit-reference-title">这一条已经填写的内容（含其他人填写的）</text>
+        <text class="edit-reference-text">{{participantEditing.all}}</text>
+      </view>
+      <text class="edit-label">我填写的内容</text>
+      <textarea class="edit-input" value="{{participantDraft}}" maxlength="5000" placeholder="写清楚这次来的情况和下一步跟进安排" bindinput="onParticipantDraft" />
+    </scroll-view>
+    <view class="edit-actions">
+      <text class="edit-button cancel" bindtap="closeParticipantEdit">取消</text>
+      <text class="edit-button confirm {{participantSaving ? 'disabled' : ''}}" bindtap="saveParticipantEdit">{{participantSaving ? '保存中' : '保存'}}</text>
+    </view>
   </view>
 </view>

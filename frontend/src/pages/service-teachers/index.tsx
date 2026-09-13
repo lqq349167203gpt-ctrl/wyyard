@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Download } from "lucide-react"
 import ExcelJS from "exceljs"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import {
@@ -12,6 +14,8 @@ import { usePagination } from "@/hooks/use-pagination"
 import {
   serviceTeacherCustomerApi,
   statisticsApi,
+  customerFollowUpApi,
+  type CourseParticipantRow,
   type CourseStatistics,
   type ServiceTeacherCustomerItem,
   type ServiceTeacherCustomerSummary,
@@ -30,13 +34,14 @@ const DEFAULT_ACTIVITY_TYPES = [
   { value: "ics", label: "内部课程" },
 ]
 type ServiceTeacherTab = "courses" | "follow-ups"
-type CourseViewTab = "courses" | "reviews"
+type CourseViewTab = "courses" | "reviews" | "participants"
 
 const EMPTY_ID_LIST: string[] = []
 type CourseRangePreset = "today" | "week" | "month" | "year" | "all" | "custom"
 type CourseRow = CourseStatistics["courses"][number]
 const COURSE_VIEW_TABS: Array<{ key: CourseViewTab; label: string }> = [
   { key: "courses", label: "课程记录" },
+  { key: "participants", label: "参与者" },
   { key: "reviews", label: "复盘记录" },
 ]
 const COURSE_RANGE_PRESETS: Array<{ value: Exclude<CourseRangePreset, "custom">; label: string }> = [
@@ -174,6 +179,24 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [truncatedReviewIds, setTruncatedReviewIds] = useState<string[]>([])
   const reviewRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
   const [reviewMeasureTick, setReviewMeasureTick] = useState(0)
+  // 「参与者」页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点（可以填自己那份）
+  const [participantRows, setParticipantRows] = useState<CourseParticipantRow[]>([])
+  const [participantTotal, setParticipantTotal] = useState(0)
+  const [participantTotalPages, setParticipantTotalPages] = useState(1)
+  const [participantPage, setParticipantPage] = useState(1)
+  const [participantLoading, setParticipantLoading] = useState(false)
+  const [participantKeyword, setParticipantKeyword] = useState("")
+  const [participantSearchKeyword, setParticipantSearchKeyword] = useState("")
+  const [participantMemberType, setParticipantMemberType] = useState("")
+  const [participantIdentityGroup, setParticipantIdentityGroup] = useState("")
+  const [participantMemberTypes, setParticipantMemberTypes] = useState<string[]>([])
+  const [participantEditing, setParticipantEditing] = useState<{
+    row: CourseParticipantRow
+    field: "visit_need" | "customer_info" | "follow_up"
+  } | null>(null)
+  const [participantDraft, setParticipantDraft] = useState("")
+  const [participantMyNoteId, setParticipantMyNoteId] = useState("")
+  const [participantSaving, setParticipantSaving] = useState(false)
 
   const followUpDefinition: ServiceTeacherFollowUpDefinition = includeCustomerInfo && includeFollowUp
     ? "both"
@@ -288,9 +311,75 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     })
   }, [reviewPagination.paginatedItems, reviewContentExpanded, courseViewTab, reviewMeasureTick])
 
-  const courseListTitle = courseViewTab === "reviews" ? "复盘记录" : "课程列表"
-  const courseListCount = courseViewTab === "reviews" ? reviewRows.length : courseRows.length
-  const courseListUnit = courseViewTab === "reviews" ? "条" : "场"
+  const courseListTitle = courseViewTab === "reviews" ? "复盘记录" : courseViewTab === "participants" ? "参与者" : "课程列表"
+  const courseListCount = courseViewTab === "reviews" ? reviewRows.length : courseViewTab === "participants" ? participantTotal : courseRows.length
+  const courseListUnit = courseViewTab === "reviews" ? "条" : courseViewTab === "participants" ? "人" : "场"
+
+  // 「参与者」页签：跟着课程筛选（时间/课程类型/老师）走，外加昵称、客户身份、新人老人三个筛选
+  const loadParticipants = useCallback((nextPage = 1, keyword = participantSearchKeyword) => {
+    if (!selectedTeacherId) { setParticipantRows([]); setParticipantTotal(0); return }
+    setParticipantLoading(true)
+    serviceTeacherCustomerApi.courseParticipants({
+      teacher_id: selectedTeacherId,
+      date_from: courseDateFrom,
+      date_to: courseDateTo,
+      all_dates: courseRangePreset === "all",
+      activity_type: courseActivityType,
+      keyword,
+      member_type: participantMemberType,
+      identity_group: participantIdentityGroup,
+      page: nextPage,
+      page_size: PAGE_SIZE,
+    }).then(result => {
+      setParticipantRows(result.items || [])
+      setParticipantTotal(result.total || 0)
+      setParticipantTotalPages(result.total_pages || 1)
+      setParticipantPage(result.page || nextPage)
+      setParticipantMemberTypes(result.member_types || [])
+    }).catch(() => {
+      setParticipantRows([]); setParticipantTotal(0); setParticipantTotalPages(1)
+    }).finally(() => setParticipantLoading(false))
+  }, [selectedTeacherId, courseDateFrom, courseDateTo, courseRangePreset, courseActivityType, participantMemberType, participantIdentityGroup, participantSearchKeyword])
+
+  useEffect(() => {
+    if (courseViewTab !== "participants") return
+    loadParticipants(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseViewTab, selectedTeacherId, courseDateFrom, courseDateTo, courseRangePreset, courseActivityType, participantMemberType, participantIdentityGroup, participantSearchKeyword])
+
+  // 搜索框输入即查（防抖），不需要再点「查询」
+  useEffect(() => {
+    const timer = setTimeout(() => setParticipantSearchKeyword(participantKeyword.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [participantKeyword])
+
+  const openParticipantEditor = async (row: CourseParticipantRow, field: "visit_need" | "customer_info" | "follow_up") => {
+    setParticipantEditing({ row, field })
+    setParticipantMyNoteId("")
+    setParticipantDraft("")
+    if (!row.visit_id) return
+    try {
+      const mine = await customerFollowUpApi.myNote(row.visit_id, field)
+      setParticipantMyNoteId(mine?.id || "")
+      setParticipantDraft(mine?.content || "")
+    } catch { /* 拿不到就按新填写处理 */ }
+  }
+
+  const saveParticipantNote = async () => {
+    if (!participantEditing) return
+    const content = participantDraft.trim()
+    if (!content) return
+    setParticipantSaving(true)
+    try {
+      const { row, field } = participantEditing
+      if (participantMyNoteId) await customerFollowUpApi.update(participantMyNoteId, content)
+      else await customerFollowUpApi.create(row.visit_id, field, content)
+      setParticipantEditing(null)
+      loadParticipants(participantPage)
+    } finally {
+      setParticipantSaving(false)
+    }
+  }
 
   useEffect(() => {
     coursePagination.goToPage(1)
@@ -588,6 +677,36 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                   aria-label="课程结束日期"
                 />
               </div>
+              {/* 参与者页签的筛选跟这一行放在一起，不再单独占一行 */}
+              {courseViewTab === "participants" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="ml-1 text-[12px] text-[#8f959e]">昵称</span>
+                  <Input
+                    value={participantKeyword}
+                    onChange={event => setParticipantKeyword(event.target.value)}
+                    placeholder="按昵称或姓名搜索"
+                    className="h-7 w-[150px] rounded-[4px] border-[#dee0e3] text-[12px] shadow-none focus-visible:ring-0"
+                  />
+                  <span className="ml-1 text-[12px] text-[#8f959e]">客户身份</span>
+                  <SelectDropdown
+                    size="sm"
+                    className="w-[118px]"
+                    value={participantMemberType}
+                    options={[{ value: "", label: "全部客户身份" }, ...participantMemberTypes.map(item => ({ value: item, label: item }))]}
+                    onChange={setParticipantMemberType}
+                    buttonClassName="border-[#dee0e3] bg-white"
+                  />
+                  <span className="ml-1 text-[12px] text-[#8f959e]">人员</span>
+                  <SelectDropdown
+                    size="sm"
+                    className="w-[100px]"
+                    value={participantIdentityGroup}
+                    options={[{ value: "", label: "全部人员" }, { value: "新人", label: "新人" }, { value: "老人", label: "老人" }]}
+                    onChange={setParticipantIdentityGroup}
+                    buttonClassName="border-[#dee0e3] bg-white"
+                  />
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -643,7 +762,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
           )}
         </div>
 
-        {courseViewTab !== "reviews" && (
+        {courseViewTab === "courses" && (
           <div className="border-b border-[#f0f0f0] px-4 py-3">
             <div className="mb-2 text-[12px] font-medium text-[#4e535a]">课程概览</div>
             <div className="grid grid-cols-3 gap-2">
@@ -698,6 +817,80 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             <div className="py-16 text-center text-sm text-muted-foreground">暂无可选课程老师</div>
           ) : courseLoading ? (
             <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+          ) : courseViewTab === "participants" ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-center justify-between gap-3 border-b border-[#f0f0f0] px-4 py-2">
+                <span className="text-[12px] text-[#8f959e]">参与者列表（含其他人填写的内容，点内容可以填写自己那份）</span>
+                <span className="text-[12px] text-[#8f959e]">共 {participantTotal} 人</span>
+              </div>
+                {participantLoading ? (
+                <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
+              ) : participantRows.length === 0 ? (
+                <div className="py-16 text-center text-sm text-muted-foreground">所选条件下暂无参与者</div>
+              ) : (
+                <div>
+                  {/* 宽度跟着页面走，不设最小宽度：长文本靠换行和收起，不再把页面撑破 */}
+                  <Table className="w-full table-fixed">
+                    <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
+                      <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
+                        {/* 列宽按百分比分配，合计 100%，表格永远不超过页面宽度 */}
+                        <TableHead className="h-9 w-[8%] px-2 pl-4 text-[11px] font-normal">课程日期</TableHead>
+                        <TableHead className="h-9 w-[9%] px-2 text-[11px] font-normal">昵称</TableHead>
+                        <TableHead className="h-9 w-[8%] px-2 text-[11px] font-normal">身份</TableHead>
+                        <TableHead className="h-9 w-[15%] px-2 text-[11px] font-normal">课程名称</TableHead>
+                        <TableHead className="h-9 w-[20%] px-2 text-[11px] font-normal">当天的来访需求</TableHead>
+                        <TableHead className="h-9 w-[20%] px-2 text-[11px] font-normal">客户信息</TableHead>
+                        <TableHead className="h-9 w-[20%] px-2 pr-4 text-[11px] font-normal">跟进点</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {participantRows.map(row => (
+                        <TableRow key={row.id} className="align-top text-[12px]">
+                          <TableCell className="whitespace-normal px-3 py-2 pl-4 text-[12px] tabular-nums text-[#8f959e]">{row.course_date || <EmptyDash />}</TableCell>
+                          <TableCell className="whitespace-normal px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCustomerId(row.customer_id)}
+                              className="break-words text-left text-[12px] text-[#2b2f36] hover:underline"
+                            >{row.nickname || <EmptyDash />}</button>
+                          </TableCell>
+                          <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</TableCell>
+                          <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">{row.course_name || <EmptyDash />}</TableCell>
+                          {(["visit_need", "customer_info", "follow_up"] as const).map(field => (
+                            <TableCell key={field} className="whitespace-normal px-3 py-2">
+                              {row[field] ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openParticipantEditor(row, field)}
+                                  className="block w-full break-words text-left text-[12px] leading-5 text-[#4e535a] hover:text-[#3370ff]"
+                                  title="点击填写自己的内容"
+                                >
+                                  <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{row[field]}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openParticipantEditor(row, field)}
+                                  className="flex h-8 w-full items-center rounded-[4px] border border-[#e1e4e7] bg-[#fafbfc] px-2.5 text-left text-[12px] text-[#9aa1a9] hover:border-[#b9cdf8] hover:bg-white hover:text-[#4e535a]"
+                                >点击填写</button>
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <PaginationBar
+                currentPage={participantPage}
+                totalPages={participantTotalPages}
+                totalItems={participantTotal}
+                startIndex={participantTotal === 0 ? 0 : (participantPage - 1) * PAGE_SIZE + 1}
+                endIndex={Math.min(participantPage * PAGE_SIZE, participantTotal)}
+                onPageChange={next => loadParticipants(next)}
+              />
+            </div>
           ) : courseViewTab === "reviews" ? (
             reviewRows.length === 0 ? (
               <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无复盘记录</div>
@@ -1006,6 +1199,43 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       <Dialog open={!!selectedCustomerId} onOpenChange={open => { if (!open) setSelectedCustomerId(null) }}>
         <DialogContent className="max-h-[90vh] max-w-[1180px] gap-0 overflow-y-auto p-0">
           <DetailView selectedCustomerId={selectedCustomerId} onClearSelection={() => setSelectedCustomerId(null)} hideSearch />
+        </DialogContent>
+      </Dialog>
+
+      {/* 参与者页签：填写/修改自己这一条（上面显示所有人填写的内容做参考） */}
+      <Dialog open={!!participantEditing} onOpenChange={open => { if (!open && !participantSaving) setParticipantEditing(null) }}>
+        <DialogContent initialFocus={false} className="w-[560px] max-w-[92vw] max-h-[88vh] gap-0 overflow-hidden rounded-[6px] border-[0.5px] border-[#e8eaed] p-0">
+          <div className="border-b-[0.5px] border-[#f0f0f0] px-5 pb-2 pt-3">
+            <h3 className="text-[14px] font-normal text-[#1f2329]">
+              填写{participantEditing?.field === "visit_need" ? "来访需求" : participantEditing?.field === "customer_info" ? "客户信息" : "跟进点"}
+            </h3>
+          </div>
+          <div className="max-h-[64vh] space-y-3 overflow-y-auto px-5 py-4">
+            <p className="text-[12px] text-[#8f959e]">
+              {participantEditing?.row.course_date} · {participantEditing?.row.nickname} · {participantEditing?.row.course_name}
+            </p>
+            {participantEditing && participantEditing.row[participantEditing.field] && (
+              <div className="max-h-[180px] overflow-y-auto rounded-[4px] bg-[#f7f8fa] px-3 py-2">
+                <div className="mb-1 text-[11px] text-[#8f959e]">这一条已经填写的内容（含其他人填写的）</div>
+                <div className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{participantEditing.row[participantEditing.field]}</div>
+              </div>
+            )}
+            <div>
+              <div className="mb-1 text-[11px] text-[#8f959e]">我填写的内容</div>
+              <textarea
+                value={participantDraft}
+                onChange={event => setParticipantDraft(event.target.value)}
+                rows={5}
+                maxLength={5000}
+                placeholder="写清楚这次来的情况和下一步跟进安排"
+                className="w-full rounded-[4px] border-[0.5px] border-[#e1e4e7] px-3 py-2 text-[12.5px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#b0b5bb] focus:border-[#b9cdf8]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t-[0.5px] border-[#f0f0f0] px-5 py-2.5">
+            <Button variant="outline" size="sm" onClick={() => setParticipantEditing(null)} disabled={participantSaving} className="h-8 w-[88px] rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">取消</Button>
+            <Button size="sm" onClick={saveParticipantNote} disabled={participantSaving || !participantDraft.trim()} className="h-8 w-[104px] rounded-[4px] border border-[#3370ff] bg-[#3370ff] text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{participantSaving ? "保存中" : "保存"}</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

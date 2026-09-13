@@ -217,6 +217,7 @@ Page({
     coarseRecords: [],
     coarseDeletingId: '',
     coarseEntryVisible: false,
+    coarseEditData: null,
     coarseEntryPickerOpen: false,
   },
 
@@ -360,7 +361,13 @@ Page({
   },
 
   onCoarseEntryOpen() {
-    this.setData({ coarseEntryVisible: true, coarseEntryPickerOpen: false })
+    this.setData({ coarseEntryVisible: true, coarseEntryPickerOpen: false, coarseEditData: null })
+  },
+
+  onCoarseEditTap(e) {
+    const record = this.data.coarseRecords.find(item => item.id === e.currentTarget.dataset.id)
+    if (!record || !record._canDelete) return
+    this.setData({ coarseEditData: record, coarseEntryVisible: true, coarseEntryPickerOpen: false })
   },
 
   onCoarseEntryClose() {

@@ -49,6 +49,7 @@ SECTION_MAP = {
     "/api/agents": "AI 配置",
     "/api/ai-configs": "AI 配置",
     "/api/class-records": "课表",
+    "/api/customer-follow-ups": "客户跟进",
     "/api/accounts": "账号管理",
     "/api/positions": "账号管理",
     "/api/healing-identities": "疗愈老师",

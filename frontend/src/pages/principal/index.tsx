@@ -899,7 +899,9 @@ export default function PrincipalPage() {
   }
   async function download() {
     setBusy(true); setError("")
-    try { const blob = await principalApi.download({ ...query, tab: listTab, list_view: listView, breakdown: serverPicks }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "组织俱乐部.xlsx"; link.click(); URL.revokeObjectURL(url) }
+    try { const blob = await principalApi.download({ ...query, tab: listTab, list_view: listView, breakdown: serverPicks,
+      ...(showTrafficList ? { export_view: "traffic" as const, export_customer_ids: sortedTrafficCustomers.map(customer => customer.id).filter((id): id is string => !!id) } : {}),
+    }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = showTrafficList ? "引流客户.xlsx" : "组织俱乐部.xlsx"; link.click(); URL.revokeObjectURL(url) }
     catch (e) { setError(e instanceof Error ? e.message : "导出失败") } finally { setBusy(false) }
   }
   // 列表标题与「自定义筛选」结果区一致：日期区间 · 说明
@@ -1930,6 +1932,11 @@ export default function PrincipalPage() {
               </button>
             )}
             <ColumnSettings config={listTrafficColumns} onChange={changeTrafficColumns} />
+            <button type="button" onClick={download}
+              disabled={busy || pagination.loading || !!pagination.error}
+              className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50">
+              <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
+            </button>
             <button
               type="button"
               onClick={() => setExpandTrafficCells(current => !current)}

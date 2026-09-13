@@ -1,5 +1,5 @@
 const { authApi, organizationApi } = require('../../utils/api')
-const { DEV } = require('../../utils/config')
+const { DEV, BASE_URL } = require('../../utils/config')
 
 const DEV_ACCOUNTS = [
   { username: 'admin', label: '管理员' },
@@ -176,6 +176,8 @@ Page({
     wx.setStorageSync('currentUser', data.account)
     wx.setStorageSync('userPermissions', data.permissions)
     wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' })
+    // 记住这个登录态属于哪个数据源（本地 / 正式服务器），换源后要重新登录
+    wx.setStorageSync('auth_base_url', BASE_URL)
 
     // 开发模式登录不改动用户保存的账号密码
     if (this.data.loginMode === 'password') {

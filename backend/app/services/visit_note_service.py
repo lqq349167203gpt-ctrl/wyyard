@@ -117,6 +117,25 @@ def list_notes(visit_ids: Iterable[str]) -> list[VisitNote]:
     )
 
 
+def list_notes_by_creator(
+    account_id: str = "",
+    owner_name: str = "",
+    username: str = "",
+) -> list[VisitNote]:
+    """「客户跟进」页用：只看这个人自己填过的来访需求 / 客户信息 / 跟进点。"""
+    if not account_id and not owner_name and not username:
+        return []
+    return sorted(
+        (
+            note
+            for note in _notes.values()
+            if not note.is_deleted and can_manage_note(note, account_id, owner_name, username)
+        ),
+        key=lambda note: (note.updated_at, note.id),
+        reverse=True,
+    )
+
+
 def list_visible_notes(
     visit_ids: Iterable[str],
     account_id: str = "",

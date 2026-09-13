@@ -3,6 +3,9 @@
 const { BASE_URL } = require('./config')
 console.info('[api] 当前数据源:', BASE_URL)
 
+// 登录态是跟数据源绑定的：本地和正式服务器的 token 互不认，换源必须重新登录
+const AUTH_SOURCE_KEY = 'auth_base_url'
+
 // 独立于 app.globalData._loginReady 的登录 promise，防止旧代码立即 resolve 干扰
 let _loginPromise = null
 let _silentLoginPromise = null
@@ -38,6 +41,8 @@ function _saveLoginState(data) {
   wx.setStorageSync('currentUser', data.account)
   wx.setStorageSync('userPermissions', permissions)
   wx.setStorageSync('userEditPermissions', editPermissions)
+  // 记住这个登录态是哪个数据源发的，换源后旧 token 一定无效
+  wx.setStorageSync(AUTH_SOURCE_KEY, BASE_URL)
 
   const app = getApp()
   if (app) {
@@ -143,6 +148,7 @@ function _clearAuthAndGoLogin(reason) {
     disabled: '账号已停用，请联系管理员',
     password_changed: '密码已修改，请重新登录',
     kicked: '账号已在其他设备登录',
+    source_changed: '数据源已切换，请重新登录',
   }
   wx.showToast({ title: messages[reason] || '登录状态已失效', icon: 'none' })
   setTimeout(() => {
@@ -151,6 +157,22 @@ function _clearAuthAndGoLogin(reason) {
       complete: () => { _logoutScheduled = false },
     })
   }, 1000)
+}
+
+/**
+ * 数据源（本地 / 正式服务器）换了以后，旧 token 在新后端一定验不过：
+ * 与其让每个请求都走一次 401 → 静默重登失败 → 弹「网络不稳定」，
+ * 不如启动时直接把登录态清掉、回登录页重新登一次。
+ * 返回 true 表示已经清掉登录态。
+ */
+function ensureAuthSource() {
+  const token = wx.getStorageSync('auth_token')
+  if (!token) return false
+  const from = wx.getStorageSync(AUTH_SOURCE_KEY)
+  if (from === BASE_URL) return false
+  // from 为空＝老版本没记过数据源，无法判断这个 token 属于谁，同样重新登一次
+  _clearAuthAndGoLogin('source_changed')
+  return true
 }
 
 // base64 字符表（JWT 使用 base64url，解码前需先替换 -/_ 并补齐 padding）
@@ -768,10 +790,10 @@ const paymentApi = {
     delete: (id) => request(`/api/project-deductions/${id}`, { method: 'DELETE' }),
     availableItems: (customerId, projectType) =>
       request(`/api/project-deductions/available-items?customer_id=${customerId}&project_type=${projectType}`),
-    coarseDoorOptions: (customerId) =>
-      request(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}`),
-    createCoarseDoorCourse: (data) =>
-      request('/api/project-deductions/coarse-door-course', { method: 'POST', data }),
+    coarseDoorOptions: (customerId, editingId = '') =>
+      request(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}&editing_id=${encodeURIComponent(editingId)}`),
+    createCoarseDoorCourse: (data, editingId = '') =>
+      request(`/api/project-deductions/coarse-door-course${editingId ? '/' + encodeURIComponent(editingId) : ''}`, { method: editingId ? 'PATCH' : 'POST', data }),
   },
 
   // 退费
@@ -808,6 +830,13 @@ const communicationRecordApi = {
 
 // 服务老师
 const serviceTeacherApi = {
+  courseParticipants: (params = {}) => {
+    const qs = Object.entries(params)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+      .join('&')
+    return request(`/api/service-teacher-customers/course-participants${qs ? '?' + qs : ''}`)
+  },
   metadata: (courses = false) => request(`/api/service-teacher-customers/${courses ? 'course-metadata' : 'metadata'}`),
   list: (params = {}) => {
     const qs = Object.entries(params)
@@ -864,6 +893,7 @@ const customAnalysisApi = {
 }
 
 module.exports = {
+  ensureAuthSource,
   principalApi: {
     metadata: () => request('/api/principal/metadata'),
     rules: () => request('/api/principal/rules'),
@@ -878,6 +908,19 @@ module.exports = {
   visitApi,
   visitNoteApi,
   activityParticipantNoteApi,
+  // 客户跟进：自己填过的客户信息 / 跟进点
+  customerFollowUpApi: {
+    list: (params = {}) => {
+      const query = [`page=${params.page || 1}`, `page_size=${params.pageSize || 20}`]
+      if (params.keyword) query.push(`keyword=${encodeURIComponent(params.keyword)}`)
+      return request(`/api/customer-follow-ups?${query.join('&')}`)
+    },
+    update: (noteId, content) => request(`/api/customer-follow-ups/${noteId}`, { method: 'PATCH', data: { content } }),
+    create: (visitId, category, content) => request('/api/customer-follow-ups', {
+      method: 'POST',
+      data: { visit_id: visitId, category, content },
+    }),
+  },
   visitVerificationApi,
   classRecordApi,
   activityWithdrawalApi,

@@ -22,6 +22,72 @@ def _create_organization_course(client, course_name: str):
     return organization, course
 
 
+def test_edit_coarse_course_preserves_identity_and_rolls_back(client, created_customer, monkeypatch):
+    from app.services import membership_card_service, project_deduction_service, storage
+
+    customer_id = created_customer["id"]
+    org, course = _create_organization_course(client, "换课验证")
+    visit = client.post("/api/visits", json={"visit_date": "2026-09-01", "customer_id": customer_id, "nickname": created_customer["nickname"], "arrived": True}).json()
+    lessons = [client.post("/api/class-records", json={"date": "2026-09-01", "start_time": time, "course_id": course["id"], "course_name": "换课验证", "course_type": "沙龙活动", "participant_ids": [customer_id]}).json() for time in ("09:00", "14:00")]
+    payload = {"customer_id": customer_id, "record_type": "class", "record_id": lessons[0]["id"], "course_organization_id": org["id"], "settlement_organization_id": org["id"], "deal_date": "2026-09-01", "closers": []}
+    original_response = client.post("/api/project-deductions/coarse-door-course", json=payload)
+    assert original_response.status_code == 200, original_response.text
+    original = original_response.json()
+    path = f'/api/project-deductions/coarse-door-course/{original["id"]}'
+    try:
+        options = client.get("/api/project-deductions/coarse-door-options", params={"customer_id": customer_id, "editing_id": original["id"]}).json()
+        assert {row["record_id"] for row in options["courses"]} >= {row["id"] for row in lessons}
+        payload.update(deal_date="2026-09-03", closers=[{"id": customer_id, "name": "成交人甲", "amount": 0}, {"id": "", "name": "成交人乙", "amount": 0}], notes="编辑备注")
+        updated = client.patch(path, json=payload)
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["created_by"] == original["created_by"]
+        assert updated.json()["created_at"] == original["created_at"]
+        assert updated.json()["deduction_date"] == "2026-09-03"
+        assert len(updated.json()["closers"]) == 2
+        assert updated.json()["notes"] == "编辑备注"
+        assert membership_card_service.get_debt(customer_id) == 1
+        payload.update(record_id=lessons[1]["id"], closers=[])
+        with monkeypatch.context() as patch:
+            def fail_commit(*args):
+                raise RuntimeError("模拟换课提交失败")
+            patch.setattr(storage, "commit_pending_writes", fail_commit)
+            with pytest.raises(Exception, match="模拟换课提交失败"):
+                client.patch(path, json=payload)
+        assert project_deduction_service._deductions[original["id"]].source_activity_id == lessons[0]["id"]
+        assert storage.load_item("project_deductions.json", original["id"])["source_activity_id"] == lessons[0]["id"]
+        assert membership_card_service.get_debt(customer_id) == 1
+        updated = client.patch(path, json=payload)
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["id"] == original["id"]
+        assert updated.json()["source_activity_id"] == lessons[1]["id"]
+        assert updated.json()["closers"] == []
+        assert membership_card_service.get_debt(customer_id) == 1
+        other = client.post("/api/project-deductions/coarse-door-course", json={**payload, "record_id": lessons[0]["id"]})
+        assert other.status_code == 200, other.text
+        assert client.patch(path, json={**payload, "record_id": lessons[0]["id"]}).status_code == 400
+        assert project_deduction_service._deductions[original["id"]].source_activity_id == lessons[1]["id"]
+        assert client.delete(f'/api/project-deductions/{other.json()["id"]}').status_code == 200
+        assert client.patch(path, json={**payload, "customer_id": "other"}).status_code == 400
+        with monkeypatch.context() as patch:
+            from app.api import project_deductions
+            def denied(*args):
+                raise HTTPException(403, "仅能修改自己创建的记录")
+            patch.setattr(project_deductions, "ensure_payment_record_manager", denied)
+            assert client.patch(path, json=payload).status_code == 403
+        # 移除旧课程不取消已换课记录；移除新课程才取消。
+        assert client.patch(f'/api/class-records/{lessons[0]["id"]}/participants', json={"participant_ids": []}).status_code == 200
+        assert not project_deduction_service._deductions[original["id"]].cancelled
+        assert client.patch(f'/api/class-records/{lessons[1]["id"]}/participants?confirm_coarse_cancellation=1', json={"participant_ids": []}).status_code == 200
+        assert project_deduction_service._deductions[original["id"]].cancelled
+        assert client.patch(path, json=payload).status_code in (400, 404)
+    finally:
+        for lesson in lessons:
+            client.delete(f'/api/class-records/{lesson["id"]}?confirm_coarse_cancellation=1')
+        client.delete(f'/api/visits/{visit["id"]}?confirm_coarse_cancellation=1')
+        client.delete(f'/api/courses/{course["id"]}')
+        client.delete(f'/api/organizations/{org["id"]}')
+
+
 @pytest.mark.parametrize("withdraw", [False, True])
 def test_removing_participant_cancels_coarse_with_confirmation_and_rollback(client, created_customer, monkeypatch, withdraw):
     from app.services import class_record_service, membership_card_service, project_deduction_service, storage
@@ -349,6 +415,13 @@ def test_coarse_door_card_returns_all_original_card_deductions(client, created_c
         "customer_id": created_customer["id"], "card_type": "粗门次卡",
     })
     assert any(item["id"] == deduction["id"] for item in dedicated_records.json())
+    assert membership_card_service.get_card_effective_remaining(normal_card["id"]) == 5
+    edited = client.patch(f'/api/project-deductions/coarse-door-course/{deduction["id"]}', json={
+        "customer_id": created_customer["id"], "record_type": "class", "record_id": activity["id"],
+        "course_organization_id": organization["id"], "deal_date": "2026-09-03", "closers": [], "notes": "仅改备注与日期",
+    })
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["id"] == deduction["id"]
     assert membership_card_service.get_card_effective_remaining(normal_card["id"]) == 5
     detail = client.get(f"/api/customer-detail/{created_customer['id']}")
     activity_row = next(

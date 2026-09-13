@@ -101,6 +101,9 @@ class PrincipalQuery(StrictBaseModel):
     breakdown: list[str] = Field(default_factory=list, max_length=16)
     # 只看某个客户的记录（列表里点「成交笔数」时用来取这个客户的全部成交）
     customer_id: str = Field(default="", max_length=64)
+    # 引流客户导出：ID 仅用于收窄已授权结果及保持页面顺序，不作为数据来源。
+    export_view: Literal["", "traffic"] = ""
+    export_customer_ids: list[str] | None = Field(default=None, max_length=50000)
     # 只有使用者主动点「查询」时才记分析日志；切 tab、翻页这类自动请求不记，避免刷屏
     log_analysis: bool = False
     # 交易列表的展示口径：order＝每笔交易一行；customer＝同一人只显示一行（合并）

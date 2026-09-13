@@ -1767,8 +1767,8 @@ def _course_customer_daily_context(
     date_from: str,
     date_to: str,
     payment_groups: list[list],
-) -> tuple[dict[tuple[str, str], dict], dict[tuple[str, str], str]]:
-    """构建客户每日成交与需求索引，供趋势和课程人员弹窗共用。"""
+) -> tuple[dict[tuple[str, str], dict], dict[tuple[str, str], str], dict[tuple[str, str], dict]]:
+    """构建客户每日成交、需求与邀约备注索引，供趋势、课程人员弹窗和「参与者」页签共用。"""
     payments: dict[tuple[str, str], dict] = defaultdict(
         lambda: {"amount": 0.0, "closers": set()}
     )
@@ -1796,18 +1796,29 @@ def _course_customer_daily_context(
             payments[key]["closers"].update(closer_names)
 
     needs_by_customer_date: dict[tuple[str, str], list[str]] = defaultdict(list)
+    # 「参与者」页签要按人显示当天的来访需求 / 客户信息 / 跟进点，这里一并带上
+    notes_by_customer_date: dict[tuple[str, str], dict] = {}
     for visit in visit_service.list_visits():
         visit_date = getattr(visit, "visit_date", "")
         customer_id = getattr(visit, "customer_id", "")
         needs = (getattr(visit, "needs", None) or "").strip()
-        if date_from <= visit_date <= date_to and customer_id and needs:
-            key = (visit_date, customer_id)
+        if not (date_from <= visit_date <= date_to and customer_id):
+            continue
+        key = (visit_date, customer_id)
+        entry = notes_by_customer_date.setdefault(
+            key,
+            {"visit_id": getattr(visit, "id", "") or "", "customer_info": "", "follow_up": ""},
+        )
+        entry["customer_info"] = (getattr(visit, "feedback", None) or "").strip()
+        entry["follow_up"] = (getattr(visit, "healing_notes", None) or "").strip()
+        if needs:
             if needs not in needs_by_customer_date[key]:
                 needs_by_customer_date[key].append(needs)
-    return payments, {
+    daily_needs = {
         key: "；".join(values)
         for key, values in needs_by_customer_date.items()
     }
+    return payments, daily_needs, notes_by_customer_date
 
 
 def _course_activity_name(activity_type: str, label: str, activity) -> str:
@@ -2067,7 +2078,7 @@ def get_course_statistics(
             )
         )
     payment_groups = _payment_record_groups() if can_view_payment else []
-    daily_payments, daily_needs = _course_customer_daily_context(
+    daily_payments, daily_needs, daily_notes = _course_customer_daily_context(
         date_from,
         date_to,
         payment_groups,
@@ -2131,6 +2142,10 @@ def get_course_statistics(
                     "identity_group": identity_group,
                     "participation_role": participant_roles[participant_id],
                     "daily_need": daily_needs.get((activity.date, participant_id), ""),
+                    # 「参与者」页签：这一天的邀约备注（多人填写时值里带「填写人：内容」）
+                    "daily_visit_id": (daily_notes.get((activity.date, participant_id)) or {}).get("visit_id", ""),
+                    "daily_customer_info": (daily_notes.get((activity.date, participant_id)) or {}).get("customer_info", ""),
+                    "daily_follow_up": (daily_notes.get((activity.date, participant_id)) or {}).get("follow_up", ""),
                     "daily_transaction_amount": (
                         round(payment["amount"], 2) if can_view_payment_details else None
                     ),

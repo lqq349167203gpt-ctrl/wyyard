@@ -67,6 +67,7 @@
         <text wx:if="{{item.cancelled}}" class="coarse-toolbar-caption">已取消｜已从课程移除</text>
         <view class="coarse-record-actions">
           <text class="coarse-record-count">{{item.cancelled ? '原抵扣 ' : '-'}}{{item.count}}次</text>
+          <text class="coarse-record-edit" wx:if="{{item._canDelete}}" catchtap="onCoarseEditTap" data-id="{{item.id}}">编辑</text>
           <text class="coarse-record-delete {{coarseDeletingId === item.id ? 'disabled' : ''}}" wx:if="{{item._canDelete}}" catchtap="onCoarseDeleteTap" data-id="{{item.id}}">{{coarseDeletingId === item.id ? '删除中' : '删除'}}</text>
         </view>
       </view>
@@ -79,12 +80,14 @@
   <view class="payment-entry-mask" wx:if="{{coarseEntryVisible}}" bindtap="onCoarseEntryClose">
     <view class="payment-entry-panel" catchtap="stopPropagation">
       <view class="payment-entry-head">
-        <text class="payment-entry-title">新增粗门次卡</text>
+        <text class="payment-entry-title">{{coarseEditData ? '编辑粗门次卡' : '新增粗门次卡'}}</text>
         <text class="payment-entry-close" bindtap="onCoarseEntryClose">关闭</text>
       </view>
       <scroll-view class="payment-entry-body" scroll-y>
         <payment-form
           type="coarse_door_card"
+          is-edit="{{!!coarseEditData}}"
+          edit-data="{{coarseEditData}}"
           bind:success="onCoarseEntrySuccess"
           bind:pickerstate="onCoarseEntryPickerState"
         />

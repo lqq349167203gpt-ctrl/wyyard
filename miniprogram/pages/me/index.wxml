@@ -29,6 +29,11 @@
       <text class="menu-label">课程记录</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onCustomerFollowUpsTap" wx:if="{{canCustomerFollowUps}}">
+      <image class="menu-icon" src="{{icons.commRecords}}" mode="aspectFit" />
+      <text class="menu-label">客户跟进</text>
+      <text class="menu-arrow">›</text>
+    </view>
     <view class="menu-item" bindtap="onPrincipalTap" wx:if="{{canPrincipal}}">
       <image class="menu-icon" src="{{icons.dailyReport}}" mode="aspectFit" />
       <text class="menu-label">组织/俱乐部</text>

@@ -780,6 +780,7 @@
 .coarse-record-main { display: flex; align-items: center; justify-content: space-between; }
 .coarse-record-name { color: #1f2329; font-size: 27rpx; }
 .coarse-record-actions { display: flex; align-items: center; gap: 18rpx; }
+.coarse-record-edit { padding: 8rpx 0; color: #3370ff; font-size: 22rpx; line-height: 1; }
 .coarse-record-count { color: #4e535a; font-size: 24rpx; }
 .coarse-record-delete { padding: 8rpx 0 8rpx 10rpx; color: #c4506a; font-size: 22rpx; line-height: 1; }
 .coarse-record-delete.disabled { color: #b9bdc3; }

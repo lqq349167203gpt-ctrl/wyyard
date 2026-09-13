@@ -63,6 +63,52 @@ def list_customer_notes(customer_id: str) -> list[ActivityParticipantNote]:
     )
 
 
+def list_notes_by_creator(
+    actor_id: str = "",
+    actor_name: str = "",
+) -> list[ActivityParticipantNote]:
+    """「客户跟进」用：只看这个人自己填过的记录（老数据按填写人姓名兜底）。"""
+    if not actor_id and not actor_name:
+        return []
+    return sorted(
+        (
+            note
+            for note in _notes.values()
+            if not note.is_deleted
+            and (
+                (note.created_by_id and note.created_by_id == actor_id)
+                or (not note.created_by_id and actor_name and note.created_by == actor_name)
+            )
+        ),
+        key=lambda note: (note.activity_date, note.updated_at, note.id),
+        reverse=True,
+    )
+
+
+def update_note_content(
+    *,
+    note_id: str,
+    content: str,
+    actor_id: str = "",
+    actor_name: str = "",
+) -> ActivityParticipantNote:
+    """客户跟进页里直接改自己填过的内容；不是本人填的不能改。"""
+    normalized = content.strip()
+    if not normalized:
+        raise ValueError("记录内容不能为空")
+    with _note_lock:
+        note = get_note(note_id)
+        if not note:
+            raise LookupError("记录不存在")
+        if not can_manage_note(note, actor_id, actor_name):
+            raise PermissionError("只能修改自己填写的记录")
+        note.content = normalized
+        note.updated_at = datetime.now(timezone.utc)
+        _notes[note.id] = note
+        _save(note)
+        return note
+
+
 def get_note(note_id: str) -> ActivityParticipantNote | None:
     note = _notes.get(note_id)
     return note if note and not note.is_deleted else None

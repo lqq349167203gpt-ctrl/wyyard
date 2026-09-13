@@ -40,6 +40,8 @@ PAGE_NAMES = {
     "/member-statistics": "会员情况",
     "/course-statistics": "课程记录",
     "/pages/course-records/index": "课程记录",
+    "/customer-follow-ups": "客户跟进",
+    "/pages/customer-follow-ups/index": "客户跟进",
     "/product-sales": "产品销售",
     "/statistics": "服务数据",
     "/financial-overview": "财务数据",

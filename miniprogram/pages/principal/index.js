@@ -1026,7 +1026,11 @@ Page({
     if (this.data.busy || this.data.loading) return
     this.setData({ busy: true })
     try {
-      const buffer = await principalApi.export(this.data.query)
+      const traffic = this.data.query.tab === 'overview' && this.data.overviewGroup === 'traffic'
+      const buffer = await principalApi.export({
+        ...this.data.query, breakdown: this.data.picks,
+        ...(traffic ? { export_view: 'traffic', export_customer_ids: this.data.list.map(row => row.id) } : {}),
+      })
       const path = wx.env.USER_DATA_PATH + '/principal-' + Date.now() + '.xlsx'
       await new Promise((resolve, reject) => wx.getFileSystemManager().writeFile({ filePath: path, data: buffer, success: resolve, fail: reject }))
       await new Promise((resolve, reject) => wx.openDocument({ filePath: path, fileType: 'xlsx', showMenu: true, success: resolve, fail: reject }))

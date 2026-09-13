@@ -51,6 +51,7 @@ const businessItems = [
   { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
   { title: "服务老师", icon: IconSparkles, path: "/service-teachers", permission: "service-teacher" },
   { title: "课程记录", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
+  { title: "客户跟进", icon: IconClipboardText, path: "/customer-follow-ups", permission: "customer-follow-ups" },
   { title: "组织/俱乐部", icon: IconSchool, path: "/principal", permission: "principal" },
 ]
 

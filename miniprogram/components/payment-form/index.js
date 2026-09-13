@@ -318,7 +318,7 @@ Component({
     _loadOrganizations() {
       organizationApi.list().then(res => {
         const orgs = res || []
-        const currentOrgId = this.data.formData.organization_id || ''
+        const currentOrgId = (this.data.isEdit && this.data.editData ? this.data.editData.organization_id : this.data.formData.organization_id) || ''
         const currentIndex = orgs.findIndex(item => item.id === currentOrgId)
         // 粗门次卡新增：成交归属不预选，必须由录入人自己确认（必填）
         const needsExplicitChoice = this.data.type === 'coarse_door_card' && !this.data.isEdit
@@ -347,19 +347,20 @@ Component({
         coarseCourses: [],
         coarseCourseIndex: -1,
       })
-      paymentApi.deductions.coarseDoorOptions(customerId).then(result => {
+      const editing = this.data.isEdit ? this.data.editData : null
+      paymentApi.deductions.coarseDoorOptions(customerId, editing ? editing.id : '').then(result => {
         const courseOrganizations = result.course_organizations || result.organizations || []
         const courses = (result.courses || []).map(item => Object.assign({}, item, {
           _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
         }))
-        const courseOrgIndex = courseOrganizations.length === 1 ? 0 : -1
+        const courseOrgIndex = editing ? courseOrganizations.findIndex(item => item.id === editing.source_organization_id) : (courseOrganizations.length === 1 ? 0 : -1)
+        const visibleCourses = courseOrgIndex >= 0 ? courses.filter(item => (item.organization_ids || []).includes(courseOrganizations[courseOrgIndex].id)) : []
         this._coarseAllCourses = courses
         this.setData({
           coarseCourseOrganizations: courseOrganizations,
           coarseCourseOrganizationIndex: courseOrgIndex,
-          coarseCourses: courseOrgIndex === 0
-            ? courses.filter(item => (item.organization_ids || []).includes(courseOrganizations[0].id))
-            : [],
+          coarseCourses: visibleCourses,
+          coarseCourseIndex: editing ? visibleCourses.findIndex(item => item.record_type === editing.source_activity_type && item.record_id === editing.source_activity_id) : -1,
           coarseOptionsLoading: false,
         })
       }).catch(error => {
@@ -373,7 +374,7 @@ Component({
       const fd = {
         customer_id: d.customer_id,
         organization_id: d.organization_id ?? '',
-        deal_date: d.deal_date ? d.deal_date.slice(0, 10) : today(),
+        deal_date: (d.deal_date || d.deduction_date || today()).slice(0, 10),
         effective_date: d.effective_date ? d.effective_date.slice(0, 10) : '',
         duration_type: d.duration_type ?? '',
         duration_value: d.duration_value ?? '',
@@ -467,10 +468,12 @@ Component({
         closerIdMap,
         hidePaymentDetails,
       })
+      if (type === 'coarse_door_card') this._loadCoarseDoorOptions(d.customer_id)
     },
 
     onPickerOpen(e) {
       const field = e.currentTarget.dataset.field
+      if (field === 'customer' && this.data.isEdit && this.data.type === 'coarse_door_card') return
       if (field === 'customer' && this.data.presetCustomer && this.data.presetCustomer.id) return
       this.setData({
         showPicker: true,
@@ -858,14 +861,14 @@ Component({
           deal_date: this.data.formData.deal_date,
           closers: this.data.closers.map(closer => ({ id: closer.id || '', name: closer.nickname || '', amount: 0 })),
           notes: this.data.formData.notes || '',
-        })
+        }, isEdit ? this.data.editData.id : '')
       } else {
         const payload = this._buildPayload()
         const api = paymentApi.getByType(type)
         action = isEdit ? api.update(this.data.editData.id, payload) : api.create(payload)
       }
       action.then(() => {
-        wx.showToast({ title: type === 'coarse_door_card' ? '抵扣成功' : (isEdit ? '已保存' : '已新增') })
+        wx.showToast({ title: isEdit ? '已保存' : (type === 'coarse_door_card' ? '抵扣成功' : '已新增') })
         this.triggerEvent('success')
       }).catch(err => {
         wx.showToast({ title: err.message || '操作失败', icon: 'none' })

@@ -85,6 +85,7 @@ ALL_PAGE_KEYS = [
     # 数据
     "custom-analysis", "service-teacher", "principal",
     "course-statistics",
+    "customer-follow-ups",
     # 报表
     "daily-report",
     # 业务

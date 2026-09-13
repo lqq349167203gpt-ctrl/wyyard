@@ -29,6 +29,7 @@ const ALL_PAGES = [
   { key: "custom-analysis", label: "自定义筛选" },
   { key: "service-teacher", label: "服务老师" },
   { key: "course-statistics", label: "课程记录" },
+  { key: "customer-follow-ups", label: "客户跟进" },
   { key: "principal", label: "组织/俱乐部" },
   // 报表
   { key: "daily-report", label: "每日报表" },
@@ -69,7 +70,7 @@ const ALL_PAGES = [
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "principal"] },
+  { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "customer-follow-ups", "principal"] },
   { label: "报表", keys: ["daily-report"] },
   { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },

@@ -20,6 +20,7 @@ from app.services import (
     service_teacher_customer_service,
 )
 from app.utils.record_ownership import request_actor_customer_ids
+from app.utils.pagination import paginate
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
 
@@ -194,6 +195,65 @@ def export_follow_ups(
         rows,
         f"服务老师跟进记录_{teacher or '未选择'}.xlsx",
     )
+
+
+@router.get("/course-participants", dependencies=[Depends(require_page_permission("course-statistics"))])
+def list_course_participants(
+    request: Request,
+    teacher_id: str = Query(""),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    all_dates: bool = Query(False),
+    activity_type: str = Query("all"),
+    keyword: str = Query(""),
+    member_type: str = Query(""),
+    identity_group: str = Query(""),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """课程记录的「参与者」页签：自己课程的全部参与者 + 当天的来访需求 / 客户信息 / 跟进点。"""
+    from app.api.statistics import get_course_statistics
+
+    result = get_course_statistics(
+        date_from=date_from,
+        date_to=date_to,
+        all_dates=all_dates,
+        granularity="day",
+        organization_id=None,
+        activity_type=activity_type,
+        course_subtype=None,
+        teacher_id=teacher_id or None,
+        request=request,
+    )
+    rows = []
+    for course in result["courses"]:
+        for participant in course["participants"]:
+            rows.append({
+                "id": f"{course['id']}:{participant['id']}",
+                "course_date": course["date"],
+                "course_name": course["name"],
+                "activity_type_label": course["activity_type_label"],
+                "customer_id": participant["id"],
+                "nickname": participant["nickname"],
+                "member_type": participant.get("member_type", ""),
+                "identity_group": participant.get("identity_group", ""),
+                "visit_need": participant.get("daily_need", ""),
+                "customer_info": participant.get("daily_customer_info", ""),
+                "follow_up": participant.get("daily_follow_up", ""),
+                "visit_id": participant.get("daily_visit_id", ""),
+            })
+    rows.sort(key=lambda item: (item["course_date"], item["nickname"]), reverse=True)
+    # 筛选项：客户身份（会员身份）取全部参与者的去重值
+    member_types = sorted({row["member_type"] for row in rows if row["member_type"]})
+    identity_groups = ["新人", "老人"]
+    needle = keyword.strip().casefold()
+    if needle:
+        rows = [row for row in rows if needle in (row["nickname"] or "").casefold()]
+    if member_type:
+        rows = [row for row in rows if row["member_type"] == member_type]
+    if identity_group:
+        rows = [row for row in rows if row["identity_group"] == identity_group]
+    return {**paginate(rows, page, page_size), "member_types": member_types, "identity_groups": identity_groups}
 
 
 @router.get("/export-courses", dependencies=[Depends(require_page_permission("course-statistics"))])

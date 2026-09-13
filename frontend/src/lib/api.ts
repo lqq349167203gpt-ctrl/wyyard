@@ -45,6 +45,8 @@ export interface ConversionRule {
   date_to: string
 }
 export interface PrincipalQuery {
+  export_view?: "" | "traffic"
+  export_customer_ids?: string[]
   organization_id: string
   date_from: string | null
   date_to: string | null
@@ -673,7 +675,56 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
   summary: ServiceTeacherCustomerSummary
 }
 
+// 课程记录的「参与者」页签：一行 = 某场课的一个参与者 + 当天的邀约备注
+export interface CourseParticipantRow {
+  id: string
+  course_date: string
+  course_name: string
+  activity_type_label: string
+  customer_id: string
+  nickname: string
+  member_type: string
+  identity_group: string
+  visit_need: string
+  customer_info: string
+  follow_up: string
+  visit_id: string
+}
+
 export const serviceTeacherCustomerApi = {
+  courseParticipants: (params: {
+    teacher_id?: string
+    date_from?: string
+    date_to?: string
+    all_dates?: boolean
+    activity_type?: string
+    keyword?: string
+    member_type?: string
+    identity_group?: string
+    page: number
+    page_size: number
+  }) => {
+    const query = new URLSearchParams()
+    query.set("page", String(params.page))
+    query.set("page_size", String(params.page_size))
+    if (params.teacher_id) query.set("teacher_id", params.teacher_id)
+    if (params.date_from) query.set("date_from", params.date_from)
+    if (params.date_to) query.set("date_to", params.date_to)
+    if (params.all_dates) query.set("all_dates", "true")
+    if (params.activity_type) query.set("activity_type", params.activity_type)
+    if (params.keyword) query.set("keyword", params.keyword)
+    if (params.member_type) query.set("member_type", params.member_type)
+    if (params.identity_group) query.set("identity_group", params.identity_group)
+    return request<{
+      items: CourseParticipantRow[]
+      total: number
+      page: number
+      page_size: number
+      total_pages: number
+      member_types: string[]
+      identity_groups: string[]
+    }>(`/api/service-teacher-customers/course-participants?${query.toString()}`)
+  },
   recordExport: (content: string, courses = false) => request(`/api/service-teacher-customers/${courses ? 'course-export-audit' : 'export-audit'}`, {
     method: 'POST', body: JSON.stringify({ content }),
   }),
@@ -3663,6 +3714,48 @@ export const communicationRecordApi = {
 
 export const followupRecordApi = {
   list: (customerId?: string) => request<{ items: ActivityFollowup[]; total: number }>(`/api/followup-records${customerId ? `?customer_id=${customerId}` : ""}`),
+}
+
+// 客户跟进：自己填过的「客户信息 / 跟进点」（数据来自课表的参与人记录）
+export interface CustomerFollowUpNote {
+  id: string
+  content: string
+  updated_at: string
+}
+
+export interface CustomerFollowUpRow {
+  id: string
+  visit_id: string
+  customer_id: string
+  customer_name: string
+  customer_identity: string
+  visit_date: string
+  visit_time: string
+  activities: string[]
+  updated_at: string
+  visit_need: CustomerFollowUpNote | null
+  customer_info: CustomerFollowUpNote | null
+  follow_up: CustomerFollowUpNote | null
+}
+
+export const customerFollowUpApi = {
+  list: (params: { keyword?: string; date_from?: string; date_to?: string; page?: number; page_size?: number } = {}) => {
+    const query = new URLSearchParams()
+    query.set("page", String(params.page ?? 1))
+    query.set("page_size", String(params.page_size ?? 20))
+    if (params.keyword) query.set("keyword", params.keyword)
+    if (params.date_from) query.set("date_from", params.date_from)
+    if (params.date_to) query.set("date_to", params.date_to)
+    return request<{ items: CustomerFollowUpRow[]; total: number; page: number; page_size: number; total_pages: number }>(`/api/customer-follow-ups?${query.toString()}`)
+  },
+  update: (noteId: string, content: string) =>
+    request<CustomerFollowUpNote>(`/api/customer-follow-ups/${noteId}`, { method: "PATCH", body: JSON.stringify({ content }) }),
+  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up", content: string) =>
+    request<CustomerFollowUpNote>("/api/customer-follow-ups", { method: "POST", body: JSON.stringify({ visit_id: visitId, category, content }) }),
+  myNote: (visitId: string, category: "visit_need" | "customer_info" | "follow_up") =>
+    request<{ id: string; content: string; updated_at: string } | null>(
+      `/api/customer-follow-ups/my-note?visit_id=${encodeURIComponent(visitId)}&category=${category}`,
+    ),
 }
 
 // Offline Course Records

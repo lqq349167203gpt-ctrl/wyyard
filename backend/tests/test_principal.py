@@ -660,6 +660,38 @@ def test_export_wraps_details_and_escapes_formula(client, monkeypatch):
     assert sheet["B2"].alignment.wrap_text
 
 
+def test_traffic_export_uses_visible_customers_and_selected_order(client, monkeypatch):
+    import io
+
+    from openpyxl import load_workbook
+
+    def analyze(_request, query, export=False):
+        assert export and query.tab == "overview"
+        return {"columns": [], "items": [], "total": 0, "breakdown": {"traffic": [
+            {"label": "老师甲", "customers": [
+                {"id": "a", "name": "客户甲", "tags": ["新客"], "deals": 2},
+                {"id": "b", "name": "=1+1", "tags": [], "deals": 0},
+            ]},
+        ]}}
+
+    monkeypatch.setattr(service, "analyze", analyze)
+    response = client.post("/api/principal/export", json={
+        "export_view": "traffic", "export_customer_ids": ["b", "invisible", "a", "b"],
+    })
+    assert response.status_code == 200
+    sheet = load_workbook(io.BytesIO(response.content)).active
+    assert sheet.max_row == 3
+    assert sheet["A1"].value == "昵称"
+    assert sheet["A2"].value == "'=1+1"
+    assert sheet["A3"].value == "客户甲"
+    assert sheet["C3"].value == "老师甲"
+    assert sheet["I3"].value == 2
+    empty = client.post("/api/principal/export", json={
+        "export_view": "traffic", "export_customer_ids": [],
+    })
+    assert load_workbook(io.BytesIO(empty.content)).active.max_row == 1
+
+
 def test_deadline_today_is_still_observing():
     result = calculate([source()], ConversionRule(window_days=0), today=date(2026, 1, 1))
     assert result["summary"]["观察中"] == 1

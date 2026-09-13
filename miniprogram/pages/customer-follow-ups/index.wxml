@@ -1,0 +1,75 @@
+<page-meta page-style="{{editing ? 'overflow:hidden;height:100vh;' : ''}}" />
+<view class="page">
+  <!-- 搜索：按昵称或姓名 -->
+  <view class="search-card">
+    <input
+      class="search-input"
+      value="{{keyword}}"
+      placeholder="按昵称或姓名搜索"
+      confirm-type="search"
+      bindinput="onKeywordInput"
+      bindconfirm="onSearch"
+    />
+    <view class="search-button" bindtap="onSearch">查询</view>
+    <view class="search-reset" wx:if="{{searchKeyword}}" bindtap="onResetSearch">重置</view>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view class="empty muted" wx:if="{{!list.length && !loading}}">
+    {{searchKeyword ? '没有匹配的跟进记录' : '你还没有填写过来访需求、客户信息或跟进点'}}
+  </view>
+
+  <!-- 一条 = 一次邀约：给谁填的、哪天来的、当天参加的活动 + 来访需求/客户信息/跟进点 -->
+  <view class="record-card" wx:for="{{list}}" wx:key="id">
+    <view class="record-head">
+      <text class="record-date">{{item.dateText}}</text>
+      <!-- 昵称后面紧挨着身份，不要再拉开 -->
+      <view class="record-title">
+        <text class="record-name" data-id="{{item.customer_id}}" bindtap="openCustomer">{{item.customer_name || '未命名'}}</text>
+        <text class="record-identity" wx:if="{{item.customer_identity}}">{{item.customer_identity}}</text>
+      </view>
+    </view>
+    <view class="record-activity">
+      <text class="record-activity-name" wx:if="{{item.activityText}}">{{item.activityText}}</text>
+      <!-- 当天没参加活动：用很短的浅灰横线占位 -->
+      <view class="record-activity-empty" wx:else></view>
+    </view>
+    <view class="record-field" data-index="{{index}}" data-field="visit_need" bindtap="openEdit">
+      <text class="record-field-label">来访需求</text>
+      <text class="record-field-value" wx:if="{{item.visit_need}}">{{item.visit_need.content}}</text>
+      <view class="record-field-input" wx:else>点击填写</view>
+    </view>
+    <view class="record-field" data-index="{{index}}" data-field="customer_info" bindtap="openEdit">
+      <text class="record-field-label">客户信息</text>
+      <text class="record-field-value" wx:if="{{item.customer_info}}">{{item.customer_info.content}}</text>
+      <view class="record-field-input" wx:else>点击填写</view>
+    </view>
+    <view class="record-field" data-index="{{index}}" data-field="follow_up" bindtap="openEdit">
+      <text class="record-field-label">跟进点</text>
+      <text class="record-field-value" wx:if="{{item.follow_up}}">{{item.follow_up.content}}</text>
+      <view class="record-field-input" wx:else>点击填写</view>
+    </view>
+    <text class="record-updated" wx:if="{{item.updatedText}}">更新于 {{item.updatedText}}</text>
+  </view>
+
+  <view class="loading muted" wx:if="{{loading}}">加载中…</view>
+  <view class="muted end" wx:elif="{{list.length && !hasMore}}">没有更多了</view>
+
+  <!-- 修改自己填的内容 -->
+  <view class="sheet-mask" wx:if="{{editing}}" catchtouchmove="noop" bindtap="closeEdit"></view>
+  <view class="edit-sheet" wx:if="{{editing}}">
+    <view class="sheet-head">
+      <text class="sheet-title">{{editing.creating ? '填写' : '修改'}}{{editing.title}}</text>
+      <text class="sheet-close" bindtap="closeEdit">关闭</text>
+    </view>
+    <scroll-view class="edit-body" scroll-y>
+      <text class="edit-subtitle">{{editing.customerName}} · {{editing.dateText}}<block wx:if="{{editing.activityName}}"> · {{editing.activityName}}</block></text>
+      <!-- 不用 auto-height：内容几百字时会把弹层撑出屏幕、按钮点不到 -->
+      <textarea class="edit-input" value="{{draft}}" maxlength="5000" placeholder="写清楚这次来的情况和下一步跟进安排" bindinput="onDraftInput" />
+    </scroll-view>
+    <view class="edit-actions">
+      <text class="edit-button cancel" bindtap="closeEdit">取消</text>
+      <text class="edit-button confirm {{saving ? 'disabled' : ''}}" bindtap="saveEdit">{{saving ? '保存中' : (editing.creating ? '填写' : '保存')}}</text>
+    </view>
+  </view>
+</view>

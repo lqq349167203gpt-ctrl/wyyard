@@ -204,6 +204,10 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         "identity_group": "新人",
         "participation_role": "参与者",
         "daily_need": "放松减压",
+        # 「参与者」页签用：当天的邀约备注（这条假数据里没有邀约 id 和备注）
+        "daily_visit_id": "",
+        "daily_customer_info": "",
+        "daily_follow_up": "",
         "daily_transaction_amount": 1200,
         "closers": "老师甲",
     }

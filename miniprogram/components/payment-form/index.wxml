@@ -8,7 +8,7 @@
     </view>
     <view class="pf-row pf-row-last">
       <text class="pf-label">成交归属</text>
-      <picker class="pf-picker" mode="selector" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrgChange">
+      <picker class="pf-picker" mode="selector" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrgChange" disabled="{{isEdit && type === 'coarse_door_card'}}">
         <view class="pf-value {{orgIndex >= 0 && organizations[orgIndex] ? '' : 'pf-placeholder'}}">{{orgIndex >= 0 && organizations[orgIndex] ? organizations[orgIndex].name : (organizations.length > 0 ? '请选择成交归属' : '暂无组织')}}</view>
       </picker>
     </view>
@@ -20,7 +20,7 @@
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
         <text class="{{selectedCustomer ? '' : 'pf-placeholder'}}">{{selectedCustomer.nickname || '选择用户'}}</text>
-        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer}}" catchtap="onPickerClear" data-field="customer">x</text>
+        <text class="pf-clear" wx:if="{{selectedCustomer && !presetCustomer && !isEdit}}" catchtap="onPickerClear" data-field="customer">x</text>
       </view>
     </view>
     <view class="pf-row">
@@ -305,7 +305,7 @@
   <view class="pf-confirm-mask" wx:if="{{confirmVisible}}" catchtap="onConfirmClose">
     <view class="pf-confirm-panel" catchtap="stopPropagation">
       <view class="pf-confirm-header">
-        <text class="pf-confirm-title">{{type === 'coarse_door_card' ? '确认抵扣' : (isEdit ? '确认编辑' : '确认新增')}}</text>
+        <text class="pf-confirm-title">{{isEdit ? '确认编辑' : (type === 'coarse_door_card' ? '确认抵扣' : '确认新增')}}</text>
         <text class="pf-confirm-rule" wx:if="{{!hidePaymentDetails}}">成交人金额合计需与费用金额一致</text>
       </view>
       <scroll-view class="pf-confirm-body" scroll-y>
@@ -323,7 +323,7 @@
 
   <view class="pf-btns" wx:if="{{!hideBtn}}">
     <button class="pf-submit" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}">
-      {{type === 'coarse_door_card' ? '确认抵扣' : (isEdit ? '保    存' : '添    加')}}
+      {{isEdit ? '保    存' : (type === 'coarse_door_card' ? '确认抵扣' : '添    加')}}
     </button>
   </view>
 </view>

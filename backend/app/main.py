@@ -18,6 +18,7 @@ from app.api.business_reminders import router as business_reminders_router
 from app.api.chat_history import router as chat_history_router
 from app.api.chat_logs import router as chat_logs_router
 from app.api.class_records import router as class_records_router
+from app.api.customer_follow_ups import router as customer_follow_ups_router
 from app.api.client import router as client_router
 from app.api.client_notifications import router as client_notifications_router
 from app.api.communication_records import router as communication_records_router
@@ -123,6 +124,7 @@ app.include_router(courses_router)
 app.include_router(spaces_router)
 app.include_router(course_types_router)
 app.include_router(class_records_router)
+app.include_router(customer_follow_ups_router)
 app.include_router(group_cases_router)
 app.include_router(group_case_sessions_router)
 app.include_router(energy_knots_router)

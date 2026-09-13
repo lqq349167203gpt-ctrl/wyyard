@@ -1,4 +1,4 @@
-const { serviceTeacherApi } = require('./api')
+const { serviceTeacherApi, customerFollowUpApi } = require('./api')
 
 const COURSE_TYPES = [
   { value: 'all', label: '全部课程' },
@@ -97,6 +97,24 @@ module.exports = function createRecordsPage(mode) { return {
     courseViewTab: 'courses',
     reviewRecords: [],
     reviewExpanded: {},
+    // 「参与者」子页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点
+    participantRecords: [],
+    participantPage: 1,
+    participantTotal: 0,
+    participantHasMore: false,
+    participantLoading: false,
+    participantKeyword: '',
+    participantSearchKeyword: '',
+    participantMemberType: '',
+    participantMemberTypes: [{ value: '', label: '全部客户身份' }],
+    participantMemberTypeIndex: 0,
+    participantIdentityGroup: '',
+    participantIdentityOptions: [{ value: '', label: '全部人员' }, { value: '新人', label: '新人' }, { value: '老人', label: '老人' }],
+    participantIdentityIndex: 0,
+    participantEditing: null,
+    participantDraft: '',
+    participantMyNoteId: '',
+    participantSaving: false,
     followUpRecords: [],
     followUpPage: 1,
     followUpTotal: 0,
@@ -313,7 +331,131 @@ module.exports = function createRecordsPage(mode) { return {
 
   // 课程记录页：切「课程记录 / 复盘记录」
   onCourseViewTab(event) {
-    this.setData({ courseViewTab: event.currentTarget.dataset.tab })
+    const tab = event.currentTarget.dataset.tab
+    this.setData({ courseViewTab: tab })
+    if (tab === 'participants') this.loadParticipants(true)
+  },
+
+  // ---- 参与者：昵称/姓名、客户身份、新人老人 三个筛选，时间跟上面的课程周期一致 ----
+  formatParticipant(row) {
+    const parts = String(row.course_date || '').split('-')
+    return {
+      ...row,
+      dateText: parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : (row.course_date || ''),
+      identityText: row.member_type || row.identity_group || '',
+    }
+  },
+
+  async loadParticipants(reset) {
+    if (!this.data.teacherId || this.data.participantLoading) return
+    const page = reset ? 1 : this.data.participantPage + 1
+    this.setData({ participantLoading: true, ...(reset ? { participantRecords: [] } : {}) })
+    try {
+      const selectedType = this.data.courseTypes[this.data.courseTypeIndex] || COURSE_TYPES[0]
+      const result = await serviceTeacherApi.courseParticipants({
+        teacher_id: this.data.teacherId,
+        date_from: this.data.courseDateFrom,
+        date_to: this.data.courseDateTo,
+        all_dates: this.data.courseRangePreset === 'all',
+        activity_type: selectedType.value,
+        keyword: this.data.participantSearchKeyword,
+        member_type: this.data.participantMemberType,
+        identity_group: this.data.participantIdentityGroup,
+        page,
+        page_size: 20,
+      })
+      const items = (result.items || []).map(item => this.formatParticipant(item))
+      const records = reset ? items : this.data.participantRecords.concat(items)
+      this.setData({
+        participantRecords: records,
+        participantPage: result.page || page,
+        participantTotal: result.total || 0,
+        participantHasMore: records.length < (result.total || 0),
+        participantMemberTypes: [{ value: '', label: '全部客户身份' }].concat((result.member_types || []).map(value => ({ value, label: value }))),
+      })
+    } catch (e) {
+      this.setData({ participantRecords: reset ? [] : this.data.participantRecords })
+    } finally {
+      this.setData({ participantLoading: false })
+    }
+  },
+
+  onParticipantKeyword(event) { this.setData({ participantKeyword: event.detail.value }) },
+  // 输入即查（防抖 400ms），不用再点按钮
+  onParticipantKeywordDebounced() {
+    if (this._participantKeywordTimer) clearTimeout(this._participantKeywordTimer)
+    this._participantKeywordTimer = setTimeout(() => {
+      this.setData({ participantSearchKeyword: (this.data.participantKeyword || '').trim() })
+      this.loadParticipants(true)
+    }, 400)
+  },
+  onParticipantSearch() {
+    this.setData({ participantSearchKeyword: (this.data.participantKeyword || '').trim() })
+    this.loadParticipants(true)
+  },
+  onParticipantReset() {
+    this.setData({
+      participantKeyword: '', participantSearchKeyword: '',
+      participantMemberType: '', participantMemberTypeIndex: 0,
+      participantIdentityGroup: '', participantIdentityIndex: 0,
+    })
+    this.loadParticipants(true)
+  },
+  onParticipantMemberType(event) {
+    const index = Number(event.detail.value)
+    this.setData({ participantMemberTypeIndex: index, participantMemberType: this.data.participantMemberTypes[index].value })
+    this.loadParticipants(true)
+  },
+  onParticipantIdentity(event) {
+    const index = Number(event.detail.value)
+    this.setData({ participantIdentityIndex: index, participantIdentityGroup: this.data.participantIdentityOptions[index].value })
+    this.loadParticipants(true)
+  },
+  onParticipantCustomer(event) {
+    wx.navigateTo({ url: `/pages/customer-profile/index?id=${encodeURIComponent(event.currentTarget.dataset.id)}` })
+  },
+  /** 点某一段内容：显示所有人填写的内容，下面填我自己那份 */
+  async onParticipantOpenEdit(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    const field = event.currentTarget.dataset.field
+    const row = this.data.participantRecords[index]
+    if (!row) return
+    const titles = { visit_need: '来访需求', customer_info: '客户信息', follow_up: '跟进点' }
+    this.setData({
+      participantEditing: {
+        index, field, visitId: row.visit_id,
+        title: titles[field] || '内容',
+        nickname: row.nickname, dateText: row.dateText, courseName: row.course_name,
+        all: row[field] || '',
+      },
+      participantDraft: '',
+      participantMyNoteId: '',
+    })
+    if (!row.visit_id) return
+    try {
+      const mine = await customerFollowUpApi.myNote(row.visit_id, field)
+      this.setData({ participantMyNoteId: (mine && mine.id) || '', participantDraft: (mine && mine.content) || '' })
+    } catch (e) { /* 拿不到就按新填写处理 */ }
+  },
+  onParticipantDraft(event) { this.setData({ participantDraft: event.detail.value }) },
+  closeParticipantEdit() { if (!this.data.participantSaving) this.setData({ participantEditing: null }) },
+  async saveParticipantEdit() {
+    const editing = this.data.participantEditing
+    const content = (this.data.participantDraft || '').trim()
+    if (!editing || !content) { wx.showToast({ title: '内容不能为空', icon: 'none' }); return }
+    if (this.data.participantSaving) return
+    this.setData({ participantSaving: true })
+    try {
+      if (this.data.participantMyNoteId) await customerFollowUpApi.update(this.data.participantMyNoteId, content)
+      else await customerFollowUpApi.create(editing.visitId, editing.field, content)
+      this.setData({ participantEditing: null, participantDraft: '' })
+      wx.showToast({ title: '已保存', icon: 'none' })
+      this.loadParticipants(true)
+    } catch (e) {
+      wx.showToast({ title: e.message || '保存失败', icon: 'none' })
+    } finally {
+      this.setData({ participantSaving: false })
+    }
   },
 
   // 复盘内容太长时按行展开/缩略

@@ -172,12 +172,38 @@ def query(data: PrincipalQuery, request: Request):
 
 @router.post("/export")
 def export(data: PrincipalQuery, request: Request):
+    if data.export_view == "traffic":
+        data = data.model_copy(update={"tab": "overview"})
     result = principal_service.analyze(request, data, export=True)
+    if data.export_view == "traffic":
+        fields = [
+            ("name", "昵称"), ("referral_date", "引流日期"), ("referrer", "引流人"),
+            ("referrer_handler", "承接人"), ("identity", "会员身份"),
+            ("follow_up_status", "跟进阶段"), ("traffic_source", "流量来源"),
+            ("tags", "客户标签"), ("deals", "交易笔数"), ("invite_count", "邀约次数"),
+            ("cancel_count", "取消次数"), ("arrive_count", "到店次数"),
+            ("visit_interval", "平均到店间隔"), ("activity_count", "参与活动"),
+        ]
+        # 从同一权限过滤后的引流列表取数据，忽略客户端传入的无权访问或已失效 ID。
+        customers = {
+            customer["id"]: {**customer, "referrer": group["label"]}
+            for group in result.get("breakdown", {}).get("traffic", [])
+            for customer in group.get("customers", [])
+        }
+        ids = data.export_customer_ids if data.export_customer_ids is not None else list(customers)
+        items = []
+        for customer_id in dict.fromkeys(ids):
+            if customer_id not in customers:
+                continue
+            customer = customers[customer_id]
+            items.append({**customer, "tags": "、".join(customer.get("tags") or []), "details": []})
+        result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
+                  "items": items, "total": len(items)}
     columns = result["columns"]
     rows = [[item.get(c["key"], "") for c in columns] + ["\n".join(item["details"])] for item in result["items"]]
     # 阻止用户文本在 Excel 中成为公式。
     rows = [["'" + value if isinstance(value, str) and value.startswith(("=", "+", "-", "@")) else value for value in row] for row in rows]
-    label = "导出转化分析" if data.tab == "conversion" else "导出组织/俱乐部"
+    label = "导出引流客户" if data.export_view == "traffic" else "导出转化分析" if data.tab == "conversion" else "导出组织/俱乐部"
     suffix = f"，规则：{data.rule.name}" if data.tab == "conversion" else f"，{data.tab}"
     audit(request, f"{label}：{result['total']}条{suffix}", "EXPORT")
     # Excel 工作表名不允许包含 “/”，用去掉斜杠的名称
