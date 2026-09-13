@@ -41,6 +41,9 @@ export default function CustomerFollowUpsPage() {
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState("")
   const [searchKeyword, setSearchKeyword] = useState("")
+  // 日期筛选（放在列表卡片里，改了就查，不需要点按钮）
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   // 编辑自己填的那一条（来访需求 / 客户信息 / 跟进点）
@@ -50,11 +53,11 @@ export default function CustomerFollowUpsPage() {
   // 点昵称看客户详情（权限沿用客户浏览权限，由后端校验）
   const [detailCustomerId, setDetailCustomerId] = useState<string | null>(null)
 
-  const fetchRows = useCallback(async (nextPage: number, nextKeyword: string) => {
+  const fetchRows = useCallback(async (nextPage: number, nextKeyword: string, from = dateFrom, to = dateTo) => {
     setLoading(true)
     setError("")
     try {
-      const result = await customerFollowUpApi.list({ keyword: nextKeyword, page: nextPage, page_size: PAGE_SIZE })
+      const result = await customerFollowUpApi.list({ keyword: nextKeyword, date_from: from, date_to: to, page: nextPage, page_size: PAGE_SIZE })
       setRows(result.items || [])
       setTotal(result.total || 0)
       setTotalPages(result.total_pages || 1)
@@ -67,9 +70,15 @@ export default function CustomerFollowUpsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [dateFrom, dateTo])
 
   useEffect(() => { fetchRows(1, "") }, [fetchRows])
+
+  // 搜索框输入即查
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchKeyword(keyword.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [keyword])
 
   const runSearch = () => {
     setSearchKeyword(keyword.trim())
@@ -131,19 +140,6 @@ export default function CustomerFollowUpsPage() {
           <h1 className="text-[15px] font-medium text-[#1f2329]">客户跟进</h1>
           <p className="mt-1 text-[12px] text-[#8f959e]">这里只列你自己填写过的来访需求、客户信息与跟进点；点昵称可以看客户详情，点内容可以改。</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Input
-            value={keyword}
-            onChange={event => setKeyword(event.target.value)}
-            onKeyDown={event => { if (event.key === "Enter") runSearch() }}
-            placeholder="按昵称或姓名搜索"
-            className="h-8 w-[220px] rounded-[4px] border-[0.5px] border-[#e1e4e7] text-[12px] shadow-none focus-visible:ring-0"
-          />
-          <Button size="sm" onClick={runSearch} disabled={loading} className="h-8 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-4 text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">
-            <Search className="mr-1 h-3.5 w-3.5" />查询
-          </Button>
-          <Button variant="outline" size="sm" onClick={resetSearch} disabled={loading} className="h-8 rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white px-3 text-[12px] font-normal text-[#4e535a] shadow-none hover:bg-[#f7f8fa]">重置</Button>
-        </div>
       </div>
 
       {searchKeyword && (
@@ -156,7 +152,23 @@ export default function CustomerFollowUpsPage() {
       {error && <div className="mb-3 rounded-[4px] border border-[#f1d9dc] bg-[#fff8f8] px-3 py-2 text-[12px] text-[#b94a58]">{error}</div>}
 
       <div className="rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
-        {/* 固定列宽 + 允许换行：长文本不再把整张表撑出屏幕（表格组件默认 nowrap） */}
+        {/* 日期筛选放在列表卡片内，改完即时查询 */}
+        <div className="flex items-center gap-2 border-b border-[#f0f0f0] px-4 py-2">
+          <span className="text-[12px] text-[#8f959e]">昵称</span>
+          <Input
+            value={keyword}
+            onChange={event => setKeyword(event.target.value)}
+            placeholder="按昵称或姓名搜索"
+            className="h-7 w-[200px] rounded-[4px] border border-[#dee0e3] text-[11px] shadow-none focus-visible:ring-0"
+          />
+          <span className="text-[12px] text-[#8f959e]">日期</span>
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={event => setDateFrom(event.target.value)} className="h-7 rounded-[4px] border border-[#dee0e3] px-2 text-[11px] text-[#2b2f36] outline-none" aria-label="开始日期" />
+          <span className="text-[11px] text-[#8f959e]">-</span>
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={event => setDateTo(event.target.value)} className="h-7 rounded-[4px] border border-[#dee0e3] px-2 text-[11px] text-[#2b2f36] outline-none" aria-label="结束日期" />
+          {(dateFrom || dateTo) && (
+            <button type="button" onClick={() => { setDateFrom(""); setDateTo("") }} className="text-[12px] text-[#3370ff] hover:underline">清除</button>
+          )}
+        </div>
         <Table className="w-full table-fixed">
           <TableHeader>
             <TableRow>
