@@ -31,6 +31,7 @@ const PAGE_LABELS: Record<string, string> = {
   "referral-statistics": "引流统计",
   "member-statistics": "会员情况",
   "course-statistics": "课程记录",
+  "customer-follow-ups": "客户跟进",
   "principal": "组织/俱乐部",
   "product-sales": "产品销售",
   "statistics": "服务数据",
