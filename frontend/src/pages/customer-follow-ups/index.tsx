@@ -22,6 +22,13 @@ const LIST_COLUMNS = [
   { key: "follow_up", label: "跟进点", width: "19%" },
   { key: "updated", label: "更新时间", width: "12%" },
 ]
+const DATE_PRESETS = [
+  { value: "today", label: "当天" },
+  { value: "week", label: "本周" },
+  { value: "month", label: "本月" },
+  { value: "year", label: "本年" },
+  { value: "all", label: "全部" },
+]
 const NOTE_FIELDS = [
   { key: "visit_need" as const, label: "来访需求" },
   { key: "customer_info" as const, label: "客户信息" },
@@ -54,6 +61,7 @@ export default function CustomerFollowUpsPage() {
   // 日期筛选（放在列表卡片里，改了就查，不需要点按钮）
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [datePreset, setDatePreset] = useState("all")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   // 编辑自己填的那一条（来访需求 / 客户信息 / 跟进点）
@@ -89,6 +97,25 @@ export default function CustomerFollowUpsPage() {
     const timer = setTimeout(() => setSearchKeyword(keyword.trim()), 300)
     return () => clearTimeout(timer)
   }, [keyword])
+
+  // 时间快捷项：和「参与者」页同一套算法
+  const applyDatePreset = (preset: string) => {
+    const pad = (value: number) => String(value).padStart(2, "0")
+    const fmt = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    const now = new Date()
+    let from = ""
+    let to = ""
+    if (preset === "today") { from = fmt(now); to = fmt(now) }
+    else if (preset === "week") {
+      const start = new Date(now)
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+      from = fmt(start); to = fmt(now)
+    } else if (preset === "month") { from = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); to = fmt(now) }
+    else if (preset === "year") { from = fmt(new Date(now.getFullYear(), 0, 1)); to = fmt(now) }
+    setDatePreset(preset)
+    setDateFrom(from)
+    setDateTo(to)
+  }
 
   const runSearch = () => {
     setSearchKeyword(keyword.trim())
@@ -171,13 +198,38 @@ export default function CustomerFollowUpsPage() {
             placeholder="按昵称或姓名搜索"
             className="h-7 w-[200px] rounded-[4px] border border-[#dee0e3] text-[11px] shadow-none focus-visible:ring-0"
           />
-          <span className="text-[12px] text-[#8f959e]">日期</span>
-          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={event => setDateFrom(event.target.value)} className="h-7 rounded-[4px] border border-[#dee0e3] px-2 text-[11px] text-[#2b2f36] outline-none" aria-label="开始日期" />
-          <span className="text-[11px] text-[#8f959e]">-</span>
-          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={event => setDateTo(event.target.value)} className="h-7 rounded-[4px] border border-[#dee0e3] px-2 text-[11px] text-[#2b2f36] outline-none" aria-label="结束日期" />
-          {(dateFrom || dateTo) && (
-            <button type="button" onClick={() => { setDateFrom(""); setDateTo("") }} className="text-[12px] text-[#3370ff] hover:underline">清除</button>
-          )}
+          <span className="ml-1 text-[12px] text-[#8f959e]">时间</span>
+          <div className="flex h-8 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+            {DATE_PRESETS.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => applyDatePreset(option.value)}
+                className={`h-[26px] rounded-[2px] px-2 text-[12px] transition-colors ${datePreset === option.value ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:bg-[#f5f6f7]"}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center rounded-[4px] bg-[#f0f1f3] p-0.5">
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={event => { setDatePreset("custom"); setDateFrom(event.target.value) }}
+              className="h-[26px] rounded-[2px] border-none bg-white px-2 text-[11px] text-[#2b2f36] outline-none"
+              aria-label="开始日期"
+            />
+            <span className="flex h-[26px] items-center bg-white px-1 text-[11px] text-[#8f959e]">-</span>
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={event => { setDatePreset("custom"); setDateTo(event.target.value) }}
+              className="h-[26px] rounded-[2px] border-none bg-white px-2 text-[11px] text-[#2b2f36] outline-none"
+              aria-label="结束日期"
+            />
+          </div>
         </div>
         {/* 列标题只出现一次，每个日期一张卡片 */}
         <div className="px-4 pt-3">
