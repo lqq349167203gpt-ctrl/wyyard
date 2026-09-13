@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课表页 · 样式优化一稿</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #eef0f3;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 40px;
+    padding: 40px 24px;
+    min-height: 100vh;
+  }
+
+  /* ===== 手机框 ===== */
+  .phone {
+    width: 375px;
+    height: 760px;
+    background: #f7f8fa;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(20, 24, 31, 0.10);
+    flex-shrink: 0;
+  }
+
+  /* ===== 状态栏 ===== */
+  .statusbar {
+    height: 44px;
+    background: #f3f7ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2329;
+  }
+
+  /* ===== 顶部 ===== */
+  .head {
+    background: #f3f7ff;
+    padding: 10px 16px 14px;
+  }
+  .head-row {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+  }
+  .head-date {
+    display: flex;
+    align-items: center;
+    font-size: 21px;
+    font-weight: 600;
+    color: #1f2329;
+    letter-spacing: 0.2px;
+  }
+  .head-date .wk {
+    margin-left: 7px;
+    color: #8f959e;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .head-date .drop {
+    margin-left: 6px;
+    color: #a6acb4;
+    font-size: 11px;
+  }
+  /* 优化点：空间切换由白底胶囊改为无底色文字，靠 hairline 分隔 */
+  .head-space {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    color: #646a73;
+    font-size: 12px;
+    padding-left: 14px;
+    border-left: 1px solid #dfe4ec;
+  }
+
+  /* 优化点：周历半透明白改纯白，数字灰度加深一档 */
+  .week-strip {
+    margin-top: 8px;
+    border-radius: 14px;
+    background: #ffffff;
+    padding: 10px 7px 8px;
+    display: flex;
+  }
+  .week-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .week-label {
+    color: #8f959e;
+    font-size: 10px;
+  }
+  .week-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-top: 4px;
+    border-radius: 9px;
+    color: #4e5560;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .week-count-dot {
+    width: 3.5px;
+    height: 3.5px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background: #c3cee6;
+    opacity: 0;
+  }
+  .week-count-dot.visible { opacity: 1; }
+  .week-day.selected .week-label { color: #3370ff; }
+  .week-day.selected .week-number {
+    background: #3370ff;
+    color: #fff;
+  }
+  .week-day.selected .week-count-dot { background: #3370ff; }
+
+  /* ===== 列表 ===== */
+  .list { padding: 14px 0 20px; }
+  .group { margin-bottom: 14px; }
+  .group-heading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 20px 8px;
+  }
+  /* 优化点：黄点 12→10，更精致 */
+  .group-heading-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #f4dc84;
+    flex-shrink: 0;
+  }
+  .group-label {
+    color: #4e535a;
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+  .group-count {
+    color: #b0b5bb;
+    font-size: 11px;
+    font-weight: 400;
+  }
+  .withdraw-entry {
+    margin-left: auto;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 7px;
+    background: #f2f3f5;
+    display: flex;
+    align-items: center;
+    color: #4e535a;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .group-card {
+    overflow: hidden;
+    margin: 0 12px;
+    border-radius: 14px;
+    background: #fff;
+  }
+  .card {
+    display: flex;
+    align-items: center;
+    min-height: 60px;
+    padding: 10px 14px;
+  }
+  .card + .card { border-top: 1px solid #f1f2f4; }
+
+  .card-time {
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .t1 {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #1f2329;
+    display: block;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.2px;
+  }
+  .t2 {
+    font-size: 10.5px;
+    color: #a6acb4;
+    display: block;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .card-mid {
+    flex: 1;
+    min-width: 0;
+    margin-left: 12px;
+  }
+  .card-line1 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  /* 优化点：公益标签由绿字改为极淡绿底小签，收敛颜色 */
+  .welfare-tag {
+    flex-shrink: 0;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: #eef5f0;
+    color: #3d7a55;
+    font-size: 10px;
+    font-weight: 400;
+  }
+  /* 优化点：课程名 600→500，靠字号而非字重 */
+  .name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2329;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .type {
+    font-size: 11px;
+    color: #a6acb4;
+    flex-shrink: 0;
+  }
+  .card-line2 {
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: #8f959e;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .creator-text {
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid #e8eaed;
+  }
+  .card-right {
+    flex-shrink: 0;
+    margin-left: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  /* 优化点：参与人数数字用主文字色，"人"弱化 */
+  .ppl { font-size: 11.5px; color: #8f959e; }
+  .ppl b { color: #4e535a; font-weight: 500; }
+  /* 优化点：状态改为小圆点 + 灰字，去掉孤立文字的漂浮感 */
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    color: #a6acb4;
+  }
+  .status::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #b9c8e7;
+  }
+
+  /* ===== FAB：阴影减淡 ===== */
+  .fab {
+    position: absolute;
+    right: 16px;
+    bottom: 84px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #3370ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 26px;
+    font-weight: 300;
+    box-shadow: 0 6px 18px rgba(51, 112, 255, 0.18);
+  }
+
+  /* ===== 右侧说明栏 ===== */
+  .panel {
+    max-width: 420px;
+    flex-shrink: 0;
+  }
+  .panel h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2329;
+    margin-bottom: 6px;
+  }
+  .panel .sub {
+    font-size: 13px;
+    color: #646a73;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    font-weight: 500;
+    color: #8f959e;
+    letter-spacing: 1px;
+    margin: 22px 0 10px;
+    text-transform: uppercase;
+  }
+  .change {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .change .no {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #f4dc84;
+    color: #6b5b1e;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .change .body { min-width: 0; }
+  .change .t {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2329;
+    margin-bottom: 3px;
+  }
+  .change .d {
+    font-size: 12px;
+    color: #8f959e;
+    line-height: 1.55;
+  }
+  .keep {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    color: #646a73;
+    line-height: 1.6;
+  }
+  .keep b { color: #4e535a; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>· · ·</span></div>
+
+  <div class="head">
+    <div class="head-row">
+      <div class="head-date">8月30日<span class="wk">周日</span><span class="drop">▾</span></div>
+      <div class="head-space">桃园时代</div>
+    </div>
+    <div class="week-strip">
+      <div class="week-day"><span class="week-label">一</span><span class="week-number">25</span><span class="week-count-dot visible"></span></div>
+      <div class="week-day"><span class="week-label">二</span><span class="week-number">26</span><span class="week-count-dot visible"></span></div>
+      <div class="week-day"><span class="week-label">三</span><span class="week-number">27</span><span class="week-count-dot visible"></span></div>
+      <div class="week-day"><span class="week-label">四</span><span class="week-number">28</span><span class="week-count-dot"></span></div>
+      <div class="week-day"><span class="week-label">五</span><span class="week-number">29</span><span class="week-count-dot visible"></span></div>
+      <div class="week-day selected"><span class="week-label">日</span><span class="week-number">30</span><span class="week-count-dot visible"></span></div>
+      <div class="week-day"><span class="week-label">一</span><span class="week-number">31</span><span class="week-count-dot"></span></div>
+    </div>
+  </div>
+
+  <div class="list">
+    <div class="group">
+      <div class="group-heading">
+        <span class="group-heading-dot"></span>
+        <span class="group-label">上午</span>
+        <span class="group-count">2 场</span>
+        <span class="withdraw-entry">退课</span>
+      </div>
+      <div class="group-card">
+        <div class="card">
+          <div class="card-time"><span class="t1">09:30</span><span class="t2">10:30</span></div>
+          <div class="card-mid">
+            <div class="card-line1"><span class="welfare-tag">公益</span><span class="name">静观冥想 · 晨间场</span><span class="type">常规课</span></div>
+            <div class="card-line2"><span>冥想室 A</span><span class="creator-text">创建人 · 王老师</span></div>
+          </div>
+          <div class="card-right"><span class="ppl"><b>6</b> 人</span><span class="status">已发布</span></div>
+        </div>
+        <div class="card">
+          <div class="card-time"><span class="t1">10:45</span><span class="t2">11:45</span></div>
+          <div class="card-mid">
+            <div class="card-line1"><span class="name">音钵疗愈</span><span class="type">私教课</span></div>
+            <div class="card-line2"><span>音钵室</span><span class="creator-text">创建人 · 李老师</span></div>
+          </div>
+          <div class="card-right"><span class="ppl"><b>3</b> 人</span><span class="status">已发布</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-heading">
+        <span class="group-heading-dot"></span>
+        <span class="group-label">中午</span>
+        <span class="group-count">1 场</span>
+      </div>
+      <div class="group-card">
+        <div class="card">
+          <div class="card-time"><span class="t1">12:30</span><span class="t2">13:15</span></div>
+          <div class="card-mid">
+            <div class="card-line1"><span class="name">午间呼吸放松</span><span class="type">常规课</span></div>
+            <div class="card-line2"><span>共享区</span><span class="creator-text">创建人 · 王老师</span></div>
+          </div>
+          <div class="card-right"><span class="ppl"><b>2</b> 人</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-heading">
+        <span class="group-heading-dot"></span>
+        <span class="group-label">下午</span>
+        <span class="group-count">2 场</span>
+      </div>
+      <div class="group-card">
+        <div class="card">
+          <div class="card-time"><span class="t1">14:30</span><span class="t2">15:30</span></div>
+          <div class="card-mid">
+            <div class="card-line1"><span class="name">茶席美学 · 初阶</span><span class="type">活动</span></div>
+            <div class="card-line2"><span>茶室</span><span class="creator-text">创建人 · 陈默</span></div>
+          </div>
+          <div class="card-right"><span class="ppl"><b>8</b> 人</span><span class="status">已发布</span></div>
+        </div>
+        <div class="card">
+          <div class="card-time"><span class="t1">16:00</span><span class="t2">17:00</span></div>
+          <div class="card-mid">
+            <div class="card-line1"><span class="name">芳香头疗</span><span class="type">私教课</span></div>
+            <div class="card-line2"><span>理疗室 B</span><span class="creator-text">创建人 · 李老师</span></div>
+          </div>
+          <div class="card-right"><span class="ppl"><b>1</b> 人</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-heading">
+        <span class="group-heading-dot"></span>
+        <span class="group-label">晚上</span>
+        <span class="group-count">1 场</span>
+      </div>
+      <div class="group-card">
+        <div class="card">
+          <div class="card-time"><span class="t1">19:30</span><span class="t2">20:30</span></div>
+          <div class="card-mid">
+            <div class="card-line1"><span class="welfare-tag">公益</span><span class="name">晚间音钵团体场</span><span class="type">常规课</span></div>
+            <div class="card-line2"><span>音钵室</span><span class="creator-text">创建人 · 王老师</span></div>
+          </div>
+          <div class="card-right"><span class="ppl"><b>11</b> 人</span><span class="status">已发布</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fab">+</div>
+</div>
+
+<div class="panel">
+  <h1>课表页 · 样式优化一稿</h1>
+  <p class="sub">在现有 B 方案结构上只做视觉层优化，不动任何布局、交互和数据逻辑。基调不变：灰阶驱动、层级靠排版、蓝色只做小面积点缀。</p>
+
+  <h2>改动点</h2>
+  <div class="change"><span class="no">1</span><div class="body"><div class="t">周历条：半透明白改纯白</div><div class="d">rgba(255,255,255,0.78) → #FFFFFF，未选中日期数字灰度加深一档，弱日不再发灰发虚。</div></div></div>
+  <div class="change"><span class="no">2</span><div class="body"><div class="t">空间切换：白底胶囊改纯文字</div><div class="d">去掉胶囊底，改为次级灰文字 + 左侧 hairline 竖线分隔，和日期行排成一行，头部更轻。</div></div></div>
+  <div class="change"><span class="no">3</span><div class="body"><div class="t">公益标签：绿字改极淡绿底小签</div><div class="d">裸绿字在白卡上略飘，改为 #EEF5F0 底 + 深绿字的 5px 小签，和客户页标签的处理方式统一。</div></div></div>
+  <div class="change"><span class="no">4</span><div class="body"><div class="t">状态行：孤立文字改小圆点前缀</div><div class="d">"已发布" 前加 4px 淡蓝灰圆点，右侧信息列有锚点不漂浮；参与人数数字用主文字色、"人"字弱化。</div></div></div>
+  <div class="change"><span class="no">5</span><div class="body"><div class="t">字重节奏：课程名 600 → 500</div><div class="d">层级改由字号和颜色承担，整页只剩时间和日期用 600，页面更安静。</div></div></div>
+  <div class="change"><span class="no">6</span><div class="body"><div class="t">细节收敛</div><div class="d">黄点 12→10rpx；FAB 阴影减淡（0 8 32 → 0 6 18）；卡内圆角 24→22rpx 视觉量级；副信息灰色统一分三档，不再五种灰混用。</div></div></div>
+
+  <h2>保持不动</h2>
+  <div class="keep">
+    <b>结构</b>：四时段分组、一组一卡、退课在首个时段标题右侧<br>
+    <b>颜色</b>：顶部 #F3F7FF、黄点 #F4DC84、系统蓝 #3370FF、页面底 #F7F8FA<br>
+    <b>交互</b>：周历滑动切换、下拉日历、点击课程进详情、FAB 新建
+  </div>
+</div>
+
+</body>
+</html>

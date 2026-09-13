@@ -48,6 +48,7 @@
       </view>
     </view>
     <view class="record-activity">
+      <text class="record-activity-label">参与课程</text>
       <text class="record-activity-name" wx:if="{{item.activityText}}">{{item.activityText}}</text>
       <!-- 当天没参加活动：用很短的浅灰横线占位 -->
       <view class="record-activity-empty" wx:else></view>

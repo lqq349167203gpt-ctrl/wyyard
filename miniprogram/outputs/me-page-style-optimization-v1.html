@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的 · 样式优化一稿</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #eef0f3;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 40px;
+    padding: 40px 24px;
+    min-height: 100vh;
+  }
+
+  /* ===== 手机框 ===== */
+  .phone {
+    width: 375px;
+    height: 760px;
+    background: #f7f8fa;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(20, 24, 31, 0.10);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .statusbar {
+    height: 44px;
+    background: #f3f7ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2329;
+    flex-shrink: 0;
+  }
+
+  /* ===== 头部：菜单卡上浮，嵌入浅蓝头 ===== */
+  .head {
+    background: #f3f7ff;
+    padding: 22px 18px 64px;
+    flex-shrink: 0;
+  }
+  .head-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #3370ff;
+  }
+  .info { min-width: 0; flex: 1; }
+  .name {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2329;
+    line-height: 1.2;
+    display: block;
+  }
+  /* 优化点：角色 pill 半透明白改纯白实底 */
+  .role-pill {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 7px;
+    padding: 3px 12px;
+    background: #ffffff;
+    border-radius: 999px;
+    font-size: 11px;
+    color: #3370ff;
+    font-weight: 500;
+  }
+
+  /* 优化点：菜单卡上移嵌入头部，去掉 box-shadow */
+  .menu-card {
+    background: #ffffff;
+    border-radius: 14px;
+    margin: -48px 12px 0;
+    padding: 0 16px;
+    position: relative;
+    z-index: 2;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    height: 52px;
+    border-bottom: 1px solid #f1f2f4;
+  }
+  .menu-item:last-child { border-bottom: none; }
+  .menu-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    margin-right: 14px;
+  }
+  .menu-label {
+    flex: 1;
+    font-size: 14px;
+    color: #1f2329;
+    font-weight: 400;
+  }
+  .menu-arrow {
+    font-size: 18px;
+    color: #c0c4cc;
+    flex-shrink: 0;
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  /* 优化点：退出按钮去阴影，文字降为次级色，不再和菜单卡同权重 */
+  .logout-btn {
+    margin: 12px 12px 0;
+    height: 52px;
+    font-size: 14px;
+    background: #ffffff;
+    color: #4e535a;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .body-space { flex: 1; }
+
+  /* ===== 底部导航 ===== */
+  .tabbar {
+    height: 56px;
+    background: #ffffff;
+    border-top: 1px solid #f1f2f4;
+    display: flex;
+    flex-shrink: 0;
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 10px;
+    color: #8f959e;
+  }
+  .tab .ico {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: #dfe3e8;
+  }
+  .tab.active { color: #3370ff; }
+  .tab.active .ico { background: #3370ff; }
+
+  /* ===== 右侧说明栏 ===== */
+  .panel { max-width: 420px; flex-shrink: 0; }
+  .panel h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2329;
+    margin-bottom: 6px;
+  }
+  .panel .sub {
+    font-size: 13px;
+    color: #646a73;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    font-weight: 500;
+    color: #8f959e;
+    letter-spacing: 1px;
+    margin: 22px 0 10px;
+  }
+  .change {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .change .no {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #f4dc84;
+    color: #6b5b1e;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .change .t {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2329;
+    margin-bottom: 3px;
+  }
+  .change .d {
+    font-size: 12px;
+    color: #8f959e;
+    line-height: 1.55;
+  }
+  .keep {
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    color: #646a73;
+    line-height: 1.6;
+  }
+  .keep b { color: #4e535a; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><span>· · ·</span></div>
+
+  <div class="head">
+    <div class="head-row">
+      <div class="avatar">陈</div>
+      <div class="info">
+        <span class="name">陈默</span>
+        <span class="role-pill">店长</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="menu-card">
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -8"/><path d="M3 10l18 0"/><path d="M7 15l.01 0"/><path d="M11 15l2 0"/></svg>
+      <span class="menu-label">付费项目</span>
+      <span class="menu-arrow">›</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2m4 -14h6m-6 4h6m-2 4h2"/></svg>
+      <span class="menu-label">支出</span>
+      <span class="menu-arrow">›</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1"/></svg>
+      <span class="menu-label">沟通记录</span>
+      <span class="menu-arrow">›</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+      <span class="menu-label">每日报表</span>
+      <span class="menu-arrow">›</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4.172a2 2 0 0 0 .586 1.414l5.71 5.71a2.41 2.41 0 0 0 3.408 0l3.592 -3.592a2.41 2.41 0 0 0 0 -3.408l-5.71 -5.71a2 2 0 0 0 -1.414 -.586h-4.172a2 2 0 0 0 -2 2"/><path d="M18 19l1.592 -1.592a4.82 4.82 0 0 0 0 -6.816l-4.592 -4.592"/><path d="M7 10h-.01"/></svg>
+      <span class="menu-label">客户标签</span>
+      <span class="menu-arrow">›</span>
+    </div>
+    <div class="menu-item">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M12 15a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M10.16 10.62l2.34 2.88"/><path d="M15.088 13.328l2.837 -4.586"/></svg>
+      <span class="menu-label">自定义筛选</span>
+      <span class="menu-arrow">›</span>
+    </div>
+  </div>
+
+  <div class="logout-btn">退出登录</div>
+
+  <div class="body-space"></div>
+
+  <div class="tabbar">
+    <div class="tab"><span class="ico"></span>客户</div>
+    <div class="tab"><span class="ico"></span>邀约</div>
+    <div class="tab"><span class="ico"></span>课表</div>
+    <div class="tab active"><span class="ico"></span>我的</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h1>“我的”页 · 样式优化一稿</h1>
+  <p class="sub">在现有结构（头像头部 + 功能入口卡 + 退出按钮）上只做视觉层优化，不动权限逻辑和入口。沿用全套已定语言：浅蓝头、白卡、hairline、蓝色只做小点缀。</p>
+
+  <h2>改动点</h2>
+  <div class="change"><span class="no">1</span><div><div class="t">菜单卡上浮，嵌入浅蓝头部</div><div class="d">现在头部和卡片之间隔着一长条浅蓝再接灰底，页面断成三截。菜单卡上移 48rpx 压在蓝色头部上，和课表周历卡、邀约头部是同一个语言，头尾连贯。</div></div></div>
+  <div class="change"><span class="no">2</span><div><div class="t">全部卡片去阴影</div><div class="d">菜单卡和退出按钮的 box-shadow 去掉，纯白卡 + hairline 分隔，与课表、邀约、客户页一致。</div></div></div>
+  <div class="change"><span class="no">3</span><div><div class="t">角色 pill 改纯白实底</div><div class="d">rgba 半透明白在浅蓝底上显脏，改纯白，和周历卡、头像的白色统一。</div></div></div>
+  <div class="change"><span class="no">4</span><div><div class="t">退出按钮降权重</div><div class="d">文字从主黑降为次级色，高度与菜单行一致。退出是低频操作，不该和六个功能入口同权重。</div></div></div>
+  <div class="change"><span class="no">5</span><div><div class="t">排版节奏</div><div class="d">菜单字号 30→28rpx，行高统一 52px 量级；箭头字重减轻；灰色统一三档（#1F2329 / #79838F / #C0C4CC），不再五种灰混用。</div></div></div>
+
+  <h2>保持不动</h2>
+  <div class="keep">
+    <b>结构</b>：头像左对齐 + 名字 + 角色 pill，六个功能入口的顺序和权限显隐<br>
+    <b>颜色</b>：头部 #F3F7FF、头像白底蓝字、系统蓝 #3370FF、页面底 #F7F8FA<br>
+    <b>图标</b>：现有灰阶线性 SVG 图标原样保留
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>“我的”页 · 头部去蓝两版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #eef0f3;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 36px;
+    padding: 40px 24px;
+    min-height: 100vh;
+  }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .col-title { font-size: 15px; font-weight: 600; color: #1f2329; }
+  .col-sub { font-size: 12px; color: #8f959e; line-height: 1.5; text-align: center; max-width: 340px; margin-top: -8px; }
+
+  .phone {
+    width: 340px;
+    height: 700px;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(20, 24, 31, 0.10);
+    display: flex;
+    flex-direction: column;
+  }
+  .statusbar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2329;
+    flex-shrink: 0;
+  }
+
+  /* ============ A · 全白无色版 ============ */
+  .a { background: #ffffff; }
+  .a .statusbar { background: #ffffff; }
+  .a .head { padding: 20px 20px 24px; }
+  .a .head-row { display: flex; align-items: center; gap: 14px; }
+  .a .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #3370ff; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 500; flex-shrink: 0;
+  }
+  .a .name { font-size: 20px; font-weight: 600; color: #1f2329; line-height: 1.2; display: block; }
+  .a .role {
+    display: inline-flex; align-items: center;
+    margin-top: 6px; font-size: 11px; color: #8f959e;
+  }
+  .a .role::before {
+    content: ""; width: 4px; height: 4px; border-radius: 50%;
+    background: #3370ff; margin-right: 5px;
+  }
+
+  .a .menu {
+    margin: 0 12px;
+    background: #f7f8fa;
+    border-radius: 14px;
+    padding: 2px 16px;
+  }
+  .a .menu-item {
+    display: flex; align-items: center; height: 50px;
+    border-bottom: 1px solid #eceef1;
+  }
+  .a .menu-item:last-child { border-bottom: none; }
+  .a .menu-icon { width: 19px; height: 19px; flex-shrink: 0; margin-right: 13px; }
+  .a .menu-label { flex: 1; font-size: 13.5px; color: #1f2329; }
+  .a .menu-arrow { font-size: 17px; color: #c0c4cc; font-weight: 300; line-height: 1; }
+
+  .a .logout {
+    margin-top: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: #8f959e;
+  }
+  .a .body-space { flex: 1; }
+  .a .tabbar { height: 54px; background: #fff; border-top: 1px solid #f1f2f4; display: flex; flex-shrink: 0; }
+  .a .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: #8f959e; }
+  .a .tab .ico { width: 19px; height: 19px; border-radius: 6px; background: #dfe3e8; }
+  .a .tab.active { color: #3370ff; }
+  .a .tab.active .ico { background: #3370ff; }
+
+  /* ============ B · 浅灰头部版 ============ */
+  .b { background: #f7f8fa; }
+  .b .statusbar { background: #f2f3f5; }
+  .b .head { background: #f2f3f5; padding: 20px 20px 40px; }
+  .b .head-row { display: flex; align-items: center; gap: 14px; }
+  .b .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #ffffff; color: #3370ff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 600; flex-shrink: 0;
+  }
+  .b .name { font-size: 20px; font-weight: 600; color: #1f2329; line-height: 1.2; display: block; }
+  .b .role-pill {
+    display: inline-flex; align-items: center;
+    margin-top: 7px; padding: 3px 12px;
+    background: #ffffff; border-radius: 999px;
+    font-size: 11px; color: #3370ff; font-weight: 500;
+  }
+  .b .menu-card {
+    background: #fff; border-radius: 14px;
+    margin: -28px 12px 0; position: relative; z-index: 2;
+    padding: 0 16px;
+  }
+  .b .menu-item {
+    display: flex; align-items: center; height: 50px;
+    border-bottom: 1px solid #f1f2f4;
+  }
+  .b .menu-item:last-child { border-bottom: none; }
+  .b .menu-icon { width: 19px; height: 19px; flex-shrink: 0; margin-right: 13px; }
+  .b .menu-label { flex: 1; font-size: 13.5px; color: #1f2329; }
+  .b .menu-arrow { font-size: 17px; color: #c0c4cc; font-weight: 300; line-height: 1; }
+  .b .logout-btn {
+    margin: 12px 12px 0; height: 50px; font-size: 13.5px;
+    background: #fff; color: #4e535a; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .b .body-space { flex: 1; }
+  .b .tabbar { height: 54px; background: #fff; border-top: 1px solid #f1f2f4; display: flex; flex-shrink: 0; }
+  .b .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10px; color: #8f959e; }
+  .b .tab .ico { width: 19px; height: 19px; border-radius: 6px; background: #dfe3e8; }
+  .b .tab.active { color: #3370ff; }
+  .b .tab.active .ico { background: #3370ff; }
+</style>
+</head>
+<body>
+
+<!-- A · 全白无色版 -->
+<div class="col">
+  <div class="col-title">A · 全白无色</div>
+  <div class="phone a">
+    <div class="statusbar"><span>9:41</span><span>· · ·</span></div>
+    <div class="head">
+      <div class="head-row">
+        <div class="avatar">陈</div>
+        <div>
+          <span class="name">陈默</span>
+          <span class="role">店长</span>
+        </div>
+      </div>
+    </div>
+    <div class="menu">
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -8"/><path d="M3 10l18 0"/><path d="M7 15l.01 0"/><path d="M11 15l2 0"/></svg>
+        <span class="menu-label">付费项目</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2m4 -14h6m-6 4h6m-2 4h2"/></svg>
+        <span class="menu-label">支出</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1"/></svg>
+        <span class="menu-label">沟通记录</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+        <span class="menu-label">每日报表</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4.172a2 2 0 0 0 .586 1.414l5.71 5.71a2.41 2.41 0 0 0 3.408 0l3.592 -3.592a2.41 2.41 0 0 0 0 -3.408l-5.71 -5.71a2 2 0 0 0 -1.414 -.586h-4.172a2 2 0 0 0 -2 2"/><path d="M18 19l1.592 -1.592a4.82 4.82 0 0 0 0 -6.816l-4.592 -4.592"/><path d="M7 10h-.01"/></svg>
+        <span class="menu-label">客户标签</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M12 15a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M10.16 10.62l2.34 2.88"/><path d="M15.088 13.328l2.837 -4.586"/></svg>
+        <span class="menu-label">自定义筛选</span><span class="menu-arrow">›</span>
+      </div>
+    </div>
+    <div class="logout">退出登录</div>
+    <div class="body-space"></div>
+    <div class="tabbar">
+      <div class="tab"><span class="ico"></span>客户</div>
+      <div class="tab"><span class="ico"></span>邀约</div>
+      <div class="tab"><span class="ico"></span>课表</div>
+      <div class="tab active"><span class="ico"></span>我的</div>
+    </div>
+  </div>
+  <div class="col-sub">整页纯白，头像改为蓝色实底圆（蓝色唯一出场）。菜单收进极淡灰块，退出做纯文字。</div>
+</div>
+
+<!-- B · 浅灰头部版 -->
+<div class="col">
+  <div class="col-title">B · 浅灰头部</div>
+  <div class="phone b">
+    <div class="statusbar"><span>9:41</span><span>· · ·</span></div>
+    <div class="head">
+      <div class="head-row">
+        <div class="avatar">陈</div>
+        <div>
+          <span class="name">陈默</span>
+          <span class="role-pill">店长</span>
+        </div>
+      </div>
+    </div>
+    <div class="menu-card">
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -8"/><path d="M3 10l18 0"/><path d="M7 15l.01 0"/><path d="M11 15l2 0"/></svg>
+        <span class="menu-label">付费项目</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2m4 -14h6m-6 4h6m-2 4h2"/></svg>
+        <span class="menu-label">支出</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1"/></svg>
+        <span class="menu-label">沟通记录</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>
+        <span class="menu-label">每日报表</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v4.172a2 2 0 0 0 .586 1.414l5.71 5.71a2.41 2.41 0 0 0 3.408 0l3.592 -3.592a2.41 2.41 0 0 0 0 -3.408l-5.71 -5.71a2 2 0 0 0 -1.414 -.586h-4.172a2 2 0 0 0 -2 2"/><path d="M18 19l1.592 -1.592a4.82 4.82 0 0 0 0 -6.816l-4.592 -4.592"/><path d="M7 10h-.01"/></svg>
+        <span class="menu-label">客户标签</span><span class="menu-arrow">›</span>
+      </div>
+      <div class="menu-item">
+        <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="#79838f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M12 15a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M10.16 10.62l2.34 2.88"/><path d="M15.088 13.328l2.837 -4.586"/></svg>
+        <span class="menu-label">自定义筛选</span><span class="menu-arrow">›</span>
+      </div>
+    </div>
+    <div class="logout-btn">退出登录</div>
+    <div class="body-space"></div>
+    <div class="tabbar">
+      <div class="tab"><span class="ico"></span>客户</div>
+      <div class="tab"><span class="ico"></span>邀约</div>
+      <div class="tab"><span class="ico"></span>课表</div>
+      <div class="tab active"><span class="ico"></span>我的</div>
+    </div>
+  </div>
+  <div class="col-sub">只把头部蓝色换成中性浅灰 #F2F3F5，其余结构保持现状，改动最小。</div>
+</div>
+
+</body>
+</html>

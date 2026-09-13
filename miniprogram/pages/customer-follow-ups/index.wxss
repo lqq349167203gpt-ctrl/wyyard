@@ -15,7 +15,9 @@
 .record-title { display: flex; align-items: center; gap: 8rpx; flex: 1; min-width: 0; }
 .record-name { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 28rpx; font-weight: 500; color: #1f2329; }
 .record-identity { flex-shrink: 0; max-width: 260rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2rpx 10rpx; border-radius: 6rpx; background: #f2f3f5; font-size: 20rpx; line-height: 1.5; color: #646a73; }
-.record-activity { display: flex; align-items: baseline; gap: 12rpx; margin-top: 8rpx; min-width: 0; }
+/* 活动那一行也要有标题，否则看不出写的是什么 */
+.record-activity { display: flex; align-items: baseline; gap: 12rpx; margin-top: 10rpx; min-width: 0; }
+.record-activity-label { flex-shrink: 0; width: 116rpx; font-size: 23rpx; color: #9aa1a9; }
 /* 当天没参加活动：用很短的浅灰横线，不用文字 */
 .record-activity-empty { width: 20rpx; height: 2rpx; border-radius: 2rpx; background: #e5e8eb; }
 .record-activity-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24rpx; color: #4e535a; }

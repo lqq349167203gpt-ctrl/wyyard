@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>付费项目页 · 样式两版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #eef0f3;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 36px;
+    padding: 40px 24px;
+    min-height: 100vh;
+  }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .col-title { font-size: 15px; font-weight: 600; color: #1f2329; }
+  .col-sub { font-size: 12px; color: #8f959e; line-height: 1.5; text-align: center; max-width: 330px; margin-top: -8px; }
+
+  .phone {
+    width: 340px;
+    height: 700px;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 40px rgba(20, 24, 31, 0.10);
+    display: flex;
+    flex-direction: column;
+    background: #f7f8fa;
+  }
+  .statusbar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2329;
+    flex-shrink: 0;
+  }
+
+  /* ============ 通用元素 ============ */
+  .list { padding: 12px 12px 0; }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .row1 { display: flex; align-items: center; }
+  .name { font-size: 15px; font-weight: 500; color: #1f2329; }
+
+  .status {
+    flex-shrink: 0;
+    margin-left: 8px;
+    padding: 1.5px 7px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 400;
+  }
+  .st-active { background: #eef3ff; color: #3370ff; }
+  .st-expired { background: #faeef1; color: #c4506a; }
+  .st-future { background: #f2f3f5; color: #646a73; }
+
+  .price { margin-left: auto; flex-shrink: 0; color: #1f2329; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .price .cur { font-size: 11px; font-weight: 400; color: #8f959e; margin-right: 1px; }
+
+  .meta { margin-top: 6px; font-size: 11.5px; color: #8f959e; line-height: 1.5; }
+  .meta .sep { margin: 0 5px; color: #d5d9de; }
+
+  .notes {
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid #f1f2f4;
+    font-size: 11px;
+    color: #a6acb4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fab {
+    position: absolute;
+    right: 16px;
+    bottom: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #3370ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 24px;
+    font-weight: 300;
+    box-shadow: 0 6px 18px rgba(51, 112, 255, 0.18);
+    z-index: 5;
+  }
+
+  /* ============ A · 浅蓝头细线标签 ============ */
+  .a .statusbar { background: #f3f7ff; }
+  .a .head {
+    background: #f3f7ff;
+    padding: 6px 0 14px;
+    flex-shrink: 0;
+  }
+  .a .tab-row { display: flex; align-items: center; }
+  .a .tabs {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    padding-left: 14px;
+    gap: 4px;
+    mask-image: linear-gradient(90deg, #000 88%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .a .tab {
+    flex-shrink: 0;
+    padding: 8px 10px 10px;
+    font-size: 12.5px;
+    color: #8f959e;
+    position: relative;
+  }
+  .a .tab.active { color: #3370ff; font-weight: 600; }
+  .a .tab.active::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 0;
+    width: 18px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: #3370ff;
+  }
+  .a .export {
+    margin: 0 12px;
+    flex-shrink: 0;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 9px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    font-size: 11.5px;
+    color: #4e535a;
+  }
+
+  /* A 紧凑卡：三行结构 + 内联统计 */
+  .a .card { padding: 11px 14px; margin-bottom: 8px; }
+  .a .meta { margin-top: 5px; }
+  .a .stat-strip {
+    display: flex;
+    align-items: baseline;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f2f4;
+    font-size: 11px;
+    color: #8f959e;
+  }
+  .a .stat-strip .s { display: flex; align-items: baseline; gap: 3px; white-space: nowrap; }
+  .a .stat-strip .s + .s { margin-left: 11px; padding-left: 11px; border-left: 1px solid #f1f2f4; }
+  .a .stat-strip b {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2329;
+    font-variant-numeric: tabular-nums;
+  }
+  .a .stat-strip b.danger { color: #c4506a; }
+  .a .stat-strip .to { margin-left: auto; }
+  .a .notes { margin-top: 6px; padding-top: 6px; }
+
+  /* ============ B · 标签云统计卡 ============ */
+  .b .statusbar { background: #ffffff; }
+  .b .head {
+    background: #ffffff;
+    padding: 4px 14px 14px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #f1f2f4;
+  }
+  .b .head-row { display: flex; align-items: center; margin-bottom: 10px; }
+  .b .head-title { font-size: 17px; font-weight: 600; color: #1f2329; }
+  .b .head-export {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: #646a73;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .b .head-export::before {
+    content: "";
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    border: 1.2px solid #8f959e;
+  }
+  .b .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .b .chip {
+    padding: 5px 11px;
+    border-radius: 8px;
+    background: #f2f3f5;
+    font-size: 11.5px;
+    color: #646a73;
+  }
+  .b .chip.active { background: #eef3ff; color: #3370ff; font-weight: 500; }
+
+  /* B 统计列 */
+  .stats {
+    display: flex;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f2f4;
+  }
+  .stat { flex: 1; min-width: 0; }
+  .stat + .stat { border-left: 1px solid #f1f2f4; padding-left: 12px; }
+  .stat .num { font-size: 14.5px; font-weight: 600; color: #1f2329; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .stat .num.danger { color: #c4506a; }
+  .stat .num .unit { font-size: 10px; font-weight: 400; color: #8f959e; margin-left: 1px; }
+  .stat .lb { margin-top: 2px; font-size: 9.5px; color: #a6acb4; }
+</style>
+</head>
+<body>
+
+<!-- ============ A · 浅蓝头细线标签 ============ -->
+<div class="col">
+  <div class="col-title">A · 浅蓝头 + 细线标签</div>
+  <div class="phone a">
+    <div class="statusbar"><span>9:41</span><span>· · ·</span></div>
+    <div class="head">
+      <div class="tab-row">
+        <div class="tabs">
+          <span class="tab">会员卡</span>
+          <span class="tab active">觉醒游戏</span>
+          <span class="tab">情绪释放</span>
+          <span class="tab">OH卡诊断</span>
+          <span class="tab">能量结</span>
+        </div>
+        <span class="export">导出</span>
+      </div>
+    </div>
+
+    <div class="list">
+      <div class="card">
+        <div class="row1">
+          <span class="name">陈默</span>
+          <span class="status st-active">生效中</span>
+          <span class="price"><span class="cur">¥</span>2,880</span>
+        </div>
+        <div class="meta">基础套餐<span class="sep">·</span>创建人 王老师</div>
+        <div class="stat-strip">
+          <span class="s">购买 <b>24</b> 次</span>
+          <span class="s">剩余 <b>12</b> 次</span>
+          <span class="s to">至 2027-03-14</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row1">
+          <span class="name">林晓</span>
+          <span class="status st-expired">已过期</span>
+          <span class="price"><span class="cur">¥</span>1,440</span>
+        </div>
+        <div class="meta">基础套餐<span class="sep">·</span>创建人 王老师</div>
+        <div class="stat-strip">
+          <span class="s">购买 <b>12</b> 次</span>
+          <span class="s">剩余 <b class="danger">0</b> 次</span>
+          <span class="s to">至 2026-07-31</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row1">
+          <span class="name">周叙</span>
+          <span class="status st-active">生效中</span>
+          <span class="price"><span class="cur">¥</span>4,320</span>
+        </div>
+        <div class="meta">尊享套餐<span class="sep">·</span>创建人 李老师</div>
+        <div class="stat-strip">
+          <span class="s">购买 <b>36</b> 次</span>
+          <span class="s">剩余 <b>29</b> 次</span>
+          <span class="s to">至 2027-02-08</span>
+        </div>
+        <div class="notes">备注：老会员续费，赠两次体验</div>
+      </div>
+
+      <div class="card">
+        <div class="row1">
+          <span class="name">苏芮</span>
+          <span class="status st-future">未开始</span>
+          <span class="price"><span class="cur">¥</span>1,680</span>
+        </div>
+        <div class="meta">单次体验<span class="sep">·</span>创建人 王老师</div>
+        <div class="stat-strip">
+          <span class="s">购买 <b>3</b> 次</span>
+          <span class="s">剩余 <b>3</b> 次</span>
+          <span class="s to">至 2026-11-30</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row1">
+          <span class="name">高原</span>
+          <span class="status st-active">生效中</span>
+          <span class="price"><span class="cur">¥</span>5,760</span>
+        </div>
+        <div class="meta">基础套餐<span class="sep">·</span>创建人 李老师</div>
+        <div class="stat-strip">
+          <span class="s">购买 <b>48</b> 次</span>
+          <span class="s">剩余 <b>41</b> 次</span>
+          <span class="s to">至 2027-08-14</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="fab">+</div>
+  </div>
+  <div class="col-sub">紧凑三行卡：名字+状态+价格 / 套餐·创建人 / 内联统计条（购买·剩余·至期）。比上一版每卡省约 1/3 高度，一屏可多放 2 个。</div>
+</div>
+
+<!-- ============ B · 标签云统计卡 ============ -->
+<div class="col">
+  <div class="col-title">B · 标签平铺 + 统计卡</div>
+  <div class="phone b">
+    <div class="statusbar"><span>9:41</span><span>· · ·</span></div>
+    <div class="head">
+      <div class="head-row">
+        <span class="head-title">付费项目</span>
+        <span class="head-export">导出</span>
+      </div>
+      <div class="chips">
+        <span class="chip">会员卡</span>
+        <span class="chip active">觉醒游戏</span>
+        <span class="chip">情绪释放</span>
+        <span class="chip">OH卡诊断</span>
+        <span class="chip">能量结</span>
+        <span class="chip">内部课程</span>
+        <span class="chip">茶位费</span>
+        <span class="chip">线下落地课程</span>
+        <span class="chip">其他项目</span>
+      </div>
+    </div>
+
+    <div class="list">
+      <div class="card">
+        <div class="row1">
+          <span class="name">陈默</span>
+          <span class="status st-active">生效中</span>
+          <span class="price"><span class="cur">¥</span>2,880</span>
+        </div>
+        <div class="meta">基础套餐 24 次</div>
+        <div class="stats">
+          <div class="stat">
+            <div class="num">24<span class="unit">次</span></div>
+            <div class="lb">购买</div>
+          </div>
+          <div class="stat">
+            <div class="num">12<span class="unit">次</span></div>
+            <div class="lb">剩余</div>
+          </div>
+          <div class="stat">
+            <div class="num" style="font-size: 12.5px; padding-top: 2px;">2027-03-14</div>
+            <div class="lb">有效期至</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row1">
+          <span class="name">林晓</span>
+          <span class="status st-expired">已过期</span>
+          <span class="price"><span class="cur">¥</span>1,440</span>
+        </div>
+        <div class="meta">基础套餐 12 次</div>
+        <div class="stats">
+          <div class="stat">
+            <div class="num">12<span class="unit">次</span></div>
+            <div class="lb">购买</div>
+          </div>
+          <div class="stat">
+            <div class="num danger">0<span class="unit">次</span></div>
+            <div class="lb">剩余</div>
+          </div>
+          <div class="stat">
+            <div class="num" style="font-size: 12.5px; padding-top: 2px;">2026-07-31</div>
+            <div class="lb">有效期至</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row1">
+          <span class="name">周叙</span>
+          <span class="status st-active">生效中</span>
+          <span class="price"><span class="cur">¥</span>4,320</span>
+        </div>
+        <div class="meta">尊享套餐 36 次</div>
+        <div class="stats">
+          <div class="stat">
+            <div class="num">36<span class="unit">次</span></div>
+            <div class="lb">购买</div>
+          </div>
+          <div class="stat">
+            <div class="num">29<span class="unit">次</span></div>
+            <div class="lb">剩余</div>
+          </div>
+          <div class="stat">
+            <div class="num" style="font-size: 12.5px; padding-top: 2px;">2027-02-08</div>
+            <div class="lb">有效期至</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fab">+</div>
+  </div>
+  <div class="col-sub">九个类型全部平铺成标签，不用横滑；次卡类购买/剩余做成卡内统计列；剩余 0 用红色警示。</div>
+</div>
+
+</body>
+</html>

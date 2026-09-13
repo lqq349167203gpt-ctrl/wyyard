@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课表页 · 对齐邀约页的两版样式</title>
+<style>
+  :root { --ink:#1f2329; --ink2:#646a73; --ink3:#8f959e; --ink4:#b0b5bb; --line:#f1f2f4; --page:#f7f8fa; --head:#f3f7ff; --blue:#3370ff; --yellow:#f4dc84; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; padding:32px 24px 56px; background:#eef0f3; color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif; -webkit-font-smoothing:antialiased; }
+  .intro { max-width:860px; margin:0 auto 22px; }
+  .intro h1 { margin:0 0 7px; font-size:20px; font-weight:600; }
+  .intro p { margin:0; color:var(--ink2); font-size:13px; line-height:1.7; }
+  .plans { max-width:860px; margin:auto; display:grid; grid-template-columns:repeat(2,minmax(0,390px)); justify-content:center; gap:32px; align-items:start; }
+  .plan-head { display:flex; align-items:baseline; gap:9px; margin-bottom:10px; }
+  .letter { color:var(--blue); font-size:16px; font-weight:600; }
+  .plan-name { font-size:15px; font-weight:600; }
+  .plan-desc { margin-left:auto; color:var(--ink3); font-size:11px; }
+  .phone { width:100%; height:820px; position:relative; overflow:hidden; border:1px solid #dfe3e8; border-radius:20px; background:var(--page); }
+  .status { height:28px; padding:0 18px; display:flex; align-items:center; justify-content:space-between; background:var(--head); font-size:11px; font-weight:600; }
+  .nav { height:48px; position:relative; display:flex; align-items:center; justify-content:center; background:var(--head); font-size:17px; font-weight:600; }
+  .capsule { position:absolute; right:10px; width:78px; height:30px; display:flex; align-items:center; justify-content:space-around; padding:0 9px; border:1px solid rgba(31,35,41,.12); border-radius:16px; }
+  .dots { display:flex; gap:3px; }
+  .dots i { width:3px; height:3px; border-radius:50%; background:var(--ink); }
+  .cap-line { width:1px; height:16px; background:rgba(31,35,41,.1); }
+  .cap-circle { width:10px; height:10px; position:relative; border:1.5px solid var(--ink); border-radius:50%; }
+  .cap-circle:after { content:""; position:absolute; top:2px; left:2px; width:3px; height:3px; border-radius:50%; background:var(--ink); }
+  .head { padding:10px 16px 14px; background:var(--head); }
+  .head-row { min-height:38px; display:flex; align-items:center; }
+  .date { font-size:21px; font-weight:500; letter-spacing:-.5px; }
+  .weekday { margin-left:7px; color:var(--ink3); font-size:12px; }
+  .arrow { width:7px; height:7px; margin:-3px 0 0 8px; border-right:1.5px solid var(--ink3); border-bottom:1.5px solid var(--ink3); transform:rotate(45deg); }
+  .space { margin-left:auto; height:32px; padding:0 11px; display:flex; align-items:center; gap:6px; border-radius:10px; background:#fff; color:var(--ink2); font-size:12px; }
+  .pin { width:9px; height:11px; position:relative; border:1px solid var(--blue); border-radius:6px 6px 7px 7px; }
+  .pin:after { content:""; position:absolute; top:3px; left:3px; width:2px; height:2px; border-radius:50%; background:var(--blue); }
+  .summary-row { height:28px; display:flex; align-items:center; }
+  .summary { color:var(--ink3); font-size:11px; }
+  .summary b { color:var(--ink); font-size:13px; font-weight:500; }
+  .withdraw { margin-left:auto; color:var(--ink2); font-size:11px; }
+  .week { margin-top:9px; padding:10px 7px 8px; display:grid; grid-template-columns:repeat(7,1fr); border-radius:14px; background:rgba(255,255,255,.78); }
+  .day { display:flex; flex-direction:column; align-items:center; color:var(--ink3); font-size:10px; }
+  .num { width:28px; height:28px; margin-top:4px; display:flex; align-items:center; justify-content:center; border-radius:9px; color:var(--ink2); font-size:12px; font-weight:500; }
+  .day.active { color:var(--blue); }
+  .day.active .num { background:var(--blue); color:#fff; }
+  .daydot { width:4px; height:4px; margin-top:4px; border-radius:50%; background:#b9c8e7; }
+  .day.active .daydot { background:var(--blue); }
+  .content { height:calc(100% - 245px); overflow:hidden; padding-bottom:72px; }
+  .section-title { height:49px; padding:15px 20px 8px; display:flex; align-items:center; gap:7px; }
+  .title-dot { width:6px; height:6px; border-radius:50%; background:var(--yellow); }
+  .title-text { color:var(--ink2); font-size:12px; font-weight:500; letter-spacing:.5px; }
+  .title-count { color:var(--ink4); font-size:11px; }
+  .title-meta { margin-left:auto; color:var(--ink4); font-size:11px; }
+  .schedule-card { margin:0 12px; overflow:hidden; border-radius:12px; background:#fff; }
+  .course { min-height:82px; padding:12px 14px; display:grid; grid-template-columns:50px minmax(0,1fr) auto; align-items:center; column-gap:11px; }
+  .course + .course { border-top:1px solid var(--line); }
+  .time-start { display:block; font-size:14px; font-weight:500; font-variant-numeric:tabular-nums; }
+  .time-end { display:block; margin-top:3px; color:var(--ink3); font-size:10px; font-variant-numeric:tabular-nums; }
+  .course-main { min-width:0; }
+  .course-title { display:flex; align-items:center; gap:6px; min-width:0; }
+  .course-dot { width:6px; height:6px; flex:none; border-radius:50%; }
+  .course-name { min-width:0; overflow:hidden; color:var(--ink); font-size:14px; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
+  .type { flex:none; color:var(--ink3); font-size:10px; }
+  .course-meta { margin-top:5px; overflow:hidden; color:var(--ink2); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+  .creator { color:var(--ink3); }
+  .course-right { margin-left:5px; display:flex; flex-direction:column; align-items:flex-end; gap:5px; }
+  .people { color:var(--ink2); font-size:11px; }
+  .small-status { padding:1px 6px; border-radius:7px; background:#f2f3f5; color:var(--ink3); font-size:10px; }
+  .readonly { color:var(--ink4); font-size:10px; }
+  .period { padding:14px 20px 7px; display:flex; align-items:center; gap:7px; }
+  .period .title-dot { width:5px; height:5px; }
+  .period-name { color:var(--ink2); font-size:12px; font-weight:500; }
+  .period-count { color:var(--ink4); font-size:10px; }
+  .compact .course { min-height:76px; }
+  .compact .course-meta { display:flex; gap:5px; }
+  .sep { color:#d8dce1; }
+  .fab { position:absolute; right:17px; bottom:73px; width:52px; height:52px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--blue); color:#fff; font-size:29px; font-weight:300; }
+  .tabbar { position:absolute; right:0; bottom:0; left:0; height:62px; padding-top:7px; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid #e5e7eb; background:#fff; }
+  .tab { display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--ink3); font-size:10px; }
+  .tab.active { color:var(--blue); }
+  .tab-icon { width:18px; height:18px; position:relative; }
+  .people-icon:before,.people-icon:after,.person-icon:before,.person-icon:after { content:""; position:absolute; border:1.5px solid currentColor; }
+  .people-icon:before,.person-icon:before { width:7px; height:7px; left:5px; top:0; border-radius:50%; }
+  .people-icon:after,.person-icon:after { width:15px; height:8px; left:1px; bottom:0; border-radius:8px 8px 3px 3px; }
+  .plus-icon { border:1.5px solid currentColor; border-radius:50%; }
+  .plus-icon:before,.plus-icon:after { content:""; position:absolute; background:currentColor; }
+  .plus-icon:before { width:7px; height:1.5px; left:4px; top:8px; }
+  .plus-icon:after { width:1.5px; height:7px; left:7px; top:5px; }
+  .cal-icon { border:1.5px solid currentColor; border-radius:3px; }
+  .cal-icon:before { content:""; position:absolute; left:2px; right:2px; top:5px; border-top:1.5px solid currentColor; }
+  .cal-icon:after { content:""; position:absolute; width:3px; height:3px; left:4px; top:9px; border-radius:50%; background:currentColor; box-shadow:5px 0 0 currentColor; }
+  .notes { margin-top:12px; padding:13px 14px; border:1px solid #e0e3e7; border-radius:12px; background:#fff; }
+  .notes p { margin:0; color:var(--ink2); font-size:12px; line-height:1.75; }
+  .notes p + p { margin-top:4px; }
+  .notes b { color:var(--ink); font-weight:600; }
+  @media(max-width:820px){ body{padding:24px 14px 48px}.plans{grid-template-columns:minmax(0,390px);gap:38px} }
+</style>
+</head>
+<body>
+<header class="intro">
+  <h1>课表页 · 对齐邀约页的两版样式</h1>
+  <p>两版共用邀约页顶部、日期周历、黄色标题圆点、白卡和系统蓝选中态。区别只在课程列表如何分组。</p>
+</header>
+<main class="plans">
+  <section>
+    <div class="plan-head"><span class="letter">A</span><span class="plan-name">连续课表</span><span class="plan-desc">扫读最快</span></div>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G&nbsp;&nbsp;100%</span></div>
+      <div class="nav">课表<div class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="cap-line"></span><span class="cap-circle"></span></div></div>
+      <div class="head">
+        <div class="head-row"><span class="date">8月30日</span><span class="weekday">周日</span><span class="arrow"></span><span class="space"><span class="pin"></span>三楼茶室<span class="arrow" style="margin-left:1px"></span></span></div>
+        <div class="summary-row"><span class="summary">今日 <b>15</b> 位参与者</span><span class="withdraw">退课</span></div>
+        <div class="week">
+          <div class="day"><span>一</span><span class="num">24</span><span class="daydot"></span></div><div class="day"><span>二</span><span class="num">25</span><span class="daydot"></span></div><div class="day"><span>三</span><span class="num">26</span><span class="daydot"></span></div><div class="day"><span>四</span><span class="num">27</span><span class="daydot"></span></div><div class="day"><span>五</span><span class="num">28</span><span class="daydot"></span></div><div class="day"><span>六</span><span class="num">29</span><span class="daydot"></span></div><div class="day active"><span>日</span><span class="num">30</span><span class="daydot"></span></div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="section-title"><span class="title-dot"></span><span class="title-text">今日课表</span><span class="title-count">4 场</span><span class="title-meta">按开始时间</span></div>
+        <div class="schedule-card">
+          <div class="course"><div><span class="time-start">10:00</span><span class="time-end">11:30</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#7f77dd"></span><span class="course-name">情绪释放体验课</span><span class="type">体验</span></div><div class="course-meta">周远 · 创建人 耀凯</div></div><div class="course-right"><span class="people">3 人</span><span class="small-status">已发布</span></div></div>
+          <div class="course"><div><span class="time-start">14:00</span><span class="time-end">16:00</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#378add"></span><span class="course-name">觉醒游戏·陈默</span><span class="type">觉醒</span></div><div class="course-meta">周远 · 扣卡 1 次</div></div><div class="course-right"><span class="people">6 人</span><span class="small-status">已发布</span></div></div>
+          <div class="course"><div><span class="time-start">15:30</span><span class="time-end">17:00</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#d97070"></span><span class="course-name">情绪释放·小满</span><span class="type">情绪</span></div><div class="course-meta">何青 · 创建人 婷婷</div></div><div class="course-right"><span class="people">4 人</span><span class="readonly">仅浏览</span></div></div>
+          <div class="course"><div><span class="time-start">19:00</span><span class="time-end">21:00</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#c772a0"></span><span class="course-name">OH卡·星空夜谈</span><span class="type">OH卡</span></div><div class="course-meta">白鹭 · 扣卡 2 次</div></div><div class="course-right"><span class="people">5 人</span><span class="small-status">已发布</span></div></div>
+        </div>
+      </div>
+      <div class="fab">+</div>
+      <div class="tabbar"><div class="tab"><span class="tab-icon people-icon"></span><span>客户</span></div><div class="tab"><span class="tab-icon plus-icon"></span><span>邀约</span></div><div class="tab active"><span class="tab-icon cal-icon"></span><span>课表</span></div><div class="tab"><span class="tab-icon person-icon"></span><span>我的</span></div></div>
+    </div>
+    <div class="notes"><p><b>优点：</b>所有课程在一张白卡里，时间形成一条固定纵列，和邀约名单一样适合连续扫读。</p><p><b>取舍：</b>课程很多时，下午和晚上之间的边界较弱。</p></div>
+  </section>
+  <section>
+    <div class="plan-head"><span class="letter">B</span><span class="plan-name">时段分组</span><span class="plan-desc">边界更清楚</span></div>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G&nbsp;&nbsp;100%</span></div>
+      <div class="nav">课表<div class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="cap-line"></span><span class="cap-circle"></span></div></div>
+      <div class="head">
+        <div class="head-row"><span class="date">8月30日</span><span class="weekday">周日</span><span class="arrow"></span><span class="space"><span class="pin"></span>三楼茶室<span class="arrow" style="margin-left:1px"></span></span></div>
+        <div class="summary-row"><span class="summary">今日 <b>15</b> 位参与者</span><span class="withdraw">退课</span></div>
+        <div class="week">
+          <div class="day"><span>一</span><span class="num">24</span><span class="daydot"></span></div><div class="day"><span>二</span><span class="num">25</span><span class="daydot"></span></div><div class="day"><span>三</span><span class="num">26</span><span class="daydot"></span></div><div class="day"><span>四</span><span class="num">27</span><span class="daydot"></span></div><div class="day"><span>五</span><span class="num">28</span><span class="daydot"></span></div><div class="day"><span>六</span><span class="num">29</span><span class="daydot"></span></div><div class="day active"><span>日</span><span class="num">30</span><span class="daydot"></span></div>
+        </div>
+      </div>
+      <div class="content compact">
+        <div class="section-title"><span class="title-dot"></span><span class="title-text">今日课表</span><span class="title-count">4 场</span></div>
+        <div class="period"><span class="period-name">上午</span><span class="period-count">1 场</span></div>
+        <div class="schedule-card">
+          <div class="course"><div><span class="time-start">10:00</span><span class="time-end">11:30</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#7f77dd"></span><span class="course-name">情绪释放体验课</span><span class="type">体验</span></div><div class="course-meta"><span>周远</span><span class="sep">·</span><span class="creator">耀凯创建</span></div></div><div class="course-right"><span class="people">3 人</span><span class="small-status">已发布</span></div></div>
+        </div>
+        <div class="period"><span class="period-name">下午</span><span class="period-count">2 场</span></div>
+        <div class="schedule-card">
+          <div class="course"><div><span class="time-start">14:00</span><span class="time-end">16:00</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#378add"></span><span class="course-name">觉醒游戏·陈默</span><span class="type">觉醒</span></div><div class="course-meta"><span>周远</span><span class="sep">·</span><span>扣卡 1 次</span></div></div><div class="course-right"><span class="people">6 人</span><span class="small-status">已发布</span></div></div>
+          <div class="course"><div><span class="time-start">15:30</span><span class="time-end">17:00</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#d97070"></span><span class="course-name">情绪释放·小满</span><span class="type">情绪</span></div><div class="course-meta"><span>何青</span><span class="sep">·</span><span class="creator">婷婷创建</span></div></div><div class="course-right"><span class="people">4 人</span><span class="readonly">仅浏览</span></div></div>
+        </div>
+        <div class="period"><span class="period-name">晚上</span><span class="period-count">1 场</span></div>
+        <div class="schedule-card">
+          <div class="course"><div><span class="time-start">19:00</span><span class="time-end">21:00</span></div><div class="course-main"><div class="course-title"><span class="course-dot" style="background:#c772a0"></span><span class="course-name">OH卡·星空夜谈</span><span class="type">OH卡</span></div><div class="course-meta"><span>白鹭</span><span class="sep">·</span><span>扣卡 2 次</span></div></div><div class="course-right"><span class="people">5 人</span><span class="small-status">已发布</span></div></div>
+        </div>
+      </div>
+      <div class="fab">+</div>
+      <div class="tabbar"><div class="tab"><span class="tab-icon people-icon"></span><span>客户</span></div><div class="tab"><span class="tab-icon plus-icon"></span><span>邀约</span></div><div class="tab active"><span class="tab-icon cal-icon"></span><span>课表</span></div><div class="tab"><span class="tab-icon person-icon"></span><span>我的</span></div></div>
+    </div>
+    <div class="notes"><p><b>优点：</b>上午、下午、晚上各自一张白卡，课程多时更容易判断当前时段和空档。</p><p><b>取舍：</b>分组标题占用一些高度，一屏可见课程数略少。</p></div>
+  </section>
+</main>
+</body>
+</html>
