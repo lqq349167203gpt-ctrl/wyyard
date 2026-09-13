@@ -678,6 +678,7 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
 // 课程记录的「参与者」页签：一行 = 某场课的一个参与者 + 当天的邀约备注
 export interface CourseParticipantRow {
   id: string
+  course_id: string
   course_date: string
   course_name: string
   activity_type_label: string
@@ -689,6 +690,15 @@ export interface CourseParticipantRow {
   customer_info: string
   follow_up: string
   visit_id: string
+}
+
+/** 参与者按课程分组：一组 = 一堂课 */
+export interface CourseParticipantGroup {
+  course_id: string
+  course_date: string
+  course_name: string
+  activity_type_label: string
+  participants: CourseParticipantRow[]
 }
 
 export const serviceTeacherCustomerApi = {
@@ -716,8 +726,9 @@ export const serviceTeacherCustomerApi = {
     if (params.member_type) query.set("member_type", params.member_type)
     if (params.identity_group) query.set("identity_group", params.identity_group)
     return request<{
-      items: CourseParticipantRow[]
+      items: CourseParticipantGroup[]
       total: number
+      total_participants: number
       page: number
       page_size: number
       total_pages: number

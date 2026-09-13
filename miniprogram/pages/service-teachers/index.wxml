@@ -142,35 +142,40 @@
     </block>
 
     <block wx:elif="{{activeTab === 'courses' && courseViewTab === 'participants'}}">
-      <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 人（含其他人填写的内容，点内容可以填自己那份）</view>
+      <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 场课 · {{participantTotalParticipants}} 人（含其他人填写的内容，点内容可以填自己那份）</view>
 
-      <view class="p-record" wx:for="{{participantRecords}}" wx:key="id">
-        <view class="p-head">
-          <text class="p-date">{{item.dateText}}</text>
-          <view class="p-title">
-            <text class="p-name" data-id="{{item.customer_id}}" bindtap="onParticipantCustomer">{{item.nickname || '未命名'}}</text>
-            <text class="p-identity" wx:if="{{item.identityText}}">{{item.identityText}}</text>
+      <!-- 按课程分组：一组 = 一堂课，下面是这堂课的参与者 -->
+      <view class="p-group" wx:for="{{participantGroups}}" wx:key="course_id" wx:for-item="group" wx:for-index="gi">
+        <view class="p-group-head">
+          <text class="p-group-course">{{group.dateText}} · {{group.course_name || '未命名课程'}}</text>
+          <text class="p-group-count">{{group.activity_type_label ? group.activity_type_label + ' · ' : ''}}{{group.participants.length}} 人</text>
+        </view>
+        <view class="p-record" wx:for="{{group.participants}}" wx:key="id" wx:for-item="item" wx:for-index="index">
+          <view class="p-head">
+            <view class="p-title">
+              <text class="p-name" data-id="{{item.customer_id}}" bindtap="onParticipantCustomer">{{item.nickname || '未命名'}}</text>
+              <text class="p-identity" wx:if="{{item.identityText}}">{{item.identityText}}</text>
+            </view>
           </view>
-        </view>
-        <text class="p-course">{{item.course_name || '—'}}</text>
-        <view class="p-field" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
-          <text class="p-field-label">当天来访需求</text>
-          <text class="p-field-value" wx:if="{{item.visit_need}}">{{item.visit_need}}</text>
-          <view class="p-field-input" wx:else>点击填写</view>
-        </view>
-        <view class="p-field" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
-          <text class="p-field-label">客户信息</text>
-          <text class="p-field-value" wx:if="{{item.customer_info}}">{{item.customer_info}}</text>
-          <view class="p-field-input" wx:else>点击填写</view>
-        </view>
-        <view class="p-field" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
-          <text class="p-field-label">跟进点</text>
-          <text class="p-field-value" wx:if="{{item.follow_up}}">{{item.follow_up}}</text>
-          <view class="p-field-input" wx:else>点击填写</view>
+          <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
+            <text class="p-field-label">当天来访需求</text>
+            <text class="p-field-value" wx:if="{{item.visit_need}}">{{item.visit_need}}</text>
+            <view class="p-field-input" wx:else>点击填写</view>
+          </view>
+          <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
+            <text class="p-field-label">客户信息</text>
+            <text class="p-field-value" wx:if="{{item.customer_info}}">{{item.customer_info}}</text>
+            <view class="p-field-input" wx:else>点击填写</view>
+          </view>
+          <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
+            <text class="p-field-label">跟进点</text>
+            <text class="p-field-value" wx:if="{{item.follow_up}}">{{item.follow_up}}</text>
+            <view class="p-field-input" wx:else>点击填写</view>
+          </view>
         </view>
       </view>
       <view class="loading" wx:if="{{participantLoading}}">加载中...</view>
-      <view class="empty" wx:elif="{{!participantRecords.length}}">所选条件下暂无参与者</view>
+      <view class="empty" wx:elif="{{!participantGroups.length}}">所选条件下暂无参与者</view>
     </block>
 
     <block wx:elif="{{activeTab === 'courses'}}">

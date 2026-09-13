@@ -593,5 +593,12 @@
 .edit-button.disabled { opacity: .6; }
 
 /* 参与者页签的昵称搜索框：和上面的下拉框同一套外观 */
-.filter-input { flex: 1; min-width: 0; height: 64rpx; padding: 0 20rpx; box-sizing: border-box; border: 1rpx solid #e8eaed; border-radius: 8rpx; background: #fff; font-size: 26rpx; color: #2b2f36; }
+/* 输入框用 width:0 + flex:1，长内容不会把这一行顶出屏幕 */
+.filter-input { flex: 1; width: 0; min-width: 0; height: 64rpx; padding: 0 20rpx; box-sizing: border-box; border: 1rpx solid #e8eaed; border-radius: 8rpx; background: #fff; font-size: 26rpx; color: #2b2f36; }
 .filter-input-placeholder { color: #b0b5bb; font-size: 26rpx; }
+
+/* 参与者：按课程分组 */
+.p-group { margin-bottom: 16rpx; }
+.p-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 12rpx 16rpx; border-radius: 8rpx; background: #f2f3f5; }
+.p-group-course { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24rpx; font-weight: 500; color: #2b2f36; }
+.p-group-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Download } from "lucide-react"
 import ExcelJS from "exceljs"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -15,6 +15,7 @@ import {
   serviceTeacherCustomerApi,
   statisticsApi,
   customerFollowUpApi,
+  type CourseParticipantGroup,
   type CourseParticipantRow,
   type CourseStatistics,
   type ServiceTeacherCustomerItem,
@@ -180,7 +181,8 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const reviewRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
   const [reviewMeasureTick, setReviewMeasureTick] = useState(0)
   // 「参与者」页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点（可以填自己那份）
-  const [participantRows, setParticipantRows] = useState<CourseParticipantRow[]>([])
+  const [participantGroups, setParticipantGroups] = useState<CourseParticipantGroup[]>([])
+  const [participantTotalParticipants, setParticipantTotalParticipants] = useState(0)
   const [participantTotal, setParticipantTotal] = useState(0)
   const [participantTotalPages, setParticipantTotalPages] = useState(1)
   const [participantPage, setParticipantPage] = useState(1)
@@ -317,7 +319,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
 
   // 「参与者」页签：跟着课程筛选（时间/课程类型/老师）走，外加昵称、客户身份、新人老人三个筛选
   const loadParticipants = useCallback((nextPage = 1, keyword = participantSearchKeyword) => {
-    if (!selectedTeacherId) { setParticipantRows([]); setParticipantTotal(0); return }
+    if (!selectedTeacherId) { setParticipantGroups([]); setParticipantTotal(0); setParticipantTotalParticipants(0); return }
     setParticipantLoading(true)
     serviceTeacherCustomerApi.courseParticipants({
       teacher_id: selectedTeacherId,
@@ -331,13 +333,14 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       page: nextPage,
       page_size: PAGE_SIZE,
     }).then(result => {
-      setParticipantRows(result.items || [])
+      setParticipantGroups(result.items || [])
       setParticipantTotal(result.total || 0)
+      setParticipantTotalParticipants(result.total_participants || 0)
       setParticipantTotalPages(result.total_pages || 1)
       setParticipantPage(result.page || nextPage)
       setParticipantMemberTypes(result.member_types || [])
     }).catch(() => {
-      setParticipantRows([]); setParticipantTotal(0); setParticipantTotalPages(1)
+      setParticipantGroups([]); setParticipantTotal(0); setParticipantTotalParticipants(0); setParticipantTotalPages(1)
     }).finally(() => setParticipantLoading(false))
   }, [selectedTeacherId, courseDateFrom, courseDateTo, courseRangePreset, courseActivityType, participantMemberType, participantIdentityGroup, participantSearchKeyword])
 
@@ -821,11 +824,11 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="flex items-center justify-between gap-3 border-b border-[#f0f0f0] px-4 py-2">
                 <span className="text-[12px] text-[#8f959e]">参与者列表（含其他人填写的内容，点内容可以填写自己那份）</span>
-                <span className="text-[12px] text-[#8f959e]">共 {participantTotal} 人</span>
+                <span className="text-[12px] text-[#8f959e]">共 {participantTotal} 场课 · {participantTotalParticipants} 人</span>
               </div>
                 {participantLoading ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-              ) : participantRows.length === 0 ? (
+              ) : participantGroups.length === 0 ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">所选条件下暂无参与者</div>
               ) : (
                 <div>
@@ -844,7 +847,18 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {participantRows.map(row => (
+                      {/* 按课程分组：先一行课程名，再列这堂课的参与者 */}
+                      {participantGroups.map(group => (
+                        <Fragment key={group.course_id}>
+                          <TableRow className="bg-[#f7f8fa] hover:bg-[#f7f8fa]">
+                            <TableCell colSpan={7} className="py-1.5 pl-4 text-[12px] font-medium text-[#2b2f36]">
+                              {group.course_date || ""} · {group.course_name || "未命名课程"}
+                              <span className="ml-2 font-normal text-[#8f959e]">
+                                {group.activity_type_label ? `${group.activity_type_label} · ` : ""}{group.participants.length} 人
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                          {group.participants.map(row => (
                         <TableRow key={row.id} className="align-top text-[12px]">
                           <TableCell className="whitespace-normal px-3 py-2 pl-4 text-[12px] tabular-nums text-[#8f959e]">{row.course_date || <EmptyDash />}</TableCell>
                           <TableCell className="whitespace-normal px-3 py-2">
@@ -877,6 +891,8 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                             </TableCell>
                           ))}
                         </TableRow>
+                          ))}
+                        </Fragment>
                       ))}
                     </TableBody>
                   </Table>
@@ -889,6 +905,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 startIndex={participantTotal === 0 ? 0 : (participantPage - 1) * PAGE_SIZE + 1}
                 endIndex={Math.min(participantPage * PAGE_SIZE, participantTotal)}
                 onPageChange={next => loadParticipants(next)}
+                unit="场"
               />
             </div>
           ) : courseViewTab === "reviews" ? (

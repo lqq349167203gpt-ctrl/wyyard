@@ -99,6 +99,8 @@ module.exports = function createRecordsPage(mode) { return {
     reviewExpanded: {},
     // 「参与者」子页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点
     participantRecords: [],
+    participantGroups: [],
+    participantTotalParticipants: 0,
     participantPage: 1,
     participantTotal: 0,
     participantHasMore: false,
@@ -346,10 +348,19 @@ module.exports = function createRecordsPage(mode) { return {
     }
   },
 
+  formatParticipantGroup(group) {
+    const parts = String(group.course_date || '').split('-')
+    return {
+      ...group,
+      dateText: parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : (group.course_date || ''),
+      participants: (group.participants || []).map(item => this.formatParticipant(item)),
+    }
+  },
+
   async loadParticipants(reset) {
     if (!this.data.teacherId || this.data.participantLoading) return
     const page = reset ? 1 : this.data.participantPage + 1
-    this.setData({ participantLoading: true, ...(reset ? { participantRecords: [] } : {}) })
+    this.setData({ participantLoading: true, ...(reset ? { participantGroups: [] } : {}) })
     try {
       const selectedType = this.data.courseTypes[this.data.courseTypeIndex] || COURSE_TYPES[0]
       const result = await serviceTeacherApi.courseParticipants({
@@ -364,17 +375,18 @@ module.exports = function createRecordsPage(mode) { return {
         page,
         page_size: 20,
       })
-      const items = (result.items || []).map(item => this.formatParticipant(item))
-      const records = reset ? items : this.data.participantRecords.concat(items)
+      const groups = (result.items || []).map(group => this.formatParticipantGroup(group))
+      const records = reset ? groups : this.data.participantGroups.concat(groups)
       this.setData({
-        participantRecords: records,
+        participantGroups: records,
         participantPage: result.page || page,
         participantTotal: result.total || 0,
+        participantTotalParticipants: result.total_participants || 0,
         participantHasMore: records.length < (result.total || 0),
         participantMemberTypes: [{ value: '', label: '全部客户身份' }].concat((result.member_types || []).map(value => ({ value, label: value }))),
       })
     } catch (e) {
-      this.setData({ participantRecords: reset ? [] : this.data.participantRecords })
+      this.setData({ participantGroups: reset ? [] : this.data.participantGroups })
     } finally {
       this.setData({ participantLoading: false })
     }
@@ -416,14 +428,16 @@ module.exports = function createRecordsPage(mode) { return {
   },
   /** 点某一段内容：显示所有人填写的内容，下面填我自己那份 */
   async onParticipantOpenEdit(event) {
+    const groupIndex = Number(event.currentTarget.dataset.group)
     const index = Number(event.currentTarget.dataset.index)
     const field = event.currentTarget.dataset.field
-    const row = this.data.participantRecords[index]
+    const group = this.data.participantGroups[groupIndex]
+    const row = group && group.participants[index]
     if (!row) return
     const titles = { visit_need: '来访需求', customer_info: '客户信息', follow_up: '跟进点' }
     this.setData({
       participantEditing: {
-        index, field, visitId: row.visit_id,
+        groupIndex, index, field, visitId: row.visit_id,
         title: titles[field] || '内容',
         nickname: row.nickname, dateText: row.dateText, courseName: row.course_name,
         all: row[field] || '',

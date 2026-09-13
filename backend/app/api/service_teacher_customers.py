@@ -230,6 +230,7 @@ def list_course_participants(
         for participant in course["participants"]:
             rows.append({
                 "id": f"{course['id']}:{participant['id']}",
+                "course_id": course["id"],
                 "course_date": course["date"],
                 "course_name": course["name"],
                 "activity_type_label": course["activity_type_label"],
@@ -253,7 +254,32 @@ def list_course_participants(
         rows = [row for row in rows if row["member_type"] == member_type]
     if identity_group:
         rows = [row for row in rows if row["identity_group"] == identity_group]
-    return {**paginate(rows, page, page_size), "member_types": member_types, "identity_groups": identity_groups}
+    # 按课程分组：一组 = 一堂课，下面是这堂课的所有参与者（分页按课程分）
+    groups = []
+    for course in result["courses"]:
+        members = [row for row in rows if row["course_id"] == course["id"]]
+        if not members:
+            continue
+        groups.append({
+            "course_id": course["id"],
+            "course_date": course["date"],
+            "course_name": course["name"],
+            "activity_type_label": course["activity_type_label"],
+            "participants": members,
+        })
+    total_participants = sum(len(group["participants"]) for group in groups)
+    total_pages = max(1, (len(groups) + page_size - 1) // page_size)
+    current = min(page, total_pages)
+    return {
+        "items": groups[(current - 1) * page_size: current * page_size],
+        "total": len(groups),
+        "total_participants": total_participants,
+        "page": current,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "member_types": member_types,
+        "identity_groups": identity_groups,
+    }
 
 
 @router.get("/export-courses", dependencies=[Depends(require_page_permission("course-statistics"))])
