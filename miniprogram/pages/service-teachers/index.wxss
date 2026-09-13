@@ -572,7 +572,7 @@
 .p-field { display: flex; align-items: flex-start; gap: 12rpx; margin-top: 14rpx; }
 .p-field-label { flex-shrink: 0; width: 168rpx; font-size: 23rpx; color: #9aa1a9; }
 .p-field-value { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 25rpx; line-height: 1.6; color: #2b2f36; word-break: break-all; }
-.p-field-input { flex: 1; min-width: 0; height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fafbfc; font-size: 23rpx; color: #9aa1a9; }
+.p-field-input { flex: 1; min-width: 0; height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #ffffff; font-size: 23rpx; color: #9aa1a9; }
 
 /* 参与者页签：填写弹层（和「客户跟进」页同一套） */
 .sheet-mask { position: fixed; inset: 0; z-index: 200; background: rgba(31,35,41,.34); }

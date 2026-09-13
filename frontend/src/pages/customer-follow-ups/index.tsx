@@ -203,7 +203,7 @@ export default function CustomerFollowUpsPage() {
                         <button
                           type="button"
                           onClick={() => openEditor(row, key)}
-                          className="flex h-8 w-full items-center rounded-[4px] border border-[#e1e4e7] bg-[#fafbfc] px-2.5 text-left text-[12px] text-[#9aa1a9] transition-colors hover:border-[#b9cdf8] hover:bg-white hover:text-[#4e535a]"
+                          className="flex h-8 w-full items-center rounded-[4px] border border-[#e1e4e7] bg-white px-2.5 text-left text-[12px] text-[#9aa1a9] transition-colors hover:border-[#b9cdf8] hover:bg-white hover:text-[#4e535a]"
                         >
                           点击填写
                         </button>

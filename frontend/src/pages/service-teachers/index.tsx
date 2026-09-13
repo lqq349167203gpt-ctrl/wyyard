@@ -40,6 +40,15 @@ type CourseViewTab = "courses" | "reviews" | "participants"
 const EMPTY_ID_LIST: string[] = []
 type CourseRangePreset = "today" | "week" | "month" | "year" | "all" | "custom"
 type CourseRow = CourseStatistics["courses"][number]
+/** 参与者卡片的列宽（列标题和每张卡片共用，保证上下对齐） */
+const PARTICIPANT_COLUMNS = [
+  { key: "nickname", label: "昵称", width: "10%" },
+  { key: "identity", label: "身份", width: "9%" },
+  { key: "same_count", label: "同类活动参与数", width: "11%" },
+  { key: "visit_need", label: "当天的来访需求", width: "23%" },
+  { key: "customer_info", label: "客户信息", width: "23%" },
+  { key: "follow_up", label: "跟进点", width: "24%" },
+]
 const COURSE_VIEW_TABS: Array<{ key: CourseViewTab; label: string }> = [
   { key: "courses", label: "课程记录" },
   { key: "participants", label: "参与者" },
@@ -831,69 +840,64 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
               ) : participantGroups.length === 0 ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">所选条件下暂无参与者</div>
               ) : (
-                <div>
-                  {/* 宽度跟着页面走，不设最小宽度：长文本靠换行和收起，不再把页面撑破 */}
-                  <Table className="w-full table-fixed">
-                    <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
-                      <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
-                        {/* 列宽按百分比分配，合计 100%，表格永远不超过页面宽度 */}
-                        <TableHead className="h-9 w-[10%] px-2 pl-4 text-[11px] font-normal">昵称</TableHead>
-                        <TableHead className="h-9 w-[9%] px-2 text-[11px] font-normal">身份</TableHead>
-                        <TableHead className="h-9 w-[11%] px-2 text-[11px] font-normal">同类活动参与数</TableHead>
-                        <TableHead className="h-9 w-[23%] px-2 text-[11px] font-normal">当天的来访需求</TableHead>
-                        <TableHead className="h-9 w-[23%] px-2 text-[11px] font-normal">客户信息</TableHead>
-                        <TableHead className="h-9 w-[24%] px-2 pr-4 text-[11px] font-normal">跟进点</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {/* 按课程分组：先一行课程名，再列这堂课的参与者 */}
-                      {participantGroups.map(group => (
-                        <Fragment key={group.course_id}>
-                          <TableRow className="bg-[#f7f8fa] hover:bg-[#f7f8fa]">
-                            <TableCell colSpan={6} className="py-1.5 pl-4 text-[12px] font-medium text-[#2b2f36]">
-                              {group.course_date || ""} · {group.course_name || "未命名课程"}
-                              <span className="ml-2 font-normal text-[#8f959e]">{group.participants.length} 人</span>
-                            </TableCell>
-                          </TableRow>
+                <div className="space-y-3 px-4 py-3">
+                  {/* 列标题只在最上面出现一次，每堂课一张卡片，卡片内是极浅的分隔线 */}
+                  <table className="w-full table-fixed border-collapse text-[11px] text-[#9aa1a9]">
+                    <colgroup>{PARTICIPANT_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
+                    <thead>
+                      <tr>
+                        {PARTICIPANT_COLUMNS.map((column, index) => (
+                          <th key={column.key} className={`py-2 text-left font-normal ${index === 0 ? "pl-3" : ""}`}>{column.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                  </table>
+                  {participantGroups.map(group => (
+                    <div key={group.course_id} className="overflow-hidden rounded-[6px] border border-[#eceef0]">
+                      <div className="flex items-center justify-between gap-3 bg-[#fafbfc] px-3 py-2">
+                        <span className="min-w-0 truncate text-[12.5px] font-medium text-[#2b2f36]">
+                          {group.course_date || ""} · {group.course_name || "未命名课程"}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-[#9aa1a9]">{group.participants.length} 人</span>
+                      </div>
+                      <table className="w-full table-fixed border-collapse">
+                        <colgroup>{PARTICIPANT_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
+                        <tbody>
                           {group.participants.map(row => (
-                        <TableRow key={row.id} className="align-top text-[12px]">
-                          <TableCell className="whitespace-normal px-3 py-2 pl-4">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedCustomerId(row.customer_id)}
-                              className="break-words text-left text-[12px] text-[#2b2f36] hover:underline"
-                            >{row.nickname || <EmptyDash />}</button>
-                          </TableCell>
-                          <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</TableCell>
-                          <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">
-                            {row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}
-                          </TableCell>
-                          {(["visit_need", "customer_info", "follow_up"] as const).map(field => (
-                            <TableCell key={field} className="whitespace-normal px-3 py-2">
-                              {row[field] ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openParticipantEditor(row, field)}
-                                  className="block w-full break-words text-left text-[12px] leading-5 text-[#4e535a] hover:text-[#3370ff]"
-                                  title="点击填写自己的内容"
-                                >
-                                  <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{row[field]}</span>
+                            <tr key={row.id} className="border-t border-[#f5f6f7] align-top">
+                              <td className="break-words px-3 py-2.5 pl-3 text-[12px] text-[#2b2f36]">
+                                <button type="button" onClick={() => setSelectedCustomerId(row.customer_id)} className="text-left hover:underline">
+                                  {row.nickname || <EmptyDash />}
                                 </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => openParticipantEditor(row, field)}
-                                  className="flex h-8 w-full items-center rounded-[4px] border border-[#e1e4e7] bg-[#fafbfc] px-2.5 text-left text-[12px] text-[#9aa1a9] hover:border-[#b9cdf8] hover:bg-white hover:text-[#4e535a]"
-                                >点击填写</button>
-                              )}
-                            </TableCell>
+                              </td>
+                              <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</td>
+                              <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
+                              {(["visit_need", "customer_info", "follow_up"] as const).map(field => (
+                                <td key={field} className="px-3 py-2.5">
+                                  {row[field] ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openParticipantEditor(row, field)}
+                                      className="block w-full break-words text-left text-[12px] leading-5 text-[#4e535a] hover:text-[#3370ff]"
+                                      title="点击填写自己的内容"
+                                    >
+                                      <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{row[field]}</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => openParticipantEditor(row, field)}
+                                      className="flex h-8 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[12px] text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
+                                    >点击填写</button>
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
                           ))}
-                        </TableRow>
-                          ))}
-                        </Fragment>
-                      ))}
-                    </TableBody>
-                  </Table>
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
                 </div>
               )}
               <PaginationBar

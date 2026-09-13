@@ -25,7 +25,7 @@
 /* 长文本先收四行，点一下进编辑面板能看到全文 */
 .record-field-value { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 /* 没填过的位置做成输入框的样子，点一下就能填 */
-.record-field-input { flex: 1; min-width: 0; height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fafbfc; font-size: 23rpx; color: #9aa1a9; }
+.record-field-input { flex: 1; min-width: 0; height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #ffffff; font-size: 23rpx; color: #9aa1a9; }
 .record-updated { display: block; margin-top: 14rpx; font-size: 21rpx; color: #b0b5bb; }
 
 .loading, .end { padding: 24rpx 0 48rpx; text-align: center; }
