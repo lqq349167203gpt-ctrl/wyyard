@@ -1,4 +1,5 @@
 const { principalApi, customerApi } = require('../../utils/api')
+const { BASE_URL } = require('../../utils/config')
 // 引流客户列表的列（与 PC 的列表设置一致）：档案类字段只有该角色有权限时才出现
 const TRAFFIC_COLUMNS = [
   { key: 'name', label: '昵称（引流日期）' }, { key: 'referrer', label: '引流人' },
@@ -49,9 +50,26 @@ const ruleLabel = item => `${item.rule.name}${item.rule.scope === 'shared' ? '�
 const KINDS = ['coarse_usage', 'attendance', 'purchase']
 const OCCURRENCES = ['first', 'repeat', 'any']
 const COLUMN_STORAGE_KEY = 'principal:columns'
+const OVERVIEW_TAB = { key: 'overview', label: '经营概况' }
+const CONVERSION_TAB = { key: 'conversion', label: '转化分析' }
 // 与自定义筛选同一套：这两个规则不用填筛选值
 const VALUELESS_OPERATORS = { is_empty: true, is_not_empty: true }
 const CONDITION_MAX = 8
+
+/**
+ * 页签先用登录时缓存的权限判断（和 PC 一样）。
+ * 转化分析要靠交易明细权限，等接口回来才准；只按接口判断的话，
+ * 进页面这一下什么都不会显示，接口慢或失败时这一栏就直接不见了。
+ */
+function initialTabs() {
+  try {
+    const edit = wx.getStorageSync('userEditPermissions') || {}
+    const access = (edit.customer_access || {}).transaction_access
+    return access === 'detail' ? [OVERVIEW_TAB, CONVERSION_TAB] : [OVERVIEW_TAB]
+  } catch (e) {
+    return [OVERVIEW_TAB]
+  }
+}
 
 /** 换字段 / 换规则时把筛选值重置成这个规则该有的形状（和自定义筛选一致） */
 function conditionValueFor(definition, operator) {
@@ -100,8 +118,8 @@ Page({
     ruleSentence: '',
     canManageRule: false,
     metadata: null, organizations: [{ id: '', name: '全部可见组织/俱乐部' }], orgIndex: 0,
-    // 组织/俱乐部只有「经营概况」；转化分析要等权限确认后再挂上，不能先渲染出一个不存在的页面
-    tabs: [{ key: 'overview', label: '经营概况' }],
+    // 组织/俱乐部没有「课程记录/交易记录」这两个页面；转化分析按缓存的权限先挂上，接口回来再校正
+    tabs: initialTabs(),
     query: Object.assign({ organization_id: '', tab: 'overview', product: '', order_filter: '', status: '', rule: clone(INITIAL_RULE) }, monthRange()),
     rules: [], ruleOptions: ['默认规则'], ruleIndex: 0, ruleId: '',
     participantOptions: ['全部人员', '内部人员', '外部人员'], participantIndex: 0,
@@ -154,14 +172,20 @@ Page({
       this.setData({ ruleSentence: describeRule(this.data.query.rule, metadata) })
       const selectedIndex = rules.findIndex(r => r.id === this.data.ruleId)
       this.setData({ ruleIndex: selectedIndex + 1, ruleId: selectedIndex >= 0 ? rules[selectedIndex].id : '', canManageRule: selectedIndex >= 0 && rules[selectedIndex].can_manage === true })
-      // 与 PC 一致：只保留「经营概况」和「转化分析」（课程记录/交易记录已下线，明细都在经营概况的卡片里）
-      const tabs = [{ key: 'overview', label: '经营概况' }]
-      if (metadata.transaction_access === 'detail') tabs.push({ key: 'conversion', label: '转化分析' })
+      // 与 PC 一致：只保留「经营概况」和「转化分析」（课程记录/交易记录已下线，明细都在经营概况的卡片里）；
+      // 接口没带回权限时沿用缓存判断，不能把已经显示的这一栏又拿掉
+      const tabs = [OVERVIEW_TAB]
+      const transactionAccess = metadata.transaction_access || ((wx.getStorageSync('userEditPermissions') || {}).customer_access || {}).transaction_access
+      if (transactionAccess === 'detail') tabs.push(CONVERSION_TAB)
       this.setData({ metadata, tabs, rules, ruleOptions: ['默认规则', ...rules.map(ruleLabel)], organizations: [{ id: '', name: '全部可见组织/俱乐部' }, ...metadata.organizations] })
       await this.loadData(true)
       // 转化分析的规则编辑器用得到条件字段（口径与自定义筛选同源），进页面先备好
       if (tabs.some(item => item.key === 'conversion')) this.ensureRuleFields()
-    } catch (e) { this.setData({ error: e.message || '加载失败' }) }
+    } catch (e) {
+      // 数据源错配是最常见的失败原因，直接把当前数据源写在提示里，省得来回猜
+      const source = BASE_URL.indexOf('wyteahouse') >= 0 ? '正式服务器' : '本地'
+      this.setData({ error: `${e.message || '加载失败'}（当前数据源：${source}）` })
+    }
   },
   /** 条件字段只在需要时拉一次：字段 / 规则 / 候选项都与自定义筛选同源 */
   async ensureRuleFields() {
