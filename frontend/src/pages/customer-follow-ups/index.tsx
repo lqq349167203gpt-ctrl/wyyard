@@ -151,7 +151,7 @@ export default function CustomerFollowUpsPage() {
 
       {error && <div className="mb-3 rounded-[4px] border border-[#f1d9dc] bg-[#fff8f8] px-3 py-2 text-[12px] text-[#b94a58]">{error}</div>}
 
-      <div className="rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
+      <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         {/* 日期筛选放在列表卡片内，改完即时查询 */}
         <div className="flex items-center gap-2 border-b border-[#f0f0f0] px-4 py-2">
           <span className="text-[12px] text-[#8f959e]">昵称</span>
@@ -169,7 +169,7 @@ export default function CustomerFollowUpsPage() {
             <button type="button" onClick={() => { setDateFrom(""); setDateTo("") }} className="text-[12px] text-[#3370ff] hover:underline">清除</button>
           )}
         </div>
-        <Table className="w-full table-fixed">
+        <Table className="w-full table-fixed [&_td]:min-w-0 [&_th]:min-w-0">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[9%] !pl-4">客户</TableHead>
