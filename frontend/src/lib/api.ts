@@ -690,6 +690,8 @@ export interface CourseParticipantRow {
   customer_info: string
   follow_up: string
   visit_id: string
+  /** 同一门课（同名课程）在当前筛选范围内的参与次数 */
+  same_course_count: number
 }
 
 /** 参与者按课程分组：一组 = 一堂课 */

@@ -156,6 +156,7 @@
               <text class="p-name" data-id="{{item.customer_id}}" bindtap="onParticipantCustomer">{{item.nickname || '未命名'}}</text>
               <text class="p-identity" wx:if="{{item.identityText}}">{{item.identityText}}</text>
             </view>
+            <text class="p-same-count" wx:if="{{item.same_course_count}}">同类课程 {{item.same_course_count}} 次</text>
           </view>
           <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">当天来访需求</text>

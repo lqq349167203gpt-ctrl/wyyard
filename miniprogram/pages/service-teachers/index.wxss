@@ -602,3 +602,4 @@
 .p-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 12rpx 16rpx; border-radius: 8rpx; background: #f2f3f5; }
 .p-group-course { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24rpx; font-weight: 500; color: #2b2f36; }
 .p-group-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
+.p-same-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }

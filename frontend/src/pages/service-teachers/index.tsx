@@ -837,13 +837,12 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                     <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
                       <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
                         {/* 列宽按百分比分配，合计 100%，表格永远不超过页面宽度 */}
-                        <TableHead className="h-9 w-[8%] px-2 pl-4 text-[11px] font-normal">课程日期</TableHead>
-                        <TableHead className="h-9 w-[9%] px-2 text-[11px] font-normal">昵称</TableHead>
-                        <TableHead className="h-9 w-[8%] px-2 text-[11px] font-normal">身份</TableHead>
-                        <TableHead className="h-9 w-[15%] px-2 text-[11px] font-normal">课程名称</TableHead>
-                        <TableHead className="h-9 w-[20%] px-2 text-[11px] font-normal">当天的来访需求</TableHead>
-                        <TableHead className="h-9 w-[20%] px-2 text-[11px] font-normal">客户信息</TableHead>
-                        <TableHead className="h-9 w-[20%] px-2 pr-4 text-[11px] font-normal">跟进点</TableHead>
+                        <TableHead className="h-9 w-[10%] px-2 pl-4 text-[11px] font-normal">昵称</TableHead>
+                        <TableHead className="h-9 w-[9%] px-2 text-[11px] font-normal">身份</TableHead>
+                        <TableHead className="h-9 w-[11%] px-2 text-[11px] font-normal">同类课程参与次数</TableHead>
+                        <TableHead className="h-9 w-[23%] px-2 text-[11px] font-normal">当天的来访需求</TableHead>
+                        <TableHead className="h-9 w-[23%] px-2 text-[11px] font-normal">客户信息</TableHead>
+                        <TableHead className="h-9 w-[24%] px-2 pr-4 text-[11px] font-normal">跟进点</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -851,7 +850,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                       {participantGroups.map(group => (
                         <Fragment key={group.course_id}>
                           <TableRow className="bg-[#f7f8fa] hover:bg-[#f7f8fa]">
-                            <TableCell colSpan={7} className="py-1.5 pl-4 text-[12px] font-medium text-[#2b2f36]">
+                            <TableCell colSpan={6} className="py-1.5 pl-4 text-[12px] font-medium text-[#2b2f36]">
                               {group.course_date || ""} · {group.course_name || "未命名课程"}
                               <span className="ml-2 font-normal text-[#8f959e]">
                                 {group.activity_type_label ? `${group.activity_type_label} · ` : ""}{group.participants.length} 人
@@ -860,8 +859,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                           </TableRow>
                           {group.participants.map(row => (
                         <TableRow key={row.id} className="align-top text-[12px]">
-                          <TableCell className="whitespace-normal px-3 py-2 pl-4 text-[12px] tabular-nums text-[#8f959e]">{row.course_date || <EmptyDash />}</TableCell>
-                          <TableCell className="whitespace-normal px-3 py-2">
+                          <TableCell className="whitespace-normal px-3 py-2 pl-4">
                             <button
                               type="button"
                               onClick={() => setSelectedCustomerId(row.customer_id)}
@@ -869,7 +867,9 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                             >{row.nickname || <EmptyDash />}</button>
                           </TableCell>
                           <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</TableCell>
-                          <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">{row.course_name || <EmptyDash />}</TableCell>
+                          <TableCell className="whitespace-normal px-3 py-2 text-[12px] text-[#4e535a]">
+                            {row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}
+                          </TableCell>
                           {(["visit_need", "customer_info", "follow_up"] as const).map(field => (
                             <TableCell key={field} className="whitespace-normal px-3 py-2">
                               {row[field] ? (
