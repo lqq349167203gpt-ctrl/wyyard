@@ -161,7 +161,7 @@ def create_customer_follow_up(data: CustomerFollowUpCreate, request: Request):
     customer_name = (getattr(customer, "nickname", "") or getattr(customer, "name", "") or "") if customer else "未知客户"
     request.state.operation_log_context = {
         "content": (
-            f"填写客户跟进{CATEGORY_LABELS.get(note.category, '')}：客户：{customer_name}｜"
+            f"填写客户跟进·{CATEGORY_LABELS.get(note.category, '')}：客户：{customer_name}｜"
             f"日期：{visit.visit_date or ''}｜内容：{note.content}"
         ),
         "entity_id": note.id,
@@ -199,7 +199,7 @@ def update_customer_follow_up(note_id: str, data: CustomerFollowUpUpdate, reques
     # 写操作进「操作日志」，使用统计的操作明细读的也是这份
     request.state.operation_log_context = {
         "content": (
-            f"修改客户跟进{CATEGORY_LABELS.get(updated.category, '')}：客户：{customer_name}｜"
+            f"修改客户跟进·{CATEGORY_LABELS.get(updated.category, '')}：客户：{customer_name}｜"
             f"日期：{visit_date}｜内容：{updated.content}"
         ),
         "entity_id": updated.id,
