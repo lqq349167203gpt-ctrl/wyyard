@@ -100,6 +100,7 @@ module.exports = function createRecordsPage(mode) { return {
     // 「参与者」子页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点
     participantRecords: [],
     participantGroups: [],
+    participantDateGroups: [],
     participantTotalParticipants: 0,
     participantPage: 1,
     participantTotal: 0,
@@ -377,8 +378,21 @@ module.exports = function createRecordsPage(mode) { return {
       })
       const groups = (result.items || []).map(group => this.formatParticipantGroup(group))
       const records = reset ? groups : this.data.participantGroups.concat(groups)
+      // 先按日期分组，日期下面再放当天的每堂课
+      const dateMap = {}
+      const dateGroups = []
+      records.forEach(group => {
+        const key = group.course_date || '未记录日期'
+        if (!dateMap[key]) {
+          dateMap[key] = { date: key, dateText: group.dateText || key, groups: [], people: 0 }
+          dateGroups.push(dateMap[key])
+        }
+        dateMap[key].groups.push(group)
+        dateMap[key].people += group.participants.length
+      })
       this.setData({
         participantGroups: records,
+        participantDateGroups: dateGroups,
         participantPage: result.page || page,
         participantTotal: result.total || 0,
         participantTotalParticipants: result.total_participants || 0,
