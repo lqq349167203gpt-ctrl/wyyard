@@ -54,13 +54,13 @@
 .date-card { margin-bottom: 16rpx; border: 1rpx solid #eceef0; border-radius: 12rpx; overflow: hidden; background: #fff; }
 .date-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 14rpx 18rpx; background: #fafbfc; border-bottom: 1rpx solid #f2f3f5; }
 .date-card .record-card { margin: 0; border-radius: 0; border-bottom: 1rpx solid #f5f6f7; }
-.date-title { font-size: 25rpx; font-weight: 500; color: #1f2329; }
+.date-title { font-size: 23rpx; font-weight: 500; color: #1f2329; }
 .date-meta { font-size: 21rpx; color: #9aa1a9; }
 
 /* 日期筛选行 */
 .date-filter { display: flex; align-items: center; gap: 10rpx; padding: 12rpx 20rpx; border-radius: 12rpx; background: #fff; margin-bottom: 12rpx; box-sizing: border-box; }
 .date-filter-label { flex-shrink: 0; font-size: 24rpx; color: #8f959e; }
-.date-filter-value { flex: 1; min-width: 0; height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border-radius: 8rpx; background: #f5f6f7; font-size: 23rpx; color: #2b2f36; }
+.date-filter-value { flex: 1; min-width: 0; height: 56rpx; line-height: 54rpx; padding: 0 14rpx; box-sizing: border-box; border-radius: 8rpx; background: #f5f6f7; font-size: 21rpx; color: #2b2f36; }
 .date-filter-value.placeholder { color: #a8b0ba; }
 .date-filter-sep { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
 .date-filter-clear { flex-shrink: 0; font-size: 23rpx; color: #3370ff; }
