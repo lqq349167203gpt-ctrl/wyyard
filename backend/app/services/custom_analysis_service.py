@@ -64,12 +64,14 @@ FIELD_LABELS = {
     "activity_types": "活动类型",
     "activity_names": "活动名称",
     "course_teachers": "课程老师",
+    "schedule_creators": "课表创建人",
     "communication_count": "沟通次数",
     "last_communication_date": "最近沟通",
     "total_consumption": "消费金额",
     "purchased_projects": "购买项目",
     "created_by": "客户录入人",
     "inviter_names": "邀约人",
+    "invitation_creators": "邀约创建人",
     "invitation_count_period": "期间邀约次数",
     "visit_count_period": "期间到场次数",
     "cancelled_count_period": "期间取消次数",
@@ -97,6 +99,18 @@ SENSITIVE_COLUMN_FIELDS = {
     "other_info": "other_info",
 }
 
+# 「加条件」不再提供的字段：昵称/姓名这类身份项、已停用的金额口径与支付方式、期间口径的邀约/到场次数（列表字段里仍保留）
+CONDITION_HIDDEN_FIELDS = {
+    "nickname", "name", "created_at", "payment_amount_period", "total_consumption",
+    "payment_methods", "invitation_count_period", "visit_count_period",
+}
+
+# 「显示列」也不再提供的字段：已停用的金额口径
+LIST_HIDDEN_FIELDS = {
+    "payment_amount_period",
+}
+
+
 FIELD_GROUPS = {
     "客户信息": [
         "nickname", "name", "gender", "age", "member_type", "follow_up_status",
@@ -109,11 +123,13 @@ FIELD_GROUPS = {
         "last_communication_date", "payment_dates",
     ],
     "邀约行为": [
-        "inviter_names", "invitation_count_period", "visit_count_period", "cancelled_count_period",
+        "inviter_names", "invitation_creators", "invitation_count_period", "visit_count_period",
+        "cancelled_count_period",
         "invitation_count", "visit_count",
     ],
     "课程行为": [
         "activity_count_period", "activity_count", "activity_types", "activity_names", "course_teachers",
+        "schedule_creators",
     ],
     "付费行为": [
         "payment_categories", "payment_projects", "payment_closers", "payment_methods",
@@ -139,12 +155,13 @@ PAYMENT_EVENT_FIELDS = {
     "payment_dates",
 }
 
-INVITATION_EVENT_FIELDS = {"invitation_dates", "inviter_names", "invitation_created_dates"}
-ACTIVITY_EVENT_FIELDS = {"activity_types", "activity_names", "course_teachers"}
+INVITATION_EVENT_FIELDS = {"invitation_dates", "inviter_names", "invitation_created_dates", "invitation_creators"}
+ACTIVITY_EVENT_FIELDS = {"activity_types", "activity_names", "course_teachers", "schedule_creators"}
 
 LIST_FIELDS = {
     "customer_tags", "activity_types", "activity_names", "purchased_projects",
-    "course_teachers", "inviter_names", "payment_categories", "payment_projects", "payment_closers", "payment_methods",
+    "course_teachers", "inviter_names", "invitation_creators", "schedule_creators",
+    "payment_categories", "payment_projects", "payment_closers", "payment_methods",
 }
 
 METRIC_LABELS = {
@@ -321,20 +338,29 @@ def _period_activity_summary(
     dict[str, set[str]],
     dict[str, set[str]],
     dict[str, set[str]],
+    dict[str, set[str]],
     dict[str, list[dict[str, Any]]],
 ]:
     counts: dict[str, int] = defaultdict(int)
     types: dict[str, set[str]] = defaultdict(set)
     names: dict[str, set[str]] = defaultdict(set)
     teachers: dict[str, set[str]] = defaultdict(set)
+    creators: dict[str, set[str]] = defaultdict(set)
     events: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
-    def add(customer_ids: set[str], activity_type: str, activity_name: str, teacher_ids: list[str]) -> None:
+    def add(
+        customer_ids: set[str],
+        activity_type: str,
+        activity_name: str,
+        teacher_ids: list[str],
+        creator_name: str = "",
+    ) -> None:
         teacher_names = [
             (teacher_name_by_id or {}).get(teacher_id, teacher_id)
             for teacher_id in teacher_ids
             if teacher_id
         ]
+        creator = creator_name.strip()
         for customer_id in customer_ids:
             if not customer_id:
                 continue
@@ -343,10 +369,13 @@ def _period_activity_summary(
             if activity_name:
                 names[customer_id].add(activity_name)
             teachers[customer_id].update(teacher_names)
+            if creator:
+                creators[customer_id].add(creator)
             events[customer_id].append({
                 "activity_types": [activity_type],
                 "activity_names": [activity_name] if activity_name else [],
                 "course_teachers": teacher_names,
+                "schedule_creators": [creator] if creator else [],
             })
 
     for record in class_record_service.list_records(start_date=date_from or None, end_date=date_to or None):
@@ -355,6 +384,7 @@ def _period_activity_summary(
             "沙龙活动",
             record.activity_name or record.course_name,
             list(record.teacher_ids or []),
+            str(getattr(record, "created_by", "") or ""),
         )
     session_sources = [
         (group_case_session_service.list_sessions, "觉醒游戏"),
@@ -371,8 +401,9 @@ def _period_activity_summary(
                 activity_type,
                 activity_name,
                 list(getattr(session, "teacher_ids", []) or []),
+                str(getattr(session, "created_by", "") or ""),
             )
-    return counts, types, names, teachers, events
+    return counts, types, names, teachers, creators, events
 
 
 def build_customer_dataset(
@@ -396,6 +427,7 @@ def build_customer_dataset(
     period_cancelled_counts: dict[str, int] = defaultdict(int)
     period_visit_dates: dict[str, set[str]] = defaultdict(set)
     period_inviter_names: dict[str, set[str]] = defaultdict(set)
+    period_invitation_creators: dict[str, set[str]] = defaultdict(set)
     period_invitation_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
     all_invitation_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
     # 直接读取邀约缓存做批量聚合，避免 list_visits() 为每个日期重复构建活动详情。
@@ -409,8 +441,10 @@ def build_customer_dataset(
         if created_date:
             invitation_created_dates[customer_id].add(created_date)
         inviter_name = str(visit.referrer_handler or "").strip()
+        creator_name = str(getattr(visit, "created_by", "") or "").strip()
         invitation_event = {
             "inviter_names": [inviter_name] if inviter_name else [],
+            "invitation_creators": [creator_name] if creator_name else [],
             "invitation_dates": [visit.visit_date] if visit.visit_date else [],
             "invitation_created_dates": [created_date] if created_date else [],
             "visit_date": visit.visit_date,
@@ -432,6 +466,8 @@ def build_customer_dataset(
             period_visit_dates[customer_id].add(visit.visit_date)
         if inviter_name:
             period_inviter_names[customer_id].add(inviter_name)
+        if creator_name:
+            period_invitation_creators[customer_id].add(creator_name)
         period_invitation_events[customer_id].append(invitation_event)
 
     activity_map = visit_service._build_all_activities()  # 项目内批量聚合，避免逐客户重复扫描活动表
@@ -444,6 +480,7 @@ def build_customer_dataset(
         period_activity_types,
         period_activity_names,
         period_course_teachers,
+        period_schedule_creators,
         period_activity_events,
     ) = _period_activity_summary(date_from, date_to, teacher_name_by_id)
 
@@ -547,6 +584,8 @@ def build_customer_dataset(
             "total_consumption": max(round(payment_totals.get(customer.id, 0), 2), 0),
             "purchased_projects": sorted(period_purchased_projects.get(customer.id, set())),
             "inviter_names": sorted(period_inviter_names.get(customer.id, set())),
+            "invitation_creators": sorted(period_invitation_creators.get(customer.id, set())),
+            "schedule_creators": sorted(period_schedule_creators.get(customer.id, set())),
             "invitation_count_period": period_invitation_counts.get(customer.id, 0),
             "visit_count_period": len(period_visit_dates.get(customer.id, set())),
             "arrival_count_period": len(period_visit_dates.get(customer.id, set())),
@@ -798,6 +837,12 @@ def _scope_invitation_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) ->
                 for name in event.get("inviter_names", [])
                 if name
             }),
+            "invitation_creators": sorted({
+                name
+                for event in events
+                for name in event.get("invitation_creators", [])
+                if name
+            }),
             "invitation_created_dates": sorted({
                 created_date
                 for event in events
@@ -846,6 +891,7 @@ def _matching_invitation_events(
                 "arrived": False,
                 "cancelled": False,
                 "inviter_names": [],
+                "invitation_creators": [],
                 "invitation_created_dates": [],
             }
             for visit_date in row.get("invitation_dates", [])
@@ -857,6 +903,11 @@ def _matching_invitation_events(
         for event in source_events
         if matcher(_matches(event, condition, plan.date_from, plan.date_to) for condition in conditions)
     ]
+
+
+def matches_condition(row: dict[str, Any], condition: AnalysisCondition) -> bool:
+    """单条件判断的公开入口：与自定义筛选同一套字段/操作符规则。"""
+    return _matches(row, condition)
 
 
 def _matches_plan_row(row: dict[str, Any], plan: AnalysisPlan) -> bool:
@@ -912,6 +963,12 @@ def _scope_activity_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) -> l
                 for value in event.get("course_teachers", [])
                 if value
             }),
+            "schedule_creators": sorted({
+                value
+                for event in events
+                for value in event.get("schedule_creators", [])
+                if value
+            }),
             "activity_count_period": len(events),
         })
         scoped_rows.append(scoped_row)
@@ -956,6 +1013,7 @@ def _expand_display_rows(rows: list[dict[str, Any]], row_display_mode: str) -> l
                     "invitation_dates": [visit_date],
                     "invitation_created_dates": list(event.get("invitation_created_dates", [])),
                     "inviter_names": list(event.get("inviter_names", [])),
+                    "invitation_creators": list(event.get("invitation_creators", [])),
                     "invitation_count_period": 1,
                     "visit_count_period": 1,
                     "arrival_count_period": 1,
@@ -1162,6 +1220,35 @@ def _execute_comparison_plan(
     }
 
 
+def _is_blank_condition(condition: AnalysisCondition) -> bool:
+    """没填完的条件（空值 / 空多选）不参与筛选，也不应该让整条查询失败。"""
+    if condition.inherit_period:
+        return False
+    # 「未填写 / 已填写」本来就不需要填值，不能当成没填完丢掉
+    if condition.operator in {"is_empty", "is_not_empty"}:
+        return False
+    value = condition.value
+    if value is None or value == "":
+        return True
+    if isinstance(value, list):
+        return not value or any(item in (None, "") for item in value)
+    return False
+
+
+def _active_plan(plan: AnalysisPlan) -> AnalysisPlan:
+    """只保留当前模式的条件：另一种模式里遗留的、或没填完的条件一律忽略。"""
+    if plan.analysis_mode == "comparison":
+        groups = [
+            group.model_copy(update={"conditions": [c for c in group.conditions if not _is_blank_condition(c)]})
+            for group in plan.comparison_groups
+        ]
+        return plan.model_copy(update={"conditions": [], "comparison_groups": groups})
+    return plan.model_copy(update={
+        "conditions": [c for c in plan.conditions if not _is_blank_condition(c)],
+        "comparison_groups": [],
+    })
+
+
 def execute_plan(
     plan: AnalysisPlan,
     actor_id: str,
@@ -1169,9 +1256,13 @@ def execute_plan(
     page_size: int,
     allowed_customer_ids: set[str] | None = None,
 ) -> dict[str, Any]:
-    if plan.analysis_mode == "comparison":
-        return _execute_comparison_plan(plan, actor_id, allowed_customer_ids)
-    return _execute_single_plan(plan, actor_id, page, page_size, allowed_customer_ids)
+    active = _active_plan(plan)
+    if active.analysis_mode == "comparison":
+        result = _execute_comparison_plan(active, actor_id, allowed_customer_ids)
+    else:
+        result = _execute_single_plan(active, actor_id, page, page_size, allowed_customer_ids)
+    result["plan"] = plan.model_dump(mode="json")
+    return result
 
 
 def build_analysis_export(
@@ -1180,7 +1271,7 @@ def build_analysis_export(
     allowed_customer_ids: set[str] | None = None,
 ) -> tuple[io.BytesIO, int]:
     result = _execute_single_plan(
-        plan,
+        _active_plan(plan),
         actor_id,
         page=1,
         page_size=1_000_000,
@@ -1349,6 +1440,9 @@ def _add_condition(conditions: list[AnalysisCondition], field: str, operator: st
 
 
 def _date_field_from_query(query: str) -> str:
+    # 「邀约创建人」「课表创建人」是人员字段，不能被当成「邀约创建日期」
+    if "邀约创建人" in query or "课表创建人" in query:
+        return "invitation_dates"
     if "邀约创建" in query or "创建邀约" in query:
         return "invitation_created_dates"
     if "邀约" in query:
@@ -1546,6 +1640,7 @@ def metadata(
 ) -> dict[str, Any]:
     rows = build_customer_dataset(actor_id, allowed_customer_ids=allowed_customer_ids)
     fields = []
+    column_fields = []
     for group, field_names in FIELD_GROUPS.items():
         if group == "付费行为" and not allow_payment_details:
             continue
@@ -1573,18 +1668,25 @@ def metadata(
                 value_type = "select" if values and len(values) <= 500 else "text"
                 operators = ["eq", "ne", "contains", "in", "is_empty", "is_not_empty"]
                 options = values[:500]
-            fields.append({
+            definition = {
                 "value": field_name,
                 "label": FIELD_LABELS[field_name],
                 "group": group,
                 "value_type": value_type,
                 "operators": operators,
                 "options": options[:500],
-            })
-    column_fields = [
-        {"value": field["value"], "label": field["label"], "group": field["group"]}
-        for field in fields
-    ]
+            }
+            # 显示列的候选去掉期间成交金额（历史模板里已选中的列仍按原值输出）
+            if field_name not in LIST_HIDDEN_FIELDS:
+                # 消费金额是已停用的口径，仅保留给历史模板回显，不再作为可选字段
+                column_fields.append({
+                    "value": field_name,
+                    "label": FIELD_LABELS[field_name],
+                    "group": group,
+                    "legacy_only": field_name == "total_consumption",
+                })
+            if field_name not in CONDITION_HIDDEN_FIELDS:
+                fields.append(definition)
     column_fields.extend(
         {
             "value": field_name,
@@ -1594,6 +1696,18 @@ def metadata(
         for field_name, permission_key in SENSITIVE_COLUMN_FIELDS.items()
         if allowed_sensitive_fields is None or permission_key in allowed_sensitive_fields
     )
+    metrics = [
+        {
+            "value": value,
+            "label": METRIC_LABELS[value][0],
+            "unit": METRIC_LABELS[value][1],
+            "format": METRIC_LABELS[value][2],
+            # 成交金额不再作为候选项（PC 和小程序一致）；历史模板仍按原值计算，前端只拿它做回显
+            "legacy_only": value == "payment_amount",
+        }
+        for value in VISIBLE_METRICS
+        if allow_payment_details or value not in {"converted_customers", "payment_orders", "payment_amount"}
+    ]
     return {
         "fields": fields,
         "column_fields": column_fields,
@@ -1603,14 +1717,7 @@ def metadata(
             for value, label in CARD_DIMENSION_LABELS.items()
             if allow_payment_details or value not in PAYMENT_EVENT_FIELDS
         ],
-        "metrics": [
-            {
-                "value": value,
-                "label": METRIC_LABELS[value][0],
-                "unit": METRIC_LABELS[value][1],
-                "format": METRIC_LABELS[value][2],
-            }
-            for value in VISIBLE_METRICS
-            if allow_payment_details or value not in {"converted_customers", "payment_orders", "payment_amount"}
-        ],
+        "metrics": metrics,
+        # 拆分指标不再提供成交金额；历史模板仍按原值计算，只是不再作为候选项。
+        "dimension_metrics": [item for item in metrics if item["value"] != "payment_amount"],
     }

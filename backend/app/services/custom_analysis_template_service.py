@@ -95,7 +95,8 @@ def update_template(
             return None
         if template.created_by_id != actor_id and not is_super_admin:
             raise PermissionError("只能修改自己创建的模板")
-        updates = data.model_dump(exclude_unset=True)
+        # 不能用 model_dump：plan 会退化成 dict，之后按对象取属性会报错
+        updates = {key: getattr(data, key) for key in data.model_fields_set}
         if updates.get("name"):
             _ensure_unique_name(updates["name"], template.created_by_id, template.id)
         for key, value in updates.items():

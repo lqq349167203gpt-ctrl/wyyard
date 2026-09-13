@@ -2,6 +2,7 @@ const {
   classRecordApi, courseTypeApi, spaceApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
+  isOperationCancelled,
 } = require('../../utils/api')
 const {
   BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
@@ -356,13 +357,13 @@ Page({
     } else if (activityType === 'ics' && icsCourseType) {
       const typeColor = BADGE_COLORS['内部课程'] || '#5ba88a'
       const unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === 'ics')
+      // 活动名称不随类型调整，保留用户已填写的内容
       this.setData(Object.assign({}, resetFields, {
         activityType: 'ics',
         typeLabel: icsCourseType,
         typeColor,
         courseIndex: -1,
         icsCourseType,
-        activityName: icsCourseType,
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
       }))
     } else {
@@ -588,6 +589,13 @@ Page({
 
   // ---------- 保存 ----------
 
+  // api 层遇到「取消关联抵扣」二次确认时会调用它
+  showCoarseCancellationConfirm(payload) {
+    const confirm = this.selectComponent('#coarseConfirm')
+    if (!confirm) return Promise.reject(new Error('no-modal'))
+    return confirm.open(payload)
+  },
+
   async onSave() {
     const { activityType } = this.data
 
@@ -717,6 +725,8 @@ Page({
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })
+      // 用户在「取消关联抵扣」里点了取消：不是保存失败，不要追问是否重试
+      if (isOperationCancelled(e)) return
       wx.showModal({
         title: '保存失败',
         content: '是否重试？',
@@ -752,6 +762,7 @@ Page({
           wx.navigateBack()
         } catch (e) {
           this.setData({ deleting: false })
+          if (isOperationCancelled(e)) return
           wx.showModal({
             title: '删除失败',
             content: '是否重试？',

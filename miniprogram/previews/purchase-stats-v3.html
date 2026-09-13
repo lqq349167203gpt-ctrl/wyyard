@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡次统计 tab · 表格版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #212631; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+
+  .wrap { width: 640px; margin: 0 auto; }
+  .panel {
+    background: #fff; border-radius: 14px; box-shadow: 0 2px 4px rgba(33,38,49,.05);
+    padding: 0 20px 14px; overflow: hidden;
+  }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid #eef0f1; }
+  .tab-btn {
+    position: relative; padding: 12px 14px 10px; font-size: 13px; white-space: nowrap;
+    color: #79838f; font-weight: 600;
+  }
+  .tab-btn .cnt { font-size: 10.5px; color: #a8b1bd; margin-left: 3px; font-weight: 500; }
+  .tab-btn.on { color: #212631; font-weight: 700; }
+  .tab-btn.on::after {
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px;
+    height: 3px; border-radius: 3px 3px 0 0; background: #3370ff;
+  }
+  .tab-body { padding-top: 6px; }
+
+  /* ============ 表格版：只有一种行高、四列固定 ============ */
+  .t {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px 196px 56px;
+    align-items: center;
+  }
+  /* 分组头：整行浅灰底，兼做汇总 */
+  .t-group {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    background: #fafbfc; border-radius: 6px;
+    padding: 7px 10px; margin-top: 8px;
+  }
+  .t-group .g-name { font-size: 12px; font-weight: 600; color: #212631; }
+  .t-group .g-sum { font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .t-group .g-sum b { color: #212631; font-weight: 600; }
+
+  .t-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px 196px 56px;
+    align-items: center;
+    padding: 10px 10px 10px 22px;   /* 名称缩进，从属于分组 */
+    border-bottom: 1px solid #f3f4f5;
+  }
+  .t-row:last-child { border-bottom: none; }
+  .t-name { font-size: 12.5px; color: #212631; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t-name .mode { color: #a8b1bd; font-size: 12px; margin-left: 5px; }
+  .t-count { font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .t-count b { font-size: 12.5px; font-weight: 600; color: #212631; }
+  .t-date { font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  .t-status { font-size: 12px; text-align: right; }
+  .t-status.red { color: #c4506a; }
+  .t-status.grey { color: #a8b1bd; }
+
+  /* 购买明细：默认收起，展开时只是一行灰字 */
+  .t-sub {
+    grid-column: 1 / -1;
+    font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums;
+    padding-top: 4px; line-height: 1.7;
+  }
+  .t-sub .neg { color: #c4506a; }
+
+  .notes {
+    max-width: 640px; margin: 36px auto 0; background: #fff; border-radius: 16px;
+    padding: 24px 28px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 15px; margin-bottom: 10px; }
+  .notes ul { padding-left: 18px; font-size: 13px; color: #4e535a; line-height: 2.05; }
+  .notes b { color: #212631; }
+</style>
+</head>
+<body>
+
+<div class="page-title">「卡次统计」· 表格版</div>
+<div class="page-sub">一种行高 · 四列固定对齐 · 只有"剩余次数"一个字重强调 · 状态和页面其他 tab 同色的纯文字</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab-btn">跟进点<span class="cnt">6</span></div>
+      <div class="tab-btn">沟通记录<span class="cnt">3</span></div>
+      <div class="tab-btn">活动记录<span class="cnt">12</span></div>
+      <div class="tab-btn">用户回访<span class="cnt">2</span></div>
+      <div class="tab-btn on">卡次统计</div>
+      <div class="tab-btn">交易记录<span class="cnt">5</span></div>
+    </div>
+    <div class="tab-body">
+
+      <!-- 会员卡分组：分组头本身就是汇总，不再需要单独汇总卡 -->
+      <div class="t-group">
+        <span class="g-name">会员卡</span>
+        <span class="g-sum">剩余 <b>12</b> 次 · 共 30 次 · 扣卡 8 · 销卡 2 · 预支 1</span>
+      </div>
+      <div class="t-row">
+        <span class="t-name">20次卡</span>
+        <span class="t-count"><b>12</b> / 20 次</span>
+        <span class="t-date">2026-01-15 ~ 2027-01-14</span>
+        <span class="t-status"></span>
+      </div>
+      <div class="t-row">
+        <span class="t-name">10次卡</span>
+        <span class="t-count"><b>0</b> / 10 次</span>
+        <span class="t-date">2025-03-01 ~ 2026-03-01</span>
+        <span class="t-status red">已过期</span>
+      </div>
+
+      <!-- 其他项目分组 -->
+      <div class="t-group">
+        <span class="g-name">其他项目</span>
+        <span class="g-sum"></span>
+      </div>
+      <div class="t-row">
+        <span class="t-name">觉醒游戏</span>
+        <span class="t-count"><b>3</b> / 5 次</span>
+        <span class="t-date">2026-02-01 ~ 2026-08-01</span>
+        <span class="t-status"></span>
+        <!-- 购买明细：默认收起，点行展开后只是这样一行灰字（此处示意展开态） -->
+        <div class="t-sub">购买 3 次 · 剩 1 · 2026-02-01 ~ 2026-08-01　｜　购买 2 次 · 剩 2 · 2025-11-05 ~ 2026-05-05 <span class="neg">已过期</span></div>
+      </div>
+      <div class="t-row">
+        <span class="t-name">情绪释放</span>
+        <span class="t-count"><b>0</b> / 2 次</span>
+        <span class="t-date">2026-04-10 ~ 不限</span>
+        <span class="t-status grey">无次数</span>
+      </div>
+      <div class="t-row">
+        <span class="t-name">内部课程 · 疗愈师班</span>
+        <span class="t-count"><b>不限</b></span>
+        <span class="t-date">2026-01-01 ~ 2026-12-31</span>
+        <span class="t-status"></span>
+      </div>
+      <div class="t-row">
+        <span class="t-name">茶礼定制<span class="mode">线下</span></span>
+        <span class="t-count"><b>2</b> / 3 次</span>
+        <span class="t-date">2026-05-01 ~ 不限</span>
+        <span class="t-status"></span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>为什么这版不乱了</h2>
+  <ul>
+    <li><b>严格列对齐</b>：名称 / 次数 / 有效期 / 状态四列位置固定，所有行同高——眼睛按列扫，不再每行重新找位置（前两版乱的根源就是每行信息长短不一、右侧参差不齐）</li>
+    <li><b>汇总不单独做卡</b>：「会员卡」分组头右侧直接带汇总（剩余 12 · 共 30 · 扣卡 8 · 销卡 2 · 预支 1），少一个层级、少一种容器</li>
+    <li><b>唯一强调</b>：只剩"剩余次数"一个字重（600），其余全部常规字重；状态用纯文字（过期红 / 无次数灰），没有 pill、没有 chip、没有描边</li>
+    <li><b>购买明细默认收起</b>：点行才展开成一行灰字（图中觉醒游戏是展开示意），平时不占视觉</li>
+    <li>全部元素 = 12/12.5px 两种字号 + 页面原有灰色阶 + 1 个状态红，和「交易记录」表格 tab 的观感一致</li>
+  </ul>
+</div>
+
+</body>
+</html>

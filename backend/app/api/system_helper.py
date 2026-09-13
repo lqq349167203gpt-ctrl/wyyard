@@ -48,7 +48,7 @@ PERMISSION_PAGE_MAP = {
     "referral-statistics": ("引流统计", "/referral-statistics"),
     "member-statistics": ("会员情况", "/member-statistics"),
     "course-statistics": ("课程记录", "/course-statistics"),
-    "principal": ("主理人", "/principal"),
+    "principal": ("组织/俱乐部", "/principal"),
     "product-sales": ("产品销售", "/product-sales"),
     "statistics": ("服务数据", "/statistics"),
     "daily-report": ("每日报表", "/daily-report"),

@@ -95,8 +95,13 @@
 }
 
 /* 退出按钮 */
+.logout-wrap {
+  /* margin-top:auto 让按钮贴底；padding 保证内容再多也和上面的卡片留出间距，不会粘在一起 */
+  margin-top: auto;
+  padding: 24rpx 24rpx 0;
+}
+
 .logout-btn {
-  margin: auto 24rpx 24rpx;
   height: 104rpx;
   font-size: 30rpx;
   font-weight: 400;

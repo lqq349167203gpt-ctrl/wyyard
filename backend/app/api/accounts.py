@@ -14,6 +14,7 @@ from app.services import (
     wechat_service,
 )
 from app.utils.request_context import get_client_ip, get_client_source
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 require_account_manager = require_page_permission("position-management")
@@ -34,6 +35,16 @@ class AdminResetPasswordRequest(StrictBaseModel):
 
 
 # ===== 账号 =====
+
+@router.get("/me/permissions")
+async def my_permissions(request: StarletteRequest):
+    """当前登录账号的有效权限：多角色页面权限取并集，信息编辑范围按后端规则合并。"""
+    roles = get_request_roles(request)
+    return {
+        "pages": ALL_PAGE_KEYS if "超级管理员" in roles else position_permission_service.get_permissions(roles),
+        "edit_permissions": position_edit_permission_service.get_permissions(roles),
+    }
+
 
 @router.get("")
 async def list_accounts(_manager_role: str = Depends(require_account_manager)):
@@ -72,8 +83,8 @@ async def create_account(
 
 ALL_PAGE_KEYS = [
     # 数据
-    "custom-analysis", "service-teacher", "referral-statistics", "principal",
-    "member-statistics", "course-statistics", "product-sales", "statistics",
+    "custom-analysis", "service-teacher", "principal",
+    "course-statistics",
     # 报表
     "daily-report",
     # 业务
@@ -86,7 +97,7 @@ ALL_PAGE_KEYS = [
     "emotional-releases", "oh-card-readings",
     "energy-knots", "internal-courses", "tea-seat-fees", "offline-courses", "other-projects",
     # 信息配置
-    "member-identities", "customer-tags", "healing-identities", "organizations", "spaces",
+    "member-identities", "customer-tags", "upsell-config", "healing-identities", "organizations", "spaces",
     # 账号管理
     "position-management", "change-password", "disabled-customers",
     # 系统配置
@@ -181,10 +192,14 @@ async def bind_wechat(data: BindWechatRequest, request: StarletteRequest):
     existing = wechat_service.find_session_by_openid(openid)
     if existing:
         if existing.account_id == account_id:
+            # 已绑定、没有实际变更：不写操作日志
+            request.state.skip_operation_log = True
             return {"bound": True}
         raise HTTPException(status_code=409, detail="该微信已绑定其他账号")
 
     wechat_service.create_session(openid, account_id)
+    # 真正建立绑定时才记录，且用可读文案
+    request.state.operation_log_context = {"content": "绑定微信"}
     return {"bound": True}
 
 

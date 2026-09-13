@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡次统计 tab · 平级类目 + 页面同步样式</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #212631; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+
+  .compare { display: flex; gap: 32px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .col { width: 600px; flex-shrink: 0; }
+  .col-label { text-align: center; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .col-label small { display: block; font-size: 12px; color: #8f959e; font-weight: 400; margin-top: 3px; }
+
+  .panel {
+    background: #fff; border-radius: 14px; box-shadow: 0 2px 4px rgba(33,38,49,.05);
+    padding: 0 20px 14px; overflow: hidden;
+  }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid #eef0f1; }
+  .tab-btn {
+    position: relative; padding: 12px 14px 10px; font-size: 13px; white-space: nowrap;
+    color: #79838f; font-weight: 600;
+  }
+  .tab-btn .cnt { font-size: 10.5px; color: #a8b1bd; margin-left: 3px; font-weight: 500; }
+  .tab-btn.on { color: #212631; font-weight: 700; }
+  .tab-btn.on::after {
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px;
+    height: 3px; border-radius: 3px 3px 0 0; background: #3370ff;
+  }
+  .tab-body { padding-top: 12px; }
+
+  /* ======== 页面同步零件（与跟进点/活动记录完全一致）======== */
+  /* 类目卡 = 跟进点卡：bg #fafbfc + border #eef0f1 + rounded-10 + mb-9px */
+  .cat-card {
+    background: #fafbfc; border: 1px solid #eef0f1; border-radius: 10px;
+    padding: 10px 14px 4px; margin-bottom: 9px;
+  }
+  /* 类目头 = 跟进点卡头：12.5 bold + 右侧信息 */
+  .cat-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 7px; }
+  .cat-name { font-size: 12.5px; font-weight: 700; color: #212631; }
+  .cat-sum { margin-left: auto; font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .cat-sum b { color: #212631; font-weight: 600; }
+  /* 附注 = 跟进点卡内 label 色 */
+  .cat-note { font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums; padding-bottom: 7px; }
+  /* 条目行 = 用户回访 hairline */
+  .item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 80px 190px auto;
+    align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid #f0f1f2;
+  }
+  .i-name { font-size: 12.5px; color: #212631; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .i-name .mode { font-size: 12px; color: #a8b1bd; margin-left: 5px; }
+  .i-count { font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .i-count b { font-size: 12.5px; font-weight: 600; color: #212631; }
+  .i-date { font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  /* 状态 pill = 已到店/未到店 pill：rounded-full px-2 py-px 10.5 semibold */
+  .pill {
+    font-size: 10.5px; font-weight: 600; line-height: 1;
+    padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .pill.red { color: #c4506a; background: #fdeeee; }
+  .pill.grey { color: #79838f; background: #f1f0ed; }
+  .pill.green { color: #157a3c; background: #dcf5e4; }
+
+  /* ======== 右侧参考：跟进点卡原样 ======== */
+  .heal-card {
+    background: #fafbfc; border: 1px solid #eef0f1; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 9px;
+  }
+  .heal-head { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .heal-date { font-size: 12.5px; font-weight: 700; color: #212631; font-variant-numeric: tabular-nums; }
+  .heal-grid { display: grid; grid-template-columns: 84px 1fr; row-gap: 4px; column-gap: 12px; }
+  .heal-grid .k { font-size: 12px; color: #a8b1bd; padding-top: 1px; }
+  .heal-grid .v { font-size: 12px; line-height: 1.55; color: #3a4150; }
+  .ref-title { font-size: 12px; color: #8f959e; margin: 0 0 8px; }
+
+  .notes {
+    max-width: 900px; margin: 40px auto 0; background: #fff; border-radius: 16px;
+    padding: 24px 32px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 15px; margin-bottom: 10px; }
+  .notes ul { padding-left: 18px; font-size: 13px; color: #4e535a; line-height: 2.05; }
+  .notes b { color: #212631; }
+  .notes code { background: #f2f3f5; border-radius: 4px; padding: 1px 6px; font-size: 12px; color: #212631; }
+</style>
+</head>
+<body>
+
+<div class="page-title">「卡次统计」· 平级类目 + 页面同步样式</div>
+<div class="page-sub">结构 = 上一版确认的平级类目 ｜ 样式 = 全部套用跟进点卡 / 用户回访 hairline / 已到店 pill 的现成零件（右侧为原件对照）</div>
+
+<div class="compare">
+
+  <!-- ==================== 卡次统计（同步样式） ==================== -->
+  <div class="col">
+    <div class="col-label" style="color:#2ba471">卡次统计（最终版）<small>每个类目 = 一张跟进点式浅灰卡；条目 = 用户回访式 hairline 行；状态 = pill</small></div>
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab-btn">跟进点<span class="cnt">6</span></div>
+        <div class="tab-btn">沟通记录<span class="cnt">3</span></div>
+        <div class="tab-btn">活动记录<span class="cnt">12</span></div>
+        <div class="tab-btn">用户回访<span class="cnt">2</span></div>
+        <div class="tab-btn on">卡次统计</div>
+        <div class="tab-btn">交易记录<span class="cnt">5</span></div>
+      </div>
+      <div class="tab-body">
+
+        <div class="cat-card">
+          <div class="cat-head">
+            <span class="cat-name">会员卡</span>
+            <span class="cat-sum">剩余 <b>12</b> / 共 30 次</span>
+          </div>
+          <div class="cat-note">扣卡 8 次 · 销卡 2 次 · 预支扣卡 1 次</div>
+          <div class="item">
+            <span class="i-name">20次卡</span>
+            <span class="i-count"><b>12</b> / 20</span>
+            <span class="i-date">2026-01-15 ~ 2027-01-14</span>
+            <span class="pill green">生效中</span>
+          </div>
+          <div class="item">
+            <span class="i-name">10次卡</span>
+            <span class="i-count"><b>0</b> / 10</span>
+            <span class="i-date">2025-03-01 ~ 2026-03-01</span>
+            <span class="pill red">已过期</span>
+          </div>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-head">
+            <span class="cat-name">觉醒游戏</span>
+            <span class="cat-sum">剩余 <b>3</b> / 共 5 次</span>
+          </div>
+          <div class="item" style="border-top:1px solid #f0f1f2">
+            <span class="i-name">购买 3 次</span>
+            <span class="i-count">剩 <b>1</b></span>
+            <span class="i-date">2026-02-01 ~ 2026-08-01</span>
+            <span class="pill green">生效中</span>
+          </div>
+          <div class="item">
+            <span class="i-name">购买 2 次</span>
+            <span class="i-count">剩 <b>2</b></span>
+            <span class="i-date">2025-11-05 ~ 2026-05-05</span>
+            <span class="pill red">已过期</span>
+          </div>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-head">
+            <span class="cat-name">情绪释放</span>
+            <span class="cat-sum">剩余 <b>0</b> / 共 2 次</span>
+          </div>
+          <div class="item" style="border-top:1px solid #f0f1f2">
+            <span class="i-name">购买 2 次</span>
+            <span class="i-count">剩 <b>0</b></span>
+            <span class="i-date">2026-04-10 ~ 不限</span>
+            <span class="pill grey">无次数</span>
+          </div>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-head">
+            <span class="cat-name">OH卡梳理</span>
+            <span class="cat-sum">剩余 <b>4</b> / 共 6 次</span>
+          </div>
+          <div class="item" style="border-top:1px solid #f0f1f2">
+            <span class="i-name">购买 6 次</span>
+            <span class="i-count">剩 <b>4</b></span>
+            <span class="i-date">2026-06-01 ~ 2026-12-01</span>
+            <span class="pill green">生效中</span>
+          </div>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-head">
+            <span class="cat-name">内部课程</span>
+            <span class="cat-sum"><b>不限次</b></span>
+          </div>
+          <div class="item" style="border-top:1px solid #f0f1f2">
+            <span class="i-name">疗愈师班</span>
+            <span class="i-count"><b>不限</b></span>
+            <span class="i-date">2026-01-01 ~ 2026-12-31</span>
+            <span class="pill green">生效中</span>
+          </div>
+        </div>
+
+        <div class="cat-card">
+          <div class="cat-head">
+            <span class="cat-name">其他项目</span>
+            <span class="cat-sum">剩余 <b>2</b> / 共 3 次</span>
+          </div>
+          <div class="item" style="border-top:1px solid #f0f1f2">
+            <span class="i-name">茶礼定制<span class="mode">线下</span></span>
+            <span class="i-count"><b>2</b> / 3</span>
+            <span class="i-date">2026-05-01 ~ 不限</span>
+            <span class="pill green">生效中</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 对照：页面现有零件 ==================== -->
+  <div class="col">
+    <div class="col-label" style="color:#4e535a">样式来源（页面现有零件）<small>左边卡次统计的每一块都能在右边找到原件</small></div>
+    <div class="panel">
+      <div class="tab-body">
+        <p class="ref-title">零件 1 ｜ 浅灰卡容器（跟进点 tab）</p>
+        <div class="heal-card">
+          <div class="heal-head">
+            <span class="heal-date">2026/8/6 10:30</span>
+            <span class="pill green">已到店</span>
+          </div>
+          <div class="heal-grid">
+            <span class="k">当日需求</span><span class="v">想继续做情绪释放，最近睡眠不太好</span>
+            <span class="k">跟进点</span><span class="v">本周内推年卡，强调家庭套餐</span>
+          </div>
+        </div>
+        <p class="ref-title" style="margin-top:16px">零件 2 ｜ 状态 pill（已到店 / 未到店）</p>
+        <div style="display:flex;gap:8px;padding:2px 0 4px">
+          <span class="pill green">已到店</span>
+          <span class="pill grey">未到店</span>
+          <span class="pill grey">无次数</span>
+          <span class="pill red">已过期</span>
+        </div>
+        <p class="ref-title" style="margin-top:16px">零件 3 ｜ hairline 分隔行（用户回访 / 沟通记录）</p>
+        <div style="border-top:1px solid #f0f1f2;padding:9px 0;font-size:12.5px;color:#212631">晨光冥想·呼吸疗愈</div>
+        <div style="border-top:1px solid #f0f1f2;padding:9px 0;font-size:12.5px;color:#212631">OH 卡深度梳理（小组）</div>
+        <div style="border-top:1px solid #f0f1f2;padding:9px 0 2px;font-size:12.5px;color:#212631">晚间茶话·公益分享</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>同步对照表（实现时直接用这些值）</h2>
+  <ul>
+    <li><b>类目卡</b> → 跟进点卡：<code>bg-[#fafbfc] border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px]</code></li>
+    <li><b>类目名</b> → 跟进点日期字：<code>text-[12.5px] font-bold text-[#212631]</code>；<b>类目合计</b> → <code>text-[12px] text-[#8f959e]</code>，数字 <code>font-semibold text-[#212631]</code></li>
+    <li><b>条目行</b> → 用户回访分隔线：<code>border-t border-[#f0f1f2]</code>；名称 12.5px、次数/日期 12px <code>tabular-nums</code>（#8f959e / #a8b1bd）</li>
+    <li><b>状态 pill</b> → 已到店 pill 同款：<code>text-[10.5px] font-semibold px-2 py-px rounded-full</code>；生效中 = 绿（#157a3c/#dcf5e4）、无次数/未生效 = 灰（#79838f/#f1f0ed）、已过期 = 红（#c4506a/#fdeeee）</li>
+    <li><b>扣减构成附注</b> → 跟进点 label 色 <code>text-[12px] text-[#a8b1bd]</code></li>
+    <li>结构保持 v4：7 个类目平级、空类目不显示、条目四列固定</li>
+  </ul>
+</div>
+
+</body>
+</html>

@@ -1,6 +1,6 @@
 # wyyard 前端惯用写法片段
 
-全部摘自真实代码，写新页面时照抄结构。出处已标注，可去原文件看完整上下文。
+以下是结构示例，不是当前源码快照或强制模板。使用前核对目标组件 API；用户指定页面优先，不机械复制尺寸、加载时的整页 return 或仅 hover 可见的操作。授权、完成和验证规则不由示例决定。
 
 ## 页面骨架（无标题列表页）
 
@@ -17,7 +17,7 @@
 ```tsx
 <div className="flex items-center justify-between pb-2">
   <div>
-    <h1 className="text-lg font-semibold">账号管理</h1>
+    <h1 className="text-lg font-medium">账号管理</h1>
     <p className="text-xs text-muted-foreground mt-1.5">一句话说明</p>
   </div>
   <Button size="sm" className="h-8 text-xs" onClick={...}>
@@ -26,7 +26,7 @@
 </div>
 ```
 
-> 注：旧代码标题用了 `font-semibold`，新代码按准则改为 `font-medium`。
+> 标题、间距按当前页面需要适配。
 
 ## Tab 切换栏
 
@@ -75,7 +75,7 @@
           </span>
         </TableCell>
         <TableCell className="text-right pr-4">
-          <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex justify-end gap-0.5">
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleEdit(a)}>
               <Edit className="h-3.5 w-3.5" />
             </Button>

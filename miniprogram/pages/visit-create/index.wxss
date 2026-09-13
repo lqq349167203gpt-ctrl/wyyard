@@ -231,6 +231,12 @@
   margin-bottom: 16rpx;
 }
 
+.need-reference-actions {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
 .previous-need-toggle,
 .previous-need-append {
   color: #3370ff;

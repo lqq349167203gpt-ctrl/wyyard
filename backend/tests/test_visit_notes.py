@@ -173,7 +173,7 @@ def test_visit_note_list_migrates_legacy_fields(client, created_customer):
             ("follow_up", "原跟进点"),
         }
         assert all(item["created_by"] == "不闹" for item in notes)
-        assert client.get(f"/api/visits/{visit['id']}").json()["needs"] == "原来访需求"
+        assert client.get(f"/api/visits/{visit['id']}").json()["needs"] == "不闹：原来访需求"
     finally:
         client.delete(f"/api/visits/{visit['id']}")
 
@@ -270,8 +270,8 @@ def test_previous_visit_need_returns_latest_visible_need_before_current_visit(
         client.delete(f"/api/accounts/{account['id']}")
 
 
-def test_visit_need_is_private_to_each_account(client, created_customer):
-    visit = _create_visit(client, created_customer["id"], needs="创建人的私有需求")
+def test_visit_needs_are_shared_but_only_creator_can_manage(client, created_customer):
+    visit = _create_visit(client, created_customer["id"], needs="创建人的需求")
     account, other_headers = _create_other_headers(client)
     other_note_id = ""
     try:
@@ -281,18 +281,20 @@ def test_visit_need_is_private_to_each_account(client, created_customer):
         creator_need = next(
             item for item in creator_notes if item["category"] == "visit_need"
         )
-        assert creator_need["content"] == "创建人的私有需求"
+        assert creator_need["content"] == "创建人的需求"
 
         other_initial = client.get(
             f"/api/visit-notes?visit_id={visit['id']}", headers=other_headers
         )
         assert other_initial.status_code == 200
-        assert not any(
-            item["category"] == "visit_need" for item in other_initial.json()
-        )
+        shared_need = next(item for item in other_initial.json() if item["id"] == creator_need["id"])
+        assert shared_need["content"] == "创建人的需求"
+        assert shared_need["created_by"] == "不闹"
+        assert shared_need["can_edit"] is False
+        assert shared_need["can_delete"] is False
         assert client.get(
             f"/api/visits/{visit['id']}", headers=other_headers
-        ).json()["needs"] == ""
+        ).json()["needs"] == "不闹：创建人的需求"
 
         other_create = client.post(
             "/api/visit-notes",
@@ -305,19 +307,20 @@ def test_visit_need_is_private_to_each_account(client, created_customer):
         )
         assert other_create.status_code == 200, other_create.text
         other_note_id = other_create.json()["id"]
-        assert client.get(
+        expected = {"不闹：创建人的需求", f"{account['owner']}：另一位员工自己的需求"}
+        assert set(client.get(
             f"/api/visits/{visit['id']}", headers=other_headers
-        ).json()["needs"] == "另一位员工自己的需求"
-        assert client.get(f"/api/visits/{visit['id']}").json()["needs"] == "创建人的私有需求"
+        ).json()["needs"].splitlines()) == expected
+        assert set(client.get(f"/api/visits/{visit['id']}").json()["needs"].splitlines()) == expected
 
         creator_visible = client.get(
             f"/api/visit-notes?visit_id={visit['id']}"
         ).json()
-        assert [
-            item["content"]
+        assert {
+            (item["created_by"], item["content"])
             for item in creator_visible
             if item["category"] == "visit_need"
-        ] == ["创建人的私有需求"]
+        } == {("不闹", "创建人的需求"), (account["owner"], "另一位员工自己的需求")}
 
         forbidden_update = client.patch(
             f"/api/visit-notes/{creator_need['id']}",

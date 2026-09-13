@@ -71,7 +71,25 @@
     <view class="form-item column textarea-row">
       <view class="need-heading">
         <text class="form-label">来访需求</text>
-        <text class="previous-need-toggle" wx:if="{{customerId}}" bindtap="onTogglePreviousNeed">{{previousNeedOpen ? '收起上次需求' : '引用上次需求'}}</text>
+        <view class="need-reference-actions" wx:if="{{customerId}}">
+          <text class="previous-need-toggle" bindtap="onToggleVisitPurpose">{{visitPurposeOpen ? '收起到访目的' : '引用到访目的'}}</text>
+          <text class="previous-need-toggle" bindtap="onTogglePreviousNeed">{{previousNeedOpen ? '收起上次需求' : '引用上次需求'}}</text>
+        </view>
+      </view>
+      <view class="previous-need-box" wx:if="{{visitPurposeOpen}}">
+        <text class="previous-need-empty" wx:if="{{visitPurposeLoading}}">正在加载到访目的…</text>
+        <view class="previous-need-error" wx:elif="{{visitPurposeError}}" bindtap="loadVisitPurpose">
+          <text>{{visitPurposeError}}</text>
+          <text class="previous-need-retry">点击重试</text>
+        </view>
+        <block wx:elif="{{visitPurpose}}">
+          <view class="previous-need-meta">
+            <text>客户详情中的到访目的</text>
+            <text class="previous-need-append" bindtap="onAppendVisitPurpose">带入本次</text>
+          </view>
+          <text class="previous-need-content">{{visitPurpose}}</text>
+        </block>
+        <text class="previous-need-empty" wx:else>暂无可引用的到访目的</text>
       </view>
       <view class="previous-need-box" wx:if="{{previousNeedOpen}}">
         <text class="previous-need-empty" wx:if="{{previousNeedLoading}}">正在加载上次需求…</text>

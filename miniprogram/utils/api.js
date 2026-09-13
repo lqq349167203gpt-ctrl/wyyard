@@ -219,29 +219,39 @@ function _isTokenValid(token) {
   }
 }
 
-// dev-login 只是开发便利：任何时候它失败都不允许阻断业务请求，
-// 降级为无 token 直连（后端返回 401 时走统一的重新登录流程）。
-// 因此本函数永不 reject——历史上的驳回报错文案已随之从代码中物理删除。
-function _ensureLogin() {
-  const app = getApp()
-  if (!app || !app.globalData.devMode) return Promise.resolve()
-  if (app.globalData._loggingIn && _loginPromise) return _loginPromise
+// 取消粗门次卡抵扣的确认弹窗：优先用当前页面的自定义弹窗（看得清），页面没实现时退回系统弹窗
+// 用户点了「取消」属于主动放弃，调用方不该再弹「保存失败/是否重试」
+function _cancelledError(message) {
+  const error = new Error(message || '已取消操作')
+  error.cancelled = true
+  return error
+}
 
-  const token = wx.getStorageSync('auth_token')
-  if (_isTokenValid(token)) return Promise.resolve() // JWT 未过期
+function _askCoarseCancellation(data) {
+  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+  const page = pages.length ? pages[pages.length - 1] : null
+  if (page && typeof page.showCoarseCancellationConfirm === 'function') {
+    try {
+      return Promise.resolve(page.showCoarseCancellationConfirm(data))
+        .catch(() => _systemCoarseCancellation(data))
+    } catch (e) {
+      return _systemCoarseCancellation(data)
+    }
+  }
+  return _systemCoarseCancellation(data)
+}
 
-  // 需要登录：尝试 dev-login，失败仅降级放行，不影响正常登录流程
-  console.log('[request] token 无效，尝试 devAutoLogin（失败将降级放行）...')
-  wx.removeStorageSync('auth_token')
-  wx.removeStorageSync('currentUser')
-  wx.removeStorageSync('userPermissions')
-  wx.removeStorageSync('userEditPermissions')
-  _loginPromise = Promise.resolve(app._devAutoLogin())
-    .catch((err) => {
-      console.warn('[request] devAutoLogin 失败，本次请求降级为无 token 直连:', err)
+function _systemCoarseCancellation(data) {
+  return new Promise((resolve) => {
+    wx.showModal({
+      title: '取消关联抵扣',
+      content: (data && data.detail) || '',
+      confirmText: '确认继续',
+      cancelText: '取消',
+      success: (result) => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false),
     })
-    .finally(() => { _loginPromise = null })
-  return _loginPromise
+  })
 }
 
 function _extractErrorMessage(data) {
@@ -291,16 +301,6 @@ function _pageTrackingHeaders() {
 }
 
 async function request(path, options = {}) {
-  const app = getApp()
-  // devMode 下：先尽力确保有有效 JWT（skipAuth 的请求跳过，如登录类请求）。
-  // _ensureLogin 设计上永不 reject；等待超时也只是放行——dev-login 任何异常都不得阻断业务请求。
-  if (app && app.globalData.devMode && !options.skipAuth) {
-    await Promise.race([
-      _ensureLogin(),
-      new Promise((resolve) => setTimeout(resolve, 15000)),
-    ])
-  }
-
   return new Promise((resolve, reject) => {
     // skipAuth（登录类）请求不附带 token：建立会话不需要已有会话，
     // 也避免过期 token 触发后端 AuthMiddleware 误拒登录请求
@@ -324,6 +324,11 @@ async function request(path, options = {}) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           _saveRenewedToken(res.header, token)
           resolve(res.data)
+        } else if (res.statusCode === 409 && res.data && res.data.coarse_cancellation_required && path.indexOf('confirm_coarse_cancellation=1') < 0) {
+          _askCoarseCancellation(res.data).then((confirmed) => {
+            if (confirmed) request(path + (path.indexOf('?') >= 0 ? '&' : '?') + 'confirm_coarse_cancellation=1', options).then(resolve).catch(reject)
+            else reject(_cancelledError('已取消操作，名单和抵扣记录未改变'))
+          })
         } else if (res.statusCode === 401) {
           const reason = _getResponseHeader(res.header, 'x-auth-reason')
           const currentToken = wx.getStorageSync('auth_token')
@@ -488,6 +493,46 @@ const activityThemeApi = {
 // 课程类型 API
 const courseTypeApi = {
   list: () => request('/api/course-types'),
+  create: (name, organizationId, listImage, detailImages) => request('/api/course-types', {
+    method: 'POST',
+    data: {
+      name,
+      organization_id: organizationId || '',
+      list_image: listImage || '',
+      detail_images: detailImages || [],
+    },
+  }),
+  update: (name, data) => request(`/api/course-types/${encodeURIComponent(name)}`, { method: 'PATCH', data }),
+  rename: (oldName, newName) => request(`/api/course-types/${encodeURIComponent(oldName)}/rename`, {
+    method: 'PUT',
+    data: { new_name: newName },
+  }),
+  delete: (name) => request(`/api/course-types/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  reorder: (names) => request('/api/course-types', { method: 'PATCH', data: { names } }),
+}
+
+// 上传公开图片（活动列表图/详情图）
+function uploadPublicImage(filePath, name) {
+  const { BASE_URL } = require('./config')
+  const token = wx.getStorageSync('auth_token')
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: `${BASE_URL}/api/uploads/public-images`,
+      filePath,
+      name: name || 'file',
+      header: token ? { Authorization: `Bearer ${token}` } : {},
+      success: (res) => {
+        try {
+          const data = JSON.parse(res.data || '{}')
+          if (res.statusCode >= 200 && res.statusCode < 300) resolve(data)
+          else reject(new Error(data.detail || data.message || '上传失败'))
+        } catch (e) {
+          reject(new Error('上传响应解析失败'))
+        }
+      },
+      fail: (err) => reject(new Error(err.errMsg || '上传失败')),
+    })
+  })
 }
 
 // 觉醒游戏 API
@@ -527,7 +572,7 @@ const dailyGroupingApi = {
 // 客户 API
 const customerApi = {
   light: (limit) => request(`/api/customers/light${limit ? '?limit=' + limit : ''}`),
-  detail: (id, date) => request(`/api/customer-detail/${id}${date ? '?date=' + date : ''}`),
+  detail: (id, date, principalParticipant = false, principalCourse = '') => request(`/api/customer-detail/${encodeURIComponent(id)}?${date ? 'date=' + encodeURIComponent(date) + '&' : ''}${principalParticipant ? 'principal_participant=true&principal_course=' + encodeURIComponent(principalCourse) : ''}`),
   list: (params = {}) => {
     const qs = Object.entries(params)
       .filter(([_, v]) => v !== undefined && v !== null && v !== '')
@@ -570,6 +615,8 @@ const followUpStatusApi = {
 // 角色页面权限 API（用于同步 PC 端角色权限配置）
 const positionPermissionApi = {
   get: (position) => request(`/api/position-permissions/${encodeURIComponent(position)}`, { silent: true }),
+  // 当前登录账号的有效权限（多角色并集），避免只按主要角色刷新丢掉其它角色的页面
+  getMine: () => request('/api/accounts/me/permissions', { silent: true }),
 }
 
 // 账号活跃时长心跳（仅管理端小程序）
@@ -593,6 +640,14 @@ const spaceApi = {
 // 组织 API
 const organizationApi = {
   list: () => request('/api/organizations'),
+  create: (data) => request('/api/organizations', { method: 'POST', data }),
+  update: (id, data) => request(`/api/organizations/${id}`, { method: 'PATCH', data }),
+  delete: (id) => request(`/api/organizations/${id}`, { method: 'DELETE' }),
+  listDataViewers: () => request('/api/organizations/data-viewers'),
+  setDataViewers: (data_viewer_ids) => request('/api/organizations/data-viewers', {
+    method: 'PUT',
+    data: { data_viewer_ids },
+  }),
 }
 
 // 会员身份 API
@@ -812,12 +867,14 @@ module.exports = {
   principalApi: {
     metadata: () => request('/api/principal/metadata'),
     rules: () => request('/api/principal/rules'),
+    ruleFields: () => request('/api/principal/rule-fields'),
     query: (data) => request('/api/principal/query', { method: 'POST', data }),
     saveRule: (data, id) => request('/api/principal/rules' + (id ? '/' + id : ''), { method: id ? 'PATCH' : 'POST', data }),
     deleteRule: (id) => request('/api/principal/rules/' + id, { method: 'DELETE' }),
     export: (data) => request('/api/principal/export', { method: 'POST', data, responseType: 'arraybuffer', timeout: 120000 }),
   },
   request,
+  isOperationCancelled: (error) => Boolean(error && error.cancelled === true),
   visitApi,
   visitNoteApi,
   activityParticipantNoteApi,
@@ -836,6 +893,7 @@ module.exports = {
   authApi,
   dailyGroupingApi,
   courseTypeApi,
+  uploadPublicImage,
   PAYMENT_PROJECT_TYPES,
   groupCaseSessionApi,
   emotionalReleaseSessionApi,

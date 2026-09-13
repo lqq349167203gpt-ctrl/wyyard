@@ -13,6 +13,7 @@
     "pages/customer-form/index",
     "pages/customer-profile/index",
     "pages/customer-tags/index",
+    "pages/organizations/index",
     "pages/custom-analysis/index",
     "pages/service-teachers/index",
     "pages/course-records/index",

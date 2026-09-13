@@ -32,20 +32,17 @@ App({
   },
 
   onLaunch() {
-    if (this.globalData.devMode) {
-      // 开发模式下始终重新登录，获取有效 JWT（仅开发版生效，体验版/正式版不会进入此分支）
-      this.globalData._loginReady = this._devAutoLogin()
-    } else {
-      const token = wx.getStorageSync('auth_token')
-      const user = wx.getStorageSync('currentUser')
-      if (token && user) {
-        this.globalData.token = token
-        this.globalData.currentUser = user
-        this.globalData.permissions = wx.getStorageSync('userPermissions') || []
-        this.globalData.editPermissions = wx.getStorageSync('userEditPermissions') || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
-      }
-      this.globalData._loginReady = Promise.resolve()
+    // 启动只恢复本地登录态；开发版的自动登录已移除（它会清掉使用者自己登录的 token）。
+    // 免登录由登录页的登录态探测负责，失效时回落到账号密码（记住密码）。
+    const token = wx.getStorageSync('auth_token')
+    const user = wx.getStorageSync('currentUser')
+    if (token && user) {
+      this.globalData.token = token
+      this.globalData.currentUser = user
+      this.globalData.permissions = wx.getStorageSync('userPermissions') || []
+      this.globalData.editPermissions = wx.getStorageSync('userEditPermissions') || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
     }
+    this.globalData._loginReady = Promise.resolve()
   },
 
   onShow() {
@@ -140,7 +137,7 @@ App({
       return this.globalData.permissions || []
     }
     const { positionPermissionApi } = require('./utils/api')
-    const result = await positionPermissionApi.get(user.role)
+    const result = await positionPermissionApi.getMine()
     const permissions = (result && result.pages) || []
     const editPermissions = (result && result.edit_permissions) || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
     this.globalData.permissions = permissions
@@ -148,39 +145,6 @@ App({
     wx.setStorageSync('userPermissions', permissions)
     wx.setStorageSync('userEditPermissions', editPermissions)
     return permissions
-  },
-
-  async _devAutoLogin() {
-    try {
-      this.globalData._loggingIn = true
-      // 清除旧 token，避免 AuthMiddleware 拒绝 dev-login 请求
-      wx.removeStorageSync('auth_token')
-      wx.removeStorageSync('currentUser')
-      wx.removeStorageSync('userPermissions')
-      wx.removeStorageSync('userEditPermissions')
-      this.globalData.token = ''
-      this.globalData.currentUser = null
-      const { authApi } = require('./utils/api')
-      console.log('[dev-login] 开始自动登录...')
-      // 硬编码账号 'tingting' 仅为开发便利：devMode 仅开发版生效，体验版/正式版自动关闭，不会执行到本函数
-      const data = await authApi.devLogin('tingting')
-      console.log('[dev-login] 登录成功, token长度:', data.token?.length)
-      this.globalData.token = data.token
-      this.globalData.currentUser = data.account
-      this.globalData.permissions = data.permissions || []
-      this.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
-      wx.setStorageSync('auth_token', data.token)
-      wx.setStorageSync('currentUser', data.account)
-      wx.setStorageSync('userPermissions', data.permissions)
-      wx.setStorageSync('userEditPermissions', this.globalData.editPermissions)
-      console.log('[dev-login] token 已存入 storage')
-      this.scheduleUsageTracking()
-    } catch (err) {
-      console.error('[dev-login] 登录失败:', err)
-      this.globalData._loginReady = null
-    } finally {
-      this.globalData._loggingIn = false
-    }
   },
 
   checkLogin() {

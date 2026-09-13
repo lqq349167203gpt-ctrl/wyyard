@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日报表 · v2（紧凑版 + 4 tab 完整页面）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #1f2329; padding: 40px 24px 60px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 32px; }
+  .phones { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+
+  .phone {
+    width: 375px; background: #f7f8fa; border-radius: 36px; border: 8px solid #1f2329;
+    overflow: hidden; box-shadow: 0 24px 64px rgba(31,35,41,0.14); flex-shrink: 0;
+  }
+  .phone-screen { height: 720px; overflow-y: auto; position: relative; }
+  .phone-screen::-webkit-scrollbar { display: none; }
+  .statusbar { height: 24px; background: #fff; }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600; position: relative; border-bottom: 0.5px solid #f0f1f2;
+  }
+  .navbar .back { position: absolute; left: 16px; font-size: 18px; font-weight: 400; }
+
+  .datebar {
+    background: #fff; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 8px 12px; border-bottom: 0.5px solid #f0f1f2;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .datebar .nav-arrow {
+    width: 26px; height: 26px; border-radius: 8px; background: #f7f8fa;
+    display: flex; align-items: center; justify-content: center; color: #4e535a; font-size: 13px;
+  }
+  .datebar .date-main { font-size: 14px; font-weight: 600; }
+  .datebar .date-sub { font-size: 11px; color: #8f959e; margin-left: 6px; font-weight: 400; }
+  .datebar .cal { font-size: 14px; color: #3370ff; }
+
+  .tabbar {
+    background: #fff; display: flex; border-bottom: 0.5px solid #f0f1f2;
+    position: sticky; top: 43px; z-index: 10;
+  }
+  .tab {
+    flex: 1; text-align: center; padding: 9px 0 8px; font-size: 13px; color: #4e535a;
+    cursor: pointer; position: relative; user-select: none;
+  }
+  .tab .cnt { font-size: 10px; color: #8f959e; margin-left: 2px; }
+  .tab.active { color: #3370ff; font-weight: 600; }
+  .tab.active .cnt { color: #3370ff; font-weight: 400; }
+  .tab.active::after {
+    content: ""; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 3px; border-radius: 2px; background: #3370ff;
+  }
+
+  .r-body { padding: 10px 14px 28px; }
+  .tab-pane { display: none; }
+  .tab-pane.show { display: block; }
+
+  /* ==================================================== */
+  /* 客户 tab：紧凑左色条卡                                */
+  /* ==================================================== */
+  .c-card {
+    background: #fff; border-radius: 10px; margin-bottom: 8px; padding: 9px 12px 9px 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); position: relative; overflow: hidden; cursor: pointer;
+  }
+  .c-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .c-card.m::before { background: #3370ff; }
+  .c-card.n::before { background: #7ed3a5; }
+  .c-l1 { display: flex; align-items: center; gap: 6px; }
+  .c-name { font-size: 14px; font-weight: 600; }
+  .c-id {
+    font-size: 10px; border-radius: 4px; padding: 0 5px; line-height: 16px;
+    background: #f0f5ff; color: #3370ff;
+  }
+  .c-id.grey { background: #f2f3f5; color: #8f959e; }
+  .c-pill { font-size: 10px; border-radius: 9px; padding: 0 7px; line-height: 16px; }
+  .c-pill.ok { background: #e8f7e9; color: #2ba471; }
+  .c-pill.no { background: #f2f3f5; color: #8f959e; }
+  .c-amount { margin-left: auto; font-size: 14px; font-weight: 700; }
+  .c-amount.none { font-size: 11px; color: #c0c4cc; font-weight: 400; }
+  .c-l2 { margin-top: 5px; font-size: 11px; color: #8f959e; display: flex; flex-wrap: wrap; }
+  .c-l2 span + span::before { content: "·"; margin: 0 5px; color: #d0d3d6; }
+  .c-l2 b { color: #4e535a; font-weight: 600; margin-right: 1px; }
+  .c-l3 {
+    margin-top: 5px; font-size: 11px; color: #4e535a; line-height: 1.55;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .c-l3 .k { color: #8f959e; margin-right: 3px; }
+  .c-detail { display: none; margin-top: 6px; padding-top: 6px; border-top: 0.5px dashed #e8eaed; }
+  .c-card.open .c-detail { display: block; }
+  .c-card.open .c-l3 { white-space: normal; }
+  .c-detail .d-row { display: flex; font-size: 11px; line-height: 1.65; margin-bottom: 4px; }
+  .c-detail .d-label { color: #8f959e; width: 56px; flex-shrink: 0; }
+  .c-detail .d-val { color: #4e535a; flex: 1; }
+  .c-more-hint { font-size: 10px; color: #c0c4cc; margin-left: 6px; }
+
+  /* ==================================================== */
+  /* 活动 tab                                              */
+  /* ==================================================== */
+  .act-card {
+    background: #fff; border-radius: 10px; margin-bottom: 8px; padding: 10px 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); cursor: pointer;
+  }
+  .act-l1 { display: flex; align-items: center; gap: 6px; }
+  .act-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .act-tag { font-size: 10px; border-radius: 4px; padding: 0 5px; line-height: 16px; background: #e8f7e9; color: #2ba471; flex-shrink: 0; }
+  .act-tag.grey { background: #f2f3f5; color: #8f959e; }
+  .act-num { font-size: 12px; color: #8f959e; flex-shrink: 0; }
+  .act-l2 { margin-top: 5px; font-size: 11px; color: #8f959e; }
+  .act-l2 span + span::before { content: "·"; margin: 0 5px; color: #d0d3d6; }
+  .act-detail { display: none; margin-top: 6px; padding-top: 6px; border-top: 0.5px dashed #e8eaed; }
+  .act-card.open .act-detail { display: block; }
+  .act-detail .d-row { display: flex; font-size: 11px; line-height: 1.65; margin-bottom: 4px; }
+  .act-detail .d-label { color: #8f959e; width: 34px; flex-shrink: 0; }
+  .act-detail .d-val { color: #4e535a; flex: 1; }
+
+  /* ==================================================== */
+  /* 财务 tab                                              */
+  /* ==================================================== */
+  .fin-summary {
+    background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; align-items: baseline; gap: 8px;
+  }
+  .fin-summary .label { font-size: 12px; color: #8f959e; }
+  .fin-summary .total { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+  .fin-summary .by-method { margin-left: auto; font-size: 10px; color: #8f959e; text-align: right; line-height: 1.55; }
+  .f-card {
+    background: #fff; border-radius: 10px; margin-bottom: 8px; padding: 9px 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .f-l1 { display: flex; align-items: center; gap: 6px; }
+  .f-name { font-size: 13px; font-weight: 600; }
+  .f-type { font-size: 10px; border-radius: 4px; padding: 0 5px; line-height: 16px; background: #f0f5ff; color: #3370ff; }
+  .f-amount { margin-left: auto; font-size: 14px; font-weight: 700; }
+  .f-l2 { margin-top: 4px; font-size: 11px; color: #8f959e; display: flex; flex-wrap: wrap; }
+  .f-l2 span + span::before { content: "·"; margin: 0 5px; color: #d0d3d6; }
+
+  /* ==================================================== */
+  /* 销卡 tab                                              */
+  /* ==================================================== */
+  .ded-wrap { background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .ded-head, .ded-row { display: flex; align-items: center; padding: 9px 12px; font-size: 12px; }
+  .ded-head { color: #8f959e; font-size: 10px; padding-bottom: 2px; }
+  .ded-row { border-bottom: 0.5px solid #f0f1f2; }
+  .ded-wrap .ded-row:last-child { border-bottom: none; }
+  .ded-c1 { width: 25%; font-weight: 500; }
+  .ded-c2 { width: 25%; color: #4e535a; }
+  .ded-c3 { width: 17%; text-align: center; color: #4e535a; }
+  .ded-c4 { width: 17%; text-align: center; color: #4e535a; }
+  .ded-c5 { width: 16%; text-align: right; color: #4e535a; }
+  .ded-head span { font-weight: 400; }
+  .muted { color: #c0c4cc; }
+  .section-note { font-size: 11px; color: #8f959e; margin: 0 2px 8px; }
+
+  /* 改动说明 */
+  .notes {
+    max-width: 640px; margin: 40px auto 0; background: #fff; border-radius: 16px;
+    padding: 24px 28px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 16px; margin-bottom: 12px; }
+  .notes ul { padding-left: 18px; font-size: 13px; color: #4e535a; line-height: 2; }
+  .notes .new { color: #3370ff; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="page-title">每日报表 · v2</div>
+<div class="page-sub">客户 tab = 紧凑版左色条卡（加身份标签 / 今日活动 / 密度提升）；活动、财务、销卡 tab 已补齐，可点击切换</div>
+
+<div class="phones">
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div><div class="cal">📅</div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active" data-tab="customers">客户<span class="cnt">8</span></div>
+        <div class="tab" data-tab="activities">活动<span class="cnt">3</span></div>
+        <div class="tab" data-tab="finance">财务<span class="cnt">5</span></div>
+        <div class="tab" data-tab="deductions">销卡<span class="cnt">4</span></div>
+      </div>
+
+      <!-- ================= 客户 ================= -->
+      <div class="tab-pane show" id="pane-customers">
+        <div class="r-body">
+
+          <div class="c-card m" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">林小满</span><span class="c-id">会员</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount">¥3,600</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>6</b></span><span>到店 <b>4</b></span><span>今日活动 <b>2</b></span><span>剩 <b>12</b> 次</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>想继续做情绪释放，最近睡眠不太好</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">客户信息</span><span class="d-val">第三次到店，对 OH 卡接受度高，愿意带朋友</span></div>
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">本周内推年卡，强调家庭套餐</span></div>
+              <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">成交意向强，下次请李老师亲自带</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">王姐 ／ 小李 · 10:30 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card m" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">郑好</span><span class="c-id">会员</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount">¥12,800</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>20</b></span><span>到店 <b>15</b></span><span>今日活动 <b>2</b></span><span>不限</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>升级年卡，参加疗愈师课程</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">客户信息</span><span class="d-val">深度客户，已介绍 3 位朋友到店</span></div>
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">安排疗愈师课程排期</span></div>
+              <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">重点关注，可作为案例客户</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">王姐 ／ 张三 · 10:00 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card m" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">周雨桐</span><span class="c-id">会员</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount">¥980</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>12</b></span><span>到店 <b>9</b></span><span>今日活动 <b>1</b></span><span>剩 <b>3</b> 次</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>卡次快用完，咨询续卡优惠</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">客户信息</span><span class="d-val">老会员，偏好上午场次</span></div>
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">给续卡方案，月底前跟进</span></div>
+              <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">续卡概率高，价格可谈</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">自然到店 ／ 小王 · 09:30 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card m" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">孙倩</span><span class="c-id">会员</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount none">—</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>8</b></span><span>到店 <b>6</b></span><span>今日活动 <b>1</b></span><span>剩 <b>7</b> 次</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>工作压力疏导，想约一对一</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">排一对一情绪释放</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">朋友推荐 ／ 小李 · 15:00 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card m" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">何丽华</span><span class="c-id">会员</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount none">—</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>5</b></span><span>到店 <b>5</b></span><span>今日活动 <b>2</b></span><span>剩 <b>21</b> 次</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>例行参加，无特殊需求</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">保持日常维护</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">自然到店 ／ 小王 · 14:00 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card n" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">陈默</span><span class="c-id grey">新人</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount none">—</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>1</b></span><span>到店 <b>1</b></span><span>今日活动 <b>1</b></span><span>未办卡</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>朋友推荐来体验，先了解一下</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">客户信息</span><span class="d-val">首次到店，比较安静，观察为主</span></div>
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">三天内回访，约下次体验课</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">林小满 ／ 张三 · 14:00 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card n" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">刘洋</span><span class="c-id grey">新人</span>
+              <span class="c-pill ok">已到店</span>
+              <span class="c-amount none">—</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>2</b></span><span>到店 <b>1</b></span><span>今日活动 <b>2</b></span><span>未办卡</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">需求</span>对冥想课感兴趣，问年卡价格</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">发年卡资料，周五回访</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">朋友圈 ／ 小李 · 09:30 到店</span></div>
+            </div>
+          </div>
+
+          <div class="c-card n" onclick="this.classList.toggle('open')">
+            <div class="c-l1">
+              <span class="c-name">吴一凡</span><span class="c-id grey">新人</span>
+              <span class="c-pill no">未到店</span>
+              <span class="c-amount none">—</span>
+            </div>
+            <div class="c-l2">
+              <span>受邀 <b>3</b></span><span>到店 <b>0</b></span><span>今日活动 <b>0</b></span><span>未办卡</span>
+              <span class="c-more-hint">展开 ∨</span>
+            </div>
+            <div class="c-l3"><span class="k">备注</span>临时有事未到店，改约下周</div>
+            <div class="c-detail">
+              <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">下周一再确认时间</span></div>
+              <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">朋友圈 ／ 小李</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================= 活动 ================= -->
+      <div class="tab-pane" id="pane-activities">
+        <div class="r-body">
+          <div class="section-note">点击卡片展开老人 / 新人名单</div>
+
+          <div class="act-card" onclick="this.classList.toggle('open')">
+            <div class="act-l1">
+              <span class="act-name">晨光冥想·呼吸疗愈</span>
+              <span class="act-tag">疗愈课</span>
+              <span class="act-num">12 人</span>
+            </div>
+            <div class="act-l2"><span>09:30-11:00</span><span>李青、王岚</span><span>老人 8 / 新人 4</span></div>
+            <div class="act-detail">
+              <div class="d-row"><span class="d-label">老人</span><span class="d-val">林小满、周雨桐、郑好、孙倩、何丽华、赵一鸣、徐静、马天宇</span></div>
+              <div class="d-row"><span class="d-label">新人</span><span class="d-val">陈默、刘洋、杨紫曦、高翔</span></div>
+            </div>
+          </div>
+
+          <div class="act-card" onclick="this.classList.toggle('open')">
+            <div class="act-l1">
+              <span class="act-name">OH 卡深度梳理（小组）</span>
+              <span class="act-tag">小组课</span>
+              <span class="act-num">6 人</span>
+            </div>
+            <div class="act-l2"><span>14:00-16:00</span><span>王岚</span><span>老人 3 / 新人 3</span></div>
+            <div class="act-detail">
+              <div class="d-row"><span class="d-label">老人</span><span class="d-val">林小满、郑好、何丽华</span></div>
+              <div class="d-row"><span class="d-label">新人</span><span class="d-val">陈默、刘洋、高翔</span></div>
+            </div>
+          </div>
+
+          <div class="act-card" onclick="this.classList.toggle('open')">
+            <div class="act-l1">
+              <span class="act-name">晚间茶话·公益分享</span>
+              <span class="act-tag grey">公益</span>
+              <span class="act-num">15 人</span>
+            </div>
+            <div class="act-l2"><span>19:00-20:30</span><span>李青</span><span>老人 8 / 新人 7</span><span>不销卡</span></div>
+            <div class="act-detail">
+              <div class="d-row"><span class="d-label">老人</span><span class="d-val">周雨桐、郑好、孙倩、徐静、赵一鸣、何丽华、马天宇、黄敏</span></div>
+              <div class="d-row"><span class="d-label">新人</span><span class="d-val">陈默、刘洋、杨紫曦、高翔、冯远、许诺、唐果</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================= 财务 ================= -->
+      <div class="tab-pane" id="pane-finance">
+        <div class="r-body">
+
+          <div class="fin-summary">
+            <span class="label">今日合计</span>
+            <span class="total">¥18,280</span>
+            <span class="by-method">微信 ¥15,080<br>支付宝 ¥3,200</span>
+          </div>
+
+          <div class="f-card">
+            <div class="f-l1">
+              <span class="f-name">郑好</span><span class="f-type">会员卡</span>
+              <span class="f-amount">¥12,800</span>
+            </div>
+            <div class="f-l2"><span>年卡·不限次</span><span>成交人：张三</span><span>微信</span><span>引流：王姐</span></div>
+          </div>
+
+          <div class="f-card">
+            <div class="f-l1">
+              <span class="f-name">林小满</span><span class="f-type">会员卡</span>
+              <span class="f-amount">¥3,600</span>
+            </div>
+            <div class="f-l2"><span>次卡·20 次</span><span>剩 12 次</span><span>成交人：小李</span><span>支付宝</span></div>
+          </div>
+
+          <div class="f-card">
+            <div class="f-l1">
+              <span class="f-name">周雨桐</span><span class="f-type">OH卡梳理</span>
+              <span class="f-amount">¥980</span>
+            </div>
+            <div class="f-l2"><span>购买 2 次</span><span>成交人：王岚</span><span>微信</span><span>引流：自然到店</span></div>
+          </div>
+
+          <div class="f-card">
+            <div class="f-l1">
+              <span class="f-name">孙倩</span><span class="f-type">情绪释放</span>
+              <span class="f-amount">¥680</span>
+            </div>
+            <div class="f-l2"><span>购买 1 次</span><span>成交人：李青</span><span>微信</span></div>
+          </div>
+
+          <div class="f-card">
+            <div class="f-l1">
+              <span class="f-name">何丽华</span><span class="f-type">其他项目</span>
+              <span class="f-amount">¥220</span>
+            </div>
+            <div class="f-l2"><span>茶礼定制</span><span>成交人：张三</span><span>微信</span></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================= 销卡 ================= -->
+      <div class="tab-pane" id="pane-deductions">
+        <div class="r-body">
+          <div class="section-note">仅显示当日有销卡的客户，公益活动不计入</div>
+          <div class="ded-wrap">
+            <div class="ded-head">
+              <span class="ded-c1">昵称</span><span class="ded-c2">卡类型</span>
+              <span class="ded-c3">人工销</span><span class="ded-c4">活动销</span><span class="ded-c5">剩余</span>
+            </div>
+            <div class="ded-row">
+              <span class="ded-c1">林小满</span><span class="ded-c2">次卡</span>
+              <span class="ded-c3">1 次</span><span class="ded-c4">2 次</span><span class="ded-c5">12 次</span>
+            </div>
+            <div class="ded-row">
+              <span class="ded-c1">周雨桐</span><span class="ded-c2">次卡</span>
+              <span class="ded-c3 muted">—</span><span class="ded-c4">1 次</span><span class="ded-c5">3 次</span>
+            </div>
+            <div class="ded-row">
+              <span class="ded-c1">郑好</span><span class="ded-c2">疗愈师</span>
+              <span class="ded-c3 muted">—</span><span class="ded-c4">2 次</span><span class="ded-c5">不限</span>
+            </div>
+            <div class="ded-row">
+              <span class="ded-c1">孙倩</span><span class="ded-c2 muted">未办卡</span>
+              <span class="ded-c3">1 次</span><span class="ded-c4 muted">—</span><span class="ded-c5 muted">未办卡</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="notes">
+  <h2>本版改动</h2>
+  <ul>
+    <li><span class="new">身份标签</span>：客户卡首行新增「会员 / 新人」文字标签（之前只有左侧色条，没有文字）</li>
+    <li><span class="new">「今日」→「今日活动」</span>：统计行改为 受邀 / 到店 / 今日活动 / 剩余</li>
+    <li><span class="new">密度提升</span>：卡片内边距 12→9px、字号全面降 1 档（姓名 15→14、统计 12→11）、行距收紧——单卡高度从约 130px 降到约 95px，<b>一屏从 5 人提到 7~8 人</b>（当前示例正好放满 8 人）</li>
+    <li><span class="new">活动 / 财务 / 销卡 tab 已补齐</span>，同样按紧凑密度做；tab 可点击切换</li>
+    <li>细节：日期条和 tab 栏也压扁了一点，并做了吸顶，滚动长列表时不会丢上下文</li>
+  </ul>
+</div>
+
+<script>
+  document.querySelectorAll('.tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show'));
+      tab.classList.add('active');
+      document.getElementById('pane-' + tab.dataset.tab).classList.add('show');
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡次统计 tab · 样式优化对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #212631; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+
+  .compare { display: flex; gap: 32px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .col { width: 620px; flex-shrink: 0; }
+  .col-label { text-align: center; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .col-label.before { color: #c4506a; }
+  .col-label.after { color: #2ba471; }
+  .col-label small { display: block; font-size: 12px; color: #8f959e; font-weight: 400; margin-top: 3px; }
+
+  /* 模拟详情页右侧面板 */
+  .panel {
+    background: #fff; border-radius: 14px; box-shadow: 0 2px 4px rgba(33,38,49,.05);
+    padding: 0 20px 10px; overflow: hidden;
+  }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid #eef0f1; }
+  .tab-btn {
+    position: relative; padding: 12px 14px 10px; font-size: 13px; white-space: nowrap;
+    color: #79838f; font-weight: 600;
+  }
+  .tab-btn .cnt { font-size: 10.5px; color: #a8b1bd; margin-left: 3px; font-weight: 500; }
+  .tab-btn.on { color: #212631; font-weight: 700; }
+  .tab-btn.on::after {
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px;
+    height: 3px; border-radius: 3px 3px 0 0; background: #3370ff;
+  }
+  .tab-body { padding-top: 12px; }
+
+  /* ============ 现状（还原当前线上样式） ============ */
+  .old-member {
+    display: flex; align-items: center; gap: 8px; padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0; font-size: 12px; color: #2b2f36;
+  }
+  .old-label { color: #8f959e; letter-spacing: 2px; flex-shrink: 0; width: 60px; text-align: right; font-size: 12px; }
+  .old-member .inline { flex: 1; min-width: 0; padding-left: 6px; line-height: 1.9; }
+  .old-member .sub { margin-left: 12px; font-size: 11px; color: #8f959e; }
+  .old-member .expired { color: #c4506a; }
+  .old-row {
+    display: flex; align-items: center; gap: 8px; padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0; font-size: 12px; color: #2b2f36;
+  }
+  .old-row:last-child { border-bottom: none; }
+  .old-row .inline { flex: 1; min-width: 0; padding-left: 6px; line-height: 1.9; }
+  .old-row .sub { margin-left: 12px; font-size: 11px; color: #8f959e; }
+  .old-badge { font-size: 12px; color: #8f959e; background: #f0f1f2; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+
+  /* ============ 优化后 ============ */
+  .mem-section {
+    border: 1px solid #eef0f1; background: #fafbfc; border-radius: 10px;
+    padding: 12px 14px 6px;
+  }
+  .mem-head { display: flex; align-items: baseline; gap: 10px; }
+  .mem-head .k { font-size: 12px; color: #8f959e; letter-spacing: 2px; flex-shrink: 0; }
+  .mem-head .big { font-size: 17px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .mem-head .total { font-size: 11px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  .chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .chip {
+    border: 1px solid #eef0f1; background: #fff; border-radius: 999px;
+    padding: 2.5px 8px; font-size: 10.5px; color: #79838f; font-variant-numeric: tabular-nums;
+  }
+  .chip b { color: #212631; font-weight: 600; }
+  .mem-list { margin-top: 10px; border-top: 1px solid #eceef0; }
+  .mem-card-row {
+    display: flex; align-items: center; gap: 12px; padding: 7px 0;
+    border-bottom: 1px solid #f0f1f3;
+  }
+  .mem-card-row:last-child { border-bottom: none; }
+  .mem-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; }
+  .mem-name.expired { color: #c4506a; }
+  .mem-count { flex-shrink: 0; font-size: 12px; color: #79838f; font-variant-numeric: tabular-nums; }
+  .mem-count b { font-size: 13px; font-weight: 800; color: #212631; }
+  .mem-date { flex-shrink: 0; width: 152px; text-align: right; font-size: 11px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  .badge { flex-shrink: 0; font-size: 10.5px; padding: 2px 6px; border-radius: 4px; }
+  .badge.red { color: #c4506a; background: #fef0f0; }
+  .badge.grey { color: #8f959e; background: #f0f1f2; }
+
+  .o-row { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .o-row:last-child { border-bottom: none; }
+  .o-main { display: flex; align-items: center; gap: 12px; }
+  .o-type { width: 56px; flex-shrink: 0; font-size: 11px; color: #8f959e; letter-spacing: 2px; }
+  .o-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; }
+  .o-name .mode { margin-left: 6px; font-size: 11px; font-weight: 400; color: #a8b1bd; }
+  .o-count { flex-shrink: 0; font-size: 12px; color: #79838f; font-variant-numeric: tabular-nums; }
+  .o-count b { font-size: 13px; font-weight: 800; color: #212631; }
+  .o-count b.neg { color: #c4506a; }
+  .o-count .of { color: #a8b1bd; }
+  .o-date { flex-shrink: 0; width: 152px; text-align: right; font-size: 11px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  .o-subs { margin: 6px 0 0 68px; }
+  .o-sub {
+    display: flex; align-items: center; gap: 8px; font-size: 11px; color: #a8b1bd;
+    font-variant-numeric: tabular-nums; margin-top: 3px;
+  }
+  .o-sub .dot { width: 3px; height: 3px; border-radius: 50%; background: #d0d3d6; flex-shrink: 0; }
+  .o-sub b { color: #79838f; font-weight: 600; }
+  .o-sub .st-red { color: #c4506a; }
+
+  /* 说明 */
+  .notes {
+    max-width: 900px; margin: 44px auto 0; background: #fff; border-radius: 16px;
+    padding: 26px 32px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 16px; margin-bottom: 12px; }
+  .notes ul { padding-left: 18px; font-size: 13px; color: #4e535a; line-height: 2.05; }
+  .notes b { color: #212631; }
+</style>
+</head>
+<body>
+
+<div class="page-title">客户详情页 ·「卡次统计」tab 样式优化</div>
+<div class="page-sub">同一份数据：左边是现在的样子，右边是优化方案 ｜ 代码未动，确认后再改</div>
+
+<div class="compare">
+
+  <!-- ==================== 现状 ==================== -->
+  <div class="col">
+    <div class="col-label before">现状<small>所有信息 inline 挤在一行，灰色小字连成串，找不到重点</small></div>
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab-btn">跟进点<span class="cnt">6</span></div>
+        <div class="tab-btn">沟通记录<span class="cnt">3</span></div>
+        <div class="tab-btn">活动记录<span class="cnt">12</span></div>
+        <div class="tab-btn">用户回访<span class="cnt">2</span></div>
+        <div class="tab-btn on">卡次统计</div>
+        <div class="tab-btn">交易记录<span class="cnt">5</span></div>
+      </div>
+      <div class="tab-body">
+        <div class="old-member">
+          <span class="old-label">会员卡</span>
+          <span class="inline">
+            剩余12次 <span style="font-size:11px;color:#8f959e">（总30次/20次卡扣卡8次/销卡2次/预支扣卡1次）</span>
+            <span class="sub">20次卡 12次/20次 2026-01-15~2027-01-14</span>
+            <span class="sub"><span class="expired">10次卡 0次/10次 2025-03-01~2026-03-01（已过期）</span></span>
+          </span>
+        </div>
+        <div class="old-row">
+          <span class="old-label">觉醒游戏</span>
+          <span class="inline">
+            剩余3次/共5次
+            <span class="sub">购买3次（1/3） 2026-02-01~2026-08-01</span>
+            <span class="sub">购买2次（2/2） 2025-11-05~2026-05-05 <span class="expired">（已过期）</span></span>
+          </span>
+        </div>
+        <div class="old-row">
+          <span class="old-label">情绪释放</span>
+          <span class="inline">
+            剩余0次/共2次
+            <span class="sub">购买2次（0/2） 2026-04-10~不限</span>
+          </span>
+          <span class="old-badge">无次数</span>
+        </div>
+        <div class="old-row">
+          <span class="old-label">内部课程</span>
+          <span class="inline">疗愈师班&nbsp;&nbsp;<b>∞</b> 不限次&nbsp;&nbsp;2026-01-01/2026-12-31</span>
+        </div>
+        <div class="old-row">
+          <span class="old-label">其他项目</span>
+          <span class="inline">茶礼定制&nbsp;&nbsp;线下&nbsp;&nbsp;剩余2次/共3次&nbsp;&nbsp;2026-05-01~不限</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 优化后 ==================== -->
+  <div class="col">
+    <div class="col-label after">优化方案<small>汇总大字 + 扣减构成 chips + 每卡一行 + 购买明细缩进子行</small></div>
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab-btn">跟进点<span class="cnt">6</span></div>
+        <div class="tab-btn">沟通记录<span class="cnt">3</span></div>
+        <div class="tab-btn">活动记录<span class="cnt">12</span></div>
+        <div class="tab-btn">用户回访<span class="cnt">2</span></div>
+        <div class="tab-btn on">卡次统计</div>
+        <div class="tab-btn">交易记录<span class="cnt">5</span></div>
+      </div>
+      <div class="tab-body">
+
+        <!-- 会员卡区 -->
+        <div class="mem-section">
+          <div class="mem-head">
+            <span class="k">会员卡</span>
+            <span class="big">剩余 12 次</span>
+            <span class="total">共 30 次</span>
+          </div>
+          <div class="chips">
+            <span class="chip">20次卡扣卡 <b>8</b> 次</span>
+            <span class="chip">销卡 <b>2</b> 次</span>
+            <span class="chip">预支扣卡 <b>1</b> 次</span>
+          </div>
+          <div class="mem-list">
+            <div class="mem-card-row">
+              <span class="mem-name">20次卡</span>
+              <span class="mem-count"><b>12</b> / 20 次</span>
+              <span class="mem-date">2026-01-15 ~ 2027-01-14</span>
+            </div>
+            <div class="mem-card-row">
+              <span class="mem-name expired">10次卡</span>
+              <span class="mem-count"><b>0</b> / 10 次</span>
+              <span class="mem-date">2025-03-01 ~ 2026-03-01</span>
+              <span class="badge red">已过期</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 其他项目 -->
+        <div style="margin-top:4px">
+          <div class="o-row">
+            <div class="o-main">
+              <span class="o-type">觉醒游戏</span>
+              <span class="o-name"></span>
+              <span class="o-count">剩余 <b>3</b> <span class="of">/ 共 5 次</span></span>
+              <span class="o-date">2026-02-01 ~ 2026-08-01</span>
+            </div>
+            <div class="o-subs">
+              <div class="o-sub">
+                <span class="dot"></span>
+                <span>购买 3 次 · 剩 <b>1</b></span>
+                <span>2026-02-01 ~ 2026-08-01</span>
+              </div>
+              <div class="o-sub">
+                <span class="dot"></span>
+                <span>购买 2 次 · 剩 <b>2</b></span>
+                <span>2025-11-05 ~ 2026-05-05</span>
+                <span class="st-red">已过期</span>
+              </div>
+            </div>
+          </div>
+          <div class="o-row">
+            <div class="o-main">
+              <span class="o-type">情绪释放</span>
+              <span class="o-name"></span>
+              <span class="o-count">剩余 <b>0</b> <span class="of">/ 共 2 次</span></span>
+              <span class="o-date">2026-04-10 ~ 不限</span>
+              <span class="badge grey">无次数</span>
+            </div>
+            <div class="o-subs">
+              <div class="o-sub">
+                <span class="dot"></span>
+                <span>购买 2 次 · 剩 <b>0</b></span>
+                <span>2026-04-10 ~ 不限</span>
+              </div>
+            </div>
+          </div>
+          <div class="o-row">
+            <div class="o-main">
+              <span class="o-type">内部课程</span>
+              <span class="o-name">疗愈师班</span>
+              <span class="o-count"><b>∞ 不限次</b></span>
+              <span class="o-date">2026-01-01 ~ 2026-12-31</span>
+            </div>
+          </div>
+          <div class="o-row">
+            <div class="o-main">
+              <span class="o-type">其他项目</span>
+              <span class="o-name">茶礼定制<span class="mode">线下</span></span>
+              <span class="o-count">剩余 <b>2</b> <span class="of">/ 共 3 次</span></span>
+              <span class="o-date">2026-05-01 ~ 不限</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 说明 ==================== -->
+<div class="notes">
+  <h2>改了什么、为什么</h2>
+  <ul>
+    <li><b>层级拆开</b>：现状把「汇总 + 扣卡构成 + 每张卡明细」三层信息用斜杠连成一串 11px 灰字；方案里拆成三行——<b>剩余次数 17px 大字</b>（一眼答案）→ 扣减构成拆成独立 chips（每项可扫读）→ 每张卡一行</li>
+    <li><b>列对齐</b>：卡名 / 次数 / 有效期 / 状态徽标四列固定位置，多卡时纵向扫读不用找；日期统一 11px 浅灰 tabular-nums 右对齐</li>
+    <li><b>数字强调</b>：剩余次数一律 13px 加粗深色，"共 X 次"降为浅灰——现状里两者同字重同色，分不出哪个是关键数字；负数保持红色</li>
+    <li><b>购买明细降级</b>：每次购买从 inline 拼接改为缩进子行（小圆点开头），主行只留汇总；过期/未生效状态从括号文字改为徽标/红字</li>
+    <li><b>状态徽标统一</b>：已过期（红底）、未生效/无次数（灰底），位置固定在行尾，不再夹在文字中间</li>
+    <li>数据字段和分页逻辑完全不变，只是展示结构重排</li>
+  </ul>
+</div>
+
+</body>
+</html>

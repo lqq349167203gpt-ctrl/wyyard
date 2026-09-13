@@ -32,8 +32,8 @@ def _save(deduction_id: str = ""):
 _load()
 
 
-def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] = None, project_type: Optional[str] = None) -> List[ProjectDeduction]:
-    results = [d for d in _deductions.values() if not d.is_deleted]
+def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] = None, project_type: Optional[str] = None, include_cancelled: bool = False) -> List[ProjectDeduction]:
+    results = [d for d in _deductions.values() if not d.is_deleted and (include_cancelled or not d.cancelled)]
     if customer_id:
         results = [d for d in results if d.customer_id == customer_id]
     if nickname:
@@ -96,7 +96,7 @@ def _fill_current_remaining(deductions: List[ProjectDeduction]):
 
 def get_deduction_total(customer_id: str, project_type: str) -> int:
     return sum(d.count for d in _deductions.values()
-               if d.customer_id == customer_id and d.project_type == project_type and not d.is_deleted)
+               if d.customer_id == customer_id and d.project_type == project_type and not d.is_deleted and not d.cancelled)
 
 
 # 注意：project_deduction_service 内部 _deductions 与 membership_card_service._deductions 重名但语义不同：
@@ -104,7 +104,7 @@ def get_deduction_total(customer_id: str, project_type: str) -> int:
 def get_deduction_total_for_project(project_id: str) -> int:
     """统计某 project_id（例如某张会员卡 id）的销卡次数总和。"""
     return sum(d.count for d in _deductions.values()
-               if d.project_id == project_id and not d.is_deleted and not d.source_activity_id)
+               if d.project_id == project_id and not d.is_deleted and not d.cancelled and not d.source_activity_id)
 
 
 def get_available_items(customer_id: str, project_type: str) -> list:
@@ -578,14 +578,14 @@ def _activity_rows(customer_id: str) -> list[dict]:
     return rows
 
 
-def get_coarse_door_options(customer_id: str) -> dict:
+def get_coarse_door_options(customer_id: str, editing_id: str = "") -> dict:
     """返回已参与、扣卡次数大于0、且尚未用粗门次卡抵扣的课程。"""
     from app.services import organization_service
 
     used = {
         (item.source_activity_type, item.source_activity_id)
         for item in _deductions.values()
-        if not item.is_deleted
+        if not item.is_deleted and not item.cancelled and item.id != editing_id
         and item.customer_id == customer_id
         and item.project_type == "membership-cards"
         and item.project_name == COARSE_DOOR_CARD_TYPE
@@ -638,6 +638,7 @@ def create_coarse_door_course_deduction(
     closers: list[dict],
     notes: str,
     created_by: str,
+    replacement: Optional[ProjectDeduction] = None,
 ) -> ProjectDeduction:
     with _deduct_lock:
         option = next(
@@ -721,6 +722,10 @@ def create_coarse_door_course_deduction(
             created_at=now,
         )
         try:
+            if replacement:
+                deduction.id = replacement.id
+                deduction.created_at = replacement.created_at
+                deduction.created_by = replacement.created_by
             _deductions[deduction.id] = deduction
             _save(deduction.id)
             return deduction
@@ -729,6 +734,31 @@ def create_coarse_door_course_deduction(
             membership_card_service.release_coarse_card_assignment(customer_id, activity_keys)
             raise
 
+
+
+def edit_coarse_door_course_deduction(deduction_id: str, data: dict, actor: str):
+    """由课程一致性事务入口调用，换课失败时名单、会员使用与抵扣流水一起回滚。"""
+    from datetime import date
+
+    from app.services import membership_card_service
+
+    with _deduct_lock:
+        original = _deductions.get(deduction_id)
+        if not original or original.is_deleted or original.cancelled or original.project_name != COARSE_DOOR_CARD_TYPE:
+            raise ValueError("该粗门抵扣记录不存在或已取消，不能编辑")
+        if data["customer_id"] != original.customer_id:
+            raise ValueError("编辑抵扣不能更换客户")
+        date.fromisoformat(data["deal_date"])
+        options = get_coarse_door_options(original.customer_id, deduction_id)["courses"]
+        if not any(row["record_type"] == data["record_type"] and row["record_id"] == data["record_id"]
+                   and data["course_organization_id"] in row["organization_ids"] for row in options):
+            raise ValueError("所选课程不可抵扣，可能未到场、已退课、扣卡为0或已被其他记录抵扣")
+        membership_card_service.release_coarse_card_assignment(original.customer_id, original.source_activity_key.split(","))
+        original.is_deleted = True
+        return create_coarse_door_course_deduction(
+            original.customer_id, data["record_type"], data["record_id"], data["course_organization_id"],
+            original.organization_id, data["deal_date"], data["closers"], data["notes"], actor, replacement=original,
+        )
 
 
 def update_deduction(
@@ -740,7 +770,7 @@ def update_deduction(
     """修改销卡次数（不重新扣费，不覆盖创建人）"""
     with _deduct_lock:
         deduction = _deductions.get(deduction_id)
-        if not deduction or deduction.is_deleted:
+        if not deduction or deduction.is_deleted or deduction.cancelled:
             raise ValueError("记录不存在")
         if count < 1:
             raise ValueError("次数必须大于 0")
@@ -773,7 +803,7 @@ def delete_deduction(deduction_id: str) -> None:
     """软删除销卡记录"""
     with _deduct_lock:
         deduction = _deductions.get(deduction_id)
-        if not deduction or deduction.is_deleted:
+        if not deduction or deduction.is_deleted or deduction.cancelled:
             raise ValueError("记录不存在")
 
         if deduction.source_activity_key and deduction.project_name == COARSE_DOOR_CARD_TYPE:

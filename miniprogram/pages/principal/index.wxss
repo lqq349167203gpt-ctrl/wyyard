@@ -1,24 +1,189 @@
-.page { min-height: 100vh; background: #f7f8fa; padding: 24rpx; box-sizing: border-box; color: #1f2329; font-size: 26rpx; }
-.panel { background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 20rpx; }
+.page { min-height: 100vh; background: #f7f8fa; padding: 0 24rpx 24rpx; box-sizing: border-box; color: #1f2329; font-size: 26rpx; }
+.filter-card { margin-top: 24rpx; }
+.panel { background: #fff; border-radius: 12rpx; padding: 26rpx 28rpx; margin-bottom: 12rpx; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; margin-bottom: 16rpx; }
 .toolbar picker { flex: 1; min-width: 0; }
-.control { min-height: 60rpx; line-height: 60rpx; padding: 0 16rpx; border: 1rpx solid #dee0e3; border-radius: 8rpx; font-size: 24rpx; box-sizing: border-box; background: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control { display: flex; align-items: center; gap: 10rpx; min-height: 60rpx; padding: 0 16rpx; border: 1rpx solid #dee0e3; border-radius: 8rpx; font-size: 24rpx; box-sizing: border-box; background: #fff; }
+.control-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 下拉箭头：和自定义筛选同一套 SVG 图标（大小与位置各机型一致） */
+.chevron {
+  flex-shrink: 0;
+  width: 18rpx;
+  height: 18rpx;
+  margin-left: 8rpx;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nbm9uZScgc3Ryb2tlPScjOGY5NTllJyBzdHJva2Utd2lkdGg9JzIuNicgc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJz48cGF0aCBkPSdNNiA5bDYgNiA2LTYnLz48L3N2Zz4=");
+}
+.small-flex { display: inline-flex; align-items: center; gap: 8rpx; }
 .small { margin: 0; padding: 0 20rpx; min-width: 0; height: 60rpx; line-height: 58rpx; font-size: 24rpx; font-weight: 400; border: 1rpx solid #dee0e3; border-radius: 8rpx; background: #fff; color: #4e535a; }
 .small::after { border: none; }
 .primary { color: #fff; background: #3370ff; border-color: #3370ff; }
 .muted { font-size: 24rpx; color: #8f959e; line-height: 1.6; }
 .filters .muted { margin-top: 16rpx; }
 .link { color: #3370ff; font-size: 24rpx; }
-.tabs { display: flex; border-bottom: 1rpx solid #e8e8e8; margin-bottom: 24rpx; }
-.tab { flex: 1; padding: 16rpx 0; text-align: center; font-size: 26rpx; }
-.active { color: #3370ff; border-bottom: 4rpx solid #3370ff; }
+.rule-help { margin-top: 16rpx; padding-left: 20rpx; border-left: 4rpx solid #dee0e3; font-size: 24rpx; line-height: 1.8; color: #4e535a; }
+.rule-help > view + view { margin-top: 8rpx; }
+.rule-help-label { font-weight: 500; color: #1f2329; }
+.tab.active { color: #3370ff; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
 .stat { background: #fff; padding: 24rpx; border-radius: 12rpx; }
 .number { font-size: 36rpx; font-weight: 500; margin-top: 8rpx; }
 .count { padding: 20rpx 0; }
+
+/* 经营概况三张卡 */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12rpx; background: #ffffff; border-radius: 12rpx; padding: 24rpx 28rpx; margin-bottom: 12rpx; }
+.card { min-width: 0; background: #fff; border: 1rpx solid #e8eaed; border-radius: 6rpx; padding: 18rpx 16rpx; box-sizing: border-box; }
+/* 选中态做浅：只比普通描边略深一点的淡蓝，不再用主色实描边 */
+.card.active { border-color: #d5e0f5; background: #fbfcff; }
+.card-title { display: block; font-size: 22rpx; color: #646a73; }
+.card-value { display: flex; align-items: baseline; gap: 6rpx; margin-top: 10rpx; }
+.card-number { font-size: 34rpx; font-weight: 500; line-height: 1; color: #1f2329; }
+.card-unit { font-size: 20rpx; color: #8f959e; }
+.card-sub { display: block; margin-top: 8rpx; font-size: 20rpx; line-height: 1.4; color: #9aa1a9; }
+.card-title-line { display: flex; align-items: center; gap: 8rpx; }
+.card-help { width: 26rpx; height: 26rpx; border: 1rpx solid #c9cdd4; border-radius: 50%; color: #8f959e; font-size: 18rpx; line-height: 24rpx; text-align: center; }
+.card-help-text { display: block; margin-top: 8rpx; padding: 10rpx 12rpx; border-radius: 8rpx; background: #f7f8fa; font-size: 20rpx; line-height: 1.5; color: #646a73; }
+.value.expanded { white-space: normal; word-break: break-all; }
+
+/* 筛选区：一行一个条件，标签固定宽度，右边控件对齐 */
+.filter-card { padding: 14rpx 28rpx 18rpx; margin: 0 0 12rpx; border: none; }
+.filter-row { display: flex; align-items: center; gap: 12rpx; padding: 12rpx 0; }
+/* 标签固定宽度且不换行：会员身份 / 跟进阶段 / 流量来源 这类四字标签也要一行放得下 */
+.filter-label { width: 116rpx; flex-shrink: 0; font-size: 24rpx; color: #8f959e; white-space: nowrap; }
+.filter-control { flex: 1; min-width: 0; }
+.date-control { min-width: 180rpx; }
+.preset-row { display: flex; flex-wrap: wrap; gap: 10rpx; flex: 1; }
+/* 日期快捷项：未选中的不带底色/边框，只保留选中态的蓝底白字 */
+.preset { padding: 6rpx 14rpx; border-radius: 8rpx; background: transparent; font-size: 22rpx; color: #646a73; }
+.preset.active { background: #3370ff; color: #ffffff; font-weight: 500; }
+.filter-foot { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding-top: 12rpx; border-top: 1rpx solid #f2f3f5; }
+
+/* 顶部 tab：白条，两个页签居中均分，选中是蓝字 + 居中短下划线 */
+.seg-tabs { display: flex; background: #ffffff; border-radius: 12rpx; padding: 0 28rpx; margin: 24rpx 0 12rpx; }
+.seg-tab { flex: 1; position: relative; padding: 24rpx 0 22rpx; text-align: center; font-size: 28rpx; color: #646a73; }
+.seg-tab.active { color: #3370ff; font-weight: 500; }
+.seg-tab.active::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%); width: 52rpx; bottom: 0; height: 6rpx; border-radius: 6rpx 6rpx 0 0; background: #3370ff; }
+
+/* 二级拆分面板 */
+.panel-head { display: flex; align-items: baseline; gap: 12rpx; margin-bottom: 16rpx; }
+.panel-title { font-size: 28rpx; font-weight: 500; }
+/* 面板里的筛选下拉：一行两个，省一半高度 */
+/* 标题在左、控件在右（不上下排），一行两个 */
+.panel-grid { display: flex; flex-wrap: wrap; gap: 18rpx 24rpx; margin-top: 14rpx; padding-bottom: 22rpx; }
+.panel-cell { display: flex; align-items: center; gap: 10rpx; width: calc(50% - 12rpx); min-width: 0; }
+/* 标题固定宽度，右边控件一样宽 → 两列上下对齐，不会参差 */
+.panel-cell-label { flex-shrink: 0; width: 112rpx; font-size: 24rpx; color: #8f959e; white-space: nowrap; }
+.panel-cell .control { flex: 1; min-width: 0; max-width: 172rpx; }
+.panel-cell .control { min-height: 56rpx; }
+.chip-group { margin-bottom: 16rpx; }
+
+/* 课程数面板里的「课程记录 / 参与者」切换（之前漏了样式，显示成了两段文字） */
+/* 切换放在列表上面，单独一条白卡 */
+.course-view-bar { background: #ffffff; border-radius: 12rpx; padding: 14rpx 28rpx; margin-bottom: 12rpx; }
+.course-view-tabs { display: flex; gap: 4rpx; padding: 4rpx; border-radius: 10rpx; background: #f2f3f5; }
+.course-view-tab { flex: 1; height: 56rpx; line-height: 56rpx; text-align: center; font-size: 24rpx; color: #4e535a; border-radius: 8rpx; }
+/* 选中态只把字体改成黑色，其余（白底、阴影、字重）保持不变 */
+.course-view-tab.active { background: #ffffff; color: #1f2329; font-weight: 500; box-shadow: 0 1rpx 3rpx rgba(31, 35, 41, .10); }
+/* 统计数值框里的内/外解释：整行铺满、跟在指标下面，和指标同一块底 */
+.metric-hint { grid-column: 1 / -1; padding-top: 12rpx; margin-top: 4rpx; border-top: 1rpx solid #f2f3f5; }
+.metric-hint-line { display: block; font-size: 20rpx; line-height: 1.5; color: #9aa1a9; }
+.chip-group-title { font-size: 24rpx; color: #8f959e; }
+.chip-list { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 10rpx; }
+.chip { padding: 8rpx 16rpx; border: 1rpx solid #e5e7ea; border-radius: 999rpx; background: #fafbfc; font-size: 24rpx; color: #4e535a; }
+.chip.active { border-color: #b9cdf8; background: #f0f5ff; color: #3370ff; }
+/* 指标两列排开，避免换来换去的参差感 */
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 14rpx 24rpx; padding-top: 16rpx; border-top: 1rpx solid #f2f3f5; }
+.metric { display: flex; flex-direction: column; align-items: flex-start; gap: 6rpx; }
+.metric-main { display: inline-flex; align-items: baseline; gap: 8rpx; }
+.metric-value { font-size: 28rpx; font-weight: 500; }
+/* 子项（内部 / 外部）单独一行，跟在主数值下面，小一号、浅灰 */
+.metric-sub { font-size: 20rpx; line-height: 1.4; color: #9aa1a9; }
+.metric.tappable { padding: 4rpx 10rpx; margin: -4rpx -10rpx; border-radius: 8rpx; }
+.metric.tappable.active { background: #eef3ff; }
+.metric.tappable.active .metric-value { color: #3370ff; }
+
+/* 列表标题行 + 列表设置 / 排序入口 */
+.list-head { display: flex; align-items: center; justify-content: space-between; padding: 26rpx 0 18rpx; }
+.list-count { color: #4e535a; font-size: 24rpx; font-weight: 500; }
+.list-actions { display: flex; gap: 12rpx; }
+/* 列表栏按钮：与课程记录页的 outline-button 同一套（56rpx 高、8rpx 圆角、22rpx 字） */
+.tool-btn {
+  display: inline-flex;
+  min-width: 92rpx;
+  height: 56rpx;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #dee0e3;
+  border-radius: 8rpx;
+  background: #ffffff;
+  color: #4e535a;
+  font-size: 22rpx;
+  line-height: 54rpx;
+}
+.tool-btn-flex { gap: 4rpx; }
+.cards + .list-head { padding-top: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 12rpx; padding: 8rpx 0; }
+.column-row { display: flex; align-items: center; gap: 16rpx; padding: 16rpx 0; border-bottom: 1rpx solid #f2f3f5; }
+.column-label { flex: 1; font-size: 26rpx; color: #2b2f36; }
+.column-move { width: 56rpx; text-align: center; font-size: 26rpx; color: #8f959e; }
+
+/* 底部弹层（列表设置）：与自定义筛选的 sheet 样式一致 */
+.sheet-mask { position: fixed; inset: 0; z-index: 200; background: rgba(31,35,41,.34); }
+.column-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 201; border-radius: 16rpx 16rpx 0 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 26rpx 30rpx; border-bottom: 1rpx solid #f0f0f0; }
+.sheet-title { font-size: 28rpx; font-weight: 500; line-height: 1.25; }
+.sheet-done { font-size: 25rpx; line-height: 1.25; color: #3370ff; }
+.sheet-list { max-height: 62vh; }
+.sheet-item { display: flex; align-items: center; min-height: 88rpx; margin: 0 30rpx; border-bottom: 1rpx solid #f0f0f0; }
+.sheet-item-name { flex: 1; min-width: 0; font-size: 25rpx; line-height: 1.3; color: #2b2f36; }
+.sheet-item-name.selected { color: #3370ff; font-weight: 500; }
+.sheet-item-note { margin-left: 16rpx; font-size: 21rpx; color: #8f959e; }
+.sheet-check { display: flex; align-items: center; justify-content: center; width: 24rpx; height: 24rpx; flex: 0 0 24rpx; margin-left: 16rpx; box-sizing: border-box; border: 1rpx solid #c9cdd4; border-radius: 4rpx; font-size: 17rpx; line-height: 1; color: #fff; }
+.sheet-check.selected { border-color: #3370ff; background: #3370ff; }
+.sheet-foot { display: flex; align-items: center; justify-content: space-between; padding: 20rpx 30rpx 26rpx; border-top: 1rpx solid #f0f0f0; }
+.deal-row { padding: 16rpx 0; border-bottom: 1rpx solid #f2f3f5; }
+.deal-main { display: block; font-size: 26rpx; color: #2b2f36; }
 .field { display: flex; align-items: flex-start; justify-content: space-between; gap: 24rpx; padding: 10rpx 0; }
-.field .muted { flex-shrink: 0; }
-.value { text-align: right; word-break: break-all; white-space: pre-wrap; line-height: 1.6; }
+.field + .field { border-top: 1rpx solid #f0f1f2; padding-top: 16rpx; }
+.field .muted { flex-shrink: 0; max-width: 40%; font-size: 22rpx; }
+.value { flex: 1; min-width: 0; text-align: right; word-break: break-all; white-space: pre-wrap; line-height: 1.55; }
+.record { padding: 20rpx 24rpx; }
+.record + .record { margin-top: 12rpx; }
+
+/* 列表行：白卡里两行式，行间 1rpx 横线（与课表一致） */
+.record-card { background: #ffffff; border-radius: 12rpx; padding: 0 28rpx; margin-bottom: 12rpx; }
+.record-row { padding: 24rpx 0; }
+.record-row + .record-row { border-top: 1rpx solid #f0f1f2; }
+.list-head + .record-row { padding-top: 4rpx; }
+.record-main { min-width: 0; }
+.record-top { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
+.record-title { flex: 1; min-width: 0; font-size: 29rpx; font-weight: 500; color: #2b2f36; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 会员身份跟在昵称右边 */
+.record-identity { flex-shrink: 0; margin-left: 12rpx; padding: 2rpx 10rpx; border-radius: 6rpx; background: #eef3ff; color: #3370ff; font-size: 20rpx; line-height: 1.6; }
+/* 每行末尾的「资料 ›」：进客户资料页 */
+.record-link { flex-shrink: 0; margin-left: auto; padding: 2rpx 4rpx 2rpx 16rpx; color: #3370ff; font-size: 22rpx; line-height: 1.6; }
+.record-right { display: block; margin-top: 10rpx; font-size: 21rpx; color: #a8b1bd; }
+/* 分类值：浅灰小标签，一眼看出是"分类"，不和数字混在一起 */
+.record-tags { display: flex; flex-wrap: wrap; gap: 8rpx; margin-top: 12rpx; }
+.record-tag { display: inline-flex; align-items: baseline; max-width: 340rpx; padding: 4rpx 10rpx; border-radius: 6rpx; background: #f7f8fa; font-size: 21rpx; line-height: 1.5; overflow: hidden; }
+/* 标题用更浅的灰，值用深色，两者一眼能分开 */
+.record-tag-label { flex-shrink: 0; margin-right: 8rpx; color: #9aa1a9; }
+.record-tag-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2b2f36; }
+/* 数字单独一行，浅灰字，用 · 分隔 */
+.record-numbers { display: flex; flex-wrap: wrap; align-items: center; gap: 4rpx 14rpx; margin-top: 10rpx; }
+.record-number { font-size: 21rpx; line-height: 1.5; color: #2b2f36; }
+.record-number-label { margin-right: 6rpx; color: #9aa1a9; }
+.record-numbers .record-number + .record-number::before { content: "·"; margin-right: 14rpx; color: #d0d3d6; }
+/* 客户档案类字段：不加底色，一行一条，位于数字和日期之间 */
+.record-profiles { margin-top: 12rpx; }
+.record-profile { display: flex; align-items: baseline; gap: 8rpx; padding: 3rpx 0; }
+.record-profile-label { flex-shrink: 0; color: #9aa1a9; font-size: 21rpx; line-height: 1.5; }
+.record-profile-value { min-width: 0; color: #4e535a; font-size: 21rpx; line-height: 1.5; word-break: break-all; }
+.record-more { display: block; margin-top: 10rpx; font-size: 21rpx; color: #3370ff; }
 .detail-link { text-align: right; border-top: 1rpx solid #f0f0f0; margin-top: 12rpx; padding-top: 16rpx; }
 .empty { padding: 64rpx 24rpx; text-align: center; }
 .notice { padding: 20rpx 0 48rpx; }
@@ -33,4 +198,94 @@
 .days { width: 180rpx; }
 .footer { display: flex; justify-content: flex-end; gap: 16rpx; margin-top: 24rpx; }
 .evidence { padding: 20rpx 0; border-bottom: 1rpx solid #f0f0f0; word-break: break-all; line-height: 1.6; }
-.order-filter { margin-bottom: 20rpx; }
+.evidence-row { display: flex; align-items: center; gap: 12rpx; border-bottom: 1rpx solid #f0f0f0; }
+.evidence-row .evidence { flex: 1; min-width: 0; border-bottom: none; }
+
+/* ---- 转化分析：规则就地编辑（和自定义筛选同一套视觉） ---- */
+.section-card { background: #ffffff; border-radius: 12rpx; padding: 24rpx 28rpx; margin-bottom: 12rpx; }
+/* 标题一行放操作，规则下拉整行铺开，说明压在下拉下面 → 一块白卡看完整个规则 */
+.conv-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.conv-title { font-size: 28rpx; font-weight: 500; color: #1f2329; }
+.conv-head-actions { display: flex; align-items: center; gap: 12rpx; }
+.conv-btn { flex-shrink: 0; display: inline-flex; align-items: center; height: 56rpx; padding: 0 20rpx; border: 1rpx solid #dee0e3; border-radius: 8rpx; font-size: 23rpx; color: #4e535a; white-space: nowrap; }
+.conv-btn.danger { color: #c4506a; border-color: #f1d9dc; }
+.conv-picker { display: block; margin-top: 16rpx; }
+.conv-tips { padding-bottom: 18rpx; border-bottom: 1rpx solid #f2f3f5; }
+.conv-desc { display: block; margin-top: 12rpx; font-size: 22rpx; line-height: 1.6; color: #8f959e; }
+.conv-note { display: block; margin-top: 10rpx; font-size: 21rpx; line-height: 1.5; color: #9aa1a9; }
+
+.rule-line { display: flex; align-items: flex-start; gap: 16rpx; padding: 22rpx 0; border-bottom: 1rpx solid #f2f3f5; }
+.rule-line-head { flex-shrink: 0; display: flex; align-items: center; gap: 8rpx; width: 56rpx; padding-top: 16rpx; }
+.rule-line-label { font-size: 26rpx; font-weight: 500; color: #3370ff; }
+.rule-line-remove { font-size: 22rpx; color: #b0b5bb; }
+.rule-line-body { flex: 1; min-width: 0; }
+.rule-controls { display: flex; flex-wrap: wrap; gap: 10rpx; }
+.rule-pick { flex: 1 1 46%; min-width: 0; }
+.rule-pick .control { min-height: 56rpx; padding: 0 14rpx; font-size: 23rpx; }
+
+/* 一条附加条件：字段 + 规则一行，值单独一行（和自定义筛选的条件行一致） */
+.cond-card { margin-top: 12rpx; padding: 14rpx; border: 1rpx solid #eceef0; border-radius: 8rpx; background: #fbfcfd; }
+.cond-head { display: flex; align-items: center; gap: 12rpx; }
+.cond-choice { display: flex; align-items: center; flex: 0 0 auto; max-width: 58%; }
+.cond-choice.secondary { max-width: 40%; }
+.cond-choice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 23rpx; font-weight: 500; color: #2b2f36; }
+.cond-choice.secondary .cond-choice-text { font-weight: 400; color: #4e535a; }
+.cond-remove { flex-shrink: 0; margin-left: auto; padding: 0 4rpx; font-size: 22rpx; color: #b0b5bb; }
+.chevron.light { width: 16rpx; height: 16rpx; margin-left: 6rpx; }
+.cond-value { display: flex; align-items: center; gap: 10rpx; margin-top: 12rpx; }
+.cond-full { flex: 1; min-width: 0; }
+.cond-half { flex: 1; min-width: 0; }
+.cond-input { display: flex; align-items: center; height: 56rpx; padding: 0 14rpx; box-sizing: border-box; border: 1rpx solid transparent; border-radius: 6rpx; background: #f5f6f7; font-size: 23rpx; color: #2b2f36; }
+.cond-input.placeholder { color: #9aa1a9; }
+.cond-input-picker { justify-content: space-between; }
+.cond-value-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cond-sep { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
+.cond-add { display: block; margin-top: 14rpx; font-size: 24rpx; color: #3370ff; }
+.cond-add.target { margin: 18rpx 0 0 72rpx; }
+
+.conv-meta { margin-top: 20rpx; padding: 18rpx 20rpx; border-radius: 8rpx; background: #f7f8fa; }
+.conv-mode { display: block; margin-bottom: 14rpx; }
+.conv-mode .control { min-height: 56rpx; font-size: 23rpx; }
+.conv-days { display: flex; align-items: center; gap: 12rpx; }
+.conv-days-label { font-size: 23rpx; color: #4e535a; }
+.conv-days .control { width: 160rpx; min-height: 56rpx; font-size: 23rpx; }
+.conv-days-unit { font-size: 23rpx; color: #4e535a; }
+.conv-check { display: flex; align-items: center; gap: 10rpx; margin-top: 14rpx; }
+.conv-check-box { display: flex; align-items: center; justify-content: center; width: 30rpx; height: 30rpx; box-sizing: border-box; border: 1rpx solid #c9cdd4; border-radius: 6rpx; background: #fff; font-size: 20rpx; color: #fff; }
+.conv-check-box.checked { border-color: #3370ff; background: #3370ff; }
+.conv-check-text { font-size: 23rpx; color: #4e535a; }
+.conv-meta-note { display: block; margin-top: 10rpx; font-size: 20rpx; line-height: 1.5; color: #9aa1a9; }
+
+.conv-status { margin-top: 20rpx; }
+.conv-status-label { font-size: 24rpx; color: #4e535a; }
+.conv-status-tabs { display: flex; gap: 4rpx; margin-top: 12rpx; padding: 4rpx; border-radius: 10rpx; background: #f2f3f5; }
+.conv-status-tab { flex: 1; height: 56rpx; line-height: 56rpx; text-align: center; font-size: 23rpx; color: #4e535a; border-radius: 8rpx; }
+.conv-status-tab.active { background: #ffffff; color: #1f2329; font-weight: 500; box-shadow: 0 1rpx 3rpx rgba(31, 35, 41, .10); }
+.conv-status-note { display: block; margin-top: 12rpx; font-size: 21rpx; line-height: 1.5; color: #8f959e; }
+
+/* 底部：当前规则摘要 + 重置 / 查询（和自定义筛选底部那一栏一致） */
+.conv-foot { margin: 24rpx -28rpx -24rpx; padding: 20rpx 28rpx; border-top: 1rpx solid #f0f0f0; background: #fafbfc; border-radius: 0 0 12rpx 12rpx; }
+.conv-sentence { display: block; font-size: 21rpx; line-height: 1.6; color: #79838f; }
+.conv-foot-actions { display: flex; justify-content: flex-end; gap: 24rpx; margin-top: 16rpx; }
+.conv-reset { font-size: 24rpx; color: #8f959e; }
+.conv-query { padding: 0 40rpx; height: 64rpx; line-height: 64rpx; border-radius: 8rpx; background: #3370ff; color: #fff; font-size: 25rpx; }
+.conv-query.disabled { opacity: .5; }
+
+/* 保存规则弹窗（和自定义筛选的保存模板同一套） */
+.save-rule-mask { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; padding: 0 40rpx; background: rgba(31, 35, 41, .34); }
+.save-rule-dialog { width: 100%; max-width: 660rpx; border-radius: 16rpx; background: #fff; overflow: hidden; }
+.save-rule-head { padding: 26rpx 28rpx 20rpx; border-bottom: 1rpx solid #f0f0f0; }
+.save-rule-title { font-size: 28rpx; font-weight: 500; color: #1f2329; }
+.save-rule-body { padding: 26rpx 28rpx; }
+.save-rule-row { display: flex; align-items: center; gap: 16rpx; margin-bottom: 20rpx; }
+.save-rule-label { flex-shrink: 0; width: 112rpx; font-size: 24rpx; color: #4e535a; }
+.save-rule-input { flex: 1; min-width: 0; height: 64rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; font-size: 24rpx; color: #2b2f36; }
+.save-rule-placeholder { color: #b0b5bb; }
+.save-rule-scope { flex: 1; min-width: 0; display: flex; padding: 4rpx; border-radius: 8rpx; border: 1rpx solid #e1e4e7; background: #f7f8fa; }
+.save-rule-scope-item { flex: 1; height: 56rpx; line-height: 56rpx; text-align: center; border-radius: 6rpx; font-size: 23rpx; color: #646a73; }
+.save-rule-scope-item.active { background: #fff; color: #3370ff; font-weight: 500; }
+.save-rule-note { display: block; font-size: 21rpx; line-height: 1.6; color: #8f959e; }
+.save-rule-actions { display: flex; justify-content: flex-end; gap: 20rpx; padding: 20rpx 28rpx 26rpx; border-top: 1rpx solid #f0f0f0; }
+.save-rule-button { padding: 0 36rpx; height: 64rpx; line-height: 64rpx; border-radius: 8rpx; font-size: 25rpx; border: 1rpx solid #dee0e3; color: #4e535a; background: #fff; }
+.save-rule-button.confirm { border-color: #3370ff; background: #3370ff; color: #fff; }
+.save-rule-button.disabled { opacity: .6; }

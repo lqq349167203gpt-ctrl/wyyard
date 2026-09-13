@@ -1,4 +1,4 @@
-const { visitApi, visitNoteApi, spaceApi, customerApi } = require('../../utils/api')
+const { visitApi, visitNoteApi, spaceApi, customerApi, isOperationCancelled } = require('../../utils/api')
 const { formatDate, formatTime } = require('../../utils/util')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 
@@ -13,6 +13,10 @@ Page({
     previousNeedOpen: false,
     previousNeedLoading: false,
     previousNeedError: '',
+    visitPurpose: null,
+    visitPurposeOpen: false,
+    visitPurposeLoading: false,
+    visitPurposeError: '',
     feedback: '',
     healingNotes: '',
     referrerHandler: '',
@@ -58,7 +62,13 @@ Page({
       this.loadCustomers().then(() => {
         const newOne = this.data.allCustomers.find(c => !oldIds.has(c.id))
         if (newOne) {
-          this.setData({ customerId: newOne.id, customerName: newOne.nickname })
+          this.setData({
+            customerId: newOne.id,
+            customerName: newOne.nickname,
+            visitPurpose: null,
+            visitPurposeOpen: false,
+            visitPurposeError: '',
+          })
         }
         this.setData({ _expectNewCustomer: false })
       })
@@ -168,7 +178,16 @@ Page({
     const { id, nickname } = e.currentTarget.dataset
     const field = this.data.pickerField
     if (field === 'customer') {
-      this.setData({ customerId: id, customerName: nickname, previousNeed: null, previousNeedOpen: false, previousNeedError: '' })
+      this.setData({
+        customerId: id,
+        customerName: nickname,
+        previousNeed: null,
+        previousNeedOpen: false,
+        previousNeedError: '',
+        visitPurpose: null,
+        visitPurposeOpen: false,
+        visitPurposeError: '',
+      })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: nickname, referrerHandlerId: id })
     } else if (field === 'receptionist') {
@@ -180,7 +199,16 @@ Page({
   onPickerClear(e) {
     const field = e.currentTarget.dataset.field
     if (field === 'customer') {
-      this.setData({ customerId: '', customerName: '', previousNeed: null, previousNeedOpen: false, previousNeedError: '' })
+      this.setData({
+        customerId: '',
+        customerName: '',
+        previousNeed: null,
+        previousNeedOpen: false,
+        previousNeedError: '',
+        visitPurpose: null,
+        visitPurposeOpen: false,
+        visitPurposeError: '',
+      })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: '', referrerHandlerId: '' })
     } else if (field === 'receptionist') {
@@ -220,6 +248,41 @@ Page({
       return
     }
     this.setData({ needs: current ? `${current}\n${previousContent}` : previousContent })
+  },
+
+  async onToggleVisitPurpose() {
+    if (this.data.visitPurposeOpen) {
+      this.setData({ visitPurposeOpen: false })
+      return
+    }
+    this.setData({ visitPurposeOpen: true })
+    if (this.data.visitPurpose !== null || !this.data.customerId || this.data.visitPurposeLoading) return
+    await this.loadVisitPurpose()
+  },
+
+  async loadVisitPurpose() {
+    if (!this.data.customerId || this.data.visitPurposeLoading) return
+    this.setData({ visitPurposeLoading: true, visitPurposeError: '' })
+    try {
+      const detail = await customerApi.detail(this.data.customerId)
+      const visitPurpose = String(detail && detail.customer && detail.customer.tags || '').trim()
+      this.setData({ visitPurpose, visitPurposeError: '' })
+    } catch (error) {
+      this.setData({ visitPurpose: null, visitPurposeError: error.message || '加载到访目的失败' })
+    } finally {
+      this.setData({ visitPurposeLoading: false })
+    }
+  },
+
+  onAppendVisitPurpose() {
+    const visitPurpose = this.data.visitPurpose
+    if (!visitPurpose) return
+    const current = (this.data.needs || '').trim()
+    if (current.includes(visitPurpose)) {
+      wx.showToast({ title: '已带入', icon: 'none' })
+      return
+    }
+    this.setData({ needs: current ? `${current}\n${visitPurpose}` : visitPurpose })
   },
 
   onBack() {
@@ -272,6 +335,8 @@ Page({
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })
+      // 用户在「取消关联抵扣」里点了取消：不是添加失败，不要追问是否重试
+      if (isOperationCancelled(e)) return
       wx.showModal({
         title: '添加失败',
         content: '是否重试？',

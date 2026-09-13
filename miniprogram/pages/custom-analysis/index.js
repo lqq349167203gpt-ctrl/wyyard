@@ -93,7 +93,7 @@ function defaultPlan() {
     metrics: ['total_customers'],
     card_metric: 'total_customers',
     card_dimension: 'none',
-    columns: ['nickname', 'member_type', 'follow_up_status', 'referrer', 'visit_count_period', 'payment_amount_period'],
+    columns: ['nickname', 'member_type', 'follow_up_status', 'referrer', 'visit_count_period'],
     sort_by: 'referral_date',
     sort_order: 'desc',
     row_display_mode: 'unique_customers',
@@ -137,6 +137,7 @@ function formatMetricValue(value, format, unit, signed) {
 }
 
 function displayValue(field, value) {
+  if (field === 'follow_up_status' && value === '未配置') return '—'
   if (value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)) return '—'
   if (field === 'total_consumption' || field === 'payment_amount_period') return `¥${Number(value || 0).toLocaleString()}`
   if (['invitation_count', 'visit_count', 'communication_count', 'invitation_count_period', 'visit_count_period', 'cancelled_count_period'].includes(field)) return `${value}次`
@@ -179,6 +180,19 @@ Page({
     selectedColumns: [],
     columnOptions: [],
     showColumnPicker: false,
+    showFieldPicker: false,
+    fieldPickerIndex: -1,
+    fieldPickerGroupIndex: '',
+    fieldPickerOptions: [],
+    showMultiSheet: false,
+    multiSheetTitle: '',
+    multiSheetItems: [],
+    multiSheetTarget: {},
+    showOptionSheet: false,
+    optionSheetTitle: '',
+    optionSheetTarget: '',
+    optionSheetItems: [],
+    optionSheetDataset: {},
     result: null,
     metricCards: [],
     dimensionCards: [],
@@ -275,6 +289,11 @@ Page({
       const operatorIndex = Math.max(0, operatorOptions.findIndex(item => item.value === condition.operator))
       const rawValues = Array.isArray(condition.value) ? condition.value : []
       const isDate = field.value_type === 'date'
+      const fieldHasOptions = !!(field.options && field.options.length)
+      const isMulti = condition.operator === 'in'
+      const multiValues = isMulti
+        ? (Array.isArray(condition.value) ? condition.value.map(String) : (condition.value ? [String(condition.value)] : []))
+        : []
       return {
         index,
         fieldIndex,
@@ -290,7 +309,10 @@ Page({
         valueStart: rawValues[0] || '',
         valueEnd: rawValues[1] || '',
         value: Array.isArray(condition.value) ? condition.value.join('，') : (condition.value === null ? '' : condition.value),
-        useOptions: !!(field.options && field.options.length && condition.operator !== 'in' && condition.operator !== 'between'),
+        useOptions: fieldHasOptions && condition.operator !== 'in' && condition.operator !== 'between',
+        multiOptions: fieldHasOptions && isMulti,
+        multiValues,
+        multiLabel: multiValues.join('、'),
         valueOptions: (field.options || []).map(value => ({ value, label: value })),
         valueIndex: Math.max(0, (field.options || []).indexOf(String(condition.value || ''))),
         placeholder: condition.operator === 'in' ? '多个值用逗号分隔' : '输入筛选值',
@@ -321,8 +343,14 @@ Page({
     })
     const cardMetric = plan.card_metric || 'total_customers'
     plan.card_metric = cardMetric
-    const metricOptions = (metadata.metrics || []).map(item => Object.assign({}, item, { selected: plan.metrics.includes(item.value) }))
-    const dimensionMetricOptions = metadata.metrics || []
+    // 成交金额（legacy_only）不再作为候选项，只用于历史模板回显
+    const metricOptions = (metadata.metrics || [])
+      .filter(item => !item.legacy_only)
+      .map(item => Object.assign({}, item, { selected: plan.metrics.includes(item.value) }))
+    // 拆分指标不再提供成交金额（历史草稿也不保留该选项）
+    const metricSource = (metadata.metrics || []).filter(item => !item.legacy_only)
+    const dimensionMetricOptions = (metadata.dimension_metrics
+      || metricSource.filter(item => item.value !== 'payment_amount')).slice()
     const dimensionMetricIndex = Math.max(0, dimensionMetricOptions.findIndex(item => item.value === cardMetric))
     const dimensionOptions = metadata.card_dimensions || []
     const dimensionIndex = Math.max(0, dimensionOptions.findIndex(item => item.value === plan.card_dimension))
@@ -331,9 +359,11 @@ Page({
       const field = columnFields.find(item => item.value === value)
       return { value, label: field ? field.label : value }
     })
-    const orderedColumnFields = columnFields
+    // 已停用字段（消费金额）只在历史模板里回显，不再出现在可选列里
+    const selectableColumnFields = columnFields.filter(item => !item.legacy_only)
+    const orderedColumnFields = selectableColumnFields
       .filter(item => item.group === '客户详情')
-      .concat(columnFields.filter(item => item.group !== '客户详情'))
+      .concat(selectableColumnFields.filter(item => item.group !== '客户详情'))
     const columnOptions = orderedColumnFields.map((item, index) => Object.assign({}, item, {
       selected: plan.columns.includes(item.value),
       locked: item.value === 'nickname',
@@ -515,12 +545,143 @@ Page({
     this.syncPlanView(plan)
   },
 
-  onConditionFieldChange(e) {
-    const rowIndex = Number(e.currentTarget.dataset.index)
-    const field = this.data.metadata.fields[Number(e.detail.value)]
+  // 字段选择：弹层里按「客户信息 / 日期信息…」分组显示，点一下即选中
+  onOpenFieldPicker(e) {
+    const dataset = e.currentTarget.dataset
+    const datasetForRow = { index: dataset.index, groupIndex: dataset.groupIndex }
+    const row = this.conditionRow(datasetForRow)
+    const current = row && row.field
+    const fields = (this.data.metadata && this.data.metadata.fields) || []
+    const fieldPickerOptions = fields.map((item, index) => ({
+      value: item.value,
+      label: item.label,
+      selected: item.value === current,
+      showGroupHeading: index === 0 || fields[index - 1].group !== item.group,
+      groupLabel: item.group,
+    }))
+    this.setData({
+      showFieldPicker: true,
+      fieldPickerIndex: Number(dataset.index),
+      fieldPickerGroupIndex: dataset.groupIndex === undefined ? '' : Number(dataset.groupIndex),
+      fieldPickerOptions,
+    })
+  },
+
+  onCloseFieldPicker() {
+    this.setData({ showFieldPicker: false, fieldPickerIndex: -1, fieldPickerGroupIndex: '' })
+  },
+
+  // 其他下拉也走同一套弹层：点哪一项就用哪一项（复用原来的 index 处理器，逻辑不变）
+  onOpenOptionSheet(e) {
+    const target = e.currentTarget.dataset.sheet
+    const dataset = { index: e.currentTarget.dataset.index, groupIndex: e.currentTarget.dataset.groupIndex }
+    const row = target === 'operator' || target === 'valueOption' ? this.conditionRow(dataset) : null
+    const configs = {
+      template: { title: '选择已保存模板', list: this.data.templateOptions || [], current: this.data.templateIndex, key: 'name' },
+      operator: { title: '选择规则', list: (row && row.operatorOptions) || [], current: row ? row.operatorIndex : -1 },
+      valueOption: { title: '选择筛选值', list: (row && row.valueOptions) || [], current: row ? row.valueIndex : -1 },
+      dimensionMetric: { title: '选择拆分指标', list: this.data.dimensionMetricOptions || [], current: this.data.dimensionMetricIndex },
+      dimension: { title: '选择拆分维度', list: this.data.dimensionOptions || [], current: this.data.dimensionIndex },
+      rowDisplay: { title: '选择列表排列', list: this.data.rowDisplayOptions || [], current: this.data.rowDisplayIndex },
+    }
+    const config = configs[target]
+    if (!config) return
+    const optionSheetItems = config.list.map((item, index) => ({
+      value: String(index),
+      label: item.label || item.name || '',
+      selected: index === config.current,
+    }))
+    this.setData({
+      showOptionSheet: true,
+      optionSheetTitle: config.title,
+      optionSheetTarget: target,
+      optionSheetItems,
+      optionSheetDataset: dataset,
+    })
+  },
+
+  // 「属于」是多值：弹出可多选列表，勾完点完成
+  onOpenMultiSheet(e) {
+    const dataset = { index: e.currentTarget.dataset.index, groupIndex: e.currentTarget.dataset.groupIndex }
+    const row = this.conditionRow(dataset)
+    if (!row) return
+    const selected = row.multiValues || []
+    this.setData({
+      showMultiSheet: true,
+      multiSheetTitle: `${row.fieldLabel} · 可多选`,
+      multiSheetItems: (row.valueOptions || []).map(item => ({
+        value: item.value,
+        label: item.label,
+        selected: selected.indexOf(item.value) !== -1,
+      })),
+      multiSheetTarget: dataset,
+    })
+  },
+
+  onMultiSheetToggle(e) {
+    const value = e.currentTarget.dataset.value
+    this.setData({
+      multiSheetItems: this.data.multiSheetItems.map(item => (
+        item.value === value ? Object.assign({}, item, { selected: !item.selected }) : item
+      )),
+    })
+  },
+
+  onCloseMultiSheet() {
+    this.setData({ showMultiSheet: false, multiSheetItems: [], multiSheetTarget: {} })
+  },
+
+  onMultiSheetDone() {
+    const dataset = this.data.multiSheetTarget || {}
+    if (dataset.index === undefined) { this.onCloseMultiSheet(); return }
+    const values = this.data.multiSheetItems.filter(item => item.selected).map(item => item.value)
+    const plan = clonePlan(this.data.plan)
+    const condition = this.conditionOwner(plan, dataset).conditions[Number(dataset.index)]
+    if (condition) {
+      condition.value = values
+      condition.inherit_period = false
+    }
+    this.onCloseMultiSheet()
+    this.syncPlanView(plan)
+  },
+
+  onCloseOptionSheet() {
+    this.setData({ showOptionSheet: false, optionSheetTarget: '', optionSheetItems: [], optionSheetDataset: {} })
+  },
+
+  // 弹层遮罩上吞掉滑动，避免滚动穿透到页面背景
+  noop() {},
+
+  onOptionSheetPick(e) {
+    const index = Number(e.currentTarget.dataset.value)
+    if (!Number.isInteger(index) || index < 0) { this.onCloseOptionSheet(); return }
+    const target = this.data.optionSheetTarget
+    const event = { currentTarget: { dataset: this.data.optionSheetDataset }, detail: { value: index } }
+    if (target === 'template') this.onTemplateChange(event)
+    else if (target === 'operator') this.onConditionOperatorChange(event)
+    else if (target === 'valueOption') this.onConditionOptionChange(event)
+    else if (target === 'dimensionMetric') this.onDimensionMetricChange(event)
+    else if (target === 'dimension') this.onDimensionChange(event)
+    else if (target === 'rowDisplay') this.onRowDisplayChange(event)
+    this.onCloseOptionSheet()
+  },
+
+  onFieldPick(e) {
+    const fieldValue = e.currentTarget.dataset.value
+    const fields = (this.data.metadata && this.data.metadata.fields) || []
+    const field = fields.find(item => item.value === fieldValue)
+    if (!field || this.data.fieldPickerIndex < 0) { this.onCloseFieldPicker(); return }
+    const dataset = this.data.fieldPickerGroupIndex === ''
+      ? { index: this.data.fieldPickerIndex }
+      : { index: this.data.fieldPickerIndex, groupIndex: this.data.fieldPickerGroupIndex }
     const plan = clonePlan(this.data.plan)
     const operator = field.operators[0] || 'eq'
-    this.conditionOwner(plan, e.currentTarget.dataset).conditions[rowIndex] = { field: field.value, operator, value: VALUELESS_OPERATORS.includes(operator) ? null : '', inherit_period: false }
+    this.conditionOwner(plan, dataset).conditions[this.data.fieldPickerIndex] = {
+      field: field.value, operator,
+      value: VALUELESS_OPERATORS.includes(operator) ? null : '',
+      inherit_period: false,
+    }
+    this.setData({ showFieldPicker: false, fieldPickerIndex: -1, fieldPickerGroupIndex: '' })
     this.syncPlanView(plan)
   },
 
@@ -719,9 +880,20 @@ Page({
     const conditionGroups = plan.analysis_mode === 'comparison'
       ? plan.comparison_groups.map(group => group.conditions || [])
       : [plan.conditions || []]
-    const incomplete = conditionGroups.some(conditions => conditions.some(condition => !condition.inherit_period && !VALUELESS_OPERATORS.includes(condition.operator) && (condition.value === '' || condition.value === null || (Array.isArray(condition.value) && condition.value.some(value => !value)))))
-    if (incomplete) {
-      wx.showToast({ title: '请填写完整筛选条件', icon: 'none' })
+    // 没填完的条件在这里拦下来并报出是哪个字段（空数组也算没填）
+    const isBlankCondition = condition => !condition.inherit_period && !VALUELESS_OPERATORS.includes(condition.operator) && (
+      condition.value === undefined || condition.value === null || condition.value === '' ||
+      (Array.isArray(condition.value) && (condition.value.length === 0 || condition.value.some(value => !value)))
+    )
+    let blankCondition = null
+    for (const conditions of conditionGroups) {
+      blankCondition = conditions.find(isBlankCondition)
+      if (blankCondition) break
+    }
+    if (blankCondition) {
+      const fields = (this.data.metadata && this.data.metadata.fields) || []
+      const matched = fields.find(item => item.value === blankCondition.field)
+      wx.showToast({ title: `请填写「${matched ? matched.label : blankCondition.field}」的值`, icon: 'none' })
       return
     }
     this.setData({ querying: true })
@@ -745,7 +917,10 @@ Page({
         id: item.id,
         displayKey: item._display_key || item.id,
         nickname: item.nickname || '未命名',
-        fields: result.plan.columns.filter(field => field !== 'nickname').map(field => ({ label: fieldMap[field] || field, value: displayValue(field, item[field]) })),
+        fields: result.plan.columns.filter(field => field !== 'nickname').map(field => {
+          const value = displayValue(field, item[field])
+          return { label: fieldMap[field] || field, value, empty: value === '—' }
+        }),
       }))
       const dimensionMetric = (this.data.metadata.metrics || []).find(item => item.value === result.plan.card_metric)
       const dimension = (this.data.metadata.card_dimensions || []).find(item => item.value === result.plan.card_dimension)
@@ -765,6 +940,7 @@ Page({
       this.setData({
         result,
         metricCards: (result.cards || []).filter(card => !String(card.key).startsWith('dimension-')),
+        // 跟进阶段里没有配置的客户：卡片标题显示「未配置」，列表行内保持为空
         dimensionCards: (result.cards || []).filter(card => String(card.key).startsWith('dimension-')),
         dimensionResultTitle: `${dimensionMetric ? dimensionMetric.label : '符合条件人数'} · 按${dimension ? dimension.label : '分组'}拆分`,
         resultItems,

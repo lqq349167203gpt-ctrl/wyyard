@@ -42,7 +42,8 @@ function presetRange(preset) {
 }
 
 function initialRange() {
-  return presetRange('all')
+  // 默认只看本月（和 PC 端一致）
+  return presetRange('month')
 }
 
 function formatDateTime(value) {
@@ -82,7 +83,7 @@ module.exports = function createRecordsPage(mode) { return {
     courseTypes: COURSE_TYPES,
     courseTypeIndex: 0,
     courseRangePresets: COURSE_RANGE_PRESETS,
-    courseRangePreset: 'all',
+    courseRangePreset: 'month',
     courseDateFrom: initialRange().from,
     courseDateTo: initialRange().to,
     followUpFilters: FOLLOW_UP_FILTERS,
@@ -92,6 +93,10 @@ module.exports = function createRecordsPage(mode) { return {
     includeFollowUp: true,
     summaryCards: [],
     courseRecords: [],
+    // 课程记录页：课程列表 / 复盘记录两个子页签（与 PC 一致）
+    courseViewTab: 'courses',
+    reviewRecords: [],
+    reviewExpanded: {},
     followUpRecords: [],
     followUpPage: 1,
     followUpTotal: 0,
@@ -180,6 +185,10 @@ module.exports = function createRecordsPage(mode) { return {
         loading: false,
         courseTypes: activityTypes,
         courseRecords: records,
+        // 复盘记录：只保留填了复盘内容的课程，和 PC 的「复盘记录」页签一致
+        reviewRecords: records
+          .filter(course => (course.course_review || '').trim())
+          .map(course => ({ ...course, reviewText: (course.course_review || '').trim() })),
         summaryCards: [
           { label: '课程数', value: totals.courseCount, unit: '场' },
           { label: '课时数', value: totals.classHours, unit: '课时' },
@@ -300,6 +309,17 @@ module.exports = function createRecordsPage(mode) { return {
 
   onToggleContent() {
     this.setData({ contentExpanded: !this.data.contentExpanded })
+  },
+
+  // 课程记录页：切「课程记录 / 复盘记录」
+  onCourseViewTab(event) {
+    this.setData({ courseViewTab: event.currentTarget.dataset.tab })
+  },
+
+  // 复盘内容太长时按行展开/缩略
+  onToggleReview(event) {
+    const id = event.currentTarget.dataset.id
+    this.setData({ [`reviewExpanded.${id}`]: !this.data.reviewExpanded[id] })
   },
 
   onCustomerTap(event) {

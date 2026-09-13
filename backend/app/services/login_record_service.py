@@ -1,4 +1,5 @@
 import threading
+import time as time_module
 import uuid
 from datetime import datetime, time, timedelta, timezone
 from typing import Any
@@ -17,9 +18,20 @@ ACTIVITY_FALLBACK_SECONDS = 5 * 60
 _page_view_lock = threading.Lock()
 _recent_page_views: dict[tuple[str, str, str], datetime] = {}
 
+# 使用统计明细要把登录记录、操作日志、使用会话三份数据合起来算，数据量大（几万条）。
+# 每次翻页/改筛选都全量重算太慢，这里对合并结果做 30 秒缓存；有新的登录/心跳会立刻失效。
+_activity_cache: dict[tuple, tuple[float, list[dict[str, Any]]]] = {}
+_activity_cache_lock = threading.Lock()
+ACTIVITY_CACHE_SECONDS = 30
+
+
+def invalidate_activity_cache() -> None:
+    with _activity_cache_lock:
+        _activity_cache.clear()
+
 PAGE_NAMES = {
-    "/principal": "主理人",
-    "/pages/principal/index": "主理人",
+    "/principal": "组织/俱乐部",
+    "/pages/principal/index": "组织/俱乐部",
     # PC 管理端
     "/custom-analysis": "自定义筛选",
     "/service-teachers": "服务老师",
@@ -92,6 +104,7 @@ def _records() -> list[LoginRecord]:
 
 
 def _save(record: LoginRecord) -> LoginRecord:
+    invalidate_activity_cache()
     save_item(FILENAME, record.id, record.model_dump(mode="json"))
     return record
 
@@ -118,6 +131,7 @@ def record_usage_heartbeat(
     device_info: str = "",
 ) -> UsageSession:
     """记录活跃心跳；连续心跳合并为页面时间段，超过90秒的间隔不计时。"""
+    invalidate_activity_cache()
     now = datetime.now(timezone.utc)
     path = page_path.split("?", 1)[0].strip()
     item_id = f"{account.id}:{client_session_id}"
@@ -230,6 +244,7 @@ def _fallback_activity_intervals(
 
 
 def record_login(account: Any, source: str, ip: str, device_info: str = "") -> LoginRecord:
+    invalidate_activity_cache()
     return _save(LoginRecord(
         id=str(uuid.uuid4()),
         event_type="login",
@@ -559,6 +574,26 @@ def get_account_summary() -> list[dict[str, Any]]:
 
 
 def list_activity(
+    account_id: str | None = None,
+    event_type: str | None = None,
+    source: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    keyword: str | None = None,
+) -> list[dict[str, Any]]:
+    cache_key = (account_id or "", event_type or "", source or "", date_from or "", date_to or "", (keyword or "").lower())
+    now_monotonic = time_module.monotonic()
+    with _activity_cache_lock:
+        cached = _activity_cache.get(cache_key)
+        if cached and now_monotonic - cached[0] < ACTIVITY_CACHE_SECONDS:
+            return cached[1]
+    items = _build_activity(account_id, event_type, source, date_from, date_to, keyword)
+    with _activity_cache_lock:
+        _activity_cache[cache_key] = (now_monotonic, items)
+    return items
+
+
+def _build_activity(
     account_id: str | None = None,
     event_type: str | None = None,
     source: str | None = None,

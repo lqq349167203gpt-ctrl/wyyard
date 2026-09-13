@@ -2,6 +2,8 @@ import json
 import logging
 import re
 import threading
+from contextvars import ContextVar
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 
@@ -20,6 +22,35 @@ DB_URL = settings.database_url
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
+pending_writes: ContextVar[list | None] = ContextVar("course_pending_writes", default=None)
+
+
+def commit_pending_writes(writes):
+    """课程联动修改批量提交，避免名单已改而抵扣未取消。"""
+    for _, filename, _, _ in writes:
+        _validate_filename(filename)
+        _ensure_table(_table_name(filename))
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            for operation, filename, item_id, data in writes:
+                table = _table_name(filename)
+                if operation == "all":
+                    cur.execute(f'DELETE FROM "{table}"')
+                    items = data.items()
+                elif operation == "delete":
+                    cur.execute(f'DELETE FROM "{table}" WHERE id = %s', (item_id,))
+                    continue
+                else:
+                    items = [(item_id, data)]
+                for key, value in items:
+                    cur.execute(f'INSERT INTO "{table}" (id, data) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data', (key, json.dumps(value, ensure_ascii=False)))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        _put_conn(conn)
 _ensure_table_lock = threading.Lock()
 _ensured_tables: set[str] = set()
 
@@ -99,6 +130,15 @@ def load_data(filename: str) -> Dict[str, Any]:
         result = {}
         for row in rows:
             result[row["id"]] = json.loads(row["data"])
+        for operation, target, key, value in pending_writes.get() or []:
+            if target != filename:
+                continue
+            if operation == "all":
+                result = deepcopy(value)
+            elif operation == "delete":
+                result.pop(key, None)
+            else:
+                result[key] = deepcopy(value)
 
         if filename == "customer_ai_config.json" and "default" in result:
             return result["default"]
@@ -110,6 +150,8 @@ def load_data(filename: str) -> Dict[str, Any]:
 
 def load_item(filename: str, item_id: str) -> Any:
     """按 id 读取单条记录，避免整表加载（供高频鉴权路径使用）"""
+    if pending_writes.get() is not None:
+        return load_data(filename).get(item_id)
     _validate_filename(filename)
     table = _table_name(filename)
     conn = _get_conn()
@@ -124,6 +166,9 @@ def load_item(filename: str, item_id: str) -> Any:
 
 
 def save_data(filename: str, data: Dict[str, Any]):
+    if pending_writes.get() is not None:
+        pending_writes.get().append(("all", filename, "", deepcopy(data)))
+        return
     _validate_filename(filename)
     table = _table_name(filename)
     lock = _get_table_lock(table)
@@ -151,6 +196,9 @@ def save_data(filename: str, data: Dict[str, Any]):
 
 def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
     """Upsert 单条记录，避免全表重写"""
+    if pending_writes.get() is not None:
+        pending_writes.get().append(("item", filename, item_id, deepcopy(item_data)))
+        return
     _validate_filename(filename)
     table = _table_name(filename)
     conn = _get_conn()
@@ -176,6 +224,9 @@ def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
 
 def delete_item(filename: str, item_id: str):
     """删除单条记录"""
+    if pending_writes.get() is not None:
+        pending_writes.get().append(("delete", filename, item_id, None))
+        return
     _validate_filename(filename)
     table = _table_name(filename)
     conn = _get_conn()

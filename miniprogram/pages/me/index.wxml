@@ -31,7 +31,7 @@
     </view>
     <view class="menu-item" bindtap="onPrincipalTap" wx:if="{{canPrincipal}}">
       <image class="menu-icon" src="{{icons.dailyReport}}" mode="aspectFit" />
-      <text class="menu-label">主理人</text>
+      <text class="menu-label">组织/俱乐部</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>
@@ -52,6 +52,11 @@
       <text class="menu-label">客户标签</text>
       <text class="menu-arrow">›</text>
     </view>
+    <view class="menu-item" bindtap="onOrganizationsTap" wx:if="{{canOrganizations}}">
+      <image class="menu-icon" src="{{icons.customAnalysis}}" mode="aspectFit" />
+      <text class="menu-label">组织信息</text>
+      <text class="menu-arrow">›</text>
+    </view>
   </view>
 
   <!-- 付费板块 -->
@@ -64,5 +69,7 @@
   </view>
 
   <!-- 退出按钮 -->
-  <view class="logout-btn" bindtap="onLogout">退出登录</view>
+  <view class="logout-wrap">
+    <view class="logout-btn" bindtap="onLogout">退出登录</view>
+  </view>
 </view>

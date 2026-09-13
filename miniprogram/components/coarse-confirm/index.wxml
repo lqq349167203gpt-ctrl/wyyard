@@ -1,0 +1,16 @@
+<view class="coarse-mask" wx:if="{{show}}" catchtap="onCancel"></view>
+<view class="coarse-dialog" wx:if="{{show}}">
+  <view class="coarse-title">取消关联抵扣</view>
+  <view class="coarse-desc">{{description}}</view>
+  <scroll-view class="coarse-list" scroll-y>
+    <view class="coarse-item" wx:for="{{items}}" wx:key="index">
+      <text class="coarse-item-name">{{item.nickname}}</text>
+      <text class="coarse-item-meta">{{item.meta}}</text>
+    </view>
+  </scroll-view>
+  <view class="coarse-hint">是否继续？</view>
+  <view class="coarse-actions">
+    <view class="coarse-btn coarse-btn-cancel" bindtap="onCancel">取消</view>
+    <view class="coarse-btn coarse-btn-ok" bindtap="onOk">确认继续</view>
+  </view>
+</view>

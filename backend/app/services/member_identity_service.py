@@ -159,12 +159,17 @@ def _check_condition(condition, customer_id: str,
                      customer_emotional_releases, customer_energy_knots,
                      customer_oh_card_readings, customer_other_projects, today_str: str,
                      welfare_count: int = 0, customer_positions: list = None,
-                     customer_nickname: str = "", customer_total_payment: float = 0) -> bool:
+                     customer_nickname: str = "", customer_total_payment: float = 0,
+                     invite_count: int = 0, cancel_count: int = 0) -> bool:
     if isinstance(condition, dict):
         condition = IdentityCondition(**condition)
     t = condition.type
     if t == "arrival":
         return _compare_count(arrival_count, condition.count_op, condition.count_value)
+    elif t == "invitation":
+        # 邀约情况：只看有没有被邀约 / 取消，和是否到店无关
+        count = cancel_count if condition.invitation_scope == "cancelled" else invite_count
+        return _compare_count(count, condition.count_op, condition.count_value)
     elif t == "activity":
         count = welfare_count if condition.activity_scope == "welfare" else activity_count
         return _compare_count(count, condition.count_op, condition.count_value)
@@ -375,6 +380,9 @@ def refresh_member_type(customer_id: str):
     all_visits = visit_service.list_visits()
     customer_visits = [v for v in all_visits if v.customer_id == customer_id]
     arrival_count = len({v.visit_date for v in customer_visits if v.arrived})
+    # 邀约情况：正常邀约 / 已取消的邀约，与到店无关
+    invite_count = len([v for v in customer_visits if not v.cancelled])
+    cancel_count = len([v for v in customer_visits if v.cancelled])
 
     # 从实际活动数据源统计参与天数
     all_records = class_record_service.list_records()
@@ -431,7 +439,8 @@ def refresh_member_type(customer_id: str):
                                     customer_energy_knots, customer_oh_card_readings,
                                     customer_other_projects, today_str,
                                     welfare_count, customer_positions,
-                                    customer.nickname or "", customer_total_payment)
+                                    customer.nickname or "", customer_total_payment,
+                                    invite_count, cancel_count)
                    for cond in identity.conditions]
         if identity.operator == "any":
             matched = any(results)
@@ -502,6 +511,14 @@ def refresh_all():
         if v.arrived and v.visit_date:
             arrival_dates_map.setdefault(v.customer_id, set()).add(v.visit_date)
     arrival_map: dict[str, int] = {cid: len(dates) for cid, dates in arrival_dates_map.items()}
+    # 邀约情况：正常邀约 / 已取消的邀约（与到店无关）
+    invite_map: dict[str, int] = {}
+    cancel_map: dict[str, int] = {}
+    for v in all_visits:
+        if v.cancelled:
+            cancel_map[v.customer_id] = cancel_map.get(v.customer_id, 0) + 1
+        else:
+            invite_map[v.customer_id] = invite_map.get(v.customer_id, 0) + 1
 
     # 从实际活动数据源统计参与天数（必须实际到店）
     def _add_activity_date(cid: str, date: str):
@@ -606,7 +623,8 @@ def refresh_all():
                                         customer_energy_knots, customer_oh_card_readings,
                                         customer_other_projects, today_str,
                                         welfare_count, customer_positions,
-                                        c.nickname or "", customer_total_payment)
+                                        c.nickname or "", customer_total_payment,
+                                        invite_map.get(c.id, 0), cancel_map.get(c.id, 0))
                        for cond in identity.conditions]
             if identity.operator == "any":
                 matched = any(results)

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡次统计 tab · 统一页面语言版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #212631; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+
+  .compare { display: flex; gap: 32px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+  .col { width: 600px; flex-shrink: 0; }
+  .col-label { text-align: center; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .col-label small { display: block; font-size: 12px; color: #8f959e; font-weight: 400; margin-top: 3px; }
+
+  .panel {
+    background: #fff; border-radius: 14px; box-shadow: 0 2px 4px rgba(33,38,49,.05);
+    padding: 0 20px 10px; overflow: hidden;
+  }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid #eef0f1; }
+  .tab-btn {
+    position: relative; padding: 12px 14px 10px; font-size: 13px; white-space: nowrap;
+    color: #79838f; font-weight: 600;
+  }
+  .tab-btn .cnt { font-size: 10.5px; color: #a8b1bd; margin-left: 3px; font-weight: 500; }
+  .tab-btn.on { color: #212631; font-weight: 700; }
+  .tab-btn.on::after {
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px;
+    height: 3px; border-radius: 3px 3px 0 0; background: #3370ff;
+  }
+  .tab-body { padding-top: 12px; }
+
+  /* ======== 页面现有语言（从其他 tab 提取的 token）======== */
+  /* 汇总卡 = 跟进点卡片语言 */
+  .sum-card {
+    background: #fafbfc; border: 1px solid #eef0f1; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 4px;
+  }
+  .sum-grid { display: grid; grid-template-columns: 84px 1fr; row-gap: 4px; column-gap: 12px; }
+  .sum-grid .k { font-size: 12px; color: #a8b1bd; padding-top: 1px; }
+  .sum-grid .v { font-size: 12px; line-height: 1.55; color: #3a4150; }
+  .sum-grid .v b { color: #212631; font-weight: 600; }
+
+  /* 行 = 用户回访/沟通记录语言 */
+  .rows { }
+  .row { padding: 10px 0; border-bottom: 1px solid #f0f1f2; }
+  .row:last-child { border-bottom: none; }
+  .row-main { display: flex; align-items: center; gap: 12px; }
+  .row-type { width: 60px; flex-shrink: 0; font-size: 12px; color: #8f959e; }
+  .row-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: #212631; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-name .mode { margin-left: 6px; font-size: 12px; font-weight: 400; color: #a8b1bd; }
+  .row-name.strike { color: #c4506a; text-decoration: line-through; }
+  .row-count { flex-shrink: 0; font-size: 12px; color: #79838f; font-variant-numeric: tabular-nums; }
+  .row-count b { color: #212631; font-weight: 600; }
+  .row-count b.neg { color: #c4506a; }
+  .row-date { flex-shrink: 0; font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  /* 状态 pill = 已到店/未到店 pill 语言 */
+  .pill {
+    flex-shrink: 0; font-size: 10.5px; font-weight: 600; line-height: 1;
+    padding: 3px 8px; border-radius: 999px;
+  }
+  .pill.red { color: #c4506a; background: #fdeeee; }
+  .pill.grey { color: #79838f; background: #f1f0ed; }
+  /* 购买子行 = 用户回访 meta 行语言 */
+  .row-sub { margin: 5px 0 0 72px; font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; line-height: 1.7; }
+  .row-sub .neg { color: #c4506a; }
+
+  /* ======== 右侧：现有 tab 参考样本（按真实代码还原）======== */
+  .ref-block { margin-bottom: 18px; }
+  .ref-title { font-size: 12px; color: #8f959e; margin-bottom: 8px; text-align: left; }
+  /* 跟进点卡 */
+  .heal-card {
+    background: #fafbfc; border: 1px solid #eef0f1; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 9px;
+  }
+  .heal-head { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .heal-date { font-size: 12.5px; font-weight: 700; color: #212631; font-variant-numeric: tabular-nums; }
+  .heal-grid { display: grid; grid-template-columns: 84px 1fr; row-gap: 4px; column-gap: 12px; }
+  .heal-grid .k { font-size: 12px; color: #a8b1bd; padding-top: 1px; }
+  .heal-grid .v { font-size: 12px; line-height: 1.55; color: #3a4150; }
+  /* 用户回访行 */
+  .fu-row { padding: 12px; border-bottom: 1px solid #f0f1f2; }
+  .fu-title { display: flex; align-items: center; gap: 8px; }
+  .fu-name { font-size: 13px; font-weight: 500; color: #2b2f36; }
+  .fu-tag { border-radius: 4px; background: #f1f3f5; padding: 2px 6px; font-size: 12px; color: #68717d; }
+  .fu-meta { margin-top: 6px; display: flex; gap: 16px; font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .fu-content { margin-top: 8px; border-radius: 4px; background: #fafafa; padding: 8px 12px; font-size: 13px; line-height: 1.65; color: #3d444d; }
+  /* 沟通记录行 */
+  .cm-row { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f3f4f5; }
+  .cm-left { width: 130px; flex-shrink: 0; }
+  .cm-date { font-size: 12px; font-weight: 700; color: #212631; font-variant-numeric: tabular-nums; }
+  .cm-creator { font-size: 12px; color: #79838f; margin-top: 1px; }
+  .cm-content { flex: 1; font-size: 12px; line-height: 1.6; color: #3a4150; }
+
+  .notes {
+    max-width: 900px; margin: 44px auto 0; background: #fff; border-radius: 16px;
+    padding: 26px 32px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 16px; margin-bottom: 12px; }
+  .notes ul { padding-left: 18px; font-size: 13px; color: #4e535a; line-height: 2.05; }
+  .notes b { color: #212631; }
+  .notes .del { color: #c4506a; }
+</style>
+</head>
+<body>
+
+<div class="page-title">「卡次统计」tab · 用页面自己的语言重做</div>
+<div class="page-sub">左：重做的卡次统计 ｜ 右：从其他 tab 直接摘的现有样式（对照用）—— 同一套字号、同一套灰色、同一种 pill</div>
+
+<div class="compare">
+
+  <!-- ==================== 重做后的卡次统计 ==================== -->
+  <div class="col">
+    <div class="col-label" style="color:#2ba471">卡次统计（重做）<small>汇总卡 = 跟进点卡片语言；行 = 用户回访/沟通记录语言</small></div>
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab-btn">跟进点<span class="cnt">6</span></div>
+        <div class="tab-btn">沟通记录<span class="cnt">3</span></div>
+        <div class="tab-btn">活动记录<span class="cnt">12</span></div>
+        <div class="tab-btn">用户回访<span class="cnt">2</span></div>
+        <div class="tab-btn on">卡次统计</div>
+        <div class="tab-btn">交易记录<span class="cnt">5</span></div>
+      </div>
+      <div class="tab-body">
+
+        <!-- 会员卡合计：跟进点卡片 + 84px 标签栅格 -->
+        <div class="sum-card">
+          <div class="sum-grid">
+            <span class="k">会员卡合计</span>
+            <span class="v"><b>剩余 12 次</b>（共 30 次）</span>
+            <span class="k">扣减构成</span>
+            <span class="v">20次卡扣卡 8 次 / 销卡 2 次 / 预支扣卡 1 次</span>
+          </div>
+        </div>
+
+        <!-- 统一行列表：所有类型同一种行结构 -->
+        <div class="rows">
+          <div class="row">
+            <div class="row-main">
+              <span class="row-type">会员卡</span>
+              <span class="row-name">20次卡</span>
+              <span class="row-count">剩余 <b>12</b> / 共 20 次</span>
+              <span class="row-date">2026-01-15 ~ 2027-01-14</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main">
+              <span class="row-type">会员卡</span>
+              <span class="row-name">10次卡</span>
+              <span class="row-count">剩余 <b>0</b> / 共 10 次</span>
+              <span class="row-date">2025-03-01 ~ 2026-03-01</span>
+              <span class="pill red">已过期</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main">
+              <span class="row-type">觉醒游戏</span>
+              <span class="row-name"></span>
+              <span class="row-count">剩余 <b>3</b> / 共 5 次</span>
+              <span class="row-date">2026-02-01 ~ 2026-08-01</span>
+            </div>
+            <div class="row-sub">购买 3 次 · 剩 1 · 2026-02-01 ~ 2026-08-01</div>
+            <div class="row-sub">购买 2 次 · 剩 2 · 2025-11-05 ~ 2026-05-05 <span class="neg">已过期</span></div>
+          </div>
+          <div class="row">
+            <div class="row-main">
+              <span class="row-type">情绪释放</span>
+              <span class="row-name"></span>
+              <span class="row-count">剩余 <b>0</b> / 共 2 次</span>
+              <span class="row-date">2026-04-10 ~ 不限</span>
+              <span class="pill grey">无次数</span>
+            </div>
+            <div class="row-sub">购买 2 次 · 剩 0 · 2026-04-10 ~ 不限</div>
+          </div>
+          <div class="row">
+            <div class="row-main">
+              <span class="row-type">内部课程</span>
+              <span class="row-name">疗愈师班</span>
+              <span class="row-count"><b>不限次</b></span>
+              <span class="row-date">2026-01-01 ~ 2026-12-31</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-main">
+              <span class="row-type">其他项目</span>
+              <span class="row-name">茶礼定制<span class="mode">线下</span></span>
+              <span class="row-count">剩余 <b>2</b> / 共 3 次</span>
+              <span class="row-date">2026-05-01 ~ 不限</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 现有样式参考 ==================== -->
+  <div class="col">
+    <div class="col-label" style="color:#4e535a">现有 tab 的样式（对照）<small>卡次统计重做后用的就是这些零件</small></div>
+    <div class="panel">
+      <div class="tab-body" style="padding-top:14px">
+
+        <div class="ref-block">
+          <div class="ref-title">跟进点 tab —— 浅灰卡片 + 84px 标签栅格 + pill</div>
+          <div class="heal-card">
+            <div class="heal-head">
+              <span class="heal-date">2026/8/6 10:30</span>
+              <span class="pill" style="color:#157a3c;background:#dcf5e4">已到店</span>
+            </div>
+            <div class="heal-grid">
+              <span class="k">当日需求</span><span class="v">想继续做情绪释放，最近睡眠不太好</span>
+              <span class="k">跟进点</span><span class="v">本周内推年卡，强调家庭套餐</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ref-block">
+          <div class="ref-title">用户回访 tab —— hairline 行 + 灰底小签 + 浅灰 meta 行</div>
+          <div class="fu-row">
+            <div class="fu-title">
+              <span class="fu-name">晨光冥想·呼吸疗愈</span>
+              <span class="fu-tag">疗愈课</span>
+            </div>
+            <div class="fu-meta">
+              <span>活动时间：2026/08/06 09:30–11:00</span>
+              <span>老师/带领人：李青</span>
+            </div>
+            <p class="fu-content">这次呼吸练习能跟上节奏了，说睡眠有改善。</p>
+          </div>
+        </div>
+
+        <div class="ref-block">
+          <div class="ref-title">沟通记录 tab —— 左日期右内容，hairline 分隔</div>
+          <div class="cm-row">
+            <div class="cm-left">
+              <div class="cm-date">2026/8/5 16:20</div>
+              <div class="cm-creator">张三</div>
+            </div>
+            <div class="cm-content">电话回访，客户说下周三有时间到店。</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 说明 ==================== -->
+<div class="notes">
+  <h2>这一版做了什么减法</h2>
+  <ul>
+    <li><span class="del">删掉了</span>：17px 大数字、描边 chips 胶囊、四列对齐布局、∞ 符号、红点徽标、加粗 800 数字——这些都是上一版"发明"的新零件</li>
+    <li><b>汇总卡</b>直接复用「跟进点」的零件：#fafbfc 浅灰卡 + 84px 标签栅格，"剩余 12 次"只是 12px 加粗，不放大</li>
+    <li><b>行结构</b>复用「用户回访/沟通记录」的零件：hairline 分隔行、12px 灰字 meta、"剩余 12 / 共 20 次"里只有剩余次数加粗（600，不是 800）</li>
+    <li><b>状态 pill</b> 复用「已到店/未到店」的胶囊语言：已过期 = 红字浅红底、无次数 = 灰字灰底，10.5px 同款圆角</li>
+    <li><b>购买明细</b>降级为行内 12px 灰字子行（同用户回访的 meta 行），不再缩进圆点列表</li>
+    <li>整个 tab 只剩 <b>3 种字号</b>（12.5 名称 / 12 正文 / 10.5 pill）、<b>4 种颜色</b>（#212631 / #3a4150 / #8f959e / #a8b1bd + 状态红），和其他 tab 完全一致</li>
+  </ul>
+</div>
+
+</body>
+</html>

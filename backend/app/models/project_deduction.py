@@ -61,6 +61,10 @@ class ProjectDeductionCreate(StrictBaseModel):
 
 
 class ProjectDeduction(ProjectDeductionBase):
+    cancelled: bool = False
+    cancellation_reason: str = ""
+    cancelled_at: Optional[datetime] = None
+    cancelled_by: str = ""
     id: str
     created_at: datetime
     is_deleted: bool = False

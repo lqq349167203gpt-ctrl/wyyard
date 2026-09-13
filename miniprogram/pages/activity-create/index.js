@@ -2,6 +2,7 @@ const {
   classRecordApi, courseTypeApi, spaceApi, organizationApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
+  isOperationCancelled,
 } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const {
@@ -209,7 +210,7 @@ Page({
   },
 
   applyTypeSelection(activityType, courseIndex, icsCourseType) {
-    let typeLabel, unifiedIndex, activityName
+    let typeLabel, unifiedIndex
     if (activityType === 'class' && courseIndex >= 0) {
       const course = this.data.courses[courseIndex]
       typeLabel = course.name
@@ -217,19 +218,18 @@ Page({
     } else if (activityType === 'ics' && icsCourseType) {
       typeLabel = icsCourseType
       unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === 'ics')
-      activityName = icsCourseType
     } else {
       typeLabel = TYPE_LABELS[activityType] || ''
       unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === activityType)
     }
     if (unifiedIndex < 0) unifiedIndex = 0
+    // 活动名称不随类型调整，保留用户已填写的内容
     this.setData({
       unifiedIndex,
       activityType,
       courseIndex: activityType === 'class' ? courseIndex : -1,
       icsCourseType: icsCourseType || '',
       typeLabel,
-      activityName: activityName || '',
       ownerId: '',
       ownerName: '',
       teacherIds: [],
@@ -597,6 +597,7 @@ Page({
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })
+      if (isOperationCancelled(e)) return
       wx.showModal({
         title: '创建失败',
         content: '是否重试？',

@@ -152,6 +152,8 @@ Page({
 
   onLoad(options) {
     if (!getApp().checkLogin()) return
+    this._principalParticipant = options.principalParticipant === '1'
+    this._principalCourse = options.principalCourse || ''
     this.setData({
       isViewOnly: isAreaViewOnly('customers'),
       canCreatePayment: getApp().checkPagePermission('payment'),
@@ -181,7 +183,7 @@ Page({
     })
     try {
       const [detail, customerTags] = await Promise.all([
-        customerApi.detail(id),
+        customerApi.detail(id, undefined, this._principalParticipant, this._principalCourse),
         customerTagApi.listForCustomer(id).catch(() => []),
       ])
       const c = detail.customer
@@ -279,7 +281,7 @@ Page({
 
       // 加载沟通记录
       if (c.nickname && (!customerAccessPermissions || customerAccessPermissions.detail_tabs.communication)) {
-        this.loadCommunicationRecords(c.nickname)
+        this.loadCommunicationRecords(c.nickname, this._principalParticipant ? detail.communication_records || [] : undefined)
       }
     } catch (e) {
       console.error('加载客户资料失败:', e)
@@ -403,9 +405,9 @@ Page({
     }
   },
 
-  async loadCommunicationRecords(nickname) {
+  async loadCommunicationRecords(nickname, providedRecords) {
     try {
-      const res = await communicationRecordApi.list(nickname)
+      const res = providedRecords === undefined ? await communicationRecordApi.list(nickname) : providedRecords
       const list = Array.isArray(res) ? res : []
       list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       list.forEach(item => {

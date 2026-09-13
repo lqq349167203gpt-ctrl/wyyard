@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课表名单入口 + 参与人弹窗 · 样式方案</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #f1f2f4;
+    --page-bg: #f2f3f5;
+    --phone-bg: #f7f8fa;
+    --head-bg: #f3f7ff;
+    --primary: #3370ff;
+    --dot-yellow: #f4dc84;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1280px; margin: 0 auto 32px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 18px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff; border: 1px solid #ebedf0;
+    padding: 7px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px;
+  }
+  .principle b { color: var(--ink); font-weight: 600; }
+
+  .frames { max-width: 1280px; margin: 0 auto; display: flex; gap: 28px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+  .frame { flex: 0 0 375px; }
+  .frame-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .frame-no { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .frame-name { font-size: 15px; font-weight: 600; }
+  .frame-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px; height: 780px; background: var(--phone-bg);
+    border: 1px solid #dee2e6; overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: var(--head-bg); display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .navbar {
+    height: 44px; background: var(--head-bg); display: flex; align-items: center; justify-content: center;
+    position: relative; font-size: 16px; font-weight: 600; flex-shrink: 0;
+  }
+  .capsule {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    width: 74px; height: 28px; border: 1px solid #e6e9ed; border-radius: 14px; background: #fff;
+    display: flex; align-items: center; justify-content: space-evenly;
+  }
+  .capsule::before { content: "•••"; font-size: 10px; letter-spacing: 1px; }
+  .capsule::after { content: "◉"; font-size: 11px; }
+  .screen { flex: 1; position: relative; overflow: hidden; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ===== 头部（还原真机：#F3F7FF + 周日期条） ===== */
+  .head { background: var(--head-bg); padding: 10px 16px 12px; }
+  .head-row { display: flex; align-items: center; }
+  .head-date { font-size: 15px; font-weight: 600; }
+  .head-date .wk { font-weight: 400; color: var(--ink-2); margin-left: 5px; font-size: 13px; }
+  .head-date .drop { color: var(--ink-3); font-size: 11px; margin-left: 6px; }
+  .head-space {
+    margin-left: auto; font-size: 12px; color: var(--ink-2);
+    background: #fff; padding: 7px 11px; border-radius: 10px;
+  }
+  .week { display: flex; margin-top: 12px; }
+  .wd { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; }
+  .wd .w { font-size: 10px; color: var(--ink-3); }
+  .wd .d {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--ink);
+  }
+  .wd.sel .d { background: var(--primary); color: #fff; font-weight: 600; }
+  .wd .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--primary); }
+  .wd .dot.off { background: transparent; }
+
+  .mask { position: absolute; inset: 0; background: rgba(31,35,41,.34); z-index: 5; }
+
+  /* ===== 时段标题（黄点） ===== */
+  .g-head { display: flex; align-items: center; gap: 7px; padding: 10px 20px; }
+  .g-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot-yellow); }
+  .g-title { font-size: 13px; font-weight: 600; }
+  .g-count { font-size: 11px; color: var(--ink-3); }
+  .g-quit { margin-left: auto; font-size: 11.5px; color: var(--ink-3); }
+
+  /* ===== 时段白卡（打包门课） ===== */
+  .g-card {
+    background: #fff; border-radius: 12px; margin: 0 12px 8px; overflow: hidden;
+  }
+  .acard { display: flex; padding: 10px 14px; min-height: 60px; align-items: center; }
+  .acard + .acard { border-top: 1px solid var(--hairline); }
+  .ac-time { width: 46px; flex-shrink: 0; }
+  .ac-time .t1 { font-size: 14px; font-weight: 700; display: block; }
+  .ac-time .t2 { font-size: 10.5px; color: var(--ink-3); display: block; margin-top: 2px; }
+  .ac-mid { flex: 1; min-width: 0; margin-left: 11px; }
+  .ac-l1 { display: flex; align-items: center; }
+  .welfare {
+    font-size: 10px; color: #62530e; background: var(--dot-yellow);
+    border: 1px solid #e5c45e; border-radius: 3px; padding: 0 4px;
+    line-height: 1.6; margin-right: 5px; flex-shrink: 0;
+  }
+  .ac-name { font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-type { font-size: 11px; color: var(--ink-3); margin-left: 6px; flex-shrink: 0; }
+  .ac-l2 { margin-top: 4px; font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-right { flex-shrink: 0; margin-left: 10px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 5px; }
+
+  .st { font-size: 10.5px; color: var(--ink-3); }
+  .st-lock { border: 1px solid #dcdfe4; border-radius: 3px; padding: 1px 5px; }
+
+  /* A：人数胶囊 */
+  .ppl-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #f2f3f5; border-radius: 4px; padding: 4px 8px;
+    font-size: 12px; font-weight: 600; color: var(--ink);
+  }
+  .ppl-pill .chev { color: var(--ink-3); font-weight: 400; }
+
+  /* B：头像串 */
+  .ac-roster { margin-top: 6px; display: flex; align-items: center; }
+  .av-stack { display: flex; }
+  .av {
+    width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #fff;
+    font-size: 9px; color: #fff; display: flex; align-items: center; justify-content: center;
+    margin-left: -6px; flex-shrink: 0;
+  }
+  .av:first-child { margin-left: 0; }
+  .av-more { background: #eef0f2; color: var(--ink-2); font-size: 8.5px; }
+  .roster-text { font-size: 11px; color: var(--ink-3); margin-left: 7px; }
+  .roster-text .chev { color: var(--ink-4); }
+
+  /* C：课内名单条（不占右列，附在课程行下方） */
+  .acard-c { display: block; padding: 0; }
+  .acard-c .ac-top { display: flex; padding: 10px 14px 9px; align-items: center; }
+  .acard-c .ac-roster-strip {
+    display: flex; align-items: center; padding: 0 14px 9px 71px;
+    font-size: 11px; color: var(--ink-2);
+  }
+  .ac-roster-strip .names { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-roster-strip .entry { margin-left: auto; color: var(--primary); flex-shrink: 0; }
+
+  /* ===== 底部弹窗（通用） ===== */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+    background: #fff; border-radius: 12px 12px 0 0;
+    display: flex; flex-direction: column; max-height: 60%;
+  }
+  .sheet-handle { width: 32px; height: 3px; border-radius: 2px; background: #dfe2e6; margin: 8px auto 2px; flex-shrink: 0; }
+  .sheet-head {
+    display: flex; align-items: center; padding: 12px 16px 11px;
+    border-bottom: 1px solid var(--hairline); flex-shrink: 0;
+  }
+  .sheet-title { font-size: 14.5px; font-weight: 700; }
+  .sheet-title .n { color: var(--ink-3); font-weight: 400; }
+  .sheet-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; display: block; }
+  .sheet-close {
+    margin-left: auto; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-3); font-size: 18px; font-weight: 300; background: #f2f3f5; flex-shrink: 0;
+  }
+  .sheet-hint { font-size: 10.5px; color: var(--ink-4); padding: 7px 16px 0; flex-shrink: 0; }
+
+  .rl-row { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid #f5f6f7; }
+  .rl-row:last-child { border-bottom: none; }
+  .rl-av {
+    width: 30px; height: 30px; border-radius: 50%; background: #f2f3f5;
+    color: var(--ink-2); font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .rl-name { font-size: 13.5px; font-weight: 500; margin-left: 10px; }
+  .rl-tag { font-size: 10px; color: #c4506a; margin-left: 6px; }
+  .rl-chev { margin-left: auto; color: var(--ink-4); font-size: 15px; flex-shrink: 0; }
+  .rc-link { margin-left: auto; font-size: 12px; color: var(--primary); flex-shrink: 0; }
+
+  /* B：网格名单 */
+  .rg-grid { display: flex; flex-wrap: wrap; padding: 12px 10px 4px; }
+  .rg-item { width: 25%; display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; position: relative; }
+  .rg-av {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; color: #fff;
+  }
+  .rg-name { font-size: 11px; color: var(--ink); margin-top: 6px; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rg-item.off .rg-av { background: #e8eaed !important; color: var(--ink-4); }
+  .rg-item.off .rg-name { color: var(--ink-4); text-decoration: line-through; }
+  .rg-off-tag {
+    position: absolute; top: 32px; font-size: 8.5px; color: #c4506a;
+    background: #fff; padding: 0 3px; border-radius: 2px;
+  }
+
+  .notes {
+    margin-top: 14px; background: #fff; border: 1px solid #ebedf0;
+    border-radius: 3px; padding: 12px 14px;
+  }
+  .notes li {
+    font-size: 12px; color: var(--ink-2); line-height: 1.8;
+    list-style: none; padding-left: 12px; position: relative;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 4px; height: 4px; background: var(--primary); border-radius: 1px;
+  }
+  .notes li b { color: var(--ink); }
+
+  .doc-foot { max-width: 1280px; margin: 26px auto 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">课表名单入口 + 参与人弹窗 · 样式方案</div>
+  <div class="doc-sub">页面其余部分（时段白卡、黄色段标题点、周日期条、退课入口）全部保持现状，只改两处：<b>卡片上的「N人 名单›」</b>和<b>弹窗里的「查看资料」按钮</b>。每帧为「卡片 + 半开弹窗」成套呈现。</div>
+  <div class="principles">
+    <div class="principle"><b>现状：右列三层堆叠</b>　「仅查看 / 6人+名单+› 三拼元素 / 已发布」，灰蓝拼色、碎</div>
+    <div class="principle"><b>现状：人数看不出是谁</b>　只有「6 人」，对名单必须点开</div>
+    <div class="principle"><b>现状：弹窗按钮太重</b>　每行一个蓝边「查看资料」按钮，6 个人 6 个按钮</div>
+  </div>
+</div>
+
+<div class="frames">
+
+  <!-- ================= 方案 A ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">A</span>
+      <span class="frame-name">人数胶囊 + 整行可点</span>
+      <span class="frame-desc">改动最小 · 最干净</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">课表<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="head">
+          <div class="head-row">
+            <span class="head-date tnum">9月1日<span class="wk">周二</span><span class="drop">▾</span></span>
+            <span class="head-space">三楼茶室</span>
+          </div>
+          <div class="week">
+            <div class="wd"><span class="w">六</span><span class="d">29</span><span class="dot off"></span></div>
+            <div class="wd"><span class="w">日</span><span class="d">30</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">一</span><span class="d">31</span><span class="dot off"></span></div>
+            <div class="wd sel"><span class="w">二</span><span class="d">1</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">三</span><span class="d">2</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">四</span><span class="d">3</span><span class="dot off"></span></div>
+            <div class="wd"><span class="w">五</span><span class="d">4</span><span class="dot"></span></div>
+          </div>
+        </div>
+
+        <div class="g-head"><span class="g-dot"></span><span class="g-title">下午</span><span class="g-count tnum">2 场</span><span class="g-quit">退课</span></div>
+        <div class="g-card">
+          <div class="acard">
+            <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+            <div class="ac-mid">
+              <div class="ac-l1"><span class="ac-name">觉醒游戏·陈默</span><span class="ac-type">觉醒游戏</span></div>
+              <div class="ac-l2">周远 · 扣卡 1 次 · 耀凯</div>
+            </div>
+            <div class="ac-right">
+              <span class="ppl-pill tnum">6 人<span class="chev">›</span></span>
+              <span class="st">已发布</span>
+            </div>
+          </div>
+          <div class="acard">
+            <div class="ac-time tnum"><span class="t1">15:30</span><span class="t2">17:00</span></div>
+            <div class="ac-mid">
+              <div class="ac-l1"><span class="ac-name">情绪释放·小满</span><span class="ac-type">情绪释放</span></div>
+              <div class="ac-l2">何青 · 婷婷</div>
+            </div>
+            <div class="ac-right">
+              <span class="ppl-pill tnum">4 人<span class="chev">›</span></span>
+              <span class="st st-lock">仅查看</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mask"></div>
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <div>
+              <span class="sheet-title">参与人员 <span class="n tnum">6</span></span>
+              <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+            </div>
+            <div class="sheet-close">×</div>
+          </div>
+          <div class="sheet-hint">点任意一行查看客户资料</div>
+          <div>
+            <div class="rl-row"><span class="rl-av">陈</span><span class="rl-name">陈默</span><span class="rl-chev">›</span></div>
+            <div class="rl-row"><span class="rl-av">璐</span><span class="rl-name">璐小娜</span><span class="rl-chev">›</span></div>
+            <div class="rl-row"><span class="rl-av">苏</span><span class="rl-name">苏杭</span><span class="rl-chev">›</span></div>
+            <div class="rl-row"><span class="rl-av">林</span><span class="rl-name">林晓</span><span class="rl-tag">已退课</span><span class="rl-chev">›</span></div>
+            <div class="rl-row"><span class="rl-av">方</span><span class="rl-name">方舟</span><span class="rl-chev">›</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>「6人 名单 ›」三合一</b>：人数本身就是按钮——灰色小胶囊「6 人 ›」，与状态小签同色同圆角，右列干净对齐</li>
+      <li><b>弹窗去掉全部按钮</b>：整行可点跳客户资料，右侧只留灰箭头，加一行引导小字</li>
+      <li>已退课小红字、已发布、仅查看等现有规则原样保留</li>
+      <li>改动最小，<b>只动名单入口和弹窗按钮两处</b></li>
+    </ul>
+  </div>
+
+  <!-- ================= 方案 B ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">B</span>
+      <span class="frame-name">头像串上卡 + 网格名单</span>
+      <span class="frame-desc">信息量最大 · 最直观</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">课表<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="head">
+          <div class="head-row">
+            <span class="head-date tnum">9月1日<span class="wk">周二</span><span class="drop">▾</span></span>
+            <span class="head-space">三楼茶室</span>
+          </div>
+          <div class="week">
+            <div class="wd"><span class="w">六</span><span class="d">29</span><span class="dot off"></span></div>
+            <div class="wd"><span class="w">日</span><span class="d">30</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">一</span><span class="d">31</span><span class="dot off"></span></div>
+            <div class="wd sel"><span class="w">二</span><span class="d">1</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">三</span><span class="d">2</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">四</span><span class="d">3</span><span class="dot off"></span></div>
+            <div class="wd"><span class="w">五</span><span class="d">4</span><span class="dot"></span></div>
+          </div>
+        </div>
+
+        <div class="g-head"><span class="g-dot"></span><span class="g-title">下午</span><span class="g-count tnum">2 场</span><span class="g-quit">退课</span></div>
+        <div class="g-card">
+          <div class="acard">
+            <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+            <div class="ac-mid">
+              <div class="ac-l1"><span class="ac-name">觉醒游戏·陈默</span><span class="ac-type">觉醒游戏</span></div>
+              <div class="ac-roster">
+                <span class="av-stack">
+                  <span class="av" style="background:#4a7fb5;">陈</span>
+                  <span class="av" style="background:#8b72c7;">璐</span>
+                  <span class="av" style="background:#5ba88a;">苏</span>
+                  <span class="av av-more tnum">+3</span>
+                </span>
+                <span class="roster-text tnum">等 6 人 <span class="chev">›</span></span>
+              </div>
+            </div>
+            <div class="ac-right">
+              <span class="st">已发布</span>
+            </div>
+          </div>
+          <div class="acard">
+            <div class="ac-time tnum"><span class="t1">15:30</span><span class="t2">17:00</span></div>
+            <div class="ac-mid">
+              <div class="ac-l1"><span class="ac-name">情绪释放·小满</span><span class="ac-type">情绪释放</span></div>
+              <div class="ac-roster">
+                <span class="av-stack">
+                  <span class="av" style="background:#d97070;">林</span>
+                  <span class="av" style="background:#4a90d9;">方</span>
+                  <span class="av av-more tnum">+2</span>
+                </span>
+                <span class="roster-text tnum">等 4 人 <span class="chev">›</span></span>
+              </div>
+            </div>
+            <div class="ac-right">
+              <span class="st st-lock">仅查看</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mask"></div>
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <div>
+              <span class="sheet-title">参与人员 <span class="n tnum">6</span></span>
+              <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+            </div>
+            <div class="sheet-close">×</div>
+          </div>
+          <div class="sheet-hint">点头像查看客户资料</div>
+          <div class="rg-grid">
+            <div class="rg-item"><span class="rg-av" style="background:#4a7fb5;">陈</span><span class="rg-name">陈默</span></div>
+            <div class="rg-item"><span class="rg-av" style="background:#8b72c7;">璐</span><span class="rg-name">璐小娜</span></div>
+            <div class="rg-item"><span class="rg-av" style="background:#5ba88a;">苏</span><span class="rg-name">苏杭</span></div>
+            <div class="rg-item off"><span class="rg-av">林</span><span class="rg-off-tag">已退课</span><span class="rg-name">林晓</span></div>
+            <div class="rg-item"><span class="rg-av" style="background:#4a90d9;">方</span><span class="rg-name">方舟</span></div>
+            <div class="rg-item"><span class="rg-av" style="background:#c772a0;">顾</span><span class="rg-name">顾一帆</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>人数从右列拿走</b>：meta 行换成「头像串 + 等 N 人 ›」，右列只剩状态签；点整行开头像弹窗</li>
+      <li>头像串直接看到「谁来了」（前 3 位 +N），<b>不点开也能对名单</b></li>
+      <li><b>弹窗改 4 列网格</b>：大头像+名字，人多比列表好扫；已退课置灰+删除线+小标记；点任意头像跳客户资料</li>
+      <li>头像色按名字固定分配（冷色系），同一个人全店同色</li>
+    </ul>
+  </div>
+
+  <!-- ================= 方案 C ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">C</span>
+      <span class="frame-name">课内名单条 + 细链接</span>
+      <span class="frame-desc">名单最醒目 · 行稍高</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">课表<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="head">
+          <div class="head-row">
+            <span class="head-date tnum">9月1日<span class="wk">周二</span><span class="drop">▾</span></span>
+            <span class="head-space">三楼茶室</span>
+          </div>
+          <div class="week">
+            <div class="wd"><span class="w">六</span><span class="d">29</span><span class="dot off"></span></div>
+            <div class="wd"><span class="w">日</span><span class="d">30</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">一</span><span class="d">31</span><span class="dot off"></span></div>
+            <div class="wd sel"><span class="w">二</span><span class="d">1</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">三</span><span class="d">2</span><span class="dot"></span></div>
+            <div class="wd"><span class="w">四</span><span class="d">3</span><span class="dot off"></span></div>
+            <div class="wd"><span class="w">五</span><span class="d">4</span><span class="dot"></span></div>
+          </div>
+        </div>
+
+        <div class="g-head"><span class="g-dot"></span><span class="g-title">下午</span><span class="g-count tnum">2 场</span><span class="g-quit">退课</span></div>
+        <div class="g-card">
+          <div class="acard acard-c">
+            <div class="ac-top">
+              <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+              <div class="ac-mid">
+                <div class="ac-l1"><span class="ac-name">觉醒游戏·陈默</span><span class="ac-type">觉醒游戏</span></div>
+                <div class="ac-l2">周远 · 扣卡 1 次 · 耀凯</div>
+              </div>
+              <div class="ac-right">
+                <span class="st">已发布</span>
+              </div>
+            </div>
+            <div class="ac-roster-strip">
+              <span class="names tnum">6 人 · 陈默、璐小娜、苏杭、林晓…</span>
+              <span class="entry">名单 ›</span>
+            </div>
+          </div>
+          <div class="acard acard-c">
+            <div class="ac-top">
+              <div class="ac-time tnum"><span class="t1">15:30</span><span class="t2">17:00</span></div>
+              <div class="ac-mid">
+                <div class="ac-l1"><span class="ac-name">情绪释放·小满</span><span class="ac-type">情绪释放</span></div>
+                <div class="ac-l2">何青 · 婷婷</div>
+              </div>
+              <div class="ac-right">
+                <span class="st st-lock">仅查看</span>
+              </div>
+            </div>
+            <div class="ac-roster-strip">
+              <span class="names tnum">4 人 · 林晓、方舟、顾一帆…</span>
+              <span class="entry">名单 ›</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mask"></div>
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <div>
+              <span class="sheet-title">参与人员 <span class="n tnum">6</span></span>
+              <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+            </div>
+            <div class="sheet-close">×</div>
+          </div>
+          <div>
+            <div class="rl-row"><span class="rl-av">陈</span><span class="rl-name">陈默</span><span class="rc-link">资料 ›</span></div>
+            <div class="rl-row"><span class="rl-av">璐</span><span class="rl-name">璐小娜</span><span class="rc-link">资料 ›</span></div>
+            <div class="rl-row"><span class="rl-av">苏</span><span class="rl-name">苏杭</span><span class="rc-link">资料 ›</span></div>
+            <div class="rl-row"><span class="rl-av">林</span><span class="rl-name">林晓</span><span class="rl-tag">已退课</span><span class="rc-link">资料 ›</span></div>
+            <div class="rl-row"><span class="rl-av">方</span><span class="rl-name">方舟</span><span class="rc-link">资料 ›</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>名单附在课程行内下方</b>（缩进对齐名字）：「6 人 · 陈默、璐小娜…」+ 右侧「名单 ›」，右列只留状态签</li>
+      <li>名字直接印在卡上，文字比头像更省纵向空间，<b>不点开就知道谁来</b></li>
+      <li>弹窗保留列表形态，蓝边按钮换成<b>纯文字「资料 ›」细链接</b>，轻得多</li>
+      <li>代价：每门课高出一截，一天课多时首屏场次变少</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="doc-foot">
+  说明：纯样式稿，未改代码；页面其余部分与真机现状一致（白卡打包、黄色段标题点、周日期条、退课入口均未动）。入口与弹窗可混搭（如 A 胶囊 + B 网格弹窗）。<br>
+  建议：改动最小选 A；想不点开就看到人选 B；想名单最醒目选 C。选定后我只动 pages/activities 的名单入口与弹窗两处。
+</div>
+
+</body>
+</html>

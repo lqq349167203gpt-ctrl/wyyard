@@ -1,0 +1,295 @@
+<view class="page">
+  <view class="header">
+    <view>
+      <view class="title">组织信息</view>
+      <view class="sub">集中配置组织成员与客户端活动</view>
+    </view>
+    <button wx:if="{{activeTab === 'members'}}" class="btn-primary" size="mini" bindtap="openCreateOrg">新增组织</button>
+    <button wx:else class="btn-primary" size="mini" bindtap="openActCreate" disabled="{{!organizations.length}}">新增活动</button>
+  </view>
+
+  <view class="tabs">
+    <view class="tab {{activeTab === 'members' ? 'on' : ''}}" data-tab="members" bindtap="switchTab">成员配置</view>
+    <view class="tab {{activeTab === 'activities' ? 'on' : ''}}" data-tab="activities" bindtap="switchTab">活动配置</view>
+  </view>
+  <view class="tab-stat" wx:if="{{activeTab === 'members'}}">{{organizations.length}} 个组织，{{memberCount}} 位成员</view>
+  <view class="tab-stat" wx:else>{{courseTypes.length}} 个活动类型</view>
+
+  <!-- 成员配置 -->
+  <block wx:if="{{activeTab === 'members'}}">
+    <view class="viewer-bar">
+      <view class="viewer-head">
+        <text class="viewer-title">整体数据查阅人</text>
+        <text class="viewer-hint">默认属于每个组织，可查看所有组织的数据</text>
+      </view>
+      <view class="viewer-tags">
+        <view class="tag" wx:for="{{dataViewerNames}}" wx:key="*this">
+          {{item}}
+          <text class="tag-x" data-id="{{dataViewerIds[index]}}" bindtap="removeViewer">×</text>
+        </view>
+        <text class="link" bindtap="openViewerAdd">+ 添加</text>
+      </view>
+    </view>
+
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:elif="{{!organizations.length}}" class="empty">暂无组织，请先新增组织</view>
+    <view wx:else class="org-list">
+      <view class="org-card" wx:for="{{organizations}}" wx:key="id" wx:for-item="org">
+        <view class="org-head">
+          <view class="org-left">
+            <view class="sort-col" wx:if="{{index > 0 || !org.isFixed}}">
+              <text class="sort-btn {{index === 0 ? 'disabled' : ''}}" data-id="{{org.id}}" data-dir="up" bindtap="moveOrg">▲</text>
+              <text class="sort-btn {{index === organizations.length - 1 ? 'disabled' : ''}}" data-id="{{org.id}}" data-dir="down" bindtap="moveOrg">▼</text>
+            </view>
+            <view class="org-name">{{org.name}}</view>
+            <text class="org-badge" wx:if="{{org.referrer_mode === 'all'}}">全员引流</text>
+            <text class="org-badge" wx:elif="{{org.referrer_mode === 'selected'}}">指定引流 {{org.referrer_ids.length}} 人</text>
+          </view>
+          <view class="org-actions">
+            <text class="link" data-id="{{org.id}}" bindtap="openEditOrg">编辑</text>
+            <text class="link danger" data-id="{{org.id}}" data-name="{{org.name}}" bindtap="confirmDeleteOrg">删除</text>
+          </view>
+        </view>
+        <view class="org-meta" wx:if="{{org.referrer_mode === 'selected' && org.referrer_labels && org.referrer_labels.length}}">
+          引流人：{{org.referrer_labels.join('、')}}
+        </view>
+        <view class="org-meta" wx:if="{{org.include_unassigned_referrers === false}}">不含未配置引流人的客户</view>
+        <view class="member-list">
+          <view class="member-head">
+            <text class="col-nick">昵称</text>
+            <text class="col-name">姓名</text>
+            <text class="col-type">会员类型</text>
+            <text class="col-visit">到场</text>
+            <text class="col-op">操作</text>
+          </view>
+          <view class="member-row" wx:for="{{org.members}}" wx:key="id" wx:for-item="member" wx:for-index="mi">
+            <view class="col-nick">{{member.nickname || '—'}}</view>
+            <view class="col-name">{{member.name || '—'}}</view>
+            <view class="col-type">{{member.member_type || '—'}}</view>
+            <view class="col-visit">{{member.visit_count != null ? member.visit_count : '—'}}</view>
+            <view class="col-op m-ops">
+              <text class="sort-btn {{mi === 0 ? 'disabled' : ''}}" data-org-id="{{org.id}}" data-member-id="{{member.id}}" data-dir="up" bindtap="moveMember">▲</text>
+              <text class="sort-btn {{mi === org.members.length - 1 ? 'disabled' : ''}}" data-org-id="{{org.id}}" data-member-id="{{member.id}}" data-dir="down" bindtap="moveMember">▼</text>
+              <text class="link danger" data-org-id="{{org.id}}" data-member-id="{{member.id}}" bindtap="confirmRemoveMember">移除</text>
+            </view>
+          </view>
+          <view class="empty-row" wx:if="{{!org.members || !org.members.length}}">暂无成员</view>
+          <view class="add-member" data-id="{{org.id}}" bindtap="openMemberAdd">+ 添加成员</view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 活动配置 -->
+  <block wx:else>
+    <view wx:if="{{loading}}" class="empty">加载中...</view>
+    <view wx:elif="{{!courseTypes.length}}" class="empty">暂无活动类型</view>
+    <view wx:else class="org-list">
+      <view class="org-card" wx:for="{{courseTypes}}" wx:key="name" wx:for-item="type" wx:for-index="ti">
+        <view class="org-head">
+          <view class="org-left">
+            <view class="sort-col">
+              <text class="sort-btn {{ti === 0 ? 'disabled' : ''}}" data-name="{{type.name}}" data-dir="up" bindtap="moveAct">▲</text>
+              <text class="sort-btn {{ti === courseTypes.length - 1 ? 'disabled' : ''}}" data-name="{{type.name}}" data-dir="down" bindtap="moveAct">▼</text>
+            </view>
+            <view class="org-info">
+              <view class="org-name">{{type.name}}</view>
+              <view class="m-sub">
+                <text class="badge {{type.is_other ? 'gray' : 'blue'}}">{{type.is_other ? '系统内置' : '普通活动'}}</text>
+                <text wx:if="{{type.org_name}}" class="org-of">{{type.org_name}}</text>
+              </view>
+            </view>
+          </view>
+          <view class="org-actions">
+            <text class="link" data-name="{{type.name}}" bindtap="openActEdit">编辑</text>
+            <text class="link danger" wx:if="{{!type.is_other}}" data-name="{{type.name}}" bindtap="confirmDeleteAct">删除</text>
+          </view>
+        </view>
+        <view class="act-images" wx:if="{{type.list_image || (type.detail_images && type.detail_images.length)}}">
+          <image wx:if="{{type.list_image}}" class="act-thumb" src="{{type.list_image}}" mode="aspectFill" />
+          <image wx:for="{{type.detail_images}}" wx:key="*this" wx:for-item="img" class="act-thumb" src="{{img}}" mode="aspectFill" />
+        </view>
+      </view>
+    </view>
+  </block>
+</view>
+
+<!-- 新增/编辑组织 -->
+<view class="mask" wx:if="{{orgDialogOpen}}" bindtap="closeOrgDialog">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">{{editingOrgId ? '编辑组织' : '新增组织'}}</view>
+    <view class="field">
+      <text class="label">组织名称</text>
+      <input class="input" value="{{orgFormName}}" disabled="{{orgNameDisabled}}" placeholder="请输入组织名称" bindinput="onOrgNameInput" />
+      <text class="err" wx:if="{{orgNameError}}">{{orgNameError}}</text>
+    </view>
+    <view class="field">
+      <text class="label">引流归属</text>
+      <view class="modes">
+        <view class="mode {{orgReferrerMode === 'member' ? 'on' : ''}}" data-mode="member" bindtap="onOrgRefModeChange">按组织成员</view>
+        <view class="mode {{orgReferrerMode === 'all' ? 'on' : ''}}" data-mode="all" bindtap="onOrgRefModeChange">所有人</view>
+        <view class="mode {{orgReferrerMode === 'selected' ? 'on' : ''}}" data-mode="selected" bindtap="onOrgRefModeChange">指定人员</view>
+      </view>
+      <view wx:if="{{orgReferrerMode === 'selected'}}">
+        <view class="ref-tags">
+          <view class="tag" wx:for="{{orgReferrerLabels}}" wx:key="*this">
+            {{item}}
+            <text class="tag-x" data-index="{{index}}" bindtap="removeReferrer">×</text>
+          </view>
+          <text class="link" bindtap="openRefPicker">+ 选择</text>
+        </view>
+      </view>
+      <label class="check-row">
+        <checkbox checked="{{orgIncludeUnassigned}}" bindchange="onOrgUnassignedChange" color="#3370ff" />
+        <view>
+          <view>包含未配置引流人的客户</view>
+          <view class="check-hint">没填引流人的客户归到「未配置」并计入这个组织的引流统计</view>
+        </view>
+      </label>
+    </view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeOrgDialog">取消</button>
+      <button class="btn-primary" loading="{{savingOrg}}" disabled="{{savingOrg}}" bindtap="saveOrg">保存</button>
+    </view>
+  </view>
+</view>
+
+<!-- 添加成员 -->
+<view class="mask" wx:if="{{memberAddOpen}}" bindtap="closeMemberAdd">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">添加成员</view>
+    <view class="field">
+      <text class="label">搜索用户</text>
+      <input class="input" value="{{memberKeyword}}" placeholder="输入姓名或昵称搜索" bindinput="onMemberKeyword" />
+      <view class="search-list">
+        <view class="search-item" wx:for="{{memberSearchResults}}" wx:key="id" data-customer="{{item}}" bindtap="pickMember">
+          {{item.nickname || item.name || item.id}}
+          <text class="m-sub" wx:if="{{item.name}}">· {{item.name}}</text>
+        </view>
+        <view class="empty-row" wx:if="{{memberKeyword && !memberSearching && !memberSearchResults.length}}">无匹配客户</view>
+      </view>
+    </view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeMemberAdd">关闭</button>
+    </view>
+  </view>
+</view>
+
+<!-- 整体数据查阅人 -->
+<view class="mask" wx:if="{{viewerAddOpen}}" bindtap="closeViewerAdd">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">新增整体数据查阅人</view>
+    <view class="hint-text">默认属于每个组织，可查看所有组织的数据。</view>
+    <view class="field">
+      <text class="label">搜索用户</text>
+      <input class="input" value="{{viewerKeyword}}" placeholder="输入姓名或昵称搜索" bindinput="onViewerKeyword" />
+      <view class="search-list">
+        <view class="search-item" wx:for="{{viewerSearchResults}}" wx:key="id" data-customer="{{item}}" bindtap="pickViewer">
+          {{item.nickname || item.name || item.id}}
+        </view>
+        <view class="empty-row" wx:if="{{viewerKeyword && !viewerSearching && !viewerSearchResults.length}}">无匹配客户</view>
+      </view>
+    </view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeViewerAdd">关闭</button>
+    </view>
+  </view>
+</view>
+
+<!-- 选择引流人 -->
+<view class="mask" wx:if="{{refAddOpen}}" bindtap="closeRefPicker">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">选择引流人</view>
+    <view class="field">
+      <input class="input" value="{{refKeyword}}" placeholder="输入姓名或昵称搜索" bindinput="onRefKeyword" />
+      <view class="search-list">
+        <view class="search-item" wx:for="{{refSearchResults}}" wx:key="id" data-customer="{{item}}" bindtap="pickReferrer">
+          {{item.nickname || item.name || item.id}}
+        </view>
+      </view>
+    </view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeRefPicker">关闭</button>
+    </view>
+  </view>
+</view>
+
+<!-- 移除成员 -->
+<view class="mask" wx:if="{{deleteMemberOpen}}" bindtap="closeDeleteMember">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">移除成员</view>
+    <view class="hint-text">输入成员昵称确认移除</view>
+    <view class="field">
+      <input class="input" value="{{deleteMemberInput}}" placeholder="{{deleteMemberName}}" bindinput="onDeleteMemberInput" />
+      <text class="err" wx:if="{{deleteMemberError}}">{{deleteMemberError}}</text>
+    </view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeDeleteMember">取消</button>
+      <button class="btn-danger" bindtap="doDeleteMember">移除</button>
+    </view>
+  </view>
+</view>
+
+<!-- 删除组织 -->
+<view class="mask" wx:if="{{deleteOrgOpen}}" bindtap="closeDeleteOrg">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">删除组织</view>
+    <view class="hint-text">确定删除组织「{{deleteOrgName}}」吗？关联课程数据不受影响。</view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeDeleteOrg">取消</button>
+      <button class="btn-danger" bindtap="doDeleteOrg">删除</button>
+    </view>
+  </view>
+</view>
+
+<!-- 活动表单 -->
+<view class="mask" wx:if="{{actDialogOpen}}" bindtap="closeActDialog">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">{{actEditingName ? '编辑活动' : '新增活动'}}</view>
+    <view class="field">
+      <text class="label">活动名称</text>
+      <input class="input" value="{{actFormName}}" placeholder="请输入活动名称" bindinput="onActNameInput" />
+    </view>
+    <view class="field" wx:if="{{!actIsOther}}">
+      <text class="label">所属组织</text>
+      <picker mode="selector" range="{{orgNames}}" bindchange="onActOrgChange">
+        <view class="input picker">请选择所属组织</view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="label">列表图</text>
+      <view class="img-row">
+        <image wx:if="{{actFormListImage}}" class="thumb" src="{{actFormListImage}}" mode="aspectFill" bindtap="chooseActListImage" />
+        <view wx:else class="thumb add" bindtap="chooseActListImage">+</view>
+        <text class="link danger" wx:if="{{actFormListImage}}" bindtap="removeActListImage">移除</text>
+      </view>
+    </view>
+    <view class="field">
+      <text class="label">详情图</text>
+      <view class="img-row wrap">
+        <image wx:for="{{actFormDetailImages}}" wx:key="*this" wx:for-item="img" wx:for-index="di" class="thumb" src="{{img}}" mode="aspectFill" />
+        <view class="thumb add" bindtap="chooseActDetailImage">+</view>
+      </view>
+      <view class="img-remove-row">
+        <text class="link danger" wx:for="{{actFormDetailImages}}" wx:key="*this" wx:for-index="di" data-index="{{di}}" bindtap="removeActDetailImage">删图{{di + 1}}</text>
+      </view>
+    </view>
+    <text class="err" wx:if="{{actFormError}}">{{actFormError}}</text>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeActDialog">取消</button>
+      <button class="btn-primary" loading="{{actSaving || actUploading}}" disabled="{{actSaving || actUploading}}" bindtap="saveAct">保存</button>
+    </view>
+  </view>
+</view>
+
+<!-- 删除活动 -->
+<view class="mask" wx:if="{{actDeleteOpen}}" bindtap="closeDeleteAct">
+  <view class="sheet" catchtap="stopPrevent">
+    <view class="sheet-title">删除活动</view>
+    <view class="hint-text">确定删除活动「{{actDeleteName}}」吗？</view>
+    <view class="sheet-actions">
+      <button class="btn-ghost" bindtap="closeDeleteAct">取消</button>
+      <button class="btn-danger" bindtap="doDeleteAct">删除</button>
+    </view>
+  </view>
+</view>

@@ -28,9 +28,11 @@ from app.services import (
     oh_card_reading_service,
     organization_service,
     other_project_service,
+    position_edit_permission_service,
     visit_note_service,
     visit_service,
 )
+from app.utils.record_ownership import request_actor_customer_ids
 from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
@@ -1593,6 +1595,16 @@ def _course_participant_ids(activity_type: str, activity) -> set[str]:
         special_id = getattr(activity, field, "")
         if special_id:
             participant_ids.discard(special_id)
+    if activity_type == "eks":
+        # 能量结的案主可能记在 description 里（可能多个），同样不算到场人数与新人/老人名单
+        try:
+            details = json.loads(getattr(activity, "description", "") or "[]")
+        except (ValueError, TypeError):
+            details = []
+        if isinstance(details, list):
+            for item in details:
+                if isinstance(item, dict) and item.get("id"):
+                    participant_ids.discard(item["id"])
     return participant_ids
 
 
@@ -1805,9 +1817,9 @@ def _course_activity_name(activity_type: str, label: str, activity) -> str:
 
 
 def _course_activity_hours(activity_type: str, activity) -> int:
-    """课程课时：能量结按案主实际销卡数，其他活动按会员扣卡次数。"""
+    """课程课时：其他活动按会员扣卡次数；能量结没有课时，它只结算部位数（部位数单独出列）。"""
     if activity_type == "eks":
-        return energy_knot_session_service.get_session_deduction_count(activity)
+        return 0
     try:
         return max(0, int(getattr(activity, "membership_deduction_count", 1) or 0))
     except (TypeError, ValueError):
@@ -1934,6 +1946,10 @@ def get_course_statistics(
         else set(customer_map)
     )
     role = get_request_roles(request) if request else ["超级管理员"]
+    # 角色限定“与本人相关”时，只返回本人（账号归属人）作为老师/成就君的课程。
+    restricted_teacher_ids: set[str] | None = None
+    if request is not None and position_edit_permission_service.get_permissions(role)["course_records"] == "own":
+        restricted_teacher_ids = request_actor_customer_ids(request)
     transaction_access = customer_access_service.transaction_access(role)
     can_view_payment = transaction_access in {"summary", "detail"}
     can_view_payment_details = transaction_access == "detail"
@@ -1950,6 +1966,8 @@ def get_course_statistics(
             or organization_filter in member_organizations.get(customer.id, set())
         )
     ]
+    if restricted_teacher_ids is not None:
+        teachers = [customer for customer in teachers if customer.id in restricted_teacher_ids]
 
     selected_types = {
         key
@@ -1969,6 +1987,8 @@ def get_course_statistics(
 
     def _matches_common_filters(type_key: str, activity) -> bool:
         activity_teacher_ids = _course_activity_teacher_ids(activity)
+        if restricted_teacher_ids is not None and not (activity_teacher_ids & restricted_teacher_ids):
+            return False
         if teacher_id and teacher_id not in activity_teacher_ids:
             return False
         return _matches_organization(type_key, activity)
@@ -2145,6 +2165,7 @@ def get_course_statistics(
                 "start_time": getattr(activity, "start_time", "") or "",
                 "end_time": getattr(activity, "end_time", "") or "",
                 "class_hours": activity_hours,
+                "course_review": getattr(activity, "course_review", "") or "",
                 "teachers": teacher_names,
                 **_course_owner_details(type_key, activity, customer_map, visible_customer_ids),
                 "participant_count": activity_participants,

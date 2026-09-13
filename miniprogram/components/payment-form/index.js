@@ -318,12 +318,17 @@ Component({
     _loadOrganizations() {
       organizationApi.list().then(res => {
         const orgs = res || []
-        const defaultIdx = 0
-        const defaultOrgId = orgs.length > 0 ? orgs[0].id : ''
+        const currentOrgId = this.data.formData.organization_id || ''
+        const currentIndex = orgs.findIndex(item => item.id === currentOrgId)
+        // 粗门次卡新增：成交归属不预选，必须由录入人自己确认（必填）
+        const needsExplicitChoice = this.data.type === 'coarse_door_card' && !this.data.isEdit
+        const orgIndex = currentIndex >= 0
+          ? currentIndex
+          : (needsExplicitChoice || orgs.length === 0 ? -1 : 0)
         this.setData({
           organizations: orgs,
-          orgIndex: defaultIdx,
-          'formData.organization_id': this.data.formData.organization_id || defaultOrgId,
+          orgIndex,
+          'formData.organization_id': orgIndex >= 0 ? orgs[orgIndex].id : '',
         })
       }).catch(() => {})
       if (this.data.type === 'coarse_door_card') {

@@ -64,8 +64,9 @@
     <view class="coarse-record" wx:for="{{coarseRecords}}" wx:key="id">
       <view class="coarse-record-main">
         <text class="coarse-record-name">{{item.nickname}}</text>
+        <text wx:if="{{item.cancelled}}" class="coarse-toolbar-caption">已取消｜已从课程移除</text>
         <view class="coarse-record-actions">
-          <text class="coarse-record-count">-{{item.count}}次</text>
+          <text class="coarse-record-count">{{item.cancelled ? '原抵扣 ' : '-'}}{{item.count}}次</text>
           <text class="coarse-record-delete {{coarseDeletingId === item.id ? 'disabled' : ''}}" wx:if="{{item._canDelete}}" catchtap="onCoarseDeleteTap" data-id="{{item.id}}">{{coarseDeletingId === item.id ? '删除中' : '删除'}}</text>
         </view>
       </view>

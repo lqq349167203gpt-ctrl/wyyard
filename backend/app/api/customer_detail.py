@@ -71,7 +71,7 @@ def _build_activity_summary(activities: list[dict]) -> list[dict]:
 
 
 @router.get("/{customer_id}")
-def get_customer_detail(customer_id: str, request: Request, date: str | None = None):
+def get_customer_detail(customer_id: str, request: Request, date: str | None = None, principal_participant: bool = False, principal_course: str = ""):
     """获取单个客户的完整聚合详情"""
     # 客户角色只能查看自己的数据
     user_roles = get_request_roles(request)
@@ -84,10 +84,17 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     if not customer or customer.is_deleted:
         raise HTTPException(status_code=404, detail="客户不存在")
     is_customer_self = user_role == "customer"
-    if not is_customer_self and not customer_access_service.can_view_customer_for_request(request, customer):
+    external_participant = False
+    if principal_participant and not is_customer_self:
+        from app.services.principal_service import require_participant_profile_access
+        external_participant = require_participant_profile_access(request, customer_id, principal_course)
+    elif not is_customer_self and not customer_access_service.can_view_customer_for_request(request, customer):
         raise HTTPException(status_code=403, detail="没有查看该客户的权限")
 
     permissions = None if is_customer_self else customer_access_service.get_customer_permissions(user_roles)
+    if external_participant:
+        from app.services import position_edit_permission_service
+        permissions = position_edit_permission_service.get_permissions(user_roles)["principal_external_access"]
     can_follow_up = is_customer_self or bool(permissions["detail_tabs"]["follow_up"])
     can_view_activities = is_customer_self or bool(permissions["detail_tabs"]["activities"])
     can_view_followups = is_customer_self or bool(permissions["detail_tabs"]["customer_followups"])
@@ -97,7 +104,10 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
 
     basic = customer.model_dump(mode="json")
     if not is_customer_self:
-        basic = customer_access_service.protect_sensitive_data(basic, user_roles)
+        for permission_key, field_names in customer_access_service.SENSITIVE_FIELD_MAP.items():
+            if not permissions["sensitive_fields"][permission_key]:
+                for field_name in field_names:
+                    basic[field_name] = ""
         basic = customer_contact_service.protect_customer_data(
             basic,
             user_roles,
@@ -125,7 +135,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
         else None
     )
     basic["transaction_count"] = (
-        len(all_payment_records)
+        sum(1 for record in all_payment_records if not record.get("cancelled"))
         if transaction_level != "none"
         else None
     )
@@ -172,7 +182,17 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
         )
         visit_records.append(record)
 
+    communication_records = []
+    if principal_participant and not is_customer_self and permissions["detail_tabs"]["communication"]:
+        from app.services import communication_record_service
+        # 此入口只读；用客户 ID 匹配，兼容旧的昵称关联记录。
+        communication_records = [
+            {**record.model_dump(mode="json"), "can_edit": False, "can_delete": False}
+            for record in communication_record_service.list_records()
+            if (record.customer_id == customer_id if record.customer_id else record.customer_nickname == customer.nickname)
+        ]
     return {
+        "communication_records": communication_records,
         "customer": basic,
         "purchase_summary": purchase_summary,
         "activities": activities,
@@ -937,6 +957,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
     coarse_deductions = project_deduction_service.list_deductions(
         customer_id=customer_id,
         project_type="membership-cards",
+        include_cancelled=True,
     )
     for deduction in coarse_deductions:
         if deduction.project_name != project_deduction_service.COARSE_DOOR_CARD_TYPE:
@@ -955,6 +976,9 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_id": deduction.id,
             "source_created_at": deduction.created_at.isoformat(),
             "type": "粗门扣卡",
+            "cancelled": deduction.cancelled,
+            "voided": deduction.cancelled,
+            "cancellation_reason": deduction.cancellation_reason,
             "name": record_name or "课程抵扣",
             "activity_name": deduction.source_activity_name or "",
             "course_organization_name": deduction.source_organization_name or "",

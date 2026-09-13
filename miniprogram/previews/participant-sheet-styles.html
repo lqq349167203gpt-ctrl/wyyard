@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>参与人员弹窗 · 信息展示方案</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #f1f2f4;
+    --page-bg: #f2f3f5;
+    --primary: #3370ff;
+    --warn: #c4506a;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1280px; margin: 0 auto 32px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 18px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff; border: 1px solid #ebedf0;
+    padding: 7px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px;
+  }
+  .principle b { color: var(--ink); font-weight: 600; }
+
+  .frames { max-width: 1280px; margin: 0 auto; display: flex; gap: 28px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+  .frame { flex: 0 0 375px; }
+  .frame-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .frame-no { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .frame-name { font-size: 15px; font-weight: 600; }
+  .frame-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px; height: 780px; background: #f7f8fa;
+    border: 1px solid #dee2e6; overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: #f3f7ff; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .dim-list { flex: 1; filter: grayscale(.2); opacity: .55; }
+  .mask { position: absolute; inset: 0; background: rgba(31,35,41,.34); z-index: 5; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ===== 弹窗通用 ===== */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+    background: #fff; border-radius: 12px 12px 0 0;
+    display: flex; flex-direction: column; max-height: 86%;
+  }
+  .sheet-handle { width: 32px; height: 3px; border-radius: 2px; background: #dfe2e6; margin: 8px auto 2px; flex-shrink: 0; }
+  .sheet-head {
+    display: flex; align-items: center; padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--hairline); flex-shrink: 0;
+  }
+  .sheet-title { font-size: 14.5px; font-weight: 700; }
+  .sheet-title .n { color: var(--ink-3); font-weight: 400; }
+  .sheet-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; display: block; }
+  .sheet-close {
+    margin-left: auto; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-3); font-size: 18px; font-weight: 300; background: #f2f3f5; flex-shrink: 0;
+  }
+  .sheet-body { overflow: hidden; }
+
+  .p-row { display: flex; padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
+  .p-row:last-child { border-bottom: none; }
+  .p-av {
+    width: 30px; height: 30px; border-radius: 50%; background: #f2f3f5;
+    color: var(--ink-2); font-size: 12px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .p-main { flex: 1; min-width: 0; margin-left: 10px; }
+  .p-l1 { display: flex; align-items: center; }
+  .p-name { font-size: 14px; font-weight: 600; }
+  .tag-off { font-size: 10px; color: var(--warn); margin-left: 6px; flex-shrink: 0; }
+  .tag-novisit {
+    font-size: 9.5px; color: var(--ink-3); background: #f2f3f5;
+    border-radius: 2px; padding: 1px 5px; margin-left: 6px; flex-shrink: 0;
+  }
+  .p-link { margin-left: auto; font-size: 12px; color: var(--primary); flex-shrink: 0; }
+
+  /* A：一行流 */
+  .a-meta { margin-top: 4px; font-size: 11.5px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; }
+  .a-meta .sep { color: #ccd3da; }
+  .a-meta .dim { color: var(--ink-4); }
+  .a-needs { margin-top: 4px; font-size: 11.5px; color: var(--ink-2); line-height: 1.55; }
+  .a-needs .k { color: var(--ink-3); }
+
+  /* B：需求主角 */
+  .b-needs { margin-top: 5px; font-size: 13px; color: var(--ink); line-height: 1.55; }
+  .b-needs .k { color: var(--ink-3); font-size: 11.5px; }
+  .b-meta { margin-top: 5px; font-size: 11px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; }
+  .b-meta .sep { color: #d5d9de; }
+  .b-summary {
+    display: flex; gap: 12px; padding: 8px 16px;
+    font-size: 10.5px; color: var(--ink-3);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .b-summary .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; margin-right: 4px; }
+
+  /* C：字段格 */
+  .c-fields { display: flex; flex-wrap: wrap; margin-top: 8px; }
+  .c-f { width: 50%; padding: 3px 0; }
+  .c-f .k { font-size: 9.5px; color: var(--ink-4); display: block; }
+  .c-f .v { font-size: 12.5px; color: var(--ink); display: block; margin-top: 2px; font-weight: 500; }
+  .c-f.full { width: 100%; }
+  .c-f .v.need { font-weight: 400; color: var(--ink-2); line-height: 1.5; }
+
+  .dim-card {
+    background: #fff; border-radius: 12px; margin: 10px 12px; padding: 12px 14px;
+    display: flex; align-items: center;
+  }
+  .dim-time { width: 46px; font-size: 14px; font-weight: 700; }
+  .dim-name { font-size: 14px; font-weight: 600; margin-left: 11px; }
+  .dim-pill { margin-left: auto; background: #f2f3f5; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: 600; }
+
+  .notes {
+    margin-top: 14px; background: #fff; border: 1px solid #ebedf0;
+    border-radius: 3px; padding: 12px 14px;
+  }
+  .notes li {
+    font-size: 12px; color: var(--ink-2); line-height: 1.8;
+    list-style: none; padding-left: 12px; position: relative;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 4px; height: 4px; background: var(--primary); border-radius: 1px;
+  }
+  .notes li b { color: var(--ink); }
+
+  .doc-foot { max-width: 1280px; margin: 26px auto 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">参与人员弹窗 · 信息展示方案</div>
+  <div class="doc-sub">只优化弹窗内的信息排版，字段一个不少（会员身份/剩余卡次/邀约人/预计时间/来访需求/已退课/当日无邀约）。</div>
+  <div class="principles">
+    <div class="principle"><b>现状：一人一灰盒</b>　灰底信息块 × 6 个人，弹窗又重又碎</div>
+    <div class="principle"><b>现状：label 21rpx vs value 22rpx</b>　字号几乎一样，标签和值分不清谁是谁</div>
+    <div class="principle"><b>现状：需求排最后</b>　店员接待时最关心的「来访需求」位置最弱、字号最小</div>
+    <div class="principle"><b>现状：名字行挤 4 个元素</b>　名字+已退课+当日无邀约+资料› 一行塞满</div>
+  </div>
+</div>
+
+<div class="frames">
+
+  <!-- ================= 方案 A ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">A</span>
+      <span class="frame-name">一行流</span>
+      <span class="frame-desc">最紧凑 · 一屏人最多</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="dim-list">
+        <div class="dim-card"><span class="dim-time tnum">14:00</span><span class="dim-name">觉醒游戏·陈默</span><span class="dim-pill tnum">6 人 ›</span></div>
+      </div>
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="sheet-title">参与人员 <span class="n tnum">6</span></span>
+            <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+          </div>
+          <div class="sheet-close">×</div>
+        </div>
+        <div class="sheet-body">
+          <div class="p-row">
+            <span class="p-av">陈</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">陈默</span><span class="p-link">资料 ›</span></div>
+              <div class="a-meta tnum">3月卡<span class="sep">·</span>剩 2 次<span class="sep">·</span>婷婷邀约<span class="sep">·</span>预计 14:00</div>
+              <div class="a-needs"><span class="k">需求：</span>睡眠调理，最近夜间易醒加重</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">璐</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">璐小娜</span><span class="p-link">资料 ›</span></div>
+              <div class="a-meta tnum">年卡<span class="sep">·</span>不限次<span class="sep">·</span>耀凯邀约<span class="sep">·</span>预计 14:00</div>
+              <div class="a-needs"><span class="k">需求：</span>带孩子一起来，孩子在一楼等候区，课后需要开发票</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">林</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">林晓</span><span class="tag-off">已退课</span><span class="p-link">资料 ›</span></div>
+              <div class="a-meta tnum">3月卡<span class="sep">·</span>剩 2 次<span class="sep">·</span>婷婷邀约<span class="sep">·</span>预计 15:30</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">方</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">方舟</span><span class="tag-novisit">当日无邀约</span><span class="p-link">资料 ›</span></div>
+              <div class="a-meta"><span class="dim">体验 · 首次到店</span></div>
+              <div class="a-needs"><span class="k">需求：</span>首次体验，对 OH 卡感兴趣</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">顾</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">顾一帆</span><span class="p-link">资料 ›</span></div>
+              <div class="a-meta tnum">年卡<span class="sep">·</span>剩 8 次<span class="sep">·</span>耀凯邀约<span class="sep">·</span>预计 14:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>去掉灰盒</b>：四个字段合并成一行 dot 分隔的 meta 行，标签全靠阅读习惯（3月卡·剩2次·婷婷邀约·预计14:00）</li>
+      <li><b>每人最多 3 行</b>：名字行 / meta 行 / 需求行，没有需求就 2 行，一屏能看 5-6 人</li>
+      <li>字段为空自动缩短（方舟无邀约信息，meta 只剩「体验 · 首次到店」灰字）</li>
+      <li>适合<b>人多时快速扫名单</b></li>
+    </ul>
+  </div>
+
+  <!-- ================= 方案 B ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">B</span>
+      <span class="frame-name">需求主角</span>
+      <span class="frame-desc">接待动线优先</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="dim-list">
+        <div class="dim-card"><span class="dim-time tnum">14:00</span><span class="dim-name">觉醒游戏·陈默</span><span class="dim-pill tnum">6 人 ›</span></div>
+      </div>
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="sheet-title">参与人员 <span class="n tnum">6</span></span>
+            <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+          </div>
+          <div class="sheet-close">×</div>
+        </div>
+        <div class="b-summary">
+          <span><span class="dot" style="background: var(--primary);"></span>5 位有邀约</span>
+          <span><span class="dot" style="background: var(--warn);"></span>1 位已退课</span>
+          <span><span class="dot" style="background: var(--ink-4);"></span>1 位无邀约</span>
+        </div>
+        <div class="sheet-body">
+          <div class="p-row">
+            <span class="p-av">陈</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">陈默</span><span class="p-link">资料 ›</span></div>
+              <div class="b-needs"><span class="k">需求　</span>睡眠调理，最近夜间易醒加重</div>
+              <div class="b-meta tnum">3月卡 · 剩 2 次 · 婷婷邀约 · 预计 14:00</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">璐</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">璐小娜</span><span class="p-link">资料 ›</span></div>
+              <div class="b-needs"><span class="k">需求　</span>带孩子一起来，孩子在一楼等候区，课后需要开发票</div>
+              <div class="b-meta tnum">年卡 · 不限次 · 耀凯邀约 · 预计 14:00</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">林</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">林晓</span><span class="tag-off">已退课</span><span class="p-link">资料 ›</span></div>
+              <div class="b-meta tnum">3月卡 · 剩 2 次 · 婷婷邀约 · 预计 15:30</div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">方</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">方舟</span><span class="tag-novisit">当日无邀约</span><span class="p-link">资料 ›</span></div>
+              <div class="b-needs"><span class="k">需求　</span>首次体验，对 OH 卡感兴趣</div>
+              <div class="b-meta">体验 · 首次到店</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>需求提为第二行主角</b>（13px 墨色），接待时「这个人今天来要什么」一眼即答；卡次/邀约信息沉底一行小灰字</li>
+      <li><b>顶部加汇总条</b>：5 位有邀约 · 1 已退课 · 1 无邀约，开门前心里有数</li>
+      <li>名字行减负：状态签只留最关键的（已退课红字/当日无邀约灰签）</li>
+      <li>适合<b>以接待服务为中心</b>的使用场景</li>
+    </ul>
+  </div>
+
+  <!-- ================= 方案 C ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">C</span>
+      <span class="frame-name">字段格</span>
+      <span class="frame-desc">全字段档案式 · 最规整</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="dim-list">
+        <div class="dim-card"><span class="dim-time tnum">14:00</span><span class="dim-name">觉醒游戏·陈默</span><span class="dim-pill tnum">6 人 ›</span></div>
+      </div>
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="sheet-title">参与人员 <span class="n tnum">6</span></span>
+            <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+          </div>
+          <div class="sheet-close">×</div>
+        </div>
+        <div class="sheet-body">
+          <div class="p-row">
+            <span class="p-av">陈</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">陈默</span><span class="p-link">资料 ›</span></div>
+              <div class="c-fields">
+                <div class="c-f"><span class="k">会员身份</span><span class="v">3月卡</span></div>
+                <div class="c-f"><span class="k">剩余卡次</span><span class="v tnum">2 次</span></div>
+                <div class="c-f"><span class="k">邀约人</span><span class="v">婷婷</span></div>
+                <div class="c-f"><span class="k">预计时间</span><span class="v tnum">14:00</span></div>
+                <div class="c-f full"><span class="k">来访需求</span><span class="v need">睡眠调理，最近夜间易醒加重</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">林</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">林晓</span><span class="tag-off">已退课</span><span class="p-link">资料 ›</span></div>
+              <div class="c-fields">
+                <div class="c-f"><span class="k">会员身份</span><span class="v">3月卡</span></div>
+                <div class="c-f"><span class="k">剩余卡次</span><span class="v tnum">2 次</span></div>
+                <div class="c-f"><span class="k">邀约人</span><span class="v">婷婷</span></div>
+                <div class="c-f"><span class="k">预计时间</span><span class="v tnum">15:30</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="p-row">
+            <span class="p-av">方</span>
+            <div class="p-main">
+              <div class="p-l1"><span class="p-name">方舟</span><span class="tag-novisit">当日无邀约</span><span class="p-link">资料 ›</span></div>
+              <div class="c-fields">
+                <div class="c-f"><span class="k">会员身份</span><span class="v">体验</span></div>
+                <div class="c-f"><span class="k">剩余卡次</span><span class="v">首次</span></div>
+                <div class="c-f full"><span class="k">来访需求</span><span class="v need">首次体验，对 OH 卡感兴趣</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>保留「标签+值」形式但重做</b>：去灰盒，标签缩小放上方（9.5px 浅灰）、值放大放下方（12.5px 墨色 500），上下结构彻底解决"标签和值分不清"</li>
+      <li>2×2 字段格 + 需求整行，像一份迷你档案，<b>查信息最不用动脑</b></li>
+      <li>空字段整格隐藏（方舟只剩 3 格），不留"-"</li>
+      <li>行最高、一屏人最少，适合<b>需要逐人核对信息</b>的场景</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="doc-foot">
+  说明：纯样式稿，未改代码；三个方案字段完全一致，只是排版方式不同。状态规则统一：已退课=红字、当日无邀约=灰小签、资料 › 位置不变。<br>
+  建议：人多求快选 A；接待导向选 B；逐人核对选 C。也可以混搭，比如 A 的紧凑行 + B 的顶部汇总条。选定后我只动弹窗部分的 wxml/wxss。
+</div>
+
+</body>
+</html>

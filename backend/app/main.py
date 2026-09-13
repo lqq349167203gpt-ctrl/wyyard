@@ -56,11 +56,11 @@ from app.api.other_projects import router as other_projects_router
 from app.api.payment_exports import router as payment_exports_router
 from app.api.position_permissions import router as position_permissions_router
 from app.api.positions import router as positions_router
+from app.api.principal import router as principal_router
 from app.api.project_deductions import router as project_deductions_router
 from app.api.project_refunds import router as project_refunds_router
 from app.api.reminders import router as reminders_router
 from app.api.service_teacher_customers import router as service_teacher_customers_router
-from app.api.principal import router as principal_router
 from app.api.spaces import router as spaces_router
 from app.api.statistics import router as statistics_router
 from app.api.system_helper import router as system_helper_router
@@ -70,6 +70,7 @@ from app.api.tea_guest_consumptions import router as tea_guest_consumptions_rout
 from app.api.tea_guest_expenses import router as tea_guest_expenses_router
 from app.api.tea_seat_fees import router as tea_seat_fees_router
 from app.api.uploads import router as uploads_router
+from app.api.upsell_config import router as upsell_config_router
 from app.api.visit_ai_config import router as visit_ai_config_router
 from app.api.visit_history import router as visit_history_router
 from app.api.visit_notes import router as visit_notes_router
@@ -78,6 +79,7 @@ from app.api.visits import router as visits_router
 from app.api.voice import router as voice_router
 from app.api.wechat import router as wechat_router
 from app.config.settings import settings
+from app.middleware.course_deduction_consistency import CourseDeductionConsistencyMiddleware
 from app.middleware.jwt_auth import AuthMiddleware
 from app.middleware.operation_logging import OperationLogMiddleware
 from app.middleware.rate_limit import limiter
@@ -89,6 +91,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 中间件顺序：后 add 的在更外层。CORSMiddleware 最后 add（最外层），
 # 保证 AuthMiddleware 直接返回的 401 也带 CORS 头；认证相关响应头需暴露给客户端读取。
+app.add_middleware(CourseDeductionConsistencyMiddleware)
 app.add_middleware(OperationLogMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
@@ -108,6 +111,7 @@ app.include_router(custom_analysis_router)
 app.include_router(analysis_logs_router)
 app.include_router(customer_tags_router)
 app.include_router(follow_up_statuses_router)
+app.include_router(upsell_config_router)
 app.include_router(ai_configs_router)
 app.include_router(customer_ai_config_router)
 app.include_router(visit_ai_config_router)

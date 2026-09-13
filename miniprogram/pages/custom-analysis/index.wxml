@@ -1,3 +1,5 @@
+<!-- 弹层打开时锁住页面滚动，避免上下滑动带动背景（与课表页一致） -->
+<page-meta page-style="{{showColumnPicker || showFieldPicker || showMultiSheet || showOptionSheet ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
   <view class="loading" wx:if="{{loading}}">正在加载筛选项...</view>
 
@@ -5,7 +7,7 @@
     <view class="header-card">
       <view class="header-copy">
         <text class="page-title">自定义筛选</text>
-        <text class="page-subtitle">按自己的条件找出客户，查看邀约、到店和成交情况</text>
+        <text class="page-subtitle">按自己的条件筛选客户信息</text>
       </view>
       <view class="header-actions">
         <view class="save-button" bindtap="onSaveTemplate">保存模板</view>
@@ -14,9 +16,9 @@
 
     <view class="section-card template-row">
       <text class="row-label">筛选模板</text>
-      <picker class="row-picker" mode="selector" range="{{templateOptions}}" range-key="name" value="{{templateIndex}}" bindchange="onTemplateChange">
-        <view class="picker-value {{templateIndex === 0 ? 'placeholder' : ''}}">{{templateOptions[templateIndex].name}}<text class="picker-arrow">⌄</text></view>
-      </picker>
+      <view class="row-picker" data-sheet="template" bindtap="onOpenOptionSheet">
+        <view class="picker-value {{templateIndex === 0 ? 'placeholder' : ''}}">{{templateOptions[templateIndex].name}}<view class="picker-chevron"></view></view>
+      </view>
     </view>
 
     <view class="mode-switch-card">
@@ -37,7 +39,7 @@
             <text class="period-subtitle">限定期间邀约、到场、活动和成交指标</text>
           </view>
           <picker class="period-picker" mode="multiSelector" range="{{periodRange}}" value="{{periodValue}}" bindchange="onPeriodChange">
-            <view class="period-value">{{periodLabel}}<text class="picker-arrow">⌄</text></view>
+            <view class="period-value">{{periodLabel}}<view class="picker-chevron"></view></view>
           </picker>
         </view>
         <view class="preset-group">
@@ -68,21 +70,25 @@
       </view>
       <text class="condition-hint">付费条件会同步限定成交金额、单数和人数</text>
       <view class="condition-empty" wx:if="{{conditionRows.length === 0}}" bindtap="onAddCondition">当前查询全部客户，点击添加筛选条件</view>
-      <view class="condition-card" wx:for="{{conditionRows}}" wx:key="index">
-        <view class="condition-top">
-          <picker class="condition-picker" mode="selector" range="{{fieldOptions}}" range-key="label" value="{{item.fieldIndex}}" data-index="{{index}}" bindchange="onConditionFieldChange">
-            <view class="condition-choice">{{item.fieldLabel}}<text class="picker-arrow">⌄</text></view>
-          </picker>
-          <picker class="condition-picker operator" mode="selector" range="{{item.operatorOptions}}" range-key="label" value="{{item.operatorIndex}}" data-index="{{index}}" bindchange="onConditionOperatorChange">
-            <view class="condition-choice secondary">{{item.operatorLabel}}<text class="picker-arrow">⌄</text></view>
-          </picker>
-          <view class="condition-remove" data-index="{{index}}" bindtap="onRemoveCondition">×</view>
+      <view class="condition-row" wx:for="{{conditionRows}}" wx:key="index">
+      <view class="condition-card">
+        <view class="condition-picker" data-index="{{index}}" bindtap="onOpenFieldPicker">
+          <view class="condition-choice">
+            <text class="condition-choice-label">{{item.fieldLabel}}</text>
+            <view class="picker-chevron"></view>
+          </view>
         </view>
-        <view class="condition-value-row inherited-period" wx:if="{{item.inheritPeriod}}">
+        <view class="condition-picker operator" data-sheet="operator" data-index="{{index}}" bindtap="onOpenOptionSheet">
+          <view class="condition-choice secondary">
+            <text class="condition-choice-label">{{item.operatorLabel}}</text>
+            <view class="picker-chevron light"></view>
+          </view>
+        </view>
+        <view class="condition-value-row inherited-period wide" wx:if="{{item.inheritPeriod}}">
           <text class="inherited-period-value">跟随统计周期 · {{item.periodSummary}}</text>
           <view class="condition-text-action" data-index="{{index}}" bindtap="onConditionUseOwnDate">单独设置</view>
         </view>
-        <view class="condition-value-row" wx:elif="{{!item.noValue}}">
+        <view class="condition-value-row {{item.between || item.isDate ? 'wide' : ''}}" wx:elif="{{!item.noValue}}">
           <block wx:if="{{item.between && item.isDate}}">
             <picker class="condition-date-picker" mode="date" value="{{item.valueStart}}" data-index="{{index}}" data-part="start" bindchange="onConditionValueInput">
               <view class="condition-input half {{item.valueStart ? '' : 'placeholder'}}">{{item.valueStart || '开始日期'}}</view>
@@ -104,11 +110,19 @@
             </picker>
             <view class="condition-follow-action" data-index="{{index}}" bindtap="onConditionInheritPeriod">跟随周期</view>
           </block>
-          <picker wx:elif="{{item.useOptions}}" class="value-picker" mode="selector" range="{{item.valueOptions}}" range-key="label" value="{{item.valueIndex}}" data-index="{{index}}" bindchange="onConditionOptionChange">
-            <view class="condition-input {{item.value ? '' : 'placeholder'}}">{{item.value || '选择筛选值'}}<text class="picker-arrow">⌄</text></view>
-          </picker>
+          <view wx:elif="{{item.multiOptions}}" class="value-picker" data-index="{{index}}" bindtap="onOpenMultiSheet">
+            <view class="condition-input condition-input-picker {{item.multiLabel ? '' : 'placeholder'}}"><text class="condition-value-text">{{item.multiLabel || '选择筛选值'}}</text><view class="picker-chevron"></view></view>
+          </view>
+          <view wx:elif="{{item.useOptions}}" class="value-picker" data-sheet="valueOption" data-index="{{index}}" bindtap="onOpenOptionSheet">
+            <view class="condition-input condition-input-picker {{item.value ? '' : 'placeholder'}}"><text class="condition-value-text">{{item.value || '选择筛选值'}}</text><view class="picker-chevron"></view></view>
+          </view>
           <input wx:else class="condition-input" value="{{item.value}}" placeholder="{{item.placeholder}}" data-index="{{index}}" bindinput="onConditionValueInput" />
         </view>
+        <view class="condition-remove" data-index="{{index}}" bindtap="onRemoveCondition">
+          <view class="remove-line remove-line-a"></view>
+          <view class="remove-line remove-line-b"></view>
+        </view>
+      </view>
       </view>
     </view>
 
@@ -131,7 +145,7 @@
           <view class="period-head">
             <view class="period-copy"><text class="period-title">统计周期</text><text class="period-subtitle">{{group.periodSummary}}</text></view>
             <picker class="period-picker" mode="multiSelector" range="{{periodRange}}" value="{{group.periodValue}}" data-group-index="{{groupIndex}}" bindchange="onComparisonPeriodChange">
-              <view class="period-value">{{group.periodLabel}}<text class="picker-arrow">⌄</text></view>
+              <view class="period-value">{{group.periodLabel}}<view class="picker-chevron"></view></view>
             </picker>
           </view>
           <view class="preset-group compact">
@@ -160,21 +174,25 @@
         </view>
         <view class="condition-empty compact-empty" wx:if="{{group.conditionRows.length === 0}}" data-group-index="{{groupIndex}}" bindtap="onComparisonAddCondition">暂不限定客户条件，点击添加</view>
 
-        <view class="condition-card group-condition-card" wx:for="{{group.conditionRows}}" wx:key="index" wx:for-item="condition" wx:for-index="conditionIndex">
-          <view class="condition-top">
-            <picker class="condition-picker" mode="selector" range="{{fieldOptions}}" range-key="label" value="{{condition.fieldIndex}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionFieldChange">
-              <view class="condition-choice">{{condition.fieldLabel}}<text class="picker-arrow">⌄</text></view>
-            </picker>
-            <picker class="condition-picker operator" mode="selector" range="{{condition.operatorOptions}}" range-key="label" value="{{condition.operatorIndex}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionOperatorChange">
-              <view class="condition-choice secondary">{{condition.operatorLabel}}<text class="picker-arrow">⌄</text></view>
-            </picker>
-            <view class="condition-remove" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onRemoveCondition">×</view>
+        <view class="condition-row" wx:for="{{group.conditionRows}}" wx:key="index" wx:for-item="condition" wx:for-index="conditionIndex">
+        <view class="condition-card group-condition-card">
+          <view class="condition-picker" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onOpenFieldPicker">
+            <view class="condition-choice">
+              <text class="condition-choice-label">{{condition.fieldLabel}}</text>
+              <view class="picker-chevron"></view>
+            </view>
           </view>
-          <view class="condition-value-row inherited-period" wx:if="{{condition.inheritPeriod}}">
+          <view class="condition-picker operator" data-sheet="operator" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onOpenOptionSheet">
+            <view class="condition-choice secondary">
+              <text class="condition-choice-label">{{condition.operatorLabel}}</text>
+              <view class="picker-chevron light"></view>
+            </view>
+          </view>
+          <view class="condition-value-row inherited-period wide" wx:if="{{condition.inheritPeriod}}">
             <text class="inherited-period-value">跟随本组周期 · {{condition.periodSummary}}</text>
             <view class="condition-text-action" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onConditionUseOwnDate">单独设置</view>
           </view>
-          <view class="condition-value-row" wx:elif="{{!condition.noValue}}">
+          <view class="condition-value-row {{condition.between || condition.isDate ? 'wide' : ''}}" wx:elif="{{!condition.noValue}}">
             <block wx:if="{{condition.between && condition.isDate}}">
               <picker class="condition-date-picker" mode="date" value="{{condition.valueStart}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" data-part="start" bindchange="onConditionValueInput"><view class="condition-input half {{condition.valueStart ? '' : 'placeholder'}}">{{condition.valueStart || '开始日期'}}</view></picker>
               <text class="date-separator">至</text>
@@ -190,11 +208,19 @@
               <picker class="condition-date-picker single" mode="date" value="{{condition.value}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionValueInput"><view class="condition-input {{condition.value ? '' : 'placeholder'}}">{{condition.value || '选择日期'}}</view></picker>
               <view class="condition-follow-action" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onConditionInheritPeriod">跟随周期</view>
             </block>
-            <picker wx:elif="{{condition.useOptions}}" class="value-picker" mode="selector" range="{{condition.valueOptions}}" range-key="label" value="{{condition.valueIndex}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindchange="onConditionOptionChange">
-              <view class="condition-input {{condition.value ? '' : 'placeholder'}}">{{condition.value || '选择筛选值'}}<text class="picker-arrow">⌄</text></view>
-            </picker>
+            <view wx:elif="{{condition.multiOptions}}" class="value-picker" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onOpenMultiSheet">
+              <view class="condition-input condition-input-picker {{condition.multiLabel ? '' : 'placeholder'}}"><text class="condition-value-text">{{condition.multiLabel || '选择筛选值'}}</text><view class="picker-chevron"></view></view>
+            </view>
+            <view wx:elif="{{condition.useOptions}}" class="value-picker" data-sheet="valueOption" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onOpenOptionSheet">
+              <view class="condition-input condition-input-picker {{condition.value ? '' : 'placeholder'}}"><text class="condition-value-text">{{condition.value || '选择筛选值'}}</text><view class="picker-chevron"></view></view>
+            </view>
             <input wx:else class="condition-input" value="{{condition.value}}" placeholder="{{condition.placeholder}}" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindinput="onConditionValueInput" />
           </view>
+          <view class="condition-remove" data-group-index="{{groupIndex}}" data-index="{{conditionIndex}}" bindtap="onRemoveCondition">
+            <view class="remove-line remove-line-a"></view>
+            <view class="remove-line remove-line-b"></view>
+          </view>
+        </view>
         </view>
       </view>
     </view>
@@ -212,15 +238,15 @@
       </view>
       <view class="dimension-row" wx:if="{{plan.analysis_mode === 'single'}}">
         <text class="dimension-label">拆分指标</text>
-        <picker class="dimension-picker" mode="selector" range="{{dimensionMetricOptions}}" range-key="label" value="{{dimensionMetricIndex}}" bindchange="onDimensionMetricChange">
-          <view class="picker-value">{{dimensionMetricOptions[dimensionMetricIndex].label}}<text class="picker-arrow">⌄</text></view>
-        </picker>
+        <view class="dimension-picker" data-sheet="dimensionMetric" bindtap="onOpenOptionSheet">
+          <view class="picker-value">{{dimensionMetricOptions[dimensionMetricIndex].label}}<view class="picker-chevron"></view></view>
+        </view>
       </view>
       <view class="dimension-row dimension-row-secondary" wx:if="{{plan.analysis_mode === 'single'}}">
         <text class="dimension-label">拆分维度</text>
-        <picker class="dimension-picker" mode="selector" range="{{dimensionOptions}}" range-key="label" value="{{dimensionIndex}}" bindchange="onDimensionChange">
-          <view class="picker-value">{{dimensionOptions[dimensionIndex].label}}<text class="picker-arrow">⌄</text></view>
-        </picker>
+        <view class="dimension-picker" data-sheet="dimension" bindtap="onOpenOptionSheet">
+          <view class="picker-value">{{dimensionOptions[dimensionIndex].label}}<view class="picker-chevron"></view></view>
+        </view>
       </view>
       <text class="shared-metric-hint" wx:if="{{plan.analysis_mode === 'comparison'}}">以上指标会同时用于所有对比组。</text>
     </view>
@@ -238,15 +264,15 @@
           <text class="display-mode-label">列表排列</text>
           <text class="display-mode-hint">按实际到场展开时，每位客户每天显示一条</text>
         </view>
-        <picker class="display-mode-picker" mode="selector" range="{{rowDisplayOptions}}" range-key="label" value="{{rowDisplayIndex}}" bindchange="onRowDisplayChange">
-          <view class="picker-value">{{rowDisplayOptions[rowDisplayIndex].label}}<text class="picker-arrow">⌄</text></view>
-        </picker>
+        <view class="display-mode-picker" data-sheet="rowDisplay" bindtap="onOpenOptionSheet">
+          <view class="picker-value">{{rowDisplayOptions[rowDisplayIndex].label}}<view class="picker-chevron"></view></view>
+        </view>
       </view>
     </view>
 
     <view class="query-bar">
       <button class="reset-button" bindtap="onReset">重置</button>
-      <button class="query-button" loading="{{querying}}" disabled="{{querying}}" bindtap="onQuery">{{result ? '更新结果' : '查询'}}</button>
+      <button class="query-button" loading="{{querying}}" disabled="{{querying}}" bindtap="onQuery">查询</button>
     </view>
 
     <view class="result-area comparison-result" wx:if="{{result && plan.analysis_mode === 'comparison'}}">
@@ -303,7 +329,7 @@
           <view class="customer-head"><text class="customer-name">{{item.nickname}}</text><text class="customer-arrow">›</text></view>
           <view class="customer-fields">
             <view class="customer-field" wx:for="{{item.fields}}" wx:for-item="field" wx:key="label">
-              <text class="field-label">{{field.label}}</text><text class="field-value">{{field.value}}</text>
+              <text class="field-label">{{field.label}}</text><view class="field-empty-line" wx:if="{{field.empty}}"></view><text class="field-value" wx:else>{{field.value}}</text>
             </view>
           </view>
         </view>
@@ -318,7 +344,7 @@
     </view>
   </block>
 
-  <view class="sheet-mask" wx:if="{{showColumnPicker}}" bindtap="onCloseColumns"></view>
+  <view class="sheet-mask" wx:if="{{showColumnPicker}}" catchtouchmove="noop" bindtap="onCloseColumns"></view>
   <view class="column-sheet" wx:if="{{showColumnPicker}}">
     <view class="sheet-head"><text class="sheet-title">选择显示内容</text><text class="sheet-done" bindtap="onCloseColumns">完成</text></view>
     <scroll-view class="sheet-list" scroll-y>
@@ -328,6 +354,48 @@
           <text class="sheet-item-name">{{item.label}}</text>
           <text class="sheet-item-note" wx:if="{{item.locked}}">固定显示</text>
           <view class="sheet-check {{item.selected ? 'selected' : ''}}">{{item.selected ? '✓' : ''}}</view>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+
+  <!-- 筛选字段：和显示内容一样用分组小标题，点一下选中 -->
+  <view class="sheet-mask" wx:if="{{showFieldPicker}}" catchtouchmove="noop" bindtap="onCloseFieldPicker"></view>
+  <view class="column-sheet" wx:if="{{showFieldPicker}}">
+    <view class="sheet-head"><text class="sheet-title">选择筛选字段</text><text class="sheet-done" bindtap="onCloseFieldPicker">完成</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <block wx:for="{{fieldPickerOptions}}" wx:key="value">
+        <view class="sheet-group-title" wx:if="{{item.showGroupHeading}}">{{item.groupLabel}}</view>
+        <view class="sheet-item" data-value="{{item.value}}" bindtap="onFieldPick">
+          <text class="sheet-item-name {{item.selected ? 'selected' : ''}}">{{item.label}}</text>
+          <text class="sheet-field-check" wx:if="{{item.selected}}">✓</text>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+
+  <!-- 多值条件（属于）：可多选，勾完点完成 -->
+  <view class="sheet-mask" wx:if="{{showMultiSheet}}" catchtouchmove="noop" bindtap="onCloseMultiSheet"></view>
+  <view class="column-sheet" wx:if="{{showMultiSheet}}">
+    <view class="sheet-head"><text class="sheet-title">{{multiSheetTitle}}</text><text class="sheet-done" bindtap="onMultiSheetDone">完成</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <view class="sheet-item" wx:for="{{multiSheetItems}}" wx:key="value" data-value="{{item.value}}" bindtap="onMultiSheetToggle">
+        <text class="sheet-item-name">{{item.label}}</text>
+        <view class="sheet-check {{item.selected ? 'selected' : ''}}">{{item.selected ? '✓' : ''}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 其他下拉：同一套弹层样式（模板、规则、取值、拆分指标/维度、列表排列） -->
+  <view class="sheet-mask" wx:if="{{showOptionSheet}}" catchtouchmove="noop" bindtap="onCloseOptionSheet"></view>
+  <view class="column-sheet" wx:if="{{showOptionSheet}}">
+    <view class="sheet-head"><text class="sheet-title">{{optionSheetTitle}}</text><text class="sheet-done" bindtap="onCloseOptionSheet">关闭</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <block wx:for="{{optionSheetItems}}" wx:key="value">
+        <view class="sheet-group-title" wx:if="{{item.showGroupHeading}}">{{item.groupLabel}}</view>
+        <view class="sheet-item" data-value="{{item.value}}" bindtap="onOptionSheetPick">
+          <text class="sheet-item-name {{item.selected ? 'selected' : ''}}">{{item.label}}</text>
+          <text class="sheet-field-check" wx:if="{{item.selected}}">✓</text>
         </view>
       </block>
     </scroll-view>

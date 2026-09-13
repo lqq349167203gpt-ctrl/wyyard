@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>当日客户 tab · 4 种卡片样式</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #1f2329; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+  .phones { display: flex; gap: 36px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+
+  .phone {
+    width: 375px; background: #f7f8fa; border-radius: 36px; border: 8px solid #1f2329;
+    overflow: hidden; box-shadow: 0 24px 64px rgba(31,35,41,0.14); flex-shrink: 0;
+  }
+  .phone-screen { height: 700px; overflow-y: auto; position: relative; }
+  .phone-screen::-webkit-scrollbar { display: none; }
+  .statusbar { height: 24px; background: #fff; }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600; position: relative; border-bottom: 0.5px solid #f0f1f2;
+  }
+  .navbar .back { position: absolute; left: 16px; font-size: 18px; font-weight: 400; }
+  .datebar {
+    background: #fff; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 10px 12px; border-bottom: 0.5px solid #f0f1f2;
+  }
+  .datebar .nav-arrow {
+    width: 28px; height: 28px; border-radius: 8px; background: #f7f8fa;
+    display: flex; align-items: center; justify-content: center; color: #4e535a; font-size: 13px;
+  }
+  .datebar .date-main { font-size: 15px; font-weight: 600; }
+  .datebar .date-sub { font-size: 11px; color: #8f959e; margin-left: 6px; font-weight: 400; }
+  .datebar .cal { font-size: 15px; color: #3370ff; }
+  .tabbar { background: #fff; display: flex; border-bottom: 0.5px solid #f0f1f2; }
+  .tab {
+    flex: 1; text-align: center; padding: 11px 0 10px; font-size: 14px; color: #4e535a; position: relative;
+  }
+  .tab .cnt { font-size: 11px; color: #8f959e; margin-left: 2px; }
+  .tab.active { color: #3370ff; font-weight: 600; }
+  .tab.active .cnt { color: #3370ff; font-weight: 400; }
+  .tab.active::after {
+    content: ""; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 24px; height: 3px; border-radius: 2px; background: #3370ff;
+  }
+
+  .scheme-tag { text-align: center; margin-top: 14px; font-size: 14px; font-weight: 600; }
+  .scheme-tag .no { color: #3370ff; }
+  .caption { text-align: center; margin-top: 6px; font-size: 12px; color: #4e535a; max-width: 375px; line-height: 1.7; }
+  .caption .pro { color: #2ba471; } .caption .con { color: #f54a45; }
+
+  .r-tag { font-size: 10px; border-radius: 4px; padding: 1px 6px; background: #f0f5ff; color: #3370ff; }
+  .r-tag.grey { background: #f2f3f5; color: #8f959e; }
+
+  /* ==================================================== */
+  /* 样式 A：宫格数据卡                                   */
+  /* ==================================================== */
+  .a-body { padding: 12px 16px 32px; }
+  .a-card {
+    background: #fff; border-radius: 12px; margin-bottom: 10px; padding: 13px 14px 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); cursor: pointer;
+  }
+  .a-head { display: flex; align-items: center; gap: 6px; }
+  .a-name { font-size: 15px; font-weight: 600; }
+  .a-status { font-size: 10px; margin-left: 2px; }
+  .a-status.ok { color: #2ba471; } .a-status.no { color: #b0b5bb; }
+  .a-amount { margin-left: auto; font-size: 16px; font-weight: 700; }
+  .a-amount.none { font-size: 13px; color: #c0c4cc; font-weight: 400; }
+  .a-grid {
+    display: flex; margin-top: 12px; padding: 10px 0; border-top: 0.5px solid #f0f1f2;
+  }
+  .a-stat { flex: 1; text-align: center; position: relative; }
+  .a-stat + .a-stat::before {
+    content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 0.5px; height: 22px; background: #f0f1f2;
+  }
+  .a-stat .v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .a-stat .v.dim { color: #b0b5bb; font-weight: 400; }
+  .a-stat .k { font-size: 10px; color: #8f959e; margin-top: 3px; }
+  .a-detail { border-top: 0.5px dashed #e8eaed; margin-top: 2px; padding: 10px 0 12px; display: none; }
+  .a-card.open .a-detail { display: block; }
+  .a-detail .d-row { display: flex; font-size: 12px; line-height: 1.7; margin-bottom: 5px; }
+  .a-detail .d-label { color: #8f959e; width: 60px; flex-shrink: 0; }
+  .a-detail .d-val { color: #4e535a; flex: 1; }
+  .a-expand { text-align: center; font-size: 11px; color: #c0c4cc; padding: 8px 0; }
+
+  /* ==================================================== */
+  /* 样式 B：极简列表行（无卡片，hairline 分隔）          */
+  /* ==================================================== */
+  .b-body { padding: 12px 16px 32px; }
+  .b-list { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); overflow: hidden; }
+  .b-row {
+    display: flex; align-items: center; gap: 11px; padding: 12px 14px;
+    border-bottom: 0.5px solid #f0f1f2; cursor: pointer;
+  }
+  .b-row:last-child { border-bottom: none; }
+  .b-ava {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600;
+  }
+  .b-ava.m { background: #f0f5ff; color: #3370ff; }
+  .b-ava.n { background: #f2f3f5; color: #8f959e; }
+  .b-main { flex: 1; min-width: 0; }
+  .b-line1 { display: flex; align-items: center; gap: 6px; }
+  .b-name { font-size: 14px; font-weight: 600; }
+  .b-line2 { font-size: 11px; color: #8f959e; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .b-right { text-align: right; flex-shrink: 0; }
+  .b-amount { font-size: 14px; font-weight: 600; }
+  .b-amount.none { color: #c0c4cc; font-weight: 400; font-size: 12px; }
+  .b-arr { font-size: 10px; margin-top: 3px; }
+  .b-arr.ok { color: #2ba471; } .b-arr.no { color: #b0b5bb; }
+
+  /* ==================================================== */
+  /* 样式 C：大小对比（成交大卡 vs 未成交小行）           */
+  /* ==================================================== */
+  .c-body { padding: 12px 16px 32px; }
+  .c-group-label { font-size: 12px; color: #8f959e; margin: 4px 2px 8px; display: flex; align-items: center; gap: 6px; }
+  .c-group-label .pill { background: #f0f5ff; color: #3370ff; border-radius: 8px; padding: 0 7px; font-size: 11px; }
+  .c-big {
+    background: #fff; border-radius: 12px; padding: 15px 16px; margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); cursor: pointer;
+  }
+  .c-big .top { display: flex; align-items: center; gap: 6px; }
+  .c-big .name { font-size: 15px; font-weight: 600; }
+  .c-big .time { margin-left: auto; font-size: 11px; color: #8f959e; }
+  .c-big .amt { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin-top: 8px; }
+  .c-big .amt .yuan { font-size: 13px; font-weight: 500; margin-right: 1px; }
+  .c-big .meta { font-size: 11px; color: #8f959e; margin-top: 7px; }
+  .c-big .meta span + span::before { content: "·"; margin: 0 5px; color: #d0d3d6; }
+  .c-small-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); overflow: hidden; }
+  .c-small {
+    display: flex; align-items: center; gap: 8px; padding: 11px 14px; font-size: 13px;
+    border-bottom: 0.5px solid #f0f1f2; cursor: pointer;
+  }
+  .c-small:last-child { border-bottom: none; }
+  .c-small .name { font-weight: 500; }
+  .c-small .right { margin-left: auto; font-size: 12px; color: #8f959e; }
+  .c-small .arr { font-size: 10px; }
+  .c-small .arr.ok { color: #2ba471; } .c-small .arr.no { color: #b0b5bb; }
+
+  /* ==================================================== */
+  /* 样式 D：左色条身份卡                                 */
+  /* ==================================================== */
+  .d-body { padding: 12px 16px 32px; }
+  .d-card {
+    background: #fff; border-radius: 12px; margin-bottom: 10px; padding: 12px 14px 12px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); position: relative; overflow: hidden; cursor: pointer;
+  }
+  .d-card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  }
+  .d-card.m::before { background: #3370ff; }
+  .d-card.n::before { background: #7ed3a5; }
+  .d-l1 { display: flex; align-items: center; gap: 8px; }
+  .d-name { font-size: 15px; font-weight: 600; }
+  .d-pill {
+    font-size: 10px; border-radius: 10px; padding: 1px 8px;
+  }
+  .d-pill.ok { background: #e8f7e9; color: #2ba471; }
+  .d-pill.no { background: #f2f3f5; color: #8f959e; }
+  .d-amount { margin-left: auto; font-size: 15px; font-weight: 700; }
+  .d-amount.none { font-size: 12px; color: #c0c4cc; font-weight: 400; }
+  .d-l2 { display: flex; margin-top: 9px; font-size: 11px; color: #8f959e; }
+  .d-l2 .cell { margin-right: 14px; }
+  .d-l2 .cell b { color: #4e535a; font-weight: 600; font-size: 12px; margin-right: 2px; }
+  .d-l3 {
+    margin-top: 9px; padding-top: 9px; border-top: 0.5px solid #f0f1f2;
+    font-size: 12px; color: #4e535a; line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .d-l3 .k { color: #8f959e; margin-right: 4px; }
+  .d-card.open .d-l3 { -webkit-line-clamp: unset; display: block; }
+  .d-detail { display: none; margin-top: 8px; }
+  .d-card.open .d-detail { display: block; }
+  .d-detail .d-row { display: flex; font-size: 12px; line-height: 1.7; margin-bottom: 5px; }
+  .d-detail .d-label { color: #8f959e; width: 60px; flex-shrink: 0; }
+  .d-detail .d-val { color: #4e535a; flex: 1; }
+
+  /* 说明 */
+  .notes {
+    max-width: 860px; margin: 48px auto 0; background: #fff; border-radius: 16px;
+    padding: 28px 32px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 17px; margin-bottom: 14px; }
+  .notes table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .notes th, .notes td { padding: 10px 12px; text-align: left; border-bottom: 0.5px solid #f0f1f2; vertical-align: top; line-height: 1.7; }
+  .notes th { color: #8f959e; font-weight: 500; font-size: 12px; }
+  .notes td:first-child { font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="page-title">「当日客户」tab · 4 种卡片样式</div>
+<div class="page-sub">同一组数据、同一页面框架（日期条 + tab 不变），只有客户卡片样式不同 ｜ 卡片都可点击展开</div>
+
+<div class="phones">
+
+<!-- ==================== 样式 A：宫格数据卡 ==================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div><div class="cal">📅</div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active">客户<span class="cnt">8</span></div>
+        <div class="tab">活动<span class="cnt">3</span></div>
+        <div class="tab">财务<span class="cnt">5</span></div>
+        <div class="tab">销卡<span class="cnt">4</span></div>
+      </div>
+      <div class="a-body">
+
+        <div class="a-card" onclick="this.classList.toggle('open')">
+          <div class="a-head">
+            <span class="a-name">林小满</span><span class="r-tag">会员</span>
+            <span class="a-status ok">● 已到店</span>
+            <span class="a-amount">¥3,600</span>
+          </div>
+          <div class="a-grid">
+            <div class="a-stat"><div class="v">6</div><div class="k">受邀</div></div>
+            <div class="a-stat"><div class="v">4</div><div class="k">到店</div></div>
+            <div class="a-stat"><div class="v">2</div><div class="k">今日参与</div></div>
+            <div class="a-stat"><div class="v">12</div><div class="k">剩余次数</div></div>
+          </div>
+          <div class="a-detail">
+            <div class="d-row"><span class="d-label">当日需求</span><span class="d-val">想继续做情绪释放，最近睡眠不太好</span></div>
+            <div class="d-row"><span class="d-label">客户信息</span><span class="d-val">第三次到店，对 OH 卡接受度高</span></div>
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">本周内推年卡，强调家庭套餐</span></div>
+            <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">成交意向强，下次请李老师亲自带</span></div>
+            <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">王姐 ／ 小李 · 10:30 到店</span></div>
+          </div>
+          <div class="a-expand">展开 ∨</div>
+        </div>
+
+        <div class="a-card" onclick="this.classList.toggle('open')">
+          <div class="a-head">
+            <span class="a-name">郑好</span><span class="r-tag">会员</span>
+            <span class="a-status ok">● 已到店</span>
+            <span class="a-amount">¥12,800</span>
+          </div>
+          <div class="a-grid">
+            <div class="a-stat"><div class="v">20</div><div class="k">受邀</div></div>
+            <div class="a-stat"><div class="v">15</div><div class="k">到店</div></div>
+            <div class="a-stat"><div class="v">2</div><div class="k">今日参与</div></div>
+            <div class="a-stat"><div class="v dim">不限</div><div class="k">剩余次数</div></div>
+          </div>
+          <div class="a-detail">
+            <div class="d-row"><span class="d-label">当日需求</span><span class="d-val">升级年卡，参加疗愈师课程</span></div>
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">安排疗愈师课程排期</span></div>
+            <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">重点关注，可作为案例客户</span></div>
+          </div>
+          <div class="a-expand">展开 ∨</div>
+        </div>
+
+        <div class="a-card" onclick="this.classList.toggle('open')">
+          <div class="a-head">
+            <span class="a-name">周雨桐</span><span class="r-tag">会员</span>
+            <span class="a-status ok">● 已到店</span>
+            <span class="a-amount">¥980</span>
+          </div>
+          <div class="a-grid">
+            <div class="a-stat"><div class="v">12</div><div class="k">受邀</div></div>
+            <div class="a-stat"><div class="v">9</div><div class="k">到店</div></div>
+            <div class="a-stat"><div class="v">1</div><div class="k">今日参与</div></div>
+            <div class="a-stat"><div class="v">3</div><div class="k">剩余次数</div></div>
+          </div>
+          <div class="a-detail">
+            <div class="d-row"><span class="d-label">当日需求</span><span class="d-val">卡次快用完，咨询续卡优惠</span></div>
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">给续卡方案，月底前跟进</span></div>
+          </div>
+          <div class="a-expand">展开 ∨</div>
+        </div>
+
+        <div class="a-card" onclick="this.classList.toggle('open')">
+          <div class="a-head">
+            <span class="a-name">陈默</span><span class="r-tag grey">新人</span>
+            <span class="a-status ok">● 已到店</span>
+            <span class="a-amount none">—</span>
+          </div>
+          <div class="a-grid">
+            <div class="a-stat"><div class="v">1</div><div class="k">受邀</div></div>
+            <div class="a-stat"><div class="v">1</div><div class="k">到店</div></div>
+            <div class="a-stat"><div class="v">1</div><div class="k">今日参与</div></div>
+            <div class="a-stat"><div class="v dim">未办卡</div><div class="k">剩余次数</div></div>
+          </div>
+          <div class="a-detail">
+            <div class="d-row"><span class="d-label">当日需求</span><span class="d-val">朋友推荐来体验，先了解一下</span></div>
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">三天内回访，约下次体验课</span></div>
+          </div>
+          <div class="a-expand">展开 ∨</div>
+        </div>
+
+        <div class="a-card" onclick="this.classList.toggle('open')">
+          <div class="a-head">
+            <span class="a-name">吴一凡</span><span class="r-tag grey">新人</span>
+            <span class="a-status no">○ 未到店</span>
+            <span class="a-amount none">—</span>
+          </div>
+          <div class="a-grid">
+            <div class="a-stat"><div class="v">3</div><div class="k">受邀</div></div>
+            <div class="a-stat"><div class="v">0</div><div class="k">到店</div></div>
+            <div class="a-stat"><div class="v">0</div><div class="k">今日参与</div></div>
+            <div class="a-stat"><div class="v dim">未办卡</div><div class="k">剩余次数</div></div>
+          </div>
+          <div class="a-detail">
+            <div class="d-row"><span class="d-label">当日需求</span><span class="d-val">临时有事未到店，改约下周</span></div>
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">下周一再确认时间</span></div>
+          </div>
+          <div class="a-expand">展开 ∨</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">A</span> 宫格数据卡</div>
+  <div class="caption">4 个关键数字做成宫格，一眼横向对比<br><span class="pro">✓ 数据感最强、各客户之间好对比</span>　<span class="con">✗ 卡片偏高，一屏只放 3~4 人</span></div>
+</div>
+
+<!-- ==================== 样式 B：极简列表行 ==================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div><div class="cal">📅</div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active">客户<span class="cnt">8</span></div>
+        <div class="tab">活动<span class="cnt">3</span></div>
+        <div class="tab">财务<span class="cnt">5</span></div>
+        <div class="tab">销卡<span class="cnt">4</span></div>
+      </div>
+      <div class="b-body">
+        <div class="b-list">
+          <div class="b-row">
+            <div class="b-ava m">林</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">林小满</span><span class="r-tag">会员</span></div>
+              <div class="b-line2">受邀 6 · 到店 4 · 今日 2 场 · 剩 12 次</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount">¥3,600</div>
+              <div class="b-arr ok">已到店 ›</div>
+            </div>
+          </div>
+          <div class="b-row">
+            <div class="b-ava m">郑</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">郑好</span><span class="r-tag">会员</span></div>
+              <div class="b-line2">受邀 20 · 到店 15 · 今日 2 场 · 不限</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount">¥12,800</div>
+              <div class="b-arr ok">已到店 ›</div>
+            </div>
+          </div>
+          <div class="b-row">
+            <div class="b-ava m">周</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">周雨桐</span><span class="r-tag">会员</span></div>
+              <div class="b-line2">受邀 12 · 到店 9 · 今日 1 场 · 剩 3 次</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount">¥980</div>
+              <div class="b-arr ok">已到店 ›</div>
+            </div>
+          </div>
+          <div class="b-row">
+            <div class="b-ava n">陈</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">陈默</span><span class="r-tag grey">新人</span></div>
+              <div class="b-line2">受邀 1 · 到店 1 · 今日 1 场 · 未办卡</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount none">—</div>
+              <div class="b-arr ok">已到店 ›</div>
+            </div>
+          </div>
+          <div class="b-row">
+            <div class="b-ava n">吴</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">吴一凡</span><span class="r-tag grey">新人</span></div>
+              <div class="b-line2">受邀 3 · 到店 0 · 未办卡 · 改约下周</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount none">—</div>
+              <div class="b-arr no">未到店 ›</div>
+            </div>
+          </div>
+          <div class="b-row">
+            <div class="b-ava m">孙</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">孙倩</span><span class="r-tag">会员</span></div>
+              <div class="b-line2">受邀 8 · 到店 6 · 今日 1 场 · 剩 7 次</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount none">—</div>
+              <div class="b-arr ok">已到店 ›</div>
+            </div>
+          </div>
+          <div class="b-row">
+            <div class="b-ava m">何</div>
+            <div class="b-main">
+              <div class="b-line1"><span class="b-name">何丽华</span><span class="r-tag">会员</span></div>
+              <div class="b-line2">受邀 5 · 到店 5 · 今日 2 场 · 剩 21 次</div>
+            </div>
+            <div class="b-right">
+              <div class="b-amount none">—</div>
+              <div class="b-arr ok">已到店 ›</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">B</span> 极简列表行</div>
+  <div class="caption">无卡片，头像 + 两行信息 + hairline，点击行进客户详情页<br><span class="pro">✓ 密度最高最安静，一屏 8 人</span>　<span class="con">✗ 需求/反馈等长文本必须进详情页看</span></div>
+</div>
+
+<!-- ==================== 样式 C：大小对比 ==================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div><div class="cal">📅</div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active">客户<span class="cnt">8</span></div>
+        <div class="tab">活动<span class="cnt">3</span></div>
+        <div class="tab">财务<span class="cnt">5</span></div>
+        <div class="tab">销卡<span class="cnt">4</span></div>
+      </div>
+      <div class="c-body">
+
+        <div class="c-group-label">今日成交<span class="pill">3 人 · ¥17,380</span></div>
+
+        <div class="c-big" onclick="this.classList.toggle('open')">
+          <div class="top">
+            <span class="name">郑好</span><span class="r-tag">会员</span>
+            <span class="time">11:20 成交</span>
+          </div>
+          <div class="amt"><span class="yuan">¥</span>12,800</div>
+          <div class="meta"><span>年卡·不限次</span><span>受邀 20 · 到店 15 · 今日 2 场</span><span>跟进：安排疗愈师排期</span></div>
+        </div>
+
+        <div class="c-big" onclick="this.classList.toggle('open')">
+          <div class="top">
+            <span class="name">林小满</span><span class="r-tag">会员</span>
+            <span class="time">11:40 成交</span>
+          </div>
+          <div class="amt"><span class="yuan">¥</span>3,600</div>
+          <div class="meta"><span>次卡 20 次 · 剩 12 次</span><span>今日 2 场</span><span>跟进：本周推年卡</span></div>
+        </div>
+
+        <div class="c-big" onclick="this.classList.toggle('open')">
+          <div class="top">
+            <span class="name">周雨桐</span><span class="r-tag">会员</span>
+            <span class="time">15:30 成交</span>
+          </div>
+          <div class="amt"><span class="yuan">¥</span>980</div>
+          <div class="meta"><span>OH卡梳理 2 次</span><span>剩 3 次</span><span>跟进：月底前给续卡方案</span></div>
+        </div>
+
+        <div class="c-group-label" style="margin-top:16px">未成交<span class="pill" style="background:#f2f3f5;color:#8f959e">5 人</span></div>
+
+        <div class="c-small-wrap">
+          <div class="c-small">
+            <span class="name">陈默</span><span class="r-tag grey">新人</span>
+            <span class="arr ok">● 已到店</span>
+            <span class="right">首次 · 三天内回访 ›</span>
+          </div>
+          <div class="c-small">
+            <span class="name">孙倩</span><span class="r-tag">会员</span>
+            <span class="arr ok">● 已到店</span>
+            <span class="right">今日 1 场 · 剩 7 次 ›</span>
+          </div>
+          <div class="c-small">
+            <span class="name">何丽华</span><span class="r-tag">会员</span>
+            <span class="arr ok">● 已到店</span>
+            <span class="right">今日 2 场 · 剩 21 次 ›</span>
+          </div>
+          <div class="c-small">
+            <span class="name">吴一凡</span><span class="r-tag grey">新人</span>
+            <span class="arr no">○ 未到店</span>
+            <span class="right">改约下周 ›</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">C</span> 大小对比</div>
+  <div class="caption">成交客户是大主角卡（金额大数字），未成交收成小行<br><span class="pro">✓ 层级最直观，一眼看到谁成交了</span>　<span class="con">✗ 未成交客户的信息被压得较薄</span></div>
+</div>
+
+<!-- ==================== 样式 D：左色条身份卡 ==================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div><div class="cal">📅</div>
+      </div>
+      <div class="tabbar">
+        <div class="tab active">客户<span class="cnt">8</span></div>
+        <div class="tab">活动<span class="cnt">3</span></div>
+        <div class="tab">财务<span class="cnt">5</span></div>
+        <div class="tab">销卡<span class="cnt">4</span></div>
+      </div>
+      <div class="d-body">
+
+        <div class="d-card m" onclick="this.classList.toggle('open')">
+          <div class="d-l1">
+            <span class="d-name">林小满</span>
+            <span class="d-pill ok">已到店</span>
+            <span class="d-amount">¥3,600</span>
+          </div>
+          <div class="d-l2">
+            <span class="cell"><b>6</b>受邀</span><span class="cell"><b>4</b>到店</span>
+            <span class="cell"><b>2</b>今日</span><span class="cell"><b>12</b>剩余</span>
+          </div>
+          <div class="d-l3"><span class="k">需求</span>想继续做情绪释放，最近睡眠不太好</div>
+          <div class="d-detail">
+            <div class="d-row"><span class="d-label">客户信息</span><span class="d-val">第三次到店，对 OH 卡接受度高</span></div>
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">本周内推年卡，强调家庭套餐</span></div>
+            <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">成交意向强，下次请李老师亲自带</span></div>
+            <div class="d-row"><span class="d-label">引流/邀约</span><span class="d-val">王姐 ／ 小李 · 10:30 到店</span></div>
+          </div>
+        </div>
+
+        <div class="d-card m" onclick="this.classList.toggle('open')">
+          <div class="d-l1">
+            <span class="d-name">郑好</span>
+            <span class="d-pill ok">已到店</span>
+            <span class="d-amount">¥12,800</span>
+          </div>
+          <div class="d-l2">
+            <span class="cell"><b>20</b>受邀</span><span class="cell"><b>15</b>到店</span>
+            <span class="cell"><b>2</b>今日</span><span class="cell"><b>不限</b>剩余</span>
+          </div>
+          <div class="d-l3"><span class="k">需求</span>升级年卡，参加疗愈师课程</div>
+          <div class="d-detail">
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">安排疗愈师课程排期</span></div>
+            <div class="d-row"><span class="d-label">组长反馈</span><span class="d-val">重点关注，可作为案例客户</span></div>
+          </div>
+        </div>
+
+        <div class="d-card m" onclick="this.classList.toggle('open')">
+          <div class="d-l1">
+            <span class="d-name">周雨桐</span>
+            <span class="d-pill ok">已到店</span>
+            <span class="d-amount">¥980</span>
+          </div>
+          <div class="d-l2">
+            <span class="cell"><b>12</b>受邀</span><span class="cell"><b>9</b>到店</span>
+            <span class="cell"><b>1</b>今日</span><span class="cell"><b>3</b>剩余</span>
+          </div>
+          <div class="d-l3"><span class="k">需求</span>卡次快用完，咨询续卡优惠</div>
+          <div class="d-detail">
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">给续卡方案，月底前跟进</span></div>
+          </div>
+        </div>
+
+        <div class="d-card n" onclick="this.classList.toggle('open')">
+          <div class="d-l1">
+            <span class="d-name">陈默</span>
+            <span class="d-pill ok">已到店</span>
+            <span class="d-amount none">—</span>
+          </div>
+          <div class="d-l2">
+            <span class="cell"><b>1</b>受邀</span><span class="cell"><b>1</b>到店</span>
+            <span class="cell"><b>1</b>今日</span><span class="cell"><b>—</b>未办卡</span>
+          </div>
+          <div class="d-l3"><span class="k">需求</span>朋友推荐来体验，先了解一下</div>
+          <div class="d-detail">
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">三天内回访，约下次体验课</span></div>
+          </div>
+        </div>
+
+        <div class="d-card n" onclick="this.classList.toggle('open')">
+          <div class="d-l1">
+            <span class="d-name">吴一凡</span>
+            <span class="d-pill no">未到店</span>
+            <span class="d-amount none">—</span>
+          </div>
+          <div class="d-l2">
+            <span class="cell"><b>3</b>受邀</span><span class="cell"><b>0</b>到店</span>
+            <span class="cell"><b>0</b>今日</span><span class="cell"><b>—</b>未办卡</span>
+          </div>
+          <div class="d-l3"><span class="k">备注</span>临时有事未到店，改约下周</div>
+          <div class="d-detail">
+            <div class="d-row"><span class="d-label">跟进点</span><span class="d-val">下周一再确认时间</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">D</span> 左色条身份卡</div>
+  <div class="caption">左侧色条区分会员/新人，每张卡直接露出「需求」第一行<br><span class="pro">✓ 长文本不用展开也能扫到重点</span>　<span class="con">✗ 卡片信息量最大，也最高</span></div>
+</div>
+
+</div>
+
+<!-- ==================== 对比表 ==================== -->
+<div class="notes">
+  <h2>4 种样式对比</h2>
+  <table>
+    <tr><th></th><th>A 宫格数据卡</th><th>B 极简列表行</th><th>C 大小对比</th><th>D 左色条身份卡</th></tr>
+    <tr>
+      <td>气质</td>
+      <td>数据仪表盘感，数字对数字</td>
+      <td>最安静，类通讯录/Linear</td>
+      <td>主次分明，成交是主角</td>
+      <td>信息最完整，像简报</td>
+    </tr>
+    <tr>
+      <td>一屏人数</td>
+      <td>3~4 人</td>
+      <td>7~8 人</td>
+      <td>成交 2~3 + 小行若干</td>
+      <td>3~4 人</td>
+    </tr>
+    <tr>
+      <td>长文本</td>
+      <td>点展开</td>
+      <td>进详情页</td>
+      <td>跟进点直接露出，其余点展开</td>
+      <td>需求直接露出一行，其余点展开</td>
+    </tr>
+    <tr>
+      <td>适合场景</td>
+      <td>常需要横向对比客户数据</td>
+      <td>客户多、以查找为主</td>
+      <td>店长视角，先关心成交</td>
+      <td>销售视角，先关心需求和跟进</td>
+    </tr>
+    <tr>
+      <td>组合建议</td>
+      <td colspan="4">这些样式不互斥，例如：<b>C 的分组思路 + D 的卡片</b>（成交大卡用 D 样式、未成交小行）；或 <b>B 的列表 + 点行进详情页</b>，详情页里再放宫格数据</td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>

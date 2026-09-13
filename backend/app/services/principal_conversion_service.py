@@ -7,6 +7,13 @@ from zoneinfo import ZoneInfo
 from app.models.principal import ConversionAction, ConversionRule
 
 
+def _analysis():
+    """延迟导入：保持本模块不依赖业务库，只在真的用了条件时加载。"""
+    from app.services import custom_analysis_service
+
+    return custom_analysis_service
+
+
 def matches(event: dict, action: ConversionAction) -> bool:
     return (
         event["kind"] == action.kind
@@ -29,11 +36,21 @@ def select_events(events: list[dict], action: ConversionAction) -> list[dict]:
 
 
 def calculate_conversion(events: list[dict], rule: ConversionRule, source_orgs: set[str],
-                         date_from: str, date_to: str, today: date | None = None) -> dict:
+                         date_from: str, date_to: str, today: date | None = None,
+                         customer_rows: dict[str, dict] | None = None) -> dict:
     today = today or datetime.now(ZoneInfo("Asia/Shanghai")).date()
     events = [e for e in events if e["date"] <= today.isoformat()]
     sources = select_events(events, rule.source)
     targets = [select_events(events, action) for action in rule.targets]
+    rows_by_customer = customer_rows or {}
+
+    def source_ok(customer_id: str) -> bool:
+        """「从」上的条件用来筛人：客户档案不满足就不进这批人。"""
+        if not rule.source.conditions:
+            return True
+        row = rows_by_customer.get(customer_id) or {}
+        return all(_analysis().matches_condition(row, condition) for condition in rule.source.conditions)
+
     target_maps = []
     for group in targets:
         by_person = defaultdict(list)
@@ -43,7 +60,8 @@ def calculate_conversion(events: list[dict], rule: ConversionRule, source_orgs: 
     # 每人取区间内第一个符合条件起点，避免同一人重复扩大分母。
     cohort = {}
     for event in sources:
-        if event["organization_id"] in source_orgs and date_from <= event["date"] <= date_to:
+        if (event["organization_id"] in source_orgs and date_from <= event["date"] <= date_to
+                and source_ok(event["customer_id"])):
             cohort.setdefault(event["customer_id"], event)
     rows = []
     unique_targets = set()
@@ -66,7 +84,7 @@ def calculate_conversion(events: list[dict], rule: ConversionRule, source_orgs: 
         status = "converted" if converted else "unconverted" if mature else "observing"
         evidence = [source, *sorted(matched.values(), key=lambda e: (e["date"], e["id"]))]
         rows.append({
-            "id": customer_id, "customer": source["customer"], "date": source["date"],
+            "id": customer_id, "customer_id": customer_id, "customer": source["customer"], "date": source["date"],
             "organization": source["organization"], "source": source["label"],
             "deadline": deadline.isoformat(), "status": status,
             "status_label": {"converted": "已转化", "unconverted": "未转化", "observing": "观察中"}[status],
@@ -78,10 +96,10 @@ def calculate_conversion(events: list[dict], rule: ConversionRule, source_orgs: 
     mature_count = sum(r["mature"] for r in rows)
     mature_converted = sum(r["mature"] and r["status"] == "converted" for r in rows)
     return {"items": rows, "summary": {
-        "起点人数": len(rows), "转化人数": converted_count,
+        "符合条件人数": len(rows), "转化人数": converted_count,
         "转化率": f"{converted_count / len(rows) * 100:.1f}%" if rows else "—",
-        "目标交易笔数": len(unique_targets),
+        "转化成交笔数": len(unique_targets),
         "观察中": sum(r["status"] == "observing" for r in rows),
-        "观察期已结束人数": mature_count,
+        "观察已完成人数": mature_count,
         "完整观察期转化率": f"{mature_converted / mature_count * 100:.1f}%" if mature_count else "—",
     }}

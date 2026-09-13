@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序 · 客户详情 会员身份/跟进阶段/客户标签 分区预览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: #f4f5f6; padding: 40px 16px 80px; color: #2b2f36;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  h1 { font-size: 17px; font-weight: 500; color: #1f2329; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #8f959e; margin-bottom: 28px; text-align: center; max-width: 640px; }
+  .phones { display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .phone-label { font-size: 12px; color: #8f959e; }
+  .phone {
+    width: 300px; border-radius: 28px; border: 1px solid #e1e4e7; background: #f7f8fa;
+    padding: 14px 12px 20px; box-shadow: 0 4px 16px rgba(31,35,41,.06);
+  }
+  .statusbar { height: 20px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #8f959e; margin-bottom: 8px; }
+
+  /* Hero */
+  .hero { background: #fff; border-radius: 8px; padding: 14px 14px 12px; margin-bottom: 10px; }
+  .hero-top { display: flex; align-items: center; gap: 8px; }
+  .hero-name { font-size: 17px; font-weight: 700; color: #1f2329; }
+  .hero-edit { margin-left: auto; font-size: 12px; color: #646a73; border: 0.5px solid #dee0e3; border-radius: 4px; padding: 3px 10px; }
+  .hero-sub { font-size: 11px; color: #8f959e; margin-top: 3px; }
+  .hero-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  .pill { font-size: 11px; border-radius: 99px; padding: 2px 9px; }
+  .pill-gray { background: #f2f3f5; color: #4e535a; }
+  .pill-blue { background: #e0ebff; color: #2f5cc4; }
+  .pill-orange { background: #ffe8d9; color: #c25a1b; }
+  .hero-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; border-top: 0.5px solid #f0f0f0; padding-top: 10px; }
+  .hstat-num { font-size: 15px; font-weight: 700; color: #212631; }
+  .hstat-num .unit { font-size: 10px; font-weight: 500; color: #79838f; }
+  .hstat-label { font-size: 10px; color: #a8b1bd; margin-top: 1px; }
+
+  /* 分区卡 */
+  .sec { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .sec-title { font-size: 13px; font-weight: 600; color: #212631; margin-bottom: 6px; }
+  .kv { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 0.5px solid #f3f4f5; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { width: 60px; flex-shrink: 0; font-size: 12px; color: #a8b1bd; }
+  .kv .v { font-size: 12.5px; color: #212631; font-weight: 600; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .kv .mech { margin-left: auto; font-size: 10px; color: #b7bdc6; flex-shrink: 0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #3370ff; display: inline-block; transform: translateY(-1px); }
+  .tag-zone { margin-top: 2px; padding-top: 8px; }
+  .tz-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .tz-label { font-size: 12px; color: #a8b1bd; }
+  .tz-mech { font-size: 10px; color: #b7bdc6; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag { border: 0.5px solid #e1e4e7; background: #fafbfc; border-radius: 99px; padding: 2px 8px; font-size: 10.5px; color: #646a73; }
+
+  .notes { max-width: 720px; margin-top: 36px; background: #fff; border: 0.5px solid #e8eaed; border-radius: 10px; padding: 16px 20px; }
+  .notes li { font-size: 13px; color: #2b2f36; margin: 5px 0 5px 18px; line-height: 1.7; }
+  .notes b { font-weight: 500; }
+</style>
+</head>
+<body>
+
+  <h1>小程序 · 客户详情页三字段分区</h1>
+  <div class="subtitle">与 PC 端同一套语言：会员身份=系统判定（纯文字）· 跟进阶段=人工维护（蓝点状态）· 客户标签=人工多选（唯一胶囊）</div>
+
+  <div class="phones">
+
+    <div class="phone-col">
+      <div class="phone">
+        <div class="statusbar">9:41</div>
+        <div class="hero">
+          <div class="hero-top"><span class="hero-name">林小满</span><span class="hero-edit">编辑</span></div>
+          <div class="hero-sub">林晓 · 女 · 32 岁</div>
+          <div class="hero-tags">
+            <span class="pill pill-gray">体验会员</span>
+            <span class="pill pill-blue">沟通中</span>
+            <span class="pill pill-gray">高意向</span>
+            <span class="pill pill-gray">朋友推荐</span>
+          </div>
+          <div class="hero-stats">
+            <div><div class="hstat-num">12<span class="unit"> 次</span></div><div class="hstat-label">到店</div></div>
+            <div><div class="hstat-num">¥8,600</div><div class="hstat-label">消费</div></div>
+            <div><div class="hstat-num" style="font-size:12px;">2026-03-12</div><div class="hstat-label">首次到访</div></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-title">基本信息</div>
+          <div class="kv"><span class="k">电话</span><span class="v" style="font-weight:400;">138****6621</span></div>
+          <div class="kv"><span class="k">微信</span><span class="v" style="font-weight:400;">linxm88</span></div>
+        </div>
+      </div>
+      <div class="phone-label">现状：三种字段混成一排胶囊</div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone">
+        <div class="statusbar">9:41</div>
+        <div class="hero">
+          <div class="hero-top"><span class="hero-name">林小满</span><span class="hero-edit">编辑</span></div>
+          <div class="hero-sub">林晓 · 女 · 32 岁</div>
+          <div class="hero-stats" style="border-top:none;margin-top:10px;padding-top:10px;border-top:0.5px solid #f0f0f0;">
+            <div><div class="hstat-num">12<span class="unit"> 次</span></div><div class="hstat-label">到店</div></div>
+            <div><div class="hstat-num">¥8,600</div><div class="hstat-label">消费</div></div>
+            <div><div class="hstat-num" style="font-size:12px;">2026-03-12</div><div class="hstat-label">首次到访</div></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-title">身份与状态</div>
+          <div class="kv">
+            <span class="k">会员身份</span>
+            <span class="v">体验会员</span>
+            <span class="mech">系统判定</span>
+          </div>
+          <div class="kv">
+            <span class="k">服务老师</span>
+            <span class="v">阿哲</span>
+          </div>
+          <div class="kv">
+            <span class="k">跟进阶段</span>
+            <span class="v"><span class="dot"></span>沟通中</span>
+            <span class="mech">人工维护</span>
+          </div>
+          <div class="tag-zone">
+            <div class="tz-head"><span class="tz-label">客户标签</span></div>
+            <div class="tags"><span class="tag">高意向</span><span class="tag">朋友推荐</span><span class="tag">偏好晚间</span></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sec-title">基本信息</div>
+          <div class="kv"><span class="k">电话</span><span class="v" style="font-weight:400;">138****6621</span></div>
+          <div class="kv"><span class="k">微信</span><span class="v" style="font-weight:400;">linxm88</span></div>
+        </div>
+      </div>
+      <div class="phone-label">调整后：hero 只留名字和指标，三字段独立成区</div>
+    </div>
+
+  </div>
+
+  <ul class="notes">
+    <li><b>Hero 减重</b>：胶囊排整个移出 hero，hero 只留名字/基本信息/三项指标，首屏更干净</li>
+    <li><b>新增「身份与状态」卡</b>（紧随 hero）：三行 label-value——会员身份（纯文字+系统判定）、服务老师、跟进阶段（蓝点+人工维护）</li>
+    <li><b>客户标签</b>挂在该卡底部独立小区（与上方单 hairline 分隔），是全页唯一的胶囊样式 = 唯一可自由增删的字段</li>
+    <li>编辑入口不变（hero 右上"编辑"），编辑页内三个字段同样分区：会员信息（只读+判定依据）/ 流量与跟进（跟进阶段单选）/ 客户标签（多选）</li>
+    <li>视觉与 PC 端完全同语言：无暖色、无混合胶囊排、hairline 分隔</li>
+  </ul>
+
+</body>
+</html>

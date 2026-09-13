@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自定义分析页 · 诊断与改版方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: #f4f5f6; color: #2b2f36; padding: 40px 24px 80px; font-size: 13px; line-height: 1.6;
+  }
+  .page { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 18px; font-weight: 500; color: #1f2329; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #8f959e; margin-bottom: 32px; }
+  h2 { font-size: 14px; font-weight: 500; color: #1f2329; margin: 36px 0 12px; }
+
+  /* 诊断卡片 */
+  .issue { display: flex; gap: 14px; background: #fff; border: 0.5px solid #e8eaed; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .issue .no { width: 22px; height: 22px; border-radius: 50%; background: #f2f3f5; color: #79838f; font-size: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .issue .body { flex: 1; min-width: 0; }
+  .issue .now { font-size: 12px; color: #8f959e; }
+  .issue .now code { background: #f5f6f8; border-radius: 4px; padding: 1px 6px; color: #646a73; font-size: 11.5px; }
+  .issue .why { font-size: 13px; color: #2b2f36; margin-top: 4px; }
+  .issue .fix { font-size: 12px; color: #185fa5; margin-top: 6px; }
+  .issue .fix::before { content: "→ "; }
+
+  /* 改版页面 mock */
+  .mock { background: #fff; border: 0.5px solid #e8eaed; border-radius: 12px; overflow: hidden; }
+  .mock-head { padding: 16px 20px 12px; border-bottom: 0.5px solid #f0f0f0; }
+  .mock-title { font-size: 16px; font-weight: 500; color: #1f2329; }
+  .mock-sub { font-size: 12px; color: #8f959e; margin-top: 3px; }
+  .quick { padding: 14px 20px; border-bottom: 0.5px solid #f0f0f0; }
+  .quick-label { font-size: 12px; color: #8f959e; margin-bottom: 8px; }
+  .quick-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .qchip { border: 0.5px solid #e1e4e7; border-radius: 8px; padding: 8px 12px; background: #fff; cursor: pointer; min-width: 150px; }
+  .qchip:hover { border-color: #3370ff; }
+  .qchip .t { font-size: 12.5px; font-weight: 500; color: #2b2f36; }
+  .qchip .d { font-size: 11px; color: #8f959e; margin-top: 2px; }
+  .qchip.hot { border-color: #b9cdf8; background: #f7faff; }
+
+  .step { padding: 14px 20px; border-bottom: 0.5px solid #f0f0f0; }
+  .step-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+  .step-no { font-size: 12px; color: #3370ff; font-weight: 600; }
+  .step-title { font-size: 13.5px; font-weight: 500; color: #1f2329; }
+  .step-hint { font-size: 11.5px; color: #8f959e; }
+  .cond-row { display: flex; align-items: center; gap: 8px; background: #fbfcfd; border: 0.5px solid #eceef0; border-radius: 6px; padding: 6px 10px; margin-bottom: 6px; font-size: 12.5px; }
+  .cond-field { color: #212631; font-weight: 500; }
+  .cond-op { color: #8f959e; font-size: 12px; }
+  .cond-val { color: #2b2f36; }
+  .cond-x { margin-left: auto; color: #b0b5bb; font-size: 12px; }
+  .cond-add { font-size: 12px; color: #3370ff; }
+  .logic { display: inline-flex; border: 0.5px solid #e1e4e7; border-radius: 4px; padding: 2px; gap: 2px; }
+  .logic span { font-size: 11px; padding: 2px 8px; border-radius: 3px; color: #646a73; }
+  .logic .on { background: #f0f5ff; color: #3370ff; }
+  .daterange { display: inline-flex; align-items: center; gap: 6px; border: 0.5px solid #e1e4e7; border-radius: 4px; padding: 4px 8px; font-size: 12px; color: #2b2f36; }
+  .preset { font-size: 11px; color: #646a73; border: 0.5px solid #e1e4e7; border-radius: 4px; padding: 3px 8px; }
+  .preset.on { background: #1f2329; color: #fff; border-color: #1f2329; }
+
+  .metrics { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mchip { display: inline-flex; align-items: center; gap: 5px; border: 0.5px solid #e5e7ea; border-radius: 4px; padding: 4px 9px; font-size: 12px; color: #646a73; }
+  .mchip.on { border-color: #b9cdf8; background: #f7faff; color: #2b2f36; }
+  .mchip .ck { width: 12px; height: 12px; border-radius: 2px; border: 0.5px solid #c9cdd4; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: #fff; }
+  .mchip.on .ck { background: #3370ff; border-color: #3370ff; }
+  .col-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .cchip { border: 0.5px solid #e5e7ea; background: #fafbfc; font-size: 11px; color: #4e535a; padding: 3px 8px; border-radius: 4px; }
+
+  .run-bar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fafbfc; }
+  .run-summary { font-size: 12px; color: #79838f; }
+  .run-btn { margin-left: auto; background: #3370ff; color: #fff; font-size: 12.5px; border-radius: 4px; padding: 7px 22px; }
+  .run-reset { font-size: 12px; color: #8f959e; }
+
+  .result-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 14px 20px 0; }
+  .rcard { border: 0.5px solid #eceef0; padding: 10px 12px; }
+  .rcard.total { border-color: #cfdcf5; }
+  .rcard .l { font-size: 11px; color: #8f959e; }
+  .rcard .v { font-size: 20px; font-weight: 500; color: #212631; margin-top: 4px; }
+  .rcard .v small { font-size: 11px; color: #8f959e; font-weight: 400; }
+  .result-table { margin: 14px 20px 18px; border: 0.5px solid #eceef0; }
+  .rt-head { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 14px; border-bottom: 0.5px solid #f0f0f0; }
+  .rt-title { font-size: 13px; font-weight: 500; }
+  .rt-sub { font-size: 11px; color: #8f959e; }
+  .rt-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr; gap: 8px; padding: 8px 14px; font-size: 12.5px; border-bottom: 0.5px solid #f5f6f7; }
+  .rt-row.head { font-size: 11px; color: #8f959e; background: #f7f8fa; }
+  .rt-row:last-child { border-bottom: none; }
+
+  .diff { width: 100%; border-collapse: collapse; background: #fff; border: 0.5px solid #e8eaed; border-radius: 10px; overflow: hidden; }
+  .diff th { text-align: left; font-size: 11px; color: #8f959e; font-weight: 400; padding: 8px 14px; background: #f7f8fa; border-bottom: 0.5px solid #f0f0f0; }
+  .diff td { font-size: 12.5px; padding: 9px 14px; border-bottom: 0.5px solid #f3f4f5; vertical-align: top; line-height: 1.6; }
+  .diff tr:last-child td { border-bottom: none; }
+  .diff td:first-child { color: #8f959e; white-space: nowrap; }
+  .diff .old { color: #79838f; }
+  .diff .new { color: #212631; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>自定义分析页 · 诊断与改版方案</h1>
+  <div class="subtitle">核心问题：页面是按"技术结构"（条件/指标/字段/模板）组织的，而使用者脑子里是"我想知道某件事"——要把页面语言从"配置项"翻译成"问题"</div>
+
+  <!-- 诊断 -->
+  <h2>一、诊断：七个"看不懂"的点</h2>
+
+  <div class="issue"><span class="no">1</span><div class="body">
+    <div class="now">页面副标题 <code>选择筛选条件、统计指标和列表字段，并将常用组合保存为模板</code></div>
+    <div class="why">全是术语，没回答"这个页面能干嘛"。使用者第一次来不知道它能回答"本月引流的客户有多少到店了"这类问题。</div>
+    <div class="fix">改成一句人话："找出符合条件的客户，看他们的邀约、到店和成交情况"；冷启动靠写死的"示例组合"（点击帮你填好条件，可再改），不假装有常用模板。</div>
+  </div></div>
+
+  <div class="issue"><span class="no">2</span><div class="body">
+    <div class="now">统计范围说明 <code>同一时间范围会分别匹配创建、引流、邀约、到场、课程和成交日期</code></div>
+    <div class="why">全页最难懂的一句。使用者不知道"匹配"是什么意思，也不明白选了一个月到底影响了什么。</div>
+    <div class="fix">改成"统计这个时间段内发生的邀约、到店和成交"，把机制说明藏进 ⓘ。</div>
+  </div></div>
+
+  <div class="issue"><span class="no">3</span><div class="body">
+    <div class="now">区块标题 <code>筛选人群</code> + 逻辑切换 <code>同时满足 / 满足任一</code></div>
+    <div class="why">"人群"是运营黑话；"满足任一"要想一下才懂。条件行里"期间邀约次数""is_empty"类操作符更劝退。</div>
+    <div class="fix">改成"① 找出这样的客户"，逻辑切换改成"全部符合 / 符合任意一条"，操作符全部口语化（"是/不是/包含/大于/介于/为空"）。</div>
+  </div></div>
+
+  <div class="issue"><span class="no">4</span><div class="body">
+    <div class="now"><code>统计指标 · 勾选后将作为顶部数据卡片显示</code> + <code>附加分组卡片</code></div>
+    <div class="why">"顶部数据卡片"——顶部在哪？"附加分组卡片"是全页最黑话的一个词，没人知道选了会发生什么。</div>
+    <div class="fix">改成"② 看哪些总数"，说明"查询后显示在结果上方"；"附加分组卡片"改成"按…分组对比（可选）"，例：按引流人分组，每人一张卡。</div>
+  </div></div>
+
+  <div class="issue"><span class="no">5</span><div class="body">
+    <div class="now"><code>结果列表字段 · 最多显示10列，选择顺序就是列表顺序</code> + 左右箭头排序</div>
+    <div class="why">"字段"是数据库词汇；箭头一个个挪顺序又慢又难发现。</div>
+    <div class="fix">改成"③ 名单里显示哪些列"，说明"点按添加、拖动排序（最多 10 列）"，箭头换成拖把手。</div>
+  </div></div>
+
+  <div class="issue"><span class="no">6</span><div class="body">
+    <div class="now">查询入口：四个区块配完 → 页面最右下角 <code>开始查询</code></div>
+    <div class="why">动作和结果离得太远，改任何一个选项后不会自动更新，使用者不知道要再点一次。</div>
+    <div class="fix">改成改任意条件后结果区顶部出现"条件已修改，点击更新"，或 300ms 防抖自动查询。</div>
+  </div></div>
+
+  <div class="issue"><span class="no">7</span><div class="body">
+    <div class="now">模板下拉 <code>耀凯 · 共享 · 3次</code>；结果标题 <code>自助分析结果</code></div>
+    <div class="why">"3次"是什么？结果标题是系统占位语，不是这次分析的内容。</div>
+    <div class="fix">模板标注"使用过 3 次"；结果标题自动生成为人话摘要，如"本月 · 引流人是大熊 · 共 23 人"。</div>
+  </div></div>
+
+  <!-- 方案 -->
+  <h2>二、改版后页面（整体结构）</h2>
+  <div class="mock">
+    <div class="mock-head">
+      <div class="mock-title">自定义分析</div>
+      <div class="mock-sub">找出符合条件的客户，看他们的邀约、到店和成交情况</div>
+    </div>
+
+    <div class="quick">
+      <div class="quick-label">不知道从何下手？点示例帮你把条件填好（可再改）：</div>
+      <div class="quick-chips">
+        <div class="qchip"><div class="t">本月引流转化</div><div class="d">填入：引流日期=本月 + 邀约/到场/成交指标</div></div>
+        <div class="qchip"><div class="t">久未到店会员</div><div class="d">填入：会员身份=正式会员 + 到场日期早于 30 天前</div></div>
+        <div class="qchip"><div class="t">高意向未成交</div><div class="d">填入：客户标签包含「高意向」+ 成交金额=0</div></div>
+      </div>
+      <div style="margin-top:10px;font-size:11.5px;color:#a8b1bd;">我的模板：还没有保存过——配好一次分析后点右上「保存为模板」，下次从这里直接调用。</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-no">①</span><span class="step-title">找出这样的客户</span>
+        <span class="logic"><span class="on">全部符合</span><span>符合任意一条</span></span>
+        <span style="margin-left:auto;"></span><span class="cond-add">+ 加一个条件</span>
+      </div>
+      <div class="cond-row"><span class="cond-field">引流日期</span><span class="cond-op">介于</span><span class="cond-val">2026-08-01 至 2026-08-27</span><span class="cond-x">✕</span></div>
+      <div class="cond-row"><span class="cond-field">会员身份</span><span class="cond-op">是</span><span class="cond-val">体验会员、正式会员</span><span class="cond-x">✕</span></div>
+      <div class="cond-row" style="background:#fff;border-style:dashed;color:#8f959e;">条件示例：引流人 是 大熊 ｜ 期间到场次数 大于 3 ｜ 客户标签 包含 高意向</div>
+    </div>
+
+    <div class="step" style="display:flex;gap:32px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:280px;">
+        <div class="step-head"><span class="step-no">②</span><span class="step-title">看哪些总数</span><span class="step-hint">查询后显示在结果上方</span></div>
+        <div class="metrics">
+          <span class="mchip on"><span class="ck">✓</span>总人数</span>
+          <span class="mchip on"><span class="ck">✓</span>到场人数</span>
+          <span class="mchip on"><span class="ck">✓</span>成交人数</span>
+          <span class="mchip on"><span class="ck">✓</span>成交金额</span>
+          <span class="mchip"><span class="ck"></span>邀约人数</span>
+          <span class="mchip"><span class="ck"></span>参与活动人次</span>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:#79838f;">按 <span class="daterange" style="padding:2px 8px;">引流人 ▾</span> 分组对比（可选）<span style="color:#b7bdc6;font-size:11px;margin-left:6px;">每人一张卡片</span></div>
+      </div>
+      <div style="flex:1;min-width:280px;">
+        <div class="step-head"><span class="step-no">③</span><span class="step-title">名单里显示哪些列</span><span class="step-hint">最多 10 列，拖动排序</span></div>
+        <div class="col-chips">
+          <span class="cchip">⠿ 昵称</span><span class="cchip">⠿ 会员身份</span><span class="cchip">⠿ 跟进阶段</span><span class="cchip">⠿ 引流人</span><span class="cchip">⠿ 期间邀约</span><span class="cchip">⠿ 期间到场</span><span class="cchip">⠿ 成交金额</span><span class="cchip" style="border-style:dashed;color:#3370ff;background:#fff;">+ 添加</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="run-bar">
+      <span class="run-summary">当前：8月1日–27日 · 2 个条件 · 4 项总数 · 7 列</span>
+      <span class="run-reset">重置</span>
+      <span class="run-btn">查询</span>
+    </div>
+
+    <div class="result-cards">
+      <div class="rcard total"><div class="l">符合条件客户</div><div class="v">23<small> 人</small></div></div>
+      <div class="rcard"><div class="l">到场</div><div class="v">15<small> 人</small></div></div>
+      <div class="rcard"><div class="l">成交</div><div class="v">8<small> 人</small></div></div>
+      <div class="rcard"><div class="l">成交金额</div><div class="v">¥36,200</div></div>
+      <div class="rcard"><div class="l">到场率</div><div class="v">65<small> %</small></div></div>
+    </div>
+    <div class="result-table">
+      <div class="rt-head"><span class="rt-title">8月 · 体验/正式会员 · 共 23 人</span><span class="rt-sub">条件已修改？点查询更新</span></div>
+      <div class="rt-row head"><span>昵称</span><span>会员身份</span><span>跟进阶段</span><span>引流人</span><span>成交金额</span></div>
+      <div class="rt-row"><span>林小满</span><span>体验会员</span><span>沟通中</span><span>大熊</span><span>¥8,600</span></div>
+      <div class="rt-row"><span>陈女士</span><span>正式会员</span><span>已成交</span><span>阿哲</span><span>¥12,000</span></div>
+    </div>
+  </div>
+
+  <!-- 对照表 -->
+  <h2>三、文案对照（前 → 后）</h2>
+  <table class="diff">
+    <tr><th style="width:140px;">位置</th><th>现在</th><th>改成</th></tr>
+    <tr><td>副标题</td><td class="old">选择筛选条件、统计指标和列表字段，并将常用组合保存为模板</td><td class="new">找出符合条件的客户，看他们的邀约、到店和成交情况</td></tr>
+    <tr><td>时间说明</td><td class="old">同一时间范围会分别匹配创建、引流、邀约、到场、课程和成交日期</td><td class="new">统计这个时间段内发生的邀约、到店和成交（机制细节收 ⓘ）</td></tr>
+    <tr><td>筛选区</td><td class="old">筛选人群 · 同时满足/满足任一</td><td class="new">① 找出这样的客户 · 全部符合/符合任意一条</td></tr>
+    <tr><td>指标区</td><td class="old">统计指标 · 勾选后将作为顶部数据卡片显示</td><td class="new">② 看哪些总数 · 查询后显示在结果上方</td></tr>
+    <tr><td>分组</td><td class="old">附加分组卡片</td><td class="new">按…分组对比（可选），例：按引流人，每人一张卡片</td></tr>
+    <tr><td>列表区</td><td class="old">结果列表字段 · 最多显示10列，选择顺序就是列表顺序</td><td class="new">③ 名单里显示哪些列 · 最多 10 列，拖动排序</td></tr>
+    <tr><td>结果标题</td><td class="old">自助分析结果</td><td class="new">自动生成摘要：8月 · 体验/正式会员 · 共 23 人</td></tr>
+    <tr><td>模板标注</td><td class="old">耀凯 · 共享 · 3次</td><td class="new">耀凯 · 共享 · 使用过 3 次</td></tr>
+  </table>
+
+</div>
+</body>
+</html>

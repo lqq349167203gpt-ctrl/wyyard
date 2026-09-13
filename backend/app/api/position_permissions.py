@@ -62,6 +62,7 @@ class CustomerAccessPermissionUpdate(StrictBaseModel):
 
 
 class EditPermissionUpdate(StrictBaseModel):
+    principal_external_access: CustomerAccessPermissionUpdate | None = None
     principal_scope: Literal["own", "all"] = "own"
     customers: Literal["view", "all"] = "all"
     visits: Literal["view", "own", "all"] = "own"
@@ -72,6 +73,8 @@ class EditPermissionUpdate(StrictBaseModel):
     activity_lock: bool = False
     visit_lock: bool = False
     payments: Literal["own", "all"] = "all"
+    # 课程记录查看范围：own = 与本人相关，all = 全部记录。
+    course_records: Literal["own", "all"] = "all"
     contacts: ContactPermissionUpdate = Field(default_factory=ContactPermissionUpdate)
     # 兼容尚未升级的 PC/小程序：未提交该字段时由服务层按旧角色的完整可见能力处理。
     customer_access: CustomerAccessPermissionUpdate | None = None
@@ -134,6 +137,8 @@ async def set_full_permissions(data: FullPermissionUpdate, _manager_role: str = 
         edit_permissions["activity_lock"] = False
     if "payment" not in data.pages:
         edit_permissions["payments"] = "own"
+    if "course-statistics" not in data.pages:
+        edit_permissions["course_records"] = "own"
     if "healing-records" not in data.pages:
         edit_permissions["customers"] = "all"
     position_edit_permission_service.set_permissions(data.position, edit_permissions)

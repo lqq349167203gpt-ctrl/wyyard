@@ -1,4 +1,4 @@
-const { visitApi, spaceApi, customerApi, visitVerificationApi } = require('../../utils/api')
+const { visitApi, spaceApi, customerApi, visitVerificationApi, isOperationCancelled } = require('../../utils/api')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 Page({
@@ -265,6 +265,8 @@ Page({
       wx.navigateBack()
     } catch (e) {
       this.setData({ saving: false })
+      // 用户在「取消关联抵扣」里点了取消：不是保存失败，不要追问是否重试
+      if (isOperationCancelled(e)) return
       wx.showModal({
         title: '保存失败',
         content: '是否重试？',

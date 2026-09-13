@@ -323,16 +323,17 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         teacher_id="teacher-1",
     )
 
+    # 能量结没有课时，只结算部位数：课时一律为 0，部位数单独出列
     assert energy_result["statistics"] == [{
         "type": "eks",
         "label": "能量结",
         "course_count": 1,
-        "class_hours": 4,
+        "class_hours": 0,
         "participant_count": 1,
     }]
-    assert energy_result["trend"][0]["class_hours"] == 4
-    assert energy_result["teacher_statistics"][0]["class_hours"] == 4
-    assert energy_result["courses"][0]["class_hours"] == 4
+    assert energy_result["trend"][0]["class_hours"] == 0
+    assert energy_result["teacher_statistics"][0]["class_hours"] == 0
+    assert energy_result["courses"][0]["class_hours"] == 0
     assert energy_result["courses"][0]["body_part_count"] == 4
 
     # 全部时间跨课程类型按授课 ID 匹配，同名或其他老师的课程不能混入。
@@ -363,3 +364,94 @@ def test_course_owners_include_emotional_release_and_multiple_energy_owners():
         "owner_name": "小安、小白", "body_part_count": 5,
     }
     assert _course_owner_details("eks", activity, customers, {"a"})["owner_name"] == "小安"
+
+
+def test_course_statistics_limits_records_to_actor_when_scope_is_own(monkeypatch):
+    """角色选择“与本人相关”时只返回本人授课的课程。"""
+    from starlette.requests import Request
+
+    from app.api import statistics
+
+    own_activity = _activity(id="salon-own", teacher_ids=["teacher-1"])
+    other_activity = _activity(id="salon-other", teacher_ids=["teacher-2"])
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
+        ("class", "沙龙活动", lambda **_kwargs: [own_activity, other_activity]),
+    ))
+    monkeypatch.setattr(
+        statistics.customer_service,
+        "list_customers",
+        lambda: [
+            SimpleNamespace(id="teacher-1", nickname="老师甲", name="", positions=["课程老师"]),
+            SimpleNamespace(id="teacher-2", nickname="老师乙", name="", positions=["课程老师"]),
+            SimpleNamespace(id="participant-1", nickname="参与者", name="", positions=[]),
+        ],
+    )
+    monkeypatch.setattr(statistics.organization_service, "list_organizations", lambda: [])
+    monkeypatch.setattr(statistics.member_identity_service, "list_identities", lambda: [])
+    monkeypatch.setattr(statistics.visit_service, "list_visits", lambda **_kwargs: [])
+    monkeypatch.setattr(statistics.class_record_service, "_get_group_member_ids", lambda _record: set())
+    monkeypatch.setattr(statistics, "_payment_record_groups", lambda: [])
+    monkeypatch.setattr(
+        statistics.customer_access_service,
+        "visible_customer_ids",
+        lambda _request, customers: {customer.id for customer in customers},
+    )
+    monkeypatch.setattr(statistics, "get_request_roles", lambda _request: ["超级管理员"])
+    monkeypatch.setattr(
+        statistics,
+        "position_edit_permission_service",
+        SimpleNamespace(get_permissions=lambda _roles: {"course_records": "own"}),
+    )
+    monkeypatch.setattr(statistics, "request_actor_customer_ids", lambda _request: {"teacher-1"})
+
+    request = Request({"type": "http", "path": "/api/statistics/courses", "headers": []})
+    result = statistics.get_course_statistics(
+        date_from="2026-08-01",
+        date_to="2026-08-31",
+        granularity="day",
+        organization_id=None,
+        activity_type=None,
+        course_subtype=None,
+        teacher_id="",
+        request=request,
+    )
+
+    assert [row["id"] for row in result["courses"]] == ["class:salon-own"]
+    assert [teacher["id"] for teacher in result["teachers"]] == ["teacher-1"]
+
+
+def test_course_statistics_returns_no_records_when_actor_has_no_customer(monkeypatch):
+    """“与本人相关”但账号归属人没有对应客户时，不应回退到全部记录。"""
+    from starlette.requests import Request
+
+    from app.api import statistics
+
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
+        ("class", "沙龙活动", lambda **_kwargs: [_activity(id="salon-1", teacher_ids=["teacher-1"])]),
+    ))
+    monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: [])
+    monkeypatch.setattr(statistics.organization_service, "list_organizations", lambda: [])
+    monkeypatch.setattr(statistics.member_identity_service, "list_identities", lambda: [])
+    monkeypatch.setattr(statistics.visit_service, "list_visits", lambda **_kwargs: [])
+    monkeypatch.setattr(statistics, "_payment_record_groups", lambda: [])
+    monkeypatch.setattr(statistics, "get_request_roles", lambda _request: ["超级管理员"])
+    monkeypatch.setattr(
+        statistics,
+        "position_edit_permission_service",
+        SimpleNamespace(get_permissions=lambda _roles: {"course_records": "own"}),
+    )
+    monkeypatch.setattr(statistics, "request_actor_customer_ids", lambda _request: set())
+
+    request = Request({"type": "http", "path": "/api/statistics/courses", "headers": []})
+    result = statistics.get_course_statistics(
+        date_from="2026-08-01",
+        date_to="2026-08-31",
+        granularity="day",
+        organization_id=None,
+        activity_type=None,
+        course_subtype=None,
+        teacher_id="",
+        request=request,
+    )
+
+    assert result["courses"] == []

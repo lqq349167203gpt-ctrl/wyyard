@@ -63,7 +63,7 @@ class TestVisitCRUD:
         assert resp.status_code == 200
         data = resp.json()
         assert data["arrived"] is True
-        assert data["needs"] == "放松身心"
+        assert data["needs"] == "不闹：放松身心"
         assert data["experience"] == "体验很好"
         assert data["feedback"].endswith("不闹：感谢反馈")
 

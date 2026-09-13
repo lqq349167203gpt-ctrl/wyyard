@@ -953,6 +953,14 @@ Page({
     }
   },
 
+  // 取消关联抵扣的确认弹窗：api 层遇到 409 时会调用它（替代系统 wx.showModal，文字和层级更清楚）
+  showCoarseCancellationConfirm(payload) {
+    // 没有明细就 reject，让 api 层退回系统弹窗兜底
+    const confirm = this.selectComponent('#coarseConfirm')
+    if (!confirm) return Promise.reject(new Error('no-modal'))
+    return confirm.open(payload)
+  },
+
   onCreateTap() {
     if (this.data.isDayLocked) {
       wx.showToast({ title: '当天课表已锁定，请先解锁', icon: 'none' })

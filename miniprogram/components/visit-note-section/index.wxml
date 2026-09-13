@@ -36,9 +36,25 @@
   <view class="editor-header">
     <text class="editor-title">我填写的{{title}}</text>
     <view class="editor-header-actions">
+      <text class="previous-toggle" wx:if="{{category === 'visit_need' && customerId}}" bindtap="onToggleVisitPurpose">{{visitPurposeOpen ? '收起到访目的' : '引用到访目的'}}</text>
       <text class="previous-toggle" wx:if="{{category === 'visit_need' && customerId}}" bindtap="onTogglePrevious">{{previousOpen ? '收起上次需求' : '引用上次需求'}}</text>
       <text class="editor-close" bindtap="onEditorClose">取消</text>
     </view>
+  </view>
+  <view class="previous-box" wx:if="{{category === 'visit_need' && visitPurposeOpen}}">
+    <text class="previous-empty" wx:if="{{visitPurposeLoading}}">正在加载到访目的…</text>
+    <view class="previous-error" wx:elif="{{visitPurposeError}}" bindtap="loadVisitPurpose">
+      <text>{{visitPurposeError}}</text>
+      <text class="previous-retry">点击重试</text>
+    </view>
+    <block wx:elif="{{visitPurpose}}">
+      <view class="previous-meta">
+        <text>客户详情中的到访目的</text>
+        <text class="previous-append" bindtap="onAppendVisitPurpose">带入本次</text>
+      </view>
+      <text class="previous-content">{{visitPurpose}}</text>
+    </block>
+    <text class="previous-empty" wx:else>暂无可引用的到访目的</text>
   </view>
   <view class="previous-box" wx:if="{{category === 'visit_need' && previousOpen}}">
     <text class="previous-empty" wx:if="{{previousLoading}}">正在加载上次需求…</text>

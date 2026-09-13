@@ -58,6 +58,7 @@ class CustomerAccessPermissions(TypedDict):
 
 
 class PositionEditPermissions(TypedDict):
+    principal_external_access: CustomerAccessPermissions
     principal_scope: Literal["own", "all"]
     customers: EditScope
     visits: EditScope
@@ -67,6 +68,7 @@ class PositionEditPermissions(TypedDict):
     activity_lock: bool
     visit_lock: bool
     payments: EditScope
+    course_records: Literal["own", "all"]
     contacts: ContactPermissions
     customer_access: CustomerAccessPermissions
 
@@ -132,6 +134,7 @@ def _full_customer_access() -> CustomerAccessPermissions:
 
 
 DEFAULT_PERMISSIONS: PositionEditPermissions = {
+    "principal_external_access": _empty_customer_access(),
     "principal_scope": "own",
     # 兼容已有角色：客户资料在新增“仅浏览”权限前默认可编辑。
     "customers": "all",
@@ -143,10 +146,13 @@ DEFAULT_PERMISSIONS: PositionEditPermissions = {
     "activity_lock": False,
     "visit_lock": False,
     "payments": "all",
+    # 课程记录查看范围：own = 与本人（账号归属人）相关的课程，all = 全部记录。
+    "course_records": "all",
     "contacts": _empty_contact_permissions(),
     "customer_access": _empty_customer_access(),
 }
 SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
+    "principal_external_access": _full_customer_access(),
     "principal_scope": "all",
     "customers": "all",
     "visits": "all",
@@ -156,6 +162,7 @@ SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
     "activity_lock": True,
     "visit_lock": True,
     "payments": "all",
+    "course_records": "all",
     "contacts": _full_contact_permissions(),
     "customer_access": _full_customer_access(),
 }
@@ -175,6 +182,11 @@ def _normalize_customer_edit_scope(value: object) -> EditScope:
 def _normalize_teacher_edit_scope(value: object) -> EditScope:
     # 该字段表示“授课老师能否编辑本人授课课程”；旧值 all 与 own 均迁移为开启。
     return "view" if value == "view" else "own"
+
+
+def _normalize_course_record_scope(value: object) -> Literal["own", "all"]:
+    # 新权限上线前的角色保持“全部记录”，避免保存后意外收窄可见范围。
+    return "own" if value == "own" else "all"
 
 
 def _normalize_contact_actions(value: object) -> ContactActionPermissions:
@@ -232,6 +244,7 @@ def _normalize_customer_access(value: object, *, legacy_default: bool = False) -
 def _normalize_permissions(value: object) -> PositionEditPermissions:
     raw = value if isinstance(value, dict) else {}
     return {
+        "principal_external_access": _normalize_customer_access(raw.get("principal_external_access")),
         "principal_scope": "all" if raw.get("principal_scope") == "all" else "own",
         "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
@@ -243,6 +256,7 @@ def _normalize_permissions(value: object) -> PositionEditPermissions:
         "activity_lock": raw.get("activity_lock") is True,
         "visit_lock": raw.get("visit_lock") is True,
         "payments": _normalize_scope(raw.get("payments", "all")),
+        "course_records": _normalize_course_record_scope(raw.get("course_records", "all")),
         "contacts": _normalize_contacts(raw.get("contacts")),
         # 兼容上线前的已有角色：旧数据没有 customer_access 时保留原来的完整可见能力。
         "customer_access": _normalize_customer_access(
@@ -276,7 +290,15 @@ def _merge_permissions(roles: list[str]) -> PositionEditPermissions:
     merged = deepcopy(values[0])
     merged["principal_scope"] = "all" if any(value.get("principal_scope") == "all" for value in values) else "own"
 
-    for key in ("customers", "visits", "activities", "activity_teachers", "activity_participants", "payments"):
+    for key in (
+        "customers",
+        "visits",
+        "activities",
+        "activity_teachers",
+        "activity_participants",
+        "payments",
+        "course_records",
+    ):
         merged[key] = max((value[key] for value in values), key=lambda item: scope_rank[item])
     merged["activity_lock"] = any(value["activity_lock"] for value in values)
     merged["visit_lock"] = any(value["visit_lock"] for value in values)
@@ -303,6 +325,12 @@ def _merge_permissions(roles: list[str]) -> PositionEditPermissions:
         (value["customer_access"]["transaction_access"] for value in values),
         key=lambda item: transaction_rank[item],
     )
+    external = merged.setdefault("principal_external_access", _empty_customer_access())
+    external_values = [value.get("principal_external_access", _empty_customer_access()) for value in values]
+    for group in ("sensitive_fields", "detail_tabs"):
+        for key in external[group]:
+            external[group][key] = any(value[group][key] for value in external_values)
+    external["transaction_access"] = max((value["transaction_access"] for value in external_values), key=lambda item: transaction_rank[item])
     return merged
 
 
@@ -318,6 +346,9 @@ def get_all() -> dict[str, PositionEditPermissions]:
 
 
 def set_permissions(position: str, permissions: object) -> PositionEditPermissions:
+    # 旧客户端没有此字段时保留已配置的独立权限，不因保存其他设置而清空。
+    if isinstance(permissions, dict) and "principal_external_access" not in permissions:
+        permissions = {**permissions, "principal_external_access": _permissions.get(position, {}).get("principal_external_access")}
     normalized = (
         deepcopy(SUPER_ADMIN_PERMISSIONS)
         if position == "超级管理员"

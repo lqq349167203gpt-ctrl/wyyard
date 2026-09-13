@@ -45,7 +45,8 @@
       </view>
       <view class="kv">
         <text class="k">跟进阶段</text>
-        <text class="v identity-value">{{customer.follow_up_status || '未配置'}}</text>
+        <text wx:if="{{customer.follow_up_status && customer.follow_up_status !== '未配置'}}" class="v identity-value">{{customer.follow_up_status}}</text>
+        <text wx:else class="v identity-value" style="color: #c9cdd4;">—</text>
         <text class="mechanism">人工设置</text>
       </view>
       <view class="tag-zone">
@@ -359,6 +360,7 @@
         <view class="rec" wx:for="{{paymentRecords}}" wx:key="index">
           <view class="rec-head">
             <text class="rec-name">{{item.type}}</text>
+            <text wx:if="{{item.type === '粗门扣卡' && item.cancelled}}" class="rec-sub">已取消｜已从课程移除</text>
           </view>
           <view class="rec-sub" wx:if="{{item.type === '粗门扣卡'}}">
             <text>{{item.activity_name || item.name || '课程抵扣'}}</text>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>组织/俱乐部（小程序）· 克制的三个方向</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; padding: 26px; background: #eceef2; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; display: flex; gap: 24px; align-items: flex-start; }
+  .col { width: 366px; }
+  .col-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #16181c; }
+  .col-note { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: #6b7280; }
+  .phone { width: 366px; height: 730px; border-radius: 22px; overflow: hidden; box-shadow: 0 10px 30px rgba(17,24,39,.10); display: flex; flex-direction: column; }
+  .navbar { height: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 500; }
+  .body { flex: 1; overflow-y: auto; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* 通用：极细分割线 + 克制字重 */
+  .meta { font-size: 11px; letter-spacing: .3px; }
+  .kpi { display: flex; }
+  .kpi > div { flex: 1; }
+  .kpi .v { font-size: 25px; font-weight: 500; letter-spacing: -.4px; line-height: 1; }
+  .kpi .v small { font-size: 11px; font-weight: 400; margin-left: 3px; }
+  .kpi .l { margin-top: 6px; font-size: 11px; letter-spacing: .3px; }
+  .tabs { display: flex; gap: 20px; }
+  .tab { position: relative; font-size: 14px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .l1 { font-size: 14px; font-weight: 500; }
+  .row .l2 { margin-top: 4px; font-size: 11.5px; }
+  .row .right { font-size: 12px; }
+
+  /* ================= K：素白（纯灰阶，近黑强调） ================= */
+  .k-phone { background: #fafafb; }
+  .k-nav { background: #fafafb; color: #16181c; border-bottom: .5px solid #e8e9ec; }
+  .k-body { padding: 0 20px 24px; }
+  .k-head { padding: 20px 0 0; }
+  .k-kicker { font-size: 10px; letter-spacing: 1.6px; color: #a3a7ae; }
+  .k-title { margin-top: 8px; font-size: 21px; font-weight: 600; letter-spacing: -.2px; color: #16181c; }
+  .k-meta { margin-top: 8px; color: #8b9098; }
+  .k-tabs { margin-top: 18px; border-bottom: .5px solid #e8e9ec; }
+  .k-tab { padding-bottom: 12px; color: #9ca1a8; }
+  .k-tab.on { color: #16181c; font-weight: 600; }
+  .k-tab.on::after { content: ""; position: absolute; left: 0; width: 18px; bottom: -1px; height: 2px; background: #16181c; }
+  .k-kpi { padding: 20px 0; border-bottom: .5px solid #e8e9ec; }
+  .k-kpi .v { color: #16181c; }
+  .k-kpi .v small { color: #a3a7ae; }
+  .k-kpi .l { color: #8b9098; }
+  .k-tools { display: flex; justify-content: flex-end; gap: 18px; padding: 14px 0 6px; font-size: 12px; color: #8b9098; }
+  .k-row { padding: 15px 0; border-top: .5px solid #eceef0; }
+  .k-row .l1 { color: #16181c; }
+  .k-row .l2 { color: #a3a7ae; }
+  .k-row .right { color: #8b9098; }
+
+  /* ================= L：墨蓝（灰阶 + 一个低饱和点缀色） ================= */
+  .l-phone { background: #f7f8fa; }
+  .l-nav { background: #fff; color: #16181c; border-bottom: .5px solid #e9ebee; }
+  .l-body { padding: 0 20px 24px; background: #fff; }
+  .l-head { padding: 20px 0 0; }
+  .l-kicker { font-size: 10px; letter-spacing: 1.6px; color: #9aa1ab; }
+  .l-title { margin-top: 8px; font-size: 21px; font-weight: 600; letter-spacing: -.2px; color: #1a2029; }
+  .l-meta { margin-top: 8px; color: #8b929c; }
+  .l-meta b { color: #2f4b7c; font-weight: 500; }
+  .l-tabs { margin-top: 18px; border-bottom: .5px solid #e9ebee; }
+  .l-tab { padding-bottom: 12px; color: #9aa1ab; }
+  .l-tab.on { color: #1a2029; font-weight: 600; }
+  .l-tab.on::after { content: ""; position: absolute; left: 0; width: 18px; bottom: -1px; height: 2px; background: #2f4b7c; }
+  .l-kpi { padding: 22px 0; border-bottom: .5px solid #eef0f2; }
+  .l-kpi .v { color: #1a2029; }
+  .l-kpi .v small { color: #9aa1ab; }
+  .l-kpi .l { color: #8b929c; }
+  .l-kpi .v.accent { color: #2f4b7c; }
+  .l-tools { display: flex; justify-content: flex-end; gap: 18px; padding: 14px 0 6px; font-size: 12px; color: #8b929c; }
+  .l-row { padding: 15px 0; border-top: .5px solid #eef0f2; }
+  .l-row .l1 { color: #1a2029; }
+  .l-row .l2 { color: #9aa1ab; }
+  .l-row .right { color: #8b929c; }
+  .l-row .right.accent { color: #2f4b7c; }
+
+  /* ================= M：米白纸感（暖底 + 深墨） ================= */
+  .m-phone { background: #faf8f5; }
+  .m-nav { background: #faf8f5; color: #23272e; border-bottom: .5px solid #eae6df; }
+  .m-body { padding: 0 22px 24px; }
+  .m-head { padding: 22px 0 0; }
+  .m-kicker { font-size: 10px; letter-spacing: 1.8px; color: #a89f92; }
+  .m-title { margin-top: 9px; font-size: 21px; font-weight: 600; letter-spacing: -.2px; color: #23272e; }
+  .m-meta { margin-top: 9px; color: #93897c; }
+  .m-tabs { margin-top: 18px; border-bottom: .5px solid #eae6df; }
+  .m-tab { padding-bottom: 12px; color: #a89f92; }
+  .m-tab.on { color: #23272e; font-weight: 600; }
+  .m-tab.on::after { content: ""; position: absolute; left: 0; width: 18px; bottom: -1px; height: 2px; background: #23272e; }
+  .m-kpi { padding: 22px 0; border-bottom: .5px solid #eae6df; }
+  .m-kpi .v { color: #23272e; }
+  .m-kpi .v small { color: #a89f92; }
+  .m-kpi .l { color: #93897c; }
+  .m-tools { display: flex; justify-content: flex-end; gap: 18px; padding: 14px 0 6px; font-size: 12px; color: #93897c; }
+  .m-row { padding: 15px 0; border-top: .5px solid #eeeae3; }
+  .m-row .l1 { color: #23272e; }
+  .m-row .l2 { color: #a89f92; }
+  .m-row .right { color: #93897c; }
+</style>
+</head>
+<body>
+  <!-- K -->
+  <div class="col">
+    <p class="col-title">方向 K：素白（纯灰阶，近黑强调）</p>
+    <p class="col-note">完全不用品牌色。标题近黑、次级信息浅灰、分割线 0.5px；选中态是近黑文字 + 18px 短横线。数字大而细，靠字重和留白分层级。</p>
+    <div class="phone k-phone">
+      <div class="navbar k-nav">组织/俱乐部</div>
+      <div class="body k-body">
+        <div class="k-head">
+          <div class="k-kicker">PRINCIPAL</div>
+          <div class="k-title">全部可见组织/俱乐部</div>
+          <div class="meta k-meta">2026-09-01 – 09-13 · 本月 · 10 位引流人</div>
+        </div>
+        <div class="tabs k-tabs">
+          <div class="tab k-tab on">经营概况</div>
+          <div class="tab k-tab">转化分析</div>
+        </div>
+        <div class="kpi k-kpi">
+          <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+          <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+          <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+        </div>
+        <div class="k-tools"><span>排序</span><span>列表设置</span><span>导出</span></div>
+        <div class="row k-row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+        <div class="row k-row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+        <div class="row k-row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        <div class="row k-row"><div class="main"><div class="l1">沐沐</div><div class="l2">会员卡 · 月卡 · 同类复购 · 薇薇</div></div><div class="right">09-11</div></div>
+        <div class="row k-row"><div class="main"><div class="l1">璐小娜</div><div class="l2">会员卡 · 30次卡 · 首购 · 余墨</div></div><div class="right">09-11</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- L -->
+  <div class="col">
+    <p class="col-title">方向 L：墨蓝（灰阶 + 一个低饱和点缀）</p>
+    <p class="col-note">整体还是素，只留一个低饱和的墨蓝 #2F4B7C：用在选中的短横线、最关键的那个数字、以及成交金额上。比纯灰阶多一点"贵"的感觉，又不花。</p>
+    <div class="phone l-phone">
+      <div class="navbar l-nav">组织/俱乐部</div>
+      <div class="body l-body">
+        <div class="l-head">
+          <div class="l-kicker">PRINCIPAL</div>
+          <div class="l-title">全部可见组织/俱乐部</div>
+          <div class="meta l-meta">2026-09-01 – 09-13 · <b>本月</b> · 10 位引流人</div>
+        </div>
+        <div class="tabs l-tabs">
+          <div class="tab l-tab on">经营概况</div>
+          <div class="tab l-tab">转化分析</div>
+        </div>
+        <div class="kpi l-kpi">
+          <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+          <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+          <div><div class="v num accent">58<small>笔</small></div><div class="l">成交量</div></div>
+        </div>
+        <div class="l-tools"><span>排序</span><span>列表设置</span><span>导出</span></div>
+        <div class="row l-row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+        <div class="row l-row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+        <div class="row l-row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        <div class="row l-row"><div class="main"><div class="l1">沐沐</div><div class="l2">会员卡 · 月卡 · 同类复购 · 薇薇</div></div><div class="right">09-11</div></div>
+        <div class="row l-row"><div class="main"><div class="l1">璐小娜</div><div class="l2">会员卡 · 30次卡 · 首购 · 余墨</div></div><div class="right accent">¥2,980</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M -->
+  <div class="col">
+    <p class="col-title">方向 M：米白纸感（暖底 + 深墨）</p>
+    <p class="col-note">背景用暖白 #FAF8F5、文字用深墨灰、分割线偏暖，像纸质报表。比纯灰阶温和，长时间看不刺眼，气质更"稳"。</p>
+    <div class="phone m-phone">
+      <div class="navbar m-nav">组织/俱乐部</div>
+      <div class="body m-body">
+        <div class="m-head">
+          <div class="m-kicker">PRINCIPAL</div>
+          <div class="m-title">全部可见组织/俱乐部</div>
+          <div class="meta m-meta">2026-09-01 – 09-13 · 本月 · 10 位引流人</div>
+        </div>
+        <div class="tabs m-tabs">
+          <div class="tab m-tab on">经营概况</div>
+          <div class="tab m-tab">转化分析</div>
+        </div>
+        <div class="kpi m-kpi">
+          <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+          <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+          <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+        </div>
+        <div class="m-tools"><span>排序</span><span>列表设置</span><span>导出</span></div>
+        <div class="row m-row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+        <div class="row m-row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+        <div class="row m-row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        <div class="row m-row"><div class="main"><div class="l1">沐沐</div><div class="l2">会员卡 · 月卡 · 同类复购 · 薇薇</div></div><div class="right">09-11</div></div>
+        <div class="row m-row"><div class="main"><div class="l1">璐小娜</div><div class="l2">会员卡 · 30次卡 · 首购 · 余墨</div></div><div class="right">09-11</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

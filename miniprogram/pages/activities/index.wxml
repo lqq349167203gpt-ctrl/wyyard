@@ -193,6 +193,9 @@
     </view>
   </view>
 
+  <!-- 取消关联抵扣确认：自定义弹窗，替代系统 wx.showModal -->
+  <coarse-confirm id="coarseConfirm" />
+
   <view class="participant-mask" wx:if="{{showParticipantSheet}}" bindtap="onParticipantSheetClose"></view>
   <view class="participant-sheet" wx:if="{{showParticipantSheet}}">
     <view class="participant-sheet-handle"></view>

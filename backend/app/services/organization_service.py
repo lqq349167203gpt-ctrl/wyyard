@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from app.models.organization import Organization, OrganizationCreate
 from app.services.storage import load_data, save_item
@@ -43,6 +43,17 @@ def get_organization(org_id: str) -> Optional[Organization]:
     return org
 
 
+def is_member(org: Organization, customer_id: str) -> bool:
+    """组织成员判定：全局配置的「整体数据查阅人」默认属于每个组织，因此同样算作该组织成员。"""
+    if not customer_id:
+        return False
+    if customer_id in (org.member_ids or []):
+        return True
+    from app.services import organization_data_viewer_service
+
+    return organization_data_viewer_service.is_data_viewer(customer_id)
+
+
 def create_organization(data: OrganizationCreate) -> Organization:
     normalized_name = data.name.strip()
     if not normalized_name:
@@ -59,6 +70,9 @@ def create_organization(data: OrganizationCreate) -> Organization:
         updated_at=now,
         name=normalized_name,
         member_ids=data.member_ids,
+        referrer_mode=data.referrer_mode,
+        referrer_ids=data.referrer_ids,
+        include_unassigned_referrers=data.include_unassigned_referrers,
         sort_order=data.sort_order,
     )
     _organizations[org.id] = org

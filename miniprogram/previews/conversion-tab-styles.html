@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>转化分析 · 说明文字优化方案</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #4e535a;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #e8eaed;
+    --page-bg: #eceff3;
+    --primary: #3370ff;
+    --ok: #2f7d43;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1160px; margin: 0 auto 28px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 16px; line-height: 1.7; }
+  .pains { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pain {
+    background: #fff; border: 1px solid var(--hairline); border-left: 3px solid #d97070;
+    padding: 8px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px; max-width: 380px; line-height: 1.6;
+  }
+  .pain b { color: var(--ink); }
+
+  /* ============ 页面框 ============ */
+  .page {
+    max-width: 1160px; margin: 0 auto;
+    background: #f7f8fa; border: 1px solid #dee2e6; padding: 10px;
+  }
+  .card { background: #fff; border-radius: 4px; padding: 16px 22px 18px; }
+  .card + .card { margin-top: 6px; }
+
+  .filters { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .fd {
+    height: 28px; border: 1px solid #dee0e3; border-radius: 4px; background: #fff;
+    display: flex; align-items: center; padding: 0 10px; font-size: 12px; color: var(--ink-2); gap: 6px;
+  }
+  .fd .chev { color: var(--ink-4); font-size: 10px; }
+  .fd-ghost { border: none; color: var(--ink-2); }
+
+  .tabs { display: flex; gap: 20px; border-bottom: 1px solid #e8e8e8; margin-bottom: 16px; }
+  .tab { font-size: 14px; color: #2b2f36; padding-bottom: 8px; position: relative; }
+  .tab.active { color: var(--primary); }
+  .tab.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--primary); border-radius: 2px 2px 0 0; }
+
+  /* ============ 规则区 ============ */
+  .rule-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .step-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600; color: var(--primary);
+  }
+  .step-num {
+    width: 17px; height: 17px; border-radius: 50%; background: var(--primary);
+    color: #fff; font-size: 10.5px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .rule-head .tip { font-size: 11px; color: var(--ink-3); }
+  .rule-saved { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .btn {
+    height: 28px; padding: 0 12px; border-radius: 4px; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .btn-outline { border: 1px solid #dee0e3; background: #fff; color: var(--ink-2); }
+  .btn-ghost { color: var(--ink-2); }
+
+  /* 规则速读条 */
+  .rule-read {
+    margin-top: 12px; padding: 10px 14px;
+    background: #f5f8ff; border-left: 3px solid var(--primary); border-radius: 0 4px 4px 0;
+    font-size: 13px; line-height: 1.7; color: var(--ink-2);
+  }
+  .rule-read .hl { color: var(--ink); font-weight: 600; }
+  .rule-read .arrow { color: var(--primary); font-weight: 600; padding: 0 2px; }
+
+  /* 条件行 */
+  .flow { margin-top: 14px; }
+  .flow-row { display: flex; align-items: center; gap: 10px; }
+  .flow-label { width: 92px; flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .flow-label.alt { color: var(--ink-3); font-weight: 500; }
+  .cond {
+    display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    border: 1px solid #eceef0; background: #fbfcfd; border-radius: 4px; padding: 5px 8px;
+  }
+  .cond .field {
+    font-size: 12px; color: var(--ink); background: #fff; border: 1px solid #e1e4e7;
+    border-radius: 3px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .cond .field .chev { color: var(--ink-4); font-size: 9px; }
+  .cond .field.dim { color: var(--ink-3); }
+  .flow-arrow { padding: 2px 0 2px 44px; color: var(--ink-4); font-size: 12px; line-height: 1; }
+  .add-cond { margin: 6px 0 0 92px; font-size: 12px; color: var(--primary); }
+
+  /* 怎么算成功 */
+  .success-bar { display: flex; gap: 18px; margin-top: 14px; background: #f7f8fa; border-radius: 4px; padding: 10px 14px; }
+  .suc-item { display: flex; flex-direction: column; gap: 4px; }
+  .suc-item .k { font-size: 10.5px; color: var(--ink-3); }
+  .suc-item .ctl {
+    height: 28px; border: 1px solid #e1e4e7; background: #fff; border-radius: 4px;
+    display: inline-flex; align-items: center; padding: 0 9px; font-size: 12px; color: var(--ink); gap: 5px;
+  }
+  .suc-item .ctl .chev { color: var(--ink-4); font-size: 9px; }
+  .suc-item .hint { font-size: 10.5px; color: var(--ink-4); }
+  .suc-check { flex-direction: column; justify-content: center; }
+  .suc-check .box { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink); }
+  .suc-check .box .cb {
+    width: 13px; height: 13px; border-radius: 2px; background: var(--primary);
+    display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 9px;
+  }
+  .calc-link { margin-left: auto; align-self: center; font-size: 11px; color: var(--ink-3); }
+
+  /* 结果状态 */
+  .status-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #f0f1f2; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid #e1e4e7; border-radius: 4px; background: #fff; padding: 2px; }
+  .seg span { font-size: 11px; padding: 3px 10px; border-radius: 3px; color: var(--ink-2); }
+  .seg span.on { background: #f0f5ff; color: var(--primary); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+  .lg { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); }
+  .lg .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .lg b { font-weight: 600; color: var(--ink); }
+
+  /* ============ 明细表 ============ */
+  .table-head-row, .tr { display: flex; align-items: center; }
+  .table-head-row {
+    background: #fafafa; font-size: 11px; color: var(--ink-3);
+    border-bottom: 1px solid #f0f0f0; padding: 8px 0;
+  }
+  .tr { font-size: 12px; color: var(--ink-2); padding: 9px 0; border-bottom: 1px solid #f5f6f7; }
+  .tr:last-child { border-bottom: none; }
+  .tc { padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; padding: 2px 8px; border-radius: 3px;
+  }
+  .st .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .st-ok { background: var(--ok-bg, #edf8ef); color: var(--ok); }
+  .st-ok .dot { background: var(--ok); }
+  .st-no { background: #f2f3f5; color: var(--ink-3); }
+  .st-no .dot { background: var(--ink-4); }
+  .st-watch { background: #f0f5ff; color: var(--primary); }
+  .st-watch .dot { background: var(--primary); }
+  .due { font-size: 10.5px; color: var(--ink-4); }
+
+  /* 改动标注 */
+  .chg { position: relative; }
+  .chg-badge {
+    position: absolute; left: -26px; top: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--primary); color: #fff;
+    font-size: 10.5px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .changes { max-width: 1160px; margin: 22px auto 0; display: flex; flex-direction: column; gap: 8px; }
+  .change-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: #fff; border: 1px solid var(--hairline); border-radius: 3px; padding: 10px 14px;
+    font-size: 12.5px; color: var(--ink-2); line-height: 1.7;
+  }
+  .change-item .n {
+    width: 18px; height: 18px; border-radius: 50%; background: var(--primary); color: #fff;
+    font-size: 10.5px; font-weight: 600; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .change-item b { color: var(--ink); }
+  .change-item .old { color: var(--ink-4); text-decoration: line-through; }
+
+  .doc-foot { max-width: 1160px; margin: 24px auto 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">转化分析 · 说明文字优化 <span style="color: var(--ink-3); font-weight: 400;">/principal · 一版方案</span></div>
+  <div class="doc-sub">规则、控件、状态一个不少，只把"读"的部分重做：长段说明 → 一句话规则速读 + 分散到控件旁的短提示。</div>
+  <div class="pains">
+    <div class="pain"><b>现状 ①</b>　「例如：第一次用粗门次卡…」是<b>写死的示例</b>，你改了条件它还显示原来的例子，反而误导</div>
+    <div class="pain"><b>现状 ②</b>　天数和同组织规则挤成一整段 60 字长文，读完也不知道影响什么</div>
+    <div class="pain"><b>现状 ③</b>　「已转化/未转化/观察中」三个状态挤在一句话里，「观察中」到底在等什么看不明白</div>
+    <div class="pain"><b>现状 ④</b>　「先选这类客户 / 再看有没有 / 还要看第2项」之间的关系不直观，不知道这是一条"先…再…"的规则链</div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="card">
+    <!-- 筛选行（保持现状） -->
+    <div class="filters">
+      <div class="fd">全部可见组织 <span class="chev">▾</span></div>
+      <div class="fd">2026-09-01 <span style="color: var(--ink-4);">~</span> 2026-09-11</div>
+      <div class="fd fd-ghost">全部日期</div>
+    </div>
+    <div class="tabs">
+      <span class="tab">经营概况</span>
+      <span class="tab">课程记录</span>
+      <span class="tab">交易记录</span>
+      <span class="tab active">转化分析</span>
+    </div>
+
+    <!-- ① 规则区 -->
+    <div class="rule-head">
+      <span class="step-chip"><span class="step-num">1</span>想看哪种转化</span>
+      <span class="tip">改完立刻重算，长期使用再保存</span>
+      <div class="rule-saved">
+        <span class="fd" style="width: 200px;">粗门初次到场 → 会员卡首购 <span style="margin-left: auto;" class="chev">▾</span></span>
+        <span class="btn btn-outline">更新规则</span>
+        <span class="btn btn-outline">保存规则</span>
+      </div>
+    </div>
+
+    <!-- 改动 1：规则速读条（跟着选择实时变） -->
+    <div class="chg" style="margin-left: 26px;">
+      <span class="chg-badge">1</span>
+      <div class="rule-read">
+        <span class="hl">第一次</span>用粗门次卡参加活动的客户
+        <span class="arrow">→</span> <span class="hl">30 天内</span><span class="hl">第一次</span>购买会员卡
+        <span style="color: var(--ink-3);">（做到这一项即算转化成功，从首次到场当天算起）</span>
+      </div>
+    </div>
+
+    <!-- 改动 2：条件链，箭头表明"先…再…" -->
+    <div class="flow" style="margin-left: 26px; position: relative;">
+      <span class="chg-badge" style="top: 6px;">2</span>
+      <div class="flow-row">
+        <span class="flow-label">先选这类客户</span>
+        <span class="cond">
+          <span class="field">用粗门次卡参加活动 <span class="chev">▾</span></span>
+          <span class="field dim">全部类型 <span class="chev">▾</span></span>
+          <span class="field">第一次参加 <span class="chev">▾</span></span>
+        </span>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-row">
+        <span class="flow-label alt">再看有没有</span>
+        <span class="cond">
+          <span class="field">购买产品或会员卡 <span class="chev">▾</span></span>
+          <span class="field">会员卡 <span class="chev">▾</span></span>
+          <span class="field dim">不限卡种 <span class="chev">▾</span></span>
+          <span class="field">第一次购买 <span class="chev">▾</span></span>
+        </span>
+      </div>
+      <div class="add-cond">＋ 再加一项条件（最多 8 项）</div>
+    </div>
+
+    <!-- 改动 3：怎么算成功——每个控件配 10 字短提示 -->
+    <div class="chg" style="margin-left: 26px; margin-top: 14px;">
+      <span class="chg-badge" style="top: 10px;">3</span>
+      <div class="success-bar">
+        <div class="suc-item">
+          <span class="k">做到几项算成功</span>
+          <span class="ctl">做到其中一项就算 <span class="chev">▾</span></span>
+        </div>
+        <div class="suc-item">
+          <span class="k">多少天内完成</span>
+          <span class="ctl tnum" style="font-variant-numeric: tabular-nums;">30 天</span>
+          <span class="hint">从首次到场当天算起，0 = 只看当天</span>
+        </div>
+        <div class="suc-item suc-check">
+          <span class="k">组织范围</span>
+          <span class="box"><span class="cb">✓</span>限同一组织</span>
+          <span class="hint">不勾 = 其他组织完成的也算</span>
+        </div>
+        <span class="calc-link">查看计算细节 ›</span>
+      </div>
+    </div>
+
+    <!-- 改动 4：结果状态 + 状态图例 -->
+    <div class="chg" style="margin-left: 26px;">
+      <span class="chg-badge" style="top: 14px;">4</span>
+      <div class="status-row">
+        <span class="step-chip"><span class="step-num">2</span>结果状态</span>
+        <span class="seg"><span class="on">全部</span><span>已转化</span><span>未转化</span><span>观察中</span></span>
+        <div class="legend">
+          <span class="lg"><span class="dot" style="background: var(--ok);"></span><b>已转化</b>＝在期限内做到了</span>
+          <span class="lg"><span class="dot" style="background: var(--ink-4);"></span><b>未转化</b>＝到期了还没做到</span>
+          <span class="lg"><span class="dot" style="background: var(--primary);"></span><b>观察中</b>＝30 天还没到，先不下结论</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 明细表（状态色与图例呼应） -->
+  <div class="card">
+    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+      <span style="font-size: 12px; font-weight: 600; color: var(--ink-2);">转化明细 <span style="color: var(--ink-3); font-weight: 400;">（128 条）</span></span>
+      <span class="btn btn-outline" style="margin-left: auto;">⬇ 导出</span>
+    </div>
+    <div class="table-head-row">
+      <span class="tc" style="width: 110px;">客户</span>
+      <span class="tc" style="width: 130px;">首次到场</span>
+      <span class="tc" style="width: 130px;">完成动作</span>
+      <span class="tc" style="width: 110px;">截止日期</span>
+      <span class="tc" style="width: 130px;">状态</span>
+      <span class="tc">关联明细</span>
+    </div>
+    <div class="tr">
+      <span class="tc" style="width: 110px; color: var(--ink); font-weight: 500;">璐小娜</span>
+      <span class="tc tnum" style="width: 130px;">08-15 觉醒游戏</span>
+      <span class="tc" style="width: 130px;">08-28 购年卡</span>
+      <span class="tc tnum" style="width: 110px;">09-14</span>
+      <span class="tc" style="width: 130px;"><span class="st st-ok"><span class="dot"></span>已转化</span></span>
+      <span class="tc" style="color: var(--primary);">3 条</span>
+    </div>
+    <div class="tr">
+      <span class="tc" style="width: 110px; color: var(--ink); font-weight: 500;">陈默</span>
+      <span class="tc tnum" style="width: 130px;">08-20 情绪释放</span>
+      <span class="tc" style="width: 130px; color: var(--ink-4);">—</span>
+      <span class="tc tnum" style="width: 110px;">09-19</span>
+      <span class="tc" style="width: 130px;"><span class="st st-watch"><span class="dot"></span>观察中 <span class="due">剩 8 天</span></span></span>
+      <span class="tc" style="color: var(--primary);">1 条</span>
+    </div>
+    <div class="tr">
+      <span class="tc" style="width: 110px; color: var(--ink); font-weight: 500;">何青</span>
+      <span class="tc tnum" style="width: 130px;">08-02 申时茶会</span>
+      <span class="tc" style="width: 130px; color: var(--ink-4);">—</span>
+      <span class="tc tnum" style="width: 110px;">09-01</span>
+      <span class="tc" style="width: 130px;"><span class="st st-no"><span class="dot"></span>未转化</span></span>
+      <span class="tc" style="color: var(--primary);">2 条</span>
+    </div>
+    <div class="tr">
+      <span class="tc" style="width: 110px; color: var(--ink); font-weight: 500;">苏杭</span>
+      <span class="tc tnum" style="width: 130px;">08-18 觉醒游戏</span>
+      <span class="tc" style="width: 130px;">09-05 购 3月卡</span>
+      <span class="tc tnum" style="width: 110px;">09-17</span>
+      <span class="tc" style="width: 130px;"><span class="st st-ok"><span class="dot"></span>已转化</span></span>
+      <span class="tc" style="color: var(--primary);">4 条</span>
+    </div>
+  </div>
+</div>
+
+<!-- 改动清单 -->
+<div class="changes">
+  <div class="change-item"><span class="n">1</span><span><b>规则速读条（新增，核心）</b>：把当前选择的规则实时拼成一句话，改任何条件它跟着变。<span class="old">例如：第一次用粗门次卡参加活动的客户，30 天内有没有购买会员卡？</span>（写死的示例文案删除）「规则说明：…」段落并入此条。</span></div>
+  <div class="change-item"><span class="n">2</span><span><b>条件链加流向</b>：「先选这类客户 → 再看有没有」之间加 ↓ 箭头，一眼看懂是"先发生 A、再看 B"的顺序关系；副标签弱化，主标签加粗。</span></div>
+  <div class="change-item"><span class="n">3</span><span><b>「怎么算成功」拆成三个控件 + 各配 ≤12 字短提示</b>。<span class="old">天数从前面选中的到场或购买那天开始算，填 0 只看当天。不勾选"前后都在同一组织"，也会计算在其他有权查看的组织完成的情况。</span>整段删除；两段的「查看计算说明」收进右下角「查看计算细节 ›」。</span></div>
+  <div class="change-item"><span class="n">4</span><span><b>状态图例（解决"观察中"看不懂）</b>：三个状态 = 三个彩色圆点短句「已转化＝在期限内做到了 / 未转化＝到期了还没做到 / 观察中＝30天还没到，先不下结论」。<span class="old">已转化：达到条件；未转化：到期还没达到；观察中：还没到截止日期。</span>表格里的状态签用同色圆点呼应，「观察中」额外显示「剩 N 天」。</span></div>
+</div>
+
+<div class="doc-foot">
+  说明：纯样式稿，未改代码；筛选行、tab、规则控件、保存流程、分页导出全部保持现状。规则速读条文案由当前选项实时拼接（产品名/次数/天数/任一或全部），不存在"写死"的句子。<br>
+  确认后我落地到 frontend/src/pages/principal/index.tsx：删除两段长说明，新增速读条 + 控件短提示 + 状态图例 + 表内状态签「剩 N 天」。
+</div>
+
+</body>
+</html>

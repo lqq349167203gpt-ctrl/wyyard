@@ -255,5 +255,8 @@
     <button class="btn-danger" wx:if="{{!readOnly}}" bindtap="onDelete" loading="{{deleting}}" disabled="{{deleting}}">删    除</button>
     <button wx:if="{{!readOnly || canEditParticipants || canEditTeachers}}" class="btn-primary submit-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">保    存</button>
   </view>
+
+  <!-- 取消关联抵扣确认：自定义弹窗，替代系统 wx.showModal -->
+  <coarse-confirm id="coarseConfirm" />
   </block>
 </view>

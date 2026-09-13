@@ -1,4 +1,4 @@
-const { authApi } = require('../../utils/api')
+const { authApi, organizationApi } = require('../../utils/api')
 const { DEV } = require('../../utils/config')
 
 const DEV_ACCOUNTS = [
@@ -20,6 +20,7 @@ Page({
     devAccounts: DEV_ACCOUNTS,
     devIndex: 0,
     isDev: DEV, // 「开发模式」入口由 DEV 总开关控制，提审前切 false 自动隐藏
+    checkingLogin: false, // 冷启动时先看本地登录态是否还能用，能用就直接进主页
   },
 
   onLoad() {
@@ -34,6 +35,20 @@ Page({
         savePassword: !!savedPassword,
       })
     }
+    this._trySkipLogin()
+  },
+
+  // 本地已有登录态就探测一次：能用直接进主页；过期但微信已绑定会自动无感续登；
+  // 都不行才留在登录页（账号密码已回填，点一下即可）
+  _trySkipLogin() {
+    const token = wx.getStorageSync('auth_token')
+    const user = wx.getStorageSync('currentUser')
+    if (!token || !user) return
+    this.setData({ checkingLogin: true })
+    // 用一个轻量且所有角色都能访问的接口探活，避免"页面进来了、第一个请求才发现登录失效"
+    Promise.resolve(organizationApi.list())
+      .then(() => { wx.switchTab({ url: '/pages/customers/index' }) })
+      .catch(() => { this.setData({ checkingLogin: false }) })
   },
 
   // ---------- 模式切换 ----------

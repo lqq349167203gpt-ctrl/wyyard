@@ -253,7 +253,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
     assert light_list.status_code == 200
     light_visit = next(item for item in light_list.json() if item["id"] == visit.json()["id"])
     assert light_visit["visit_time"] == "14:00"
-    assert light_visit["needs"] == "睡眠调理"
+    assert light_visit["needs"] == "不闹：睡眠调理"
     assert light_visit["arrived_count"] == 0
 
     records = [
@@ -328,12 +328,16 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
     ]
 
     account, position, other_headers = _create_other_account_headers(client)
+    replacement_customer_id = ""
     try:
         visit_id = visit.json()["id"]
+        replacement = client.post("/api/customers", json={"nickname": f"归属测试替换客户_{uuid.uuid4().hex[:10]}"})
+        assert replacement.status_code == 200, replacement.text
+        replacement_customer_id = replacement.json()["id"]
         for protected_update in (
             {"visit_date": "2026-08-21"},
             {"visit_time": "15:00"},
-            {"customer_id": "other-customer"},
+            {"customer_id": replacement_customer_id},
             {"referrer_handler": "其他邀约人"},
         ):
             forbidden_visit_update = client.patch(
@@ -388,8 +392,9 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             headers=other_headers,
         )
         assert other_private_need.status_code == 200
-        assert other_private_need.json()["needs"] == "其他员工自己的来访需求"
-        assert client.get(f"/api/visits/{visit_id}").json()["needs"] == "睡眠调理"
+        expected_needs = {"不闹：睡眠调理", f"{account['owner']}：其他员工自己的来访需求"}
+        assert set(other_private_need.json()["needs"].splitlines()) == expected_needs
+        assert set(client.get(f"/api/visits/{visit_id}").json()["needs"].splitlines()) == expected_needs
 
         mixed_visit_update = client.patch(
             f"/api/visits/{visit_id}",
@@ -397,7 +402,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             headers=other_headers,
         )
         assert mixed_visit_update.status_code == 200
-        assert mixed_visit_update.json()["needs"] == "其他员工更新自己的需求"
+        assert set(mixed_visit_update.json()["needs"].splitlines()) == {"不闹：睡眠调理", f"{account['owner']}：其他员工更新自己的需求"}
 
         other_reorder = client.post(
             "/api/visits/reorder",
@@ -491,7 +496,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             f"/api/visits/{visit_id}", json={"needs": "本人可以修改"}
         )
         assert own_update.status_code == 200
-        assert own_update.json()["needs"] == "本人可以修改"
+        assert set(own_update.json()["needs"].splitlines()) == {"不闹：本人可以修改", f"{account['owner']}：其他员工更新自己的需求"}
 
         grant_all = client.put("/api/position-permissions/full", json={
             "position": position["name"],
@@ -533,8 +538,9 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             headers=other_headers,
         )
         assert allowed_visit_update.status_code == 200
-        assert allowed_visit_update.json()["needs"] == "全量权限可以修改"
-        assert client.get(f"/api/visits/{visit_id}").json()["needs"] == "本人可以修改"
+        expected_needs = {"不闹：本人可以修改", f"{account['owner']}：全量权限可以修改"}
+        assert set(allowed_visit_update.json()["needs"].splitlines()) == expected_needs
+        assert set(client.get(f"/api/visits/{visit_id}").json()["needs"].splitlines()) == expected_needs
 
         for path, record_id, protected_update in created_records:
             allowed_update = client.patch(
@@ -547,11 +553,13 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
         for path, record_id, _ in created_records:
             client.delete(f"{path}/{record_id}")
         client.delete(f"/api/visits/{visit.json()['id']}")
+        if replacement_customer_id:
+            client.delete(f"/api/customers/{replacement_customer_id}")
         client.delete(f"/api/accounts/{account['id']}")
         client.delete(f"/api/positions/{position['id']}")
 
 
-def test_super_admin_schedule_permission_does_not_merge_private_visit_needs(client, created_customer):
+def test_super_admin_visit_needs_show_each_creator_without_overwriting(client, created_customer):
     date = "2026-08-21"
     visit = client.post("/api/visits", json={
         "visit_date": date,
@@ -586,8 +594,9 @@ def test_super_admin_schedule_permission_does_not_merge_private_visit_needs(clie
             headers=headers,
         )
         assert updated.status_code == 200
-        assert updated.json()["needs"] == "超级管理员修改"
-        assert client.get(f"/api/visits/{visit.json()['id']}").json()["needs"] == "原始需求"
+        expected_needs = {"不闹：原始需求", f"{account['owner']}：超级管理员修改"}
+        assert set(updated.json()["needs"].splitlines()) == expected_needs
+        assert set(client.get(f"/api/visits/{visit.json()['id']}").json()["needs"].splitlines()) == expected_needs
     finally:
         client.delete(f"/api/visits/{visit.json()['id']}")
         client.delete(f"/api/accounts/{account['id']}")

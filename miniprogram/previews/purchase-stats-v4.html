@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡次统计 tab · 平级类目版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #212631; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+
+  .wrap { width: 640px; margin: 0 auto; }
+  .panel {
+    background: #fff; border-radius: 14px; box-shadow: 0 2px 4px rgba(33,38,49,.05);
+    padding: 0 20px 14px; overflow: hidden;
+  }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid #eef0f1; }
+  .tab-btn {
+    position: relative; padding: 12px 14px 10px; font-size: 13px; white-space: nowrap;
+    color: #79838f; font-weight: 600;
+  }
+  .tab-btn .cnt { font-size: 10.5px; color: #a8b1bd; margin-left: 3px; font-weight: 500; }
+  .tab-btn.on { color: #212631; font-weight: 700; }
+  .tab-btn.on::after {
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px;
+    height: 3px; border-radius: 3px 3px 0 0; background: #3370ff;
+  }
+  .tab-body { padding-top: 4px; }
+
+  /* ============ 类目区块：每个类目结构完全一致 ============ */
+  .cat { margin-top: 14px; }
+  .cat:first-child { margin-top: 8px; }
+  /* 类目头：类目名 + 类目合计，一条 hairline 压住 */
+  .cat-head {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 0 2px 7px; border-bottom: 1px solid #eef0f1;
+  }
+  .cat-name { font-size: 13px; font-weight: 700; color: #212631; }
+  .cat-sum { margin-left: auto; font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .cat-sum b { color: #212631; font-weight: 600; }
+  /* 类目附注（如会员卡扣减构成），可选 */
+  .cat-note { padding: 6px 2px 0; font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+
+  /* 条目行：四列固定 */
+  .item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px 196px 52px;
+    align-items: center;
+    padding: 9px 2px;
+    border-bottom: 1px solid #f5f6f7;
+  }
+  .item:last-child { border-bottom: none; }
+  .i-name { font-size: 12.5px; color: #212631; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .i-name .mode { font-size: 12px; color: #a8b1bd; margin-left: 5px; }
+  .i-count { font-size: 12px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .i-count b { font-size: 12.5px; font-weight: 600; color: #212631; }
+  .i-date { font-size: 12px; color: #a8b1bd; font-variant-numeric: tabular-nums; }
+  .i-status { font-size: 12px; text-align: right; }
+  .i-status.red { color: #c4506a; }
+  .i-status.grey { color: #a8b1bd; }
+
+  .notes {
+    max-width: 640px; margin: 36px auto 0; background: #fff; border-radius: 16px;
+    padding: 24px 28px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 15px; margin-bottom: 10px; }
+  .notes ul { padding-left: 18px; font-size: 13px; color: #4e535a; line-height: 2.05; }
+  .notes b { color: #212631; }
+</style>
+</head>
+<body>
+
+<div class="page-title">「卡次统计」· 平级类目版</div>
+<div class="page-sub">7 个类目平级，每个类目一个区块：类目名 + 类目合计 → 下面逐条列出该类的卡 / 购买批次，结构完全一致</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab-btn">跟进点<span class="cnt">6</span></div>
+      <div class="tab-btn">沟通记录<span class="cnt">3</span></div>
+      <div class="tab-btn">活动记录<span class="cnt">12</span></div>
+      <div class="tab-btn">用户回访<span class="cnt">2</span></div>
+      <div class="tab-btn on">卡次统计</div>
+      <div class="tab-btn">交易记录<span class="cnt">5</span></div>
+    </div>
+    <div class="tab-body">
+
+      <!-- 会员卡 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">会员卡</span>
+          <span class="cat-sum">剩余 <b>12</b> / 共 30 次</span>
+        </div>
+        <div class="cat-note">扣卡 8 次 · 销卡 2 次 · 预支扣卡 1 次</div>
+        <div class="item">
+          <span class="i-name">20次卡</span>
+          <span class="i-count"><b>12</b> / 20</span>
+          <span class="i-date">2026-01-15 ~ 2027-01-14</span>
+          <span class="i-status"></span>
+        </div>
+        <div class="item">
+          <span class="i-name">10次卡</span>
+          <span class="i-count"><b>0</b> / 10</span>
+          <span class="i-date">2025-03-01 ~ 2026-03-01</span>
+          <span class="i-status red">已过期</span>
+        </div>
+      </div>
+
+      <!-- 觉醒游戏 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">觉醒游戏</span>
+          <span class="cat-sum">剩余 <b>3</b> / 共 5 次</span>
+        </div>
+        <div class="item">
+          <span class="i-name">购买 3 次</span>
+          <span class="i-count">剩 <b>1</b></span>
+          <span class="i-date">2026-02-01 ~ 2026-08-01</span>
+          <span class="i-status"></span>
+        </div>
+        <div class="item">
+          <span class="i-name">购买 2 次</span>
+          <span class="i-count">剩 <b>2</b></span>
+          <span class="i-date">2025-11-05 ~ 2026-05-05</span>
+          <span class="i-status red">已过期</span>
+        </div>
+      </div>
+
+      <!-- 情绪释放 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">情绪释放</span>
+          <span class="cat-sum">剩余 <b>0</b> / 共 2 次</span>
+        </div>
+        <div class="item">
+          <span class="i-name">购买 2 次</span>
+          <span class="i-count">剩 <b>0</b></span>
+          <span class="i-date">2026-04-10 ~ 不限</span>
+          <span class="i-status grey">无次数</span>
+        </div>
+      </div>
+
+      <!-- OH卡梳理 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">OH卡梳理</span>
+          <span class="cat-sum">剩余 <b>4</b> / 共 6 次</span>
+        </div>
+        <div class="item">
+          <span class="i-name">购买 6 次</span>
+          <span class="i-count">剩 <b>4</b></span>
+          <span class="i-date">2026-06-01 ~ 2026-12-01</span>
+          <span class="i-status"></span>
+        </div>
+      </div>
+
+      <!-- 能量结 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">能量结</span>
+          <span class="cat-sum">剩余 <b>1</b> / 共 2 次</span>
+        </div>
+        <div class="item">
+          <span class="i-name">购买 2 次</span>
+          <span class="i-count">剩 <b>1</b></span>
+          <span class="i-date">2026-07-01 ~ 不限</span>
+          <span class="i-status"></span>
+        </div>
+      </div>
+
+      <!-- 内部课程 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">内部课程</span>
+          <span class="cat-sum"><b>不限次</b></span>
+        </div>
+        <div class="item">
+          <span class="i-name">疗愈师班</span>
+          <span class="i-count"><b>不限</b></span>
+          <span class="i-date">2026-01-01 ~ 2026-12-31</span>
+          <span class="i-status"></span>
+        </div>
+      </div>
+
+      <!-- 其他项目 -->
+      <div class="cat">
+        <div class="cat-head">
+          <span class="cat-name">其他项目</span>
+          <span class="cat-sum">剩余 <b>2</b> / 共 3 次</span>
+        </div>
+        <div class="item">
+          <span class="i-name">茶礼定制<span class="mode">线下</span></span>
+          <span class="i-count"><b>2</b> / 3</span>
+          <span class="i-date">2026-05-01 ~ 不限</span>
+          <span class="i-status"></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>结构逻辑</h2>
+  <ul>
+    <li><b>类目平级</b>：会员卡、觉醒游戏、情绪释放、OH卡梳理、能量结、内部课程、其他项目——7 个类目同一个模板：类目头（名称 + 该类合计）+ 条目行</li>
+    <li><b>条目统一</b>：会员卡的每张卡、游戏类的每次购买，都是类目下的一条记录，四列固定（名称 ｜ 剩余 ｜ 有效期 ｜ 状态）——"购买明细"不再是藏起来的二级信息，和卡平级</li>
+    <li><b>会员卡的扣减构成</b>（扣卡/销卡/预支）降级为类目头下一行 12px 浅灰附注，不再混进合计里</li>
+    <li><b>空类目整块不显示</b>；某类只有合计没有分批记录时（如单次项目），条目行可省略</li>
+    <li>视觉元素和前版一致：两种字号、一个加粗、状态纯文字（过期红 / 无次数灰）</li>
+  </ul>
+</div>
+
+</body>
+</html>

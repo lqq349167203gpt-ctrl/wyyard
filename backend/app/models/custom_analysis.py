@@ -35,6 +35,8 @@ AnalysisField = Literal[
     "purchased_projects",
     "created_by",
     "inviter_names",
+    "invitation_creators",
+    "schedule_creators",
     "invitation_count_period",
     "visit_count_period",
     "cancelled_count_period",
@@ -138,10 +140,10 @@ class AnalysisCondition(StrictBaseModel):
         elif self.operator == "in":
             if isinstance(self.value, str):
                 self.value = [item.strip() for item in self.value.split(",") if item.strip()]
-            if not isinstance(self.value, list) or not self.value:
-                raise ValueError("多选条件不能为空")
-        elif self.value is None or self.value == "":
-            raise ValueError("筛选值不能为空")
+            if not isinstance(self.value, list):
+                self.value = []
+        # 没填完的条件不再报错：查询时会被忽略（页面已经会提示当前模式里没填的条件），
+        # 否则另一种模式里遗留的空条件会让整个查询失败。
         return self
 
 

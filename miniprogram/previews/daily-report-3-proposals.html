@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每日报表列表页 · 3 个布局方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #eef0f3; color: #1f2329; padding: 40px 24px 80px;
+  }
+  .page-title { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .page-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 36px; }
+  .phones { display: flex; gap: 40px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+
+  .phone {
+    width: 375px; background: #f7f8fa; border-radius: 36px; border: 8px solid #1f2329;
+    overflow: hidden; box-shadow: 0 24px 64px rgba(31,35,41,0.14); flex-shrink: 0;
+  }
+  .phone-screen { height: 700px; overflow-y: auto; position: relative; }
+  .phone-screen::-webkit-scrollbar { display: none; }
+  .statusbar { height: 24px; background: #fff; }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600; position: relative; border-bottom: 0.5px solid #f0f1f2;
+  }
+  .navbar .back { position: absolute; left: 16px; font-size: 18px; font-weight: 400; }
+
+  .datebar {
+    background: #fff; display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 10px 12px; border-bottom: 0.5px solid #f0f1f2;
+  }
+  .datebar .nav-arrow {
+    width: 28px; height: 28px; border-radius: 8px; background: #f7f8fa;
+    display: flex; align-items: center; justify-content: center; color: #4e535a; font-size: 13px;
+  }
+  .datebar .date-main { font-size: 15px; font-weight: 600; }
+  .datebar .date-sub { font-size: 11px; color: #8f959e; margin-left: 6px; font-weight: 400; }
+  .datebar .cal { font-size: 15px; color: #3370ff; }
+
+  .scheme-tag {
+    text-align: center; margin-top: 14px; font-size: 14px; font-weight: 600;
+  }
+  .scheme-tag .no { color: #3370ff; }
+  .caption { text-align: center; margin-top: 6px; font-size: 12px; color: #4e535a; max-width: 375px; line-height: 1.7; }
+  .caption .pro { color: #2ba471; } .caption .con { color: #f54a45; }
+
+  /* ================= 方案一：分组长页流 ================= */
+  .g-body { padding: 12px 16px 32px; }
+  .g-section { background: #fff; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); overflow: hidden; }
+  .g-head {
+    display: flex; align-items: center; padding: 13px 14px; cursor: pointer; user-select: none;
+  }
+  .g-head .g-title { font-size: 14px; font-weight: 600; }
+  .g-head .g-count {
+    font-size: 11px; color: #3370ff; background: #f0f5ff; border-radius: 8px;
+    padding: 1px 7px; margin-left: 8px; font-weight: 500;
+  }
+  .g-head .g-amount { font-size: 13px; font-weight: 600; margin-left: 8px; }
+  .g-head .g-arrow { margin-left: auto; color: #c0c4cc; font-size: 12px; transition: transform .2s; }
+  .g-section.closed .g-arrow { transform: rotate(-90deg); }
+  .g-section.closed .g-list { display: none; }
+  .g-list { border-top: 0.5px solid #f0f1f2; }
+  .g-row {
+    display: flex; align-items: center; padding: 11px 14px; font-size: 13px;
+    border-bottom: 0.5px solid #f0f1f2; gap: 6px;
+  }
+  .g-row:last-child { border-bottom: none; }
+  .g-row .n { font-weight: 500; }
+  .r-tag { font-size: 10px; border-radius: 4px; padding: 1px 6px; background: #f0f5ff; color: #3370ff; }
+  .r-tag.grey { background: #f2f3f5; color: #8f959e; }
+  .r-tag.green { background: #e8f7e9; color: #2ba471; }
+  .arrive-dot {
+    width: 15px; height: 15px; border-radius: 50%; color: #fff; font-size: 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .arrive-dot.ok { background: #34c724; } .arrive-dot.no { background: #dee0e3; }
+  .g-row .right { margin-left: auto; color: #4e535a; font-size: 12px; }
+  .g-row .right.strong { color: #1f2329; font-weight: 600; font-size: 13px; }
+  .g-more {
+    text-align: center; padding: 10px; font-size: 12px; color: #3370ff;
+    border-top: 0.5px solid #f0f1f2; cursor: pointer;
+  }
+  .g-summary {
+    padding: 10px 14px; font-size: 12px; color: #8f959e; border-top: 0.5px solid #f0f1f2;
+    background: #fafbfc;
+  }
+
+  /* ================= 方案二：仪表盘入口 ================= */
+  .d-body { padding: 12px 16px 32px; }
+  .d-hero {
+    background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; align-items: baseline; gap: 8px;
+  }
+  .d-hero .label { font-size: 13px; color: #8f959e; }
+  .d-hero .total { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .d-hero .by { margin-left: auto; font-size: 11px; color: #8f959e; text-align: right; line-height: 1.6; }
+  .d-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .d-card {
+    background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    width: calc(50% - 5px); padding: 15px 14px; cursor: pointer;
+  }
+  .d-card .d-num { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .d-card .d-num .unit { font-size: 12px; font-weight: 400; color: #8f959e; margin-left: 2px; }
+  .d-card .d-name { font-size: 13px; color: #4e535a; margin-top: 5px; display: flex; align-items: center; }
+  .d-card .d-name .arrow { margin-left: auto; color: #c0c4cc; }
+  .d-card .d-sub { font-size: 11px; color: #8f959e; margin-top: 6px; line-height: 1.6; }
+  .d-card .dot { width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+  .d-hint { text-align: center; font-size: 11px; color: #b0b5bb; margin-top: 16px; }
+
+  /* ================= 方案三：时间轴流水 ================= */
+  .t-filter {
+    background: #fff; padding: 10px 16px; display: flex; gap: 8px; border-bottom: 0.5px solid #f0f1f2;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .t-chip {
+    font-size: 12px; color: #4e535a; background: #f2f3f5; border-radius: 14px;
+    padding: 4px 12px; cursor: pointer; user-select: none;
+  }
+  .t-chip.on { background: #3370ff; color: #fff; }
+  .t-body { padding: 14px 16px 32px; }
+  .t-item { display: flex; gap: 12px; }
+  .t-rail { display: flex; flex-direction: column; align-items: center; width: 44px; flex-shrink: 0; }
+  .t-time { font-size: 11px; color: #8f959e; font-variant-numeric: tabular-nums; }
+  .t-dot { width: 9px; height: 9px; border-radius: 50%; margin: 5px 0 4px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.05); }
+  .t-line { width: 1px; flex: 1; background: #e8eaed; }
+  .t-item:last-child .t-line { display: none; }
+  .t-card {
+    flex: 1; background: #fff; border-radius: 12px; padding: 11px 13px; margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  }
+  .t-card .t-head { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .t-card .t-head .n { font-weight: 600; }
+  .t-card .t-right { margin-left: auto; font-size: 13px; font-weight: 600; }
+  .t-card .t-right.dim { color: #8f959e; font-weight: 400; font-size: 12px; }
+  .t-card .t-sub { font-size: 12px; color: #8f959e; margin-top: 5px; line-height: 1.6; }
+  .t-card.money { border-left: 3px solid #3370ff; }
+  .t-card.money .t-right { color: #3370ff; }
+
+  /* 说明区 */
+  .notes {
+    max-width: 860px; margin: 48px auto 0; background: #fff; border-radius: 16px;
+    padding: 28px 32px; box-shadow: 0 8px 32px rgba(31,35,41,0.06);
+  }
+  .notes h2 { font-size: 17px; margin-bottom: 14px; }
+  .notes table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .notes th, .notes td { padding: 10px 12px; text-align: left; border-bottom: 0.5px solid #f0f1f2; vertical-align: top; line-height: 1.7; }
+  .notes th { color: #8f959e; font-weight: 500; font-size: 12px; }
+  .notes td:first-child { font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="page-title">每日报表列表页 · 3 个方案</div>
+<div class="page-sub">都可以点击交互：方案一可折叠分组，方案三可点筛选 chip</div>
+
+<div class="phones">
+
+<!-- ================================================== -->
+<!-- 方案一：分组长页流（无 tab，4 板块纵向堆叠可折叠） -->
+<!-- ================================================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div>
+        <div class="cal">📅</div>
+      </div>
+      <div class="g-body">
+
+        <div class="g-section">
+          <div class="g-head" onclick="this.parentElement.classList.toggle('closed')">
+            <span class="g-title">当日客户</span><span class="g-count">8 人</span><span class="g-arrow">▾</span>
+          </div>
+          <div class="g-list">
+            <div class="g-row"><span class="n">林小满</span><span class="r-tag">会员</span><span class="arrive-dot ok">✓</span><span class="right">2 场 · 剩 12 次</span><span class="right strong">¥3,600</span></div>
+            <div class="g-row"><span class="n">郑好</span><span class="r-tag">会员</span><span class="arrive-dot ok">✓</span><span class="right">2 场 · 不限</span><span class="right strong">¥12,800</span></div>
+            <div class="g-row"><span class="n">周雨桐</span><span class="r-tag">会员</span><span class="arrive-dot ok">✓</span><span class="right">1 场 · 剩 3 次</span><span class="right strong">¥980</span></div>
+            <div class="g-row"><span class="n">陈默</span><span class="r-tag grey">新人</span><span class="arrive-dot ok">✓</span><span class="right">1 场 · 未办卡</span><span class="right">—</span></div>
+            <div class="g-row"><span class="n">吴一凡</span><span class="r-tag grey">新人</span><span class="arrive-dot no">✕</span><span class="right">未到店</span><span class="right">—</span></div>
+          </div>
+          <div class="g-more">查看全部 8 人 ›</div>
+        </div>
+
+        <div class="g-section">
+          <div class="g-head" onclick="this.parentElement.classList.toggle('closed')">
+            <span class="g-title">当日活动</span><span class="g-count">3 场</span><span class="g-arrow">▾</span>
+          </div>
+          <div class="g-list">
+            <div class="g-row"><span class="n">晨光冥想·呼吸疗愈</span><span class="r-tag green">疗愈课</span><span class="right">09:30 · 李青 · 12 人</span></div>
+            <div class="g-row"><span class="n">OH 卡深度梳理</span><span class="r-tag green">小组课</span><span class="right">14:00 · 王岚 · 6 人</span></div>
+            <div class="g-row"><span class="n">晚间茶话·公益分享</span><span class="r-tag grey">公益</span><span class="right">19:00 · 李青 · 15 人</span></div>
+          </div>
+        </div>
+
+        <div class="g-section">
+          <div class="g-head" onclick="this.parentElement.classList.toggle('closed')">
+            <span class="g-title">当日财务</span><span class="g-amount">¥18,280</span><span class="g-arrow">▾</span>
+          </div>
+          <div class="g-list">
+            <div class="g-row"><span class="n">郑好</span><span class="r-tag">会员卡</span><span class="right">年卡 · 张三</span><span class="right strong">¥12,800</span></div>
+            <div class="g-row"><span class="n">林小满</span><span class="r-tag">会员卡</span><span class="right">20 次卡 · 小李</span><span class="right strong">¥3,600</span></div>
+            <div class="g-row"><span class="n">周雨桐</span><span class="r-tag">OH卡梳理</span><span class="right">2 次 · 王岚</span><span class="right strong">¥980</span></div>
+          </div>
+          <div class="g-summary">微信 ¥15,080 ／ 支付宝 ¥3,200 · 共 5 笔</div>
+        </div>
+
+        <div class="g-section closed">
+          <div class="g-head" onclick="this.parentElement.classList.toggle('closed')">
+            <span class="g-title">当日销卡</span><span class="g-count">4 人</span><span class="g-arrow">▾</span>
+          </div>
+          <div class="g-list">
+            <div class="g-row"><span class="n">林小满</span><span class="right">人工 1 · 活动 2</span><span class="right strong">剩 12 次</span></div>
+            <div class="g-row"><span class="n">周雨桐</span><span class="right">活动 1</span><span class="right strong">剩 3 次</span></div>
+            <div class="g-row"><span class="n">郑好</span><span class="right">活动 2</span><span class="right strong">不限</span></div>
+            <div class="g-row"><span class="n">孙倩</span><span class="right">人工 1</span><span class="right strong">未办卡</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">方案一</span> 分组长页流</div>
+  <div class="caption">4 板块纵向堆叠、可折叠，销卡默认收起<br><span class="pro">✓ 一屏扫全、无切换成本</span>　<span class="con">✗ 客户多时页面长，行内信息密度有限</span></div>
+</div>
+
+<!-- ================================================== -->
+<!-- 方案二：仪表盘入口（汇总数字 → 各自子页）         -->
+<!-- ================================================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div>
+        <div class="cal">📅</div>
+      </div>
+      <div class="d-body">
+
+        <div class="d-hero">
+          <span class="label">今日成交</span>
+          <span class="total">¥18,280</span>
+          <span class="by">微信 ¥15,080<br>支付宝 ¥3,200</span>
+        </div>
+
+        <div class="d-grid">
+          <div class="d-card">
+            <div class="d-num">8<span class="unit">人</span></div>
+            <div class="d-name"><span class="dot" style="background:#3370ff"></span>当日客户<span class="arrow">›</span></div>
+            <div class="d-sub">到店 7 · 未到 1<br>新人 2 · 成交 3 笔</div>
+          </div>
+          <div class="d-card">
+            <div class="d-num">3<span class="unit">场</span></div>
+            <div class="d-name"><span class="dot" style="background:#2ba471"></span>当日活动<span class="arrow">›</span></div>
+            <div class="d-sub">参与 33 人次<br>下一场 14:00 OH卡梳理</div>
+          </div>
+          <div class="d-card">
+            <div class="d-num">5<span class="unit">笔</span></div>
+            <div class="d-name"><span class="dot" style="background:#7a5af8"></span>当日财务<span class="arrow">›</span></div>
+            <div class="d-sub">会员卡 2 笔 ¥16,400<br>其他项目 3 笔 ¥1,880</div>
+          </div>
+          <div class="d-card">
+            <div class="d-num">7<span class="unit">次</span></div>
+            <div class="d-name"><span class="dot" style="background:#f79009"></span>当日销卡<span class="arrow">›</span></div>
+            <div class="d-sub">4 人有销卡<br>人工 2 · 活动 5</div>
+          </div>
+        </div>
+
+        <div class="d-hint">点击卡片进入对应明细页（明细页沿用卡片列表样式）</div>
+
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">方案二</span> 仪表盘入口</div>
+  <div class="caption">首页只有 1 个合计 + 4 张汇总卡，明细各自成页<br><span class="pro">✓ 最干净、每页只加载自己的数据（最快）</span>　<span class="con">✗ 看明细要多点一步、跨板块对比不方便</span></div>
+</div>
+
+<!-- ================================================== -->
+<!-- 方案三：时间轴流水（按时间混排 + 类型筛选）       -->
+<!-- ================================================== -->
+<div>
+  <div class="phone">
+    <div class="phone-screen">
+      <div class="statusbar"></div>
+      <div class="navbar"><span class="back">‹</span>每日报表</div>
+      <div class="datebar">
+        <div class="nav-arrow">‹</div>
+        <div><span class="date-main">8月6日</span><span class="date-sub">周四 · 今天</span></div>
+        <div class="nav-arrow">›</div>
+        <div class="cal">📅</div>
+      </div>
+      <div class="t-filter">
+        <span class="t-chip on" data-f="all">全部</span>
+        <span class="t-chip" data-f="customer">客户</span>
+        <span class="t-chip" data-f="activity">活动</span>
+        <span class="t-chip" data-f="finance">财务</span>
+        <span class="t-chip" data-f="deduction">销卡</span>
+      </div>
+      <div class="t-body">
+
+        <div class="t-item" data-t="activity">
+          <div class="t-rail"><span class="t-time">09:30</span><span class="t-dot" style="background:#2ba471"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag green">活动</span><span class="n">晨光冥想·呼吸疗愈</span><span class="t-right dim">12 人</span></div>
+            <div class="t-sub">09:30-11:00 · 李青、王岚 · 老人 8 / 新人 4</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="customer">
+          <div class="t-rail"><span class="t-time">10:00</span><span class="t-dot" style="background:#3370ff"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag">客户</span><span class="n">郑好</span><span style="font-size:10px;color:#2ba471">已到店</span><span class="t-right dim">第 15 次</span></div>
+            <div class="t-sub">会员 · 引流：王姐 · 邀约人：张三</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="finance">
+          <div class="t-rail"><span class="t-time">11:20</span><span class="t-dot" style="background:#7a5af8"></span><span class="t-line"></span></div>
+          <div class="t-card money">
+            <div class="t-head"><span class="r-tag" style="background:#f3f0ff;color:#7a5af8">成交</span><span class="n">郑好 · 年卡·不限次</span><span class="t-right">¥12,800</span></div>
+            <div class="t-sub">成交人：张三 · 微信支付</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="customer">
+          <div class="t-rail"><span class="t-time">10:30</span><span class="t-dot" style="background:#3370ff"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag">客户</span><span class="n">林小满</span><span style="font-size:10px;color:#2ba471">已到店</span><span class="t-right dim">第 4 次</span></div>
+            <div class="t-sub">会员 · 引流：王姐 · 邀约人：小李</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="deduction">
+          <div class="t-rail"><span class="t-time">11:05</span><span class="t-dot" style="background:#f79009"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag" style="background:#fef3e8;color:#f79009">销卡</span><span class="n">林小满 · 活动销 1 次</span><span class="t-right dim">剩 12 次</span></div>
+            <div class="t-sub">晨光冥想·呼吸疗愈（自动）</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="finance">
+          <div class="t-rail"><span class="t-time">11:40</span><span class="t-dot" style="background:#7a5af8"></span><span class="t-line"></span></div>
+          <div class="t-card money">
+            <div class="t-head"><span class="r-tag" style="background:#f3f0ff;color:#7a5af8">成交</span><span class="n">林小满 · 次卡 20 次</span><span class="t-right">¥3,600</span></div>
+            <div class="t-sub">成交人：小李 · 支付宝</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="activity">
+          <div class="t-rail"><span class="t-time">14:00</span><span class="t-dot" style="background:#2ba471"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag green">活动</span><span class="n">OH 卡深度梳理</span><span class="t-right dim">6 人</span></div>
+            <div class="t-sub">14:00-16:00 · 王岚 · 老人 3 / 新人 3</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="customer">
+          <div class="t-rail"><span class="t-time">14:00</span><span class="t-dot" style="background:#3370ff"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag">客户</span><span class="n">陈默</span><span style="font-size:10px;color:#2ba471">已到店</span><span class="t-right dim">首次</span></div>
+            <div class="t-sub">新人 · 引流：林小满 · 邀约人：张三</div>
+          </div>
+        </div>
+
+        <div class="t-item" data-t="deduction">
+          <div class="t-rail"><span class="t-time">16:10</span><span class="t-dot" style="background:#f79009"></span><span class="t-line"></span></div>
+          <div class="t-card">
+            <div class="t-head"><span class="r-tag" style="background:#fef3e8;color:#f79009">销卡</span><span class="n">孙倩 · 人工销 1 次</span><span class="t-right dim">未办卡</span></div>
+            <div class="t-sub">操作人：李青</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <div class="scheme-tag"><span class="no">方案三</span> 时间轴流水</div>
+  <div class="caption">当天发生的一切按时间混排成一条流，chip 筛选类型<br><span class="pro">✓ 最有「一天的复盘感」，成交高亮醒目</span>　<span class="con">✗ 找特定客户/对账汇总不如分板块直接</span></div>
+</div>
+
+</div>
+
+<!-- ==================== 对比表 ==================== -->
+<div class="notes">
+  <h2>三个方案怎么选</h2>
+  <table>
+    <tr><th></th><th>方案一 · 分组长页流</th><th>方案二 · 仪表盘入口</th><th>方案三 · 时间轴流水</th></tr>
+    <tr>
+      <td>适合谁</td>
+      <td>习惯 PC 端「一屏看 4 表」的人，想要最贴近 PC 的阅读顺序</td>
+      <td>店长快速扫数：先看合计和汇总，关心哪块再点哪块</td>
+      <td>复盘当天节奏：什么时候来了谁、什么时候成交</td>
+    </tr>
+    <tr>
+      <td>信息量</td>
+      <td>4 板块同页，但客户板块只能截断（查看全部）</td>
+      <td>首页只有数字，明细在子页（子页可完整复刻 PC 表格卡片化）</td>
+      <td>全量事件混排，但单条信息最简</td>
+    </tr>
+    <tr>
+      <td>性能</td>
+      <td>首屏要拉全 4 板块数据（请求最多）</td>
+      <td>最优——首页只需汇总数字，子页按需加载</td>
+      <td>中等——客户+活动+财务+销卡都要拉才能混排</td>
+    </tr>
+    <tr>
+      <td>风险</td>
+      <td>客户多时滚动很长；折叠状态需要记</td>
+      <td>跨板块对照（如谁成交了又销了卡）要来回跳</td>
+      <td>对账/汇总类查看（财务合计、销卡汇总）要额外做顶部小结</td>
+    </tr>
+    <tr>
+      <td>组合建议</td>
+      <td colspan="3">也可以混合：<b>方案二的首页 + 方案一作为「全部明细」页</b>，或者方案三加一条顶部「今日合计」横条</td>
+    </tr>
+  </table>
+</div>
+
+<script>
+  // 方案三筛选
+  document.querySelectorAll('.t-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      document.querySelectorAll('.t-chip').forEach(c => c.classList.remove('on'));
+      chip.classList.add('on');
+      var f = chip.dataset.f;
+      document.querySelectorAll('.t-item').forEach(function(item) {
+        item.style.display = (f === 'all' || item.dataset.t === f) ? 'flex' : 'none';
+      });
+      // 重算时间轴竖线：隐藏的元素不参与
+      document.querySelectorAll('.t-item').forEach(function(item) {
+        var line = item.querySelector('.t-line');
+        if (line) line.style.display = '';
+      });
+      var visible = Array.from(document.querySelectorAll('.t-item')).filter(i => i.style.display !== 'none');
+      visible.forEach(function(item, idx) {
+        var line = item.querySelector('.t-line');
+        if (line) line.style.display = (idx === visible.length - 1) ? 'none' : '';
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

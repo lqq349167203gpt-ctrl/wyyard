@@ -22,6 +22,87 @@ def _create_organization_course(client, course_name: str):
     return organization, course
 
 
+@pytest.mark.parametrize("withdraw", [False, True])
+def test_removing_participant_cancels_coarse_with_confirmation_and_rollback(client, created_customer, monkeypatch, withdraw):
+    from app.services import class_record_service, membership_card_service, project_deduction_service, storage
+
+    customer_id = created_customer["id"]
+    org, course = _create_organization_course(client, "取消联动课")
+    visit = client.post("/api/visits", json={"visit_date": "2026-09-01", "customer_id": customer_id, "nickname": created_customer["nickname"], "arrived": True}).json()
+    lesson = client.post("/api/class-records", json={"date": "2026-09-01", "start_time": "09:00", "course_id": course["id"], "course_name": "取消联动课", "course_type": "沙龙活动", "participant_ids": [customer_id]}).json()
+    response = client.post("/api/project-deductions/coarse-door-course", json={"customer_id": customer_id, "record_type": "class", "record_id": lesson["id"], "course_organization_id": org["id"], "settlement_organization_id": org["id"], "deal_date": "2026-09-01", "closers": []})
+    assert response.status_code == 200, response.text
+    deduction_id = response.json()["id"]
+    path = f'/api/class-records/{lesson["id"]}/participants'
+    def remove(confirm=False):
+        target = f'/api/activity-withdrawals/class/{lesson["id"]}' if withdraw else path
+        return client.request("POST" if withdraw else "PATCH", target + ("?confirm_coarse_cancellation=1" if confirm else ""), json={"customer_id": customer_id} if withdraw else {"participant_ids": []})
+    try:
+        preview = remove()
+        assert preview.status_code == 409 and preview.json()["coarse_cancellation_required"]
+        # 弹窗要说清楚是谁的抵扣：文案和结构化数据都要带客户名
+        assert preview.json()["coarse_cancellation_items"] == [{
+            "nickname": created_customer["nickname"], "activity": "取消联动课", "count": 1,
+        }]
+        assert created_customer["nickname"] in preview.json()["detail"]
+        assert customer_id in class_record_service.get_record(lesson["id"]).participant_ids
+        assert customer_id in storage.load_item("class_records.json", lesson["id"])["participant_ids"]
+        assert not project_deduction_service._deductions[deduction_id].cancelled
+        # 无撤销权限，确认也不能只改名单。
+        from app.utils import record_ownership
+        with monkeypatch.context() as patch:
+            def denied(*args):
+                raise HTTPException(403, "只能取消自己创建的抵扣")
+            patch.setattr(record_ownership, "ensure_payment_record_manager", denied)
+            rejected = remove(True)
+            assert rejected.status_code == 403
+        assert customer_id in class_record_service.get_record(lesson["id"]).participant_ids
+        # 数据库提交失败：内存与数据库都维持原状态。
+        with monkeypatch.context() as patch:
+            def fail_commit(*args):
+                raise RuntimeError("模拟提交失败")
+            patch.setattr(storage, "commit_pending_writes", fail_commit)
+            with pytest.raises(Exception, match="模拟提交失败"):
+                remove(True)
+        assert customer_id in class_record_service.get_record(lesson["id"]).participant_ids
+        assert not storage.load_item("project_deductions.json", deduction_id)["cancelled"]
+        done = remove(True)
+        assert done.status_code == 200, done.text
+        assert storage.load_item("project_deductions.json", deduction_id)["cancelled"]
+        assert membership_card_service.get_debt(customer_id) == 0
+        assert not project_deduction_service.list_deductions(customer_id)
+        detail = client.get(f"/api/customer-detail/{customer_id}").json()
+        cancelled = next(row for row in detail["payment_records"] if row["source_id"] == deduction_id)
+        assert cancelled["cancelled"] and "移除" in cancelled["cancellation_reason"]
+        assert detail["customer"]["transaction_count"] == 0
+        # 重复请求不重复退回；重加人员不恢复旧抵扣。
+        assert remove(True).status_code == 200
+        if withdraw:
+            assert client.delete(f'/api/activity-withdrawals/class/{lesson["id"]}/{customer_id}').status_code == 200
+        else:
+            assert client.patch(path, json={"participant_ids": [customer_id]}).status_code == 200
+        assert project_deduction_service._deductions[deduction_id].cancelled
+        assert membership_card_service.get_debt(customer_id) == 1
+        options = project_deduction_service.get_coarse_door_options(customer_id)
+        assert any(row["record_id"] == lesson["id"] for row in options["courses"])
+    finally:
+        client.delete(f'/api/class-records/{lesson["id"]}?confirm_coarse_cancellation=1')
+        client.delete(f'/api/visits/{visit["id"]}?confirm_coarse_cancellation=1')
+        client.delete(f'/api/courses/{course["id"]}')
+        client.delete(f'/api/organizations/{org["id"]}')
+
+
+def test_course_transaction_rolls_back_earlier_database_writes():
+    from app.services import storage
+    key = "atomic-test-" + uuid.uuid4().hex
+    with pytest.raises(TypeError):
+        storage.commit_pending_writes([
+            ("item", "project_deductions.json", key, {"test": True}),
+            ("item", "project_deductions.json", key + "-bad", {"invalid": object()}),
+        ])
+    assert storage.load_item("project_deductions.json", key) is None
+
+
 def test_coarse_door_delete_follows_payment_creator_scope(monkeypatch):
     from app.services import position_edit_permission_service
     from app.utils.record_ownership import ensure_payment_record_manager

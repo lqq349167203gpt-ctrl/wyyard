@@ -351,7 +351,7 @@ Page({
     const records = await paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡' })
     this.setData({
       coarseRecords: (Array.isArray(records) ? records : (records.items || []))
-        .map(record => Object.assign({}, record, { _canDelete: canEditRecord(record, 'payments') }))
+        .map(record => Object.assign({}, record, { _canDelete: !record.cancelled && canEditRecord(record, 'payments') }))
         .sort((a, b) => (
           String(b.deduction_date || b.created_at || '').localeCompare(String(a.deduction_date || a.created_at || ''))
           || String(b.created_at || '').localeCompare(String(a.created_at || ''))

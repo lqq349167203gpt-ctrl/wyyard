@@ -9,7 +9,7 @@
     <view class="pf-row pf-row-last">
       <text class="pf-label">成交归属</text>
       <picker class="pf-picker" mode="selector" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrgChange">
-        <view class="pf-value {{organizations.length > 0 ? '' : 'pf-placeholder'}}">{{organizations[orgIndex].name || '暂无组织'}}</view>
+        <view class="pf-value {{orgIndex >= 0 && organizations[orgIndex] ? '' : 'pf-placeholder'}}">{{orgIndex >= 0 && organizations[orgIndex] ? organizations[orgIndex].name : (organizations.length > 0 ? '请选择成交归属' : '暂无组织')}}</view>
       </picker>
     </view>
   </view>

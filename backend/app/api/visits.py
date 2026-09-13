@@ -421,7 +421,9 @@ async def update_visit(visit_id: str, data: dict, request: Request):
     if data.get("customer_id") and data["customer_id"] != old_record.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="邀约")
     visit_verification_service.ensure_update_allowed(old_record, data)
-    if "needs" in data and (old_record.cancelled or "cancelled" in data):
+    if "needs" in data and old_record.cancelled:
+        raise HTTPException(status_code=400, detail="该邀约已取消并已锁定，请先恢复邀约后再修改来访需求")
+    if "needs" in data and "cancelled" in data:
         raise HTTPException(status_code=400, detail="取消或恢复邀约时不能同时修改来访需求")
     ensure_creator_for_changed_fields(
         request,

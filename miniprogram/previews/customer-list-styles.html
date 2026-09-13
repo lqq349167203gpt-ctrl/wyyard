@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客户列表 · 样式方案对比</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #ebedf0;
+    --page-bg: #f2f3f5;
+    --phone-bg: #f7f8fa;
+    --primary: #3370ff;
+    --warn: #d97070;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1280px; margin: 0 auto 32px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 18px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff;
+    border: 1px solid var(--hairline);
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--ink-2);
+    border-radius: 3px;
+  }
+  .principle b { color: var(--ink); font-weight: 600; }
+
+  .plans {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 12px;
+  }
+  .plan { flex: 0 0 375px; }
+  .plan-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .plan-letter { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .plan-name { font-size: 15px; font-weight: 600; }
+  .plan-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px;
+    height: 720px;
+    background: var(--phone-bg);
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: #fff; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    position: relative; font-size: 16px; font-weight: 600; flex-shrink: 0;
+  }
+  .capsule {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    width: 74px; height: 28px; border: 1px solid #e6e9ed; border-radius: 14px;
+    display: flex; align-items: center; justify-content: space-evenly;
+  }
+  .capsule::before { content: "•••"; font-size: 10px; letter-spacing: 1px; }
+  .capsule::after { content: "◉"; font-size: 11px; }
+  .screen { flex: 1; position: relative; overflow: hidden; }
+
+  /* 搜索栏（三方案统一） */
+  .search-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--hairline);
+  }
+  .search-input {
+    flex: 1; height: 36px; background: #f2f3f5; border-radius: 4px;
+    display: flex; align-items: center; padding: 0 14px;
+    font-size: 13px; color: var(--ink-4);
+  }
+  .filter-btn {
+    height: 36px; padding: 0 12px; background: #f2f3f5; border-radius: 4px;
+    display: flex; align-items: center; font-size: 13px; color: #4e535a; flex-shrink: 0;
+  }
+  .filter-btn b { color: var(--primary); font-weight: 600; margin-left: 2px; }
+
+  .fab {
+    position: absolute; right: 16px; bottom: 20px; width: 46px; height: 46px;
+    border-radius: 50%; background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 300; box-shadow: 0 4px 16px rgba(51,112,255,.25);
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* 距今天数色阶（三方案统一） */
+  .d-recent { color: var(--ink-3); }
+  .d-mid { color: var(--primary); }
+  .d-over { color: var(--warn); }
+
+  /* 标签 */
+  .ctag {
+    display: inline-flex; align-items: center; padding: 1px 6px;
+    font-size: 10.5px; border-radius: 3px; background: #f2f3f5; color: var(--ink-2);
+    line-height: 1.6; flex-shrink: 0;
+  }
+
+  /* ============ 方案 A · 分组卡片修正 ============ */
+  .a-group-head {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 14px 16px 8px;
+  }
+  .a-group-title { font-size: 14px; font-weight: 700; }
+  .a-group-count { font-size: 11px; color: var(--ink-3); }
+  .a-group-head::after { content: ""; flex: 1; height: 1px; background: var(--hairline); align-self: center; }
+  .a-card {
+    background: #fff; border: 1px solid var(--hairline); border-radius: 4px;
+    margin: 0 12px 6px; overflow: hidden;
+  }
+  .a-row {
+    display: flex; align-items: center; padding: 11px 14px;
+    border-bottom: 1px solid #f5f6f7;
+  }
+  .a-row:last-child { border-bottom: none; }
+  .a-name { font-size: 14.5px; font-weight: 600; margin-right: 6px; }
+  .a-right { margin-left: auto; text-align: right; flex-shrink: 0; }
+  .a-days { font-size: 14px; font-weight: 700; display: block; }
+  .a-visits { font-size: 11px; color: var(--ink-3); display: block; margin-top: 2px; }
+
+  /* ============ 方案 B · 通栏 hairline 表 ============ */
+  .b-group-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; background: #f0f1f3;
+    font-size: 11px; color: var(--ink-2); font-weight: 600;
+    position: sticky; top: 0;
+  }
+  .b-group-head .cnt { color: var(--ink-3); font-weight: 400; }
+  .b-table { background: #fff; border-bottom: 1px solid var(--hairline); }
+  .b-row {
+    display: flex; align-items: center; padding: 10px 16px;
+    border-top: 1px solid #f5f6f7;
+  }
+  .b-row:first-child { border-top: none; }
+  .b-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+  .b-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .b-col-visits {
+    width: 58px; flex-shrink: 0; text-align: right;
+    font-size: 12px; color: var(--ink-2);
+  }
+  .b-col-days {
+    width: 64px; flex-shrink: 0; text-align: right;
+    font-size: 13px; font-weight: 700;
+  }
+  .b-col-head { font-size: 10px; color: var(--ink-4); font-weight: 400; display: block; }
+
+  /* ============ 方案 C · 双行信息行 ============ */
+  .c-group-head {
+    display: flex; align-items: baseline; gap: 8px; padding: 14px 16px 8px;
+  }
+  .c-group-title { font-size: 13px; font-weight: 700; }
+  .c-group-count { font-size: 11px; color: var(--ink-3); }
+  .c-card {
+    background: #fff; border: 1px solid var(--hairline); border-radius: 4px;
+    margin: 0 12px 8px; padding: 11px 14px; position: relative;
+  }
+  .c-card.stale { border-left: 3px solid var(--warn); }
+  .c-card.normal { border-left: 3px solid transparent; }
+  .c-line1 { display: flex; align-items: center; gap: 6px; }
+  .c-name { font-size: 14.5px; font-weight: 600; }
+  .c-days-pill {
+    margin-left: auto; flex-shrink: 0;
+    font-size: 11px; font-weight: 600;
+    padding: 1px 7px; border-radius: 3px;
+  }
+  .pill-recent { background: #f2f3f5; color: var(--ink-3); }
+  .pill-mid { background: rgba(51,112,255,.09); color: var(--primary); }
+  .pill-over { background: rgba(217,112,112,.10); color: var(--warn); }
+  .c-line2 {
+    margin-top: 6px; font-size: 12px; color: var(--ink-2);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .c-line2 .sep { color: #ccd3da; }
+
+  .notes {
+    margin-top: 14px; background: #fff; border: 1px solid var(--hairline);
+    border-radius: 3px; padding: 12px 14px;
+  }
+  .notes li {
+    font-size: 12px; color: var(--ink-2); line-height: 1.8;
+    list-style: none; padding-left: 12px; position: relative;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 4px; height: 4px; background: var(--primary); border-radius: 1px;
+  }
+  .notes li b { color: var(--ink); }
+
+  .legend {
+    display: flex; gap: 14px; align-items: center;
+    margin-top: 14px; font-size: 11.5px; color: var(--ink-2);
+  }
+  .legend .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+
+  .doc-foot {
+    max-width: 1280px; margin: 26px auto 0;
+    font-size: 11.5px; color: var(--ink-3); line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">客户列表 · 样式方案对比</div>
+  <div class="doc-sub">管理端克制方向：灰阶为主、排版驱动层级。三个方案都解决同一批清晰度问题，交互（搜索/筛选面板/分组/加载更多）不变。</div>
+  <div class="principles">
+    <div class="principle"><b>分组头锚不住</b>　现在组名是 24rpx 灰字，扫读时找不到组的边界 → 三方案都强化分组头</div>
+    <div class="principle"><b>关键信号最弱</b>　「多少天没到店」是经营上最重要的信息，现在却是括号里最小的灰字 → 三方案都把它提为右侧主信息 + 色阶</div>
+    <div class="principle"><b>右侧信息挤</b>　到店次数和天数挤在一行括号里 → 分开展示、固定位置对齐</div>
+    <div class="principle"><b>色阶图例</b>　<span class="d-recent">≤7天 灰</span> / <span class="d-mid">8–30天 蓝</span> / <span class="d-over">>30天 红</span>（功能性预警，非装饰）</div>
+  </div>
+</div>
+
+<div class="plans">
+
+  <!-- ================= 方案 A ================= -->
+  <div class="plan">
+    <div class="plan-tag">
+      <span class="plan-letter">A</span>
+      <span class="plan-name">分组卡片修正</span>
+      <span class="plan-desc">改动最小 · 层级归位</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">客户<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="search-bar">
+          <div class="search-input">搜索昵称</div>
+          <div class="filter-btn">筛选<b>2</b></div>
+        </div>
+
+        <div class="a-group-head">
+          <span class="a-group-title">年卡会员</span>
+          <span class="a-group-count tnum">12 人</span>
+        </div>
+        <div class="a-card">
+          <div class="a-row">
+            <span class="a-name">璐小娜</span>
+            <span class="ctag">VIP</span>
+            <span class="a-right">
+              <span class="a-days d-recent tnum">3天前</span>
+              <span class="a-visits tnum">到店 12 次</span>
+            </span>
+          </div>
+          <div class="a-row">
+            <span class="a-name">陈默</span>
+            <span class="a-right">
+              <span class="a-days d-mid tnum">15天前</span>
+              <span class="a-visits tnum">到店 8 次</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="a-group-head">
+          <span class="a-group-title">3月卡</span>
+          <span class="a-group-count tnum">8 人</span>
+        </div>
+        <div class="a-card">
+          <div class="a-row">
+            <span class="a-name">林晓</span>
+            <span class="ctag">老带新</span>
+            <span class="a-right">
+              <span class="a-days d-over tnum">42天前</span>
+              <span class="a-visits tnum">到店 5 次</span>
+            </span>
+          </div>
+          <div class="a-row">
+            <span class="a-name">苏杭</span>
+            <span class="a-right">
+              <span class="a-days d-recent tnum">9天前</span>
+              <span class="a-visits tnum">到店 3 次</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="a-group-head">
+          <span class="a-group-title">体验客户</span>
+          <span class="a-group-count tnum">5 人</span>
+        </div>
+        <div class="a-card">
+          <div class="a-row">
+            <span class="a-name">何青</span>
+            <span class="a-right">
+              <span class="a-days d-over tnum">67天前</span>
+              <span class="a-visits tnum">到店 1 次</span>
+            </span>
+          </div>
+          <div class="a-row">
+            <span class="a-name">方舟</span>
+            <span class="ctag">新客</span>
+            <span class="a-right">
+              <span class="a-days" style="color: var(--ink-4);">未到店</span>
+              <span class="a-visits tnum">到店 0 次</span>
+            </span>
+          </div>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>保留现有卡片分组</b>，只修层级：组名加粗 + hairline 引线 + 人数</li>
+      <li><b>右侧改两行</b>：「N天前」提为主信息加粗带色阶，「到店 X 次」降为灰小字</li>
+      <li>昵称加粗，标签淡灰底不抢眼，最多展示 2 个</li>
+      <li>改动成本最低，<b>视觉结构不变、只更清晰</b></li>
+    </ul>
+  </div>
+
+  <!-- ================= 方案 B ================= -->
+  <div class="plan">
+    <div class="plan-tag">
+      <span class="plan-letter">B</span>
+      <span class="plan-name">通栏表格</span>
+      <span class="plan-desc">列对齐 · 扫读最强</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">客户<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="search-bar">
+          <div class="search-input">搜索昵称</div>
+          <div class="filter-btn">筛选<b>2</b></div>
+        </div>
+
+        <div class="b-group-head">
+          年卡会员 <span class="cnt tnum">12 人</span>
+          <span style="margin-left:auto;"></span>
+          <span class="b-col-visits"><span class="b-col-head">到店</span></span>
+          <span class="b-col-days"><span class="b-col-head">最近</span></span>
+        </div>
+        <div class="b-table">
+          <div class="b-row">
+            <div class="b-main"><span class="b-name">璐小娜</span><span class="ctag">VIP</span></div>
+            <span class="b-col-visits tnum">12 次</span>
+            <span class="b-col-days d-recent tnum">3天前</span>
+          </div>
+          <div class="b-row">
+            <div class="b-main"><span class="b-name">陈默</span></div>
+            <span class="b-col-visits tnum">8 次</span>
+            <span class="b-col-days d-mid tnum">15天前</span>
+          </div>
+        </div>
+
+        <div class="b-group-head">
+          3月卡 <span class="cnt tnum">8 人</span>
+          <span style="margin-left:auto;"></span>
+          <span class="b-col-visits"></span>
+          <span class="b-col-days"></span>
+        </div>
+        <div class="b-table">
+          <div class="b-row">
+            <div class="b-main"><span class="b-name">林晓</span><span class="ctag">老带新</span></div>
+            <span class="b-col-visits tnum">5 次</span>
+            <span class="b-col-days d-over tnum">42天前</span>
+          </div>
+          <div class="b-row">
+            <div class="b-main"><span class="b-name">苏杭</span></div>
+            <span class="b-col-visits tnum">3 次</span>
+            <span class="b-col-days d-recent tnum">9天前</span>
+          </div>
+        </div>
+
+        <div class="b-group-head">
+          体验客户 <span class="cnt tnum">5 人</span>
+          <span style="margin-left:auto;"></span>
+          <span class="b-col-visits"></span>
+          <span class="b-col-days"></span>
+        </div>
+        <div class="b-table">
+          <div class="b-row">
+            <div class="b-main"><span class="b-name">何青</span></div>
+            <span class="b-col-visits tnum">1 次</span>
+            <span class="b-col-days d-over tnum">67天前</span>
+          </div>
+          <div class="b-row">
+            <div class="b-main"><span class="b-name">方舟</span><span class="ctag">新客</span></div>
+            <span class="b-col-visits tnum">0 次</span>
+            <span class="b-col-days" style="color: var(--ink-4);">—</span>
+          </div>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>去卡片、通栏 hairline</b>：类飞书表格，分组头灰底吸顶</li>
+      <li><b>固定列右对齐</b>：「到店」「最近」两列等宽，纵向成直线，扫一长串名单时眼睛最省力</li>
+      <li>分组头右侧带<b>列表头</b>，第一次看也知道每列是什么</li>
+      <li>密度最高，<b>适合客户量大、天天扫名单</b>的场景</li>
+    </ul>
+  </div>
+
+  <!-- ================= 方案 C ================= -->
+  <div class="plan">
+    <div class="plan-tag">
+      <span class="plan-letter">C</span>
+      <span class="plan-name">双行信息行</span>
+      <span class="plan-desc">信息最全 · 预警醒目</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">客户<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="search-bar">
+          <div class="search-input">搜索昵称</div>
+          <div class="filter-btn">筛选<b>2</b></div>
+        </div>
+
+        <div class="c-group-head">
+          <span class="c-group-title">年卡会员</span>
+          <span class="c-group-count tnum">12 人</span>
+        </div>
+        <div class="c-card normal">
+          <div class="c-line1">
+            <span class="c-name">璐小娜</span>
+            <span class="ctag">VIP</span>
+            <span class="c-days-pill pill-recent tnum">3天前</span>
+          </div>
+          <div class="c-line2">到店 12 次<span class="sep">·</span>引流 耀凯<span class="sep">·</span>年卡剩 8 个月</div>
+        </div>
+        <div class="c-card normal">
+          <div class="c-line1">
+            <span class="c-name">陈默</span>
+            <span class="c-days-pill pill-mid tnum">15天前</span>
+          </div>
+          <div class="c-line2">到店 8 次<span class="sep">·</span>引流 耀凯</div>
+        </div>
+
+        <div class="c-group-head">
+          <span class="c-group-title">3月卡</span>
+          <span class="c-group-count tnum">8 人</span>
+        </div>
+        <div class="c-card stale">
+          <div class="c-line1">
+            <span class="c-name">林晓</span>
+            <span class="ctag">老带新</span>
+            <span class="c-days-pill pill-over tnum">42天未到店</span>
+          </div>
+          <div class="c-line2">到店 5 次<span class="sep">·</span>引流 婷婷<span class="sep">·</span>卡已过期</div>
+        </div>
+        <div class="c-card normal">
+          <div class="c-line1">
+            <span class="c-name">苏杭</span>
+            <span class="c-days-pill pill-recent tnum">9天前</span>
+          </div>
+          <div class="c-line2">到店 3 次<span class="sep">·</span>引流 耀凯</div>
+        </div>
+
+        <div class="c-group-head">
+          <span class="c-group-title">体验客户</span>
+          <span class="c-group-count tnum">5 人</span>
+        </div>
+        <div class="c-card stale">
+          <div class="c-line1">
+            <span class="c-name">何青</span>
+            <span class="c-days-pill pill-over tnum">67天未到店</span>
+          </div>
+          <div class="c-line2">到店 1 次<span class="sep">·</span>体验课转化待跟进</div>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>两行式</b>：L1 昵称 + 标签 + 天数小签（色阶药丸），L2 灰色 meta 行放次要信息</li>
+      <li><b>沉睡客户左侧红条</b>：>30 天未到店整卡标红边，一扫就知道该唤醒谁</li>
+      <li>meta 行可扩展（引流人/卡状态/跟进提示），<b>信息量三方案最大</b></li>
+      <li>行高最大，一屏显示客户数最少，适合<b>精细化跟进</b>而非快速扫读</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="doc-foot">
+  说明：三方案的色阶规则一致（≤7天灰 / 8–30天蓝 / >30天红），只是呈现方式不同；「未到店/无记录」显示为灰色 — 或「未到店」。<br>
+  选择建议：改动最小选 A；每天扫大量名单选 B；要做客户唤醒跟进选 C。A 的右侧两行结构也可以和 B 的通栏表混搭。
+</div>
+
+</body>
+</html>

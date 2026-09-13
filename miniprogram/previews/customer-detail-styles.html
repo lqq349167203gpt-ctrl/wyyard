@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客户详情页 · 样式重排</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #ebedf0;
+    --page-bg: #f2f3f5;
+    --phone-bg: #f7f8fa;
+    --primary: #3370ff;
+    --warn: #d97070;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1280px; margin: 0 auto 32px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-title span { color: var(--ink-3); font-weight: 400; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 18px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff; border: 1px solid var(--hairline);
+    padding: 7px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px;
+  }
+  .principle b { color: var(--ink); font-weight: 600; }
+
+  .frames { max-width: 1280px; margin: 0 auto; display: flex; gap: 28px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+  .frame { flex: 0 0 375px; }
+  .frame-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .frame-no { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .frame-name { font-size: 15px; font-weight: 600; }
+  .frame-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px; height: 760px; background: var(--phone-bg);
+    border: 1px solid #dee2e6; overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: #fff; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    position: relative; font-size: 16px; font-weight: 600; flex-shrink: 0;
+  }
+  .navbar .back { position: absolute; left: 14px; font-size: 18px; color: var(--ink); font-weight: 400; }
+  .capsule {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    width: 74px; height: 28px; border: 1px solid #e6e9ed; border-radius: 14px;
+    display: flex; align-items: center; justify-content: space-evenly;
+  }
+  .capsule::before { content: "•••"; font-size: 10px; letter-spacing: 1px; }
+  .capsule::after { content: "◉"; font-size: 11px; }
+  .screen { flex: 1; position: relative; overflow: hidden; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ============ Hero ============ */
+  .hero { background: #fff; padding: 16px 16px 0; border-bottom: 1px solid var(--hairline); }
+  .hero-top { display: flex; align-items: center; gap: 8px; }
+  .hero-name { font-size: 19px; font-weight: 700; }
+  .pill {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    font-size: 10.5px; font-weight: 500; border-radius: 3px; line-height: 1.6; flex-shrink: 0;
+  }
+  .pill-gray { background: #f2f3f5; color: var(--ink-2); }
+  .pill-blue { background: rgba(51,112,255,.09); color: var(--primary); }
+  .pill-warn { background: rgba(217,112,112,.10); color: var(--warn); font-weight: 600; }
+  .hero-edit {
+    margin-left: auto; font-size: 12px; color: var(--ink-2);
+    border: 1px solid var(--hairline); border-radius: 3px; padding: 4px 12px;
+  }
+  .hero-tags { display: flex; gap: 6px; margin-top: 9px; }
+  .hero-stats {
+    display: flex; margin-top: 15px; padding: 12px 0 13px;
+    border-top: 1px solid var(--hairline);
+  }
+  .hstat { flex: 1; }
+  .hstat + .hstat { border-left: 1px solid var(--hairline); padding-left: 14px; }
+  .hstat-num { font-size: 16px; font-weight: 700; display: block; }
+  .hstat-num .unit { font-size: 11px; font-weight: 400; color: var(--ink-3); }
+  .hstat-label { font-size: 10.5px; color: var(--ink-3); display: block; margin-top: 3px; }
+
+  /* ============ 信息区 ============ */
+  .sec { margin-top: 10px; background: #fff; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+  .sec-title {
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 16px 9px; font-size: 12.5px; font-weight: 700;
+  }
+  .sec-title::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
+  .kv {
+    display: flex; padding: 7px 16px; font-size: 13px; align-items: baseline;
+  }
+  .kv .k { width: 64px; flex-shrink: 0; color: var(--ink-3); font-size: 12px; }
+  .kv .v { color: var(--ink); min-width: 0; flex: 1; }
+  .kv .v .ctag {
+    display: inline-flex; padding: 1px 6px; font-size: 10.5px; border-radius: 3px;
+    background: #f2f3f5; color: var(--ink-2); margin-right: 5px; line-height: 1.6;
+  }
+  .sec-pad { padding-bottom: 5px; }
+  .blk { padding: 8px 16px 10px; }
+  .blk .k { font-size: 12px; color: var(--ink-3); display: block; margin-bottom: 4px; }
+  .blk .v { font-size: 13px; line-height: 1.7; display: block; }
+  .blk + .blk { border-top: 1px dashed #eef0f2; }
+
+  /* ============ 记录区 ============ */
+  .seg-wrap { background: #fff; padding: 10px 12px 0; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; }
+  .seg { display: flex; background: #f2f3f5; border-radius: 5px; padding: 2px; overflow-x: auto; }
+  .seg-item {
+    flex-shrink: 0; padding: 5px 11px; font-size: 12px; color: var(--ink-2);
+    border-radius: 4px; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .seg-item .n { font-size: 10.5px; color: var(--ink-4); }
+  .seg-item.active { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .seg-item.active .n { color: var(--primary); }
+  .seg-gap { height: 10px; }
+
+  .rec-summary {
+    display: flex; gap: 12px; padding: 9px 16px;
+    font-size: 11px; color: var(--ink-2); background: #fff; border-bottom: 1px solid var(--hairline);
+  }
+  .rec-summary .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; }
+  .rec-list { background: #fff; }
+  .rec { padding: 11px 16px; border-bottom: 1px solid #f5f6f7; }
+  .rec:last-child { border-bottom: none; }
+  .rec-head { display: flex; align-items: center; }
+  .rec-date { font-size: 13.5px; font-weight: 700; }
+  .rec-head .pill { margin-left: auto; }
+  .rec-kv { display: flex; margin-top: 6px; font-size: 12px; align-items: baseline; }
+  .rec-kv .k { width: 56px; flex-shrink: 0; color: var(--ink-3); }
+  .rec-kv .v { color: var(--ink-2); flex: 1; min-width: 0; line-height: 1.6; }
+
+  .rec-sub { font-size: 12px; color: var(--ink-2); margin-top: 6px; display: flex; gap: 5px; align-items: baseline; }
+  .rec-sub .sep { color: #ccd3da; }
+  .rec-title-row { display: flex; align-items: baseline; }
+  .rec-name { font-size: 13.5px; font-weight: 600; }
+  .rec-amt { margin-left: auto; font-size: 13.5px; font-weight: 700; }
+  .remain { color: var(--primary); }
+
+  .sec-label {
+    font-size: 11px; font-weight: 600; color: var(--ink-3);
+    padding: 12px 16px 6px; letter-spacing: 0.02em;
+  }
+
+  .notes {
+    margin-top: 14px; background: #fff; border: 1px solid var(--hairline);
+    border-radius: 3px; padding: 12px 14px;
+  }
+  .notes li {
+    font-size: 12px; color: var(--ink-2); line-height: 1.8;
+    list-style: none; padding-left: 12px; position: relative;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 4px; height: 4px; background: var(--primary); border-radius: 1px;
+  }
+  .notes li b { color: var(--ink); }
+
+  .doc-foot { max-width: 1280px; margin: 26px auto 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">客户详情页 · 样式重排 <span>与列表 C 方案同一语言 · 仅样式稿</span></div>
+  <div class="doc-sub">以沉睡客户「林晓」为例（42 天未到店）。结构不变、内容不变，只重排样式让信息层级更清晰。</div>
+  <div class="principles">
+    <div class="principle"><b>预警上提</b>　「42天未到店」放进 Hero 第一行，和列表 C 同一套色阶小签，进页面第一眼就看到</div>
+    <div class="principle"><b>去“-”噪音</b>　空字段整行隐藏，不再显示一排占位符</div>
+    <div class="principle"><b>信息分区</b>　基本 / 来源 / 背景三个区标题化（加粗 + 引线），label 固定宽对齐</div>
+    <div class="principle"><b>Tab 改分段控件</b>　6 个 tab 带数量徽标，当前页一眼可知每个区有多少条</div>
+    <div class="principle"><b>记录条目统一</b>　所有 tab 的条目共用一种结构：日期 + 状态小签 + label-value，不再六种样式</div>
+  </div>
+</div>
+
+<div class="frames">
+
+  <!-- ================= 帧 1 · 资料区 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">1</span>
+      <span class="frame-name">资料区</span>
+      <span class="frame-desc">Hero + 三信息区</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar"><span class="back">‹</span>客户详情<div class="capsule"></div></div>
+      <div class="screen" style="overflow-y: auto;">
+        <div class="hero">
+          <div class="hero-top">
+            <span class="hero-name">林晓</span>
+            <span class="pill pill-warn tnum">42天未到店</span>
+            <span class="hero-edit">编辑</span>
+          </div>
+          <div class="hero-tags">
+            <span class="pill pill-gray">3月卡</span>
+            <span class="pill pill-blue">跟进中</span>
+            <span class="pill pill-gray">老带新</span>
+          </div>
+          <div class="hero-stats">
+            <div class="hstat">
+              <span class="hstat-num tnum">5<span class="unit"> 次</span></span>
+              <span class="hstat-label">到店</span>
+            </div>
+            <div class="hstat">
+              <span class="hstat-num tnum">¥3,600</span>
+              <span class="hstat-label">消费</span>
+            </div>
+            <div class="hstat">
+              <span class="hstat-num tnum" style="font-size: 13px;">2025-11-03</span>
+              <span class="hstat-label">首次到访</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec sec-pad">
+          <div class="sec-title">基本信息</div>
+          <div class="kv"><span class="k">姓名</span><span class="v">林晓</span></div>
+          <div class="kv"><span class="k">性别</span><span class="v">女 · 34 岁</span></div>
+          <div class="kv"><span class="k">电话</span><span class="v tnum">138 6210 xxxx</span></div>
+          <div class="kv"><span class="k">微信</span><span class="v">linxiao_88</span></div>
+          <div class="kv"><span class="k">工作</span><span class="v">全职妈妈</span></div>
+        </div>
+
+        <div class="sec sec-pad">
+          <div class="sec-title">来源归属</div>
+          <div class="kv"><span class="k">引流人</span><span class="v">婷婷</span></div>
+          <div class="kv"><span class="k">承接人</span><span class="v">耀凯</span></div>
+          <div class="kv"><span class="k">流量来源</span><span class="v">老带新（推荐人：璐小娜）</span></div>
+          <div class="kv"><span class="k">疗愈老师</span><span class="v">白鹭</span></div>
+        </div>
+
+        <div class="sec sec-pad">
+          <div class="sec-title">背景信息</div>
+          <div class="blk">
+            <span class="k">到访目的</span>
+            <span class="v">改善睡眠质量，缓解焦虑情绪</span>
+          </div>
+          <div class="blk">
+            <span class="k">当下卡点</span>
+            <span class="v">孩子升学压力大，夜间易醒，白天精神不振</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>Hero 第一行 = 昵称 + 预警签</b>：>30天未到店显示红色「N天未到店」，≤30天显示蓝/灰「N天前」</li>
+      <li>身份/状态/客户标签统一收进第二行灰色小签；「编辑」弱化到右上描边小按钮</li>
+      <li>统计行压扁：到店 / 消费 / 首次到访，hairline 分隔，首次到访改小字号日期</li>
+      <li>基本信息里<b>空字段整行隐藏</b>（如年龄未知就不出现「年龄 -」）</li>
+    </ul>
+  </div>
+
+  <!-- ================= 帧 2 · 记录区·跟进点 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">2</span>
+      <span class="frame-name">记录区 · 跟进点</span>
+      <span class="frame-desc">分段 tab + 汇总条</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar"><span class="back">‹</span>客户详情<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="seg-wrap">
+          <div class="seg">
+            <span class="seg-item active">跟进点<span class="n tnum">9</span></span>
+            <span class="seg-item">沟通<span class="n tnum">3</span></span>
+            <span class="seg-item">活动<span class="n tnum">6</span></span>
+            <span class="seg-item">卡次</span>
+            <span class="seg-item">课程</span>
+            <span class="seg-item">交易</span>
+          </div>
+          <div class="seg-gap"></div>
+        </div>
+        <div class="rec-summary">
+          <span><span class="dot" style="background: var(--primary);"></span>已到店 <b class="tnum">6</b></span>
+          <span><span class="dot" style="background: var(--ink-4);"></span>未到店 <b class="tnum">2</b></span>
+          <span><span class="dot" style="background: var(--warn);"></span>已取消 <b class="tnum">1</b></span>
+        </div>
+        <div class="rec-list">
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-date tnum">2026-07-09</span>
+              <span class="pill pill-gray">未到店</span>
+            </div>
+            <div class="rec-kv"><span class="k">当日需求</span><span class="v">睡眠调理，最近夜间易醒加重</span></div>
+            <div class="rec-kv"><span class="k">跟进点</span><span class="v">到店前一天电话确认；连续两次爽约，下次需提前收定金</span></div>
+          </div>
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-date tnum">2026-06-28</span>
+              <span class="pill pill-blue">已到店</span>
+            </div>
+            <div class="rec-kv"><span class="k">当日需求</span><span class="v">情绪释放专场</span></div>
+            <div class="rec-kv"><span class="k">客户信息</span><span class="v">近期加班多，建议约周末下午场</span></div>
+          </div>
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-date tnum">2026-06-14</span>
+              <span class="pill pill-blue">已到店</span>
+            </div>
+            <div class="rec-kv"><span class="k">跟进点</span><span class="v">颂钵体验反馈好，可推荐 3 月卡续费</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>分段控件 tab</b>：灰轨 + 白色当前段，每段带数量（跟进点 9 · 沟通 3 · 活动 6），不用逐个点开看</li>
+      <li><b>汇总条一行三色点</b>：已到店 / 未到店 / 已取消，替代现在三个大数字块</li>
+      <li>条目结构：<b>日期加粗 + 状态小签右置</b>，下面 label-value；状态只有 蓝=已到店 / 灰=未到店 / 红=已取消 三种</li>
+    </ul>
+  </div>
+
+  <!-- ================= 帧 3 · 记录区·活动+卡次 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">3</span>
+      <span class="frame-name">记录区 · 活动 / 卡次</span>
+      <span class="frame-desc">同一条目结构复用</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar"><span class="back">‹</span>客户详情<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="seg-wrap">
+          <div class="seg">
+            <span class="seg-item">跟进点<span class="n tnum">9</span></span>
+            <span class="seg-item">沟通<span class="n tnum">3</span></span>
+            <span class="seg-item active">活动<span class="n tnum">6</span></span>
+            <span class="seg-item">卡次</span>
+            <span class="seg-item">课程</span>
+            <span class="seg-item">交易</span>
+          </div>
+          <div class="seg-gap"></div>
+        </div>
+
+        <div class="rec-list">
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-date tnum">2026-07-09</span>
+              <span class="pill pill-warn">未参与</span>
+            </div>
+            <div class="rec-title-row" style="margin-top: 5px;">
+              <span class="rec-name">OH卡·星空夜谈</span>
+            </div>
+            <div class="rec-sub">参与者<span class="sep">·</span>白鹭</div>
+          </div>
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-date tnum">2026-06-20</span>
+              <span class="pill pill-blue">公益</span>
+            </div>
+            <div class="rec-title-row" style="margin-top: 5px;">
+              <span class="rec-name">申时茶会</span>
+            </div>
+            <div class="rec-sub">参与者<span class="sep">·</span>林老师<span class="sep">·</span>扣卡 1 次</div>
+          </div>
+
+          <div class="sec-label">卡次统计</div>
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-name">3月卡</span>
+              <span class="rec-amt"><span class="remain tnum">2</span><span style="color: var(--ink-3); font-weight: 400;"> / 12 次</span></span>
+            </div>
+            <div class="rec-sub tnum">2026-03-01 ~ 2026-09-01<span class="sep">·</span><span style="color: var(--warn);">历史欠卡 1 次</span></div>
+          </div>
+          <div class="rec">
+            <div class="rec-head">
+              <span class="rec-name">体验卡</span>
+              <span class="rec-amt" style="color: var(--ink-4); font-weight: 400;">已用完</span>
+            </div>
+            <div class="rec-sub tnum">2025-11-03 ~ 2025-12-03</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>同一套条目解剖</b>：日期/名称 + 状态小签 + meta 行，活动、卡次、交易、课程全部复用，学习成本零</li>
+      <li>卡次统计：<b>剩余次数提为右侧大数字</b>（蓝色），有效期和欠卡降级为 meta 行；用完的卡整体转灰</li>
+      <li>「未参与」用红色小签、「公益」用蓝色小签，和列表/跟进点的状态色一致</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="doc-foot">
+  说明：以上是纯样式稿，未改任何代码。确认后我再落地到 pages/customer-profile 的 wxml/wxss（列表 C 方案到时一起改 pages/customers）。<br>
+  数据规则：状态色全页面统一（蓝=正向/已到店/公益，灰=中性/未到店，红=预警/未参与/已取消/欠卡）；「N天未到店」色阶与列表 C 相同（≤7天灰 / 8–30天蓝 / >30天红）。
+</div>
+
+</body>
+</html>

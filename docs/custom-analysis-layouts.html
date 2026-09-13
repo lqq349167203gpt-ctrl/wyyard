@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自定义分析 — 三种布局方案</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
+  * { -webkit-font-smoothing: antialiased; }
+  .tab-active { border-color: #3370ff; color: #3370ff; }
+  .metric-on { border-color: #b9cdf8; background: #f7faff; color: #2b2f36; }
+  .metric-off { border-color: #e5e7ea; background: #fff; color: #646a73; }
+  .chip { display:inline-flex; align-items:center; gap:6px; height:28px; border-radius:4px; border:1px solid #e5e7ea; background:#fafbfc; padding:0 8px; font-size:11px; color:#4e535a; }
+  .grip { color:#a1a6ad; margin-right:4px; }
+  .add-btn { display:inline-flex; align-items:center; height:28px; border-radius:4px; border:1px dashed #b9cdf8; background:#fff; padding:0 8px; font-size:11px; color:#3370ff; }
+</style>
+</head>
+<body class="bg-[#f7f8fa] text-[#2b2f36] p-8">
+
+<!-- 方案选择 tabs -->
+<div class="max-w-[920px] mx-auto mb-6 flex gap-1 border-b border-[#e8eaed]">
+  <button onclick="show('a')" id="tab-a" class="tab-active px-4 py-2 text-[13px] border-b-2 -mb-px font-medium">方案A · 纵向分步</button>
+  <button onclick="show('b')" id="tab-b" class="px-4 py-2 text-[13px] border-b-2 border-transparent -mb-px text-[#646a73] hover:text-[#3370ff]">方案B · 卡片分区</button>
+  <button onclick="show('c')" id="tab-c" class="px-4 py-2 text-[13px] border-b-2 border-transparent -mb-px text-[#646a73] hover:text-[#3370ff]">方案C · 紧凑表单</button>
+</div>
+
+<!-- ============ 方案A：纵向分步 ============ -->
+<div id="plan-a" class="plan max-w-[920px] mx-auto rounded-[6px] bg-white overflow-hidden shadow-sm">
+  <!-- 头部 -->
+  <div class="flex items-start justify-between gap-3 border-b border-[#f0f0f0] px-[22px] py-4">
+    <div>
+      <h1 class="text-[16px] font-medium text-[#1f2329]">自定义分析</h1>
+      <p class="mt-1 text-[12px] text-[#8f959e]">找出符合条件的客户，看他们的邀约、到店和成交情况</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-[12px] text-[#8f959e]">我的模板</span>
+      <div class="h-8 w-[200px] rounded-[4px] border border-[#dee0e3] bg-white flex items-center px-2 text-[12px] text-[#a8b1bd]">选择已保存模板</div>
+      <button class="h-8 px-3 rounded-[4px] border border-[#dee0e3] bg-white text-[12px] text-[#4e535a]">保存为模板</button>
+    </div>
+  </div>
+
+  <!-- ① 筛选条件 — 纵向 -->
+  <div class="border-b border-[#f0f0f0] px-[22px] py-4">
+    <div class="mb-3 flex items-center gap-2">
+      <span class="text-[12px] font-medium text-[#3370ff]">①</span>
+      <span class="text-[14px] font-medium text-[#1f2329]">找出这样的客户</span>
+      <div class="ml-1 flex items-center rounded-[4px] border border-[#e1e4e7] p-0.5">
+        <button class="h-6 rounded-[3px] px-2.5 text-[11px] bg-[#f0f5ff] text-[#3370ff]">全部符合</button>
+        <button class="h-6 rounded-[3px] px-2.5 text-[11px] text-[#646a73]">符合任意一条</button>
+      </div>
+      <button class="ml-auto flex h-7 items-center px-1 text-[12px] text-[#3370ff]">+ 加一个条件</button>
+    </div>
+
+    <!-- 时间 -->
+    <div class="mb-2.5 flex items-center gap-1.5">
+      <span class="mr-1 text-[12px] text-[#79838f]">统计时间</span>
+      <div class="flex h-7 items-center rounded-[4px] border border-[#e1e4e7] bg-white">
+        <input type="date" value="2026-08-01" class="h-full border-none bg-transparent px-2 text-[12px] text-[#2b2f36] outline-none" />
+        <span class="text-[11px] text-[#8f959e]">至</span>
+        <input type="date" value="2026-08-27" class="h-full border-none bg-transparent px-2 text-[12px] text-[#2b2f36] outline-none" />
+      </div>
+      <button class="h-6 rounded-[4px] border px-2 text-[11px] border-[#1f2329] bg-[#1f2329] text-white">本月</button>
+      <button class="h-6 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-[11px] text-[#646a73]">今年</button>
+      <button class="h-6 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-[11px] text-[#646a73]">全部时间</button>
+    </div>
+
+    <!-- 条件行 -->
+    <div class="space-y-1.5">
+      <div class="flex items-center gap-2 rounded-[6px] border border-[#eceef0] bg-[#fbfcfd] px-2.5 py-1.5">
+        <span class="w-[150px] shrink-0 text-[12px] font-medium">会员身份</span>
+        <span class="w-[100px] shrink-0 text-[12px] text-[#8f959e]">属于</span>
+        <div class="flex-1 text-[12px]">普通会员、体验会员</div>
+        <span class="text-[#b0b5bb]">✕</span>
+      </div>
+      <div class="flex items-center gap-2 rounded-[6px] border border-[#eceef0] bg-[#fbfcfd] px-2.5 py-1.5">
+        <span class="w-[150px] shrink-0 text-[12px] font-medium">引流人</span>
+        <span class="w-[100px] shrink-0 text-[12px] text-[#8f959e]">等于</span>
+        <div class="flex-1 text-[12px]">小林</div>
+        <span class="text-[#b0b5bb]">✕</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 总数指标 — 纵向，不再和③并排 -->
+  <div class="border-b border-[#f0f0f0] px-[22px] py-4">
+    <div class="mb-2.5 flex items-baseline gap-2">
+      <span class="text-[12px] font-medium text-[#3370ff]">②</span>
+      <span class="text-[14px] font-medium text-[#1f2329]">看哪些总数</span>
+      <span class="text-[11px] text-[#8f959e]">查询后显示在结果上方</span>
+    </div>
+    <div class="flex flex-wrap gap-1.5">
+      <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>符合人数</button>
+      <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>引流人数</button>
+      <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>邀约人数</button>
+      <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>到店人数</button>
+      <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>成交人数</button>
+      <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>成交金额</button>
+      <button class="metric-off flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#c9cdd4]"></span>邀约次数</button>
+      <button class="metric-off flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#c9cdd4]"></span>到店次数</button>
+    </div>
+    <!-- 分组对比：改写描述 -->
+    <div class="mt-3 flex items-center gap-2 text-[12px] text-[#79838f]">
+      <span>按</span>
+      <div class="h-7 w-[140px] rounded-[4px] border border-[#e1e4e7] bg-white flex items-center px-2 text-[12px] text-[#a8b1bd]">不分组</div>
+      <span>拆分对比</span>
+      <span class="text-[11px] text-[#b7bdc6]">选一个维度，每个分组单独出一张统计卡</span>
+    </div>
+  </div>
+
+  <!-- ③ 列 — 纵向 -->
+  <div class="border-b border-[#f0f0f0] px-[22px] py-4">
+    <div class="mb-2.5 flex items-baseline gap-2">
+      <span class="text-[12px] font-medium text-[#3370ff]">③</span>
+      <span class="text-[14px] font-medium text-[#1f2329]">名单里显示哪些列</span>
+      <span class="text-[11px] text-[#8f959e]">最多 10 列，可拖动调整顺序</span>
+    </div>
+    <div class="flex flex-wrap gap-1.5">
+      <span class="chip">⠿ 昵称</span>
+      <span class="chip">⠿ 会员身份</span>
+      <span class="chip">⠿ 跟进阶段</span>
+      <span class="chip">⠿ 引流人</span>
+      <span class="chip">⠿ 邀约人</span>
+      <span class="chip">⠿ 期间邀约次数</span>
+      <span class="chip">⠿ 期间到店次数</span>
+      <span class="chip">⠿ 付费产品</span>
+      <span class="chip">⠿ 期间成交金额</span>
+      <span class="add-btn">+ 添加</span>
+    </div>
+  </div>
+
+  <!-- 操作栏 -->
+  <div class="flex items-center gap-3 bg-[#fafbfc] px-[22px] py-3">
+    <span class="flex-1 truncate text-[12px] text-[#79838f]">当前：08.01–08.27 · 2 个条件 · 6 项总数 · 9 列</span>
+    <button class="h-8 px-2 text-[12px] text-[#8f959e]">重置</button>
+    <button class="h-8 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-6 text-[12px] text-white">查询</button>
+  </div>
+</div>
+
+<!-- ============ 方案B：卡片分区 ============ -->
+<div id="plan-b" class="plan max-w-[920px] mx-auto rounded-[6px] bg-[#f7f8fa] overflow-hidden hidden">
+  <div class="flex items-start justify-between gap-3 px-[22px] py-4 mb-3">
+    <div>
+      <h1 class="text-[16px] font-medium text-[#1f2329]">自定义分析</h1>
+      <p class="mt-1 text-[12px] text-[#8f959e]">找出符合条件的客户，看他们的邀约、到店和成交情况</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-[12px] text-[#8f959e]">模板</span>
+      <div class="h-8 w-[180px] rounded-[4px] border border-[#dee0e3] bg-white flex items-center px-2 text-[12px] text-[#a8b1bd]">选择模板</div>
+      <button class="h-8 px-3 rounded-[4px] border border-[#dee0e3] bg-white text-[12px] text-[#4e535a]">保存模板</button>
+    </div>
+  </div>
+
+  <!-- 每个区块是独立白色卡片，间距分明 -->
+  <div class="px-[22px] space-y-3 pb-3">
+    <!-- 卡片1：筛选 -->
+    <div class="rounded-[6px] bg-white border border-[#eceef0] px-4 py-3">
+      <div class="mb-2.5 flex items-center gap-2">
+        <span class="text-[12px] font-medium text-[#3370ff]">①</span>
+        <span class="text-[14px] font-medium text-[#1f2329]">筛选客户</span>
+        <div class="ml-1 flex items-center rounded-[4px] border border-[#e1e4e7] p-0.5">
+          <button class="h-6 rounded-[3px] px-2.5 text-[11px] bg-[#f0f5ff] text-[#3370ff]">全部符合</button>
+          <button class="h-6 rounded-[3px] px-2.5 text-[11px] text-[#646a73]">符合任意一条</button>
+        </div>
+        <button class="ml-auto text-[12px] text-[#3370ff]">+ 加条件</button>
+      </div>
+      <div class="mb-2 flex items-center gap-1.5">
+        <span class="text-[12px] text-[#79838f]">时间</span>
+        <div class="flex h-7 items-center rounded-[4px] border border-[#e1e4e7] bg-white">
+          <input type="date" value="2026-08-01" class="h-full border-none bg-transparent px-2 text-[12px] outline-none" />
+          <span class="text-[11px] text-[#8f959e]">至</span>
+          <input type="date" value="2026-08-27" class="h-full border-none bg-transparent px-2 text-[12px] outline-none" />
+        </div>
+        <button class="h-6 rounded-[4px] border px-2 text-[11px] border-[#1f2329] bg-[#1f2329] text-white">本月</button>
+        <button class="h-6 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-[11px] text-[#646a73]">今年</button>
+        <button class="h-6 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-[11px] text-[#646a73]">全部</button>
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex items-center gap-2 rounded-[6px] border border-[#eceef0] bg-[#fbfcfd] px-2.5 py-1.5">
+          <span class="w-[140px] text-[12px] font-medium">会员身份</span>
+          <span class="w-[90px] text-[12px] text-[#8f959e]">属于</span>
+          <div class="flex-1 text-[12px]">普通会员、体验会员</div>
+          <span class="text-[#b0b5bb]">✕</span>
+        </div>
+        <div class="flex items-center gap-2 rounded-[6px] border border-[#eceef0] bg-[#fbfcfd] px-2.5 py-1.5">
+          <span class="w-[140px] text-[12px] font-medium">引流人</span>
+          <span class="w-[90px] text-[12px] text-[#8f959e]">等于</span>
+          <div class="flex-1 text-[12px]">小林</div>
+          <span class="text-[#b0b5bb]">✕</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 卡片2：统计指标 -->
+    <div class="rounded-[6px] bg-white border border-[#eceef0] px-4 py-3">
+      <div class="mb-2.5 flex items-baseline gap-2">
+        <span class="text-[12px] font-medium text-[#3370ff]">②</span>
+        <span class="text-[14px] font-medium text-[#1f2329]">统计指标</span>
+        <span class="text-[11px] text-[#8f959e]">勾选后显示在结果上方</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>符合人数</button>
+        <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>引流人数</button>
+        <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>邀约人数</button>
+        <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>到店人数</button>
+        <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>成交人数</button>
+        <button class="metric-on flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px]"><span class="flex h-3 w-3 items-center justify-center rounded-[2px] border border-[#3370ff] bg-[#3370ff] text-white text-[9px]">✓</span>成交金额</button>
+      </div>
+      <div class="mt-3 flex items-center gap-2 text-[12px] text-[#79838f]">
+        <span>按</span>
+        <div class="h-7 w-[140px] rounded-[4px] border border-[#e1e4e7] bg-white flex items-center px-2 text-[12px] text-[#a8b1bd]">不分组</div>
+        <span>拆分对比</span>
+        <span class="text-[11px] text-[#b7bdc6]">选一个维度，每个分组单独出一张统计卡</span>
+      </div>
+    </div>
+
+    <!-- 卡片3：显示列 -->
+    <div class="rounded-[6px] bg-white border border-[#eceef0] px-4 py-3">
+      <div class="mb-2.5 flex items-baseline gap-2">
+        <span class="text-[12px] font-medium text-[#3370ff]">③</span>
+        <span class="text-[14px] font-medium text-[#1f2329]">显示列</span>
+        <span class="text-[11px] text-[#8f959e]">最多 10 列，拖动排序</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <span class="chip">⠿ 昵称</span>
+        <span class="chip">⠿ 会员身份</span>
+        <span class="chip">⠿ 跟进阶段</span>
+        <span class="chip">⠿ 引流人</span>
+        <span class="chip">⠿ 邀约人</span>
+        <span class="chip">⠿ 期间邀约次数</span>
+        <span class="chip">⠿ 期间到店次数</span>
+        <span class="chip">⠿ 付费产品</span>
+        <span class="chip">⠿ 期间成交金额</span>
+        <span class="add-btn">+ 添加</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作栏 -->
+  <div class="flex items-center gap-3 bg-white border-t border-[#f0f0f0] px-[22px] py-3">
+    <span class="flex-1 truncate text-[12px] text-[#79838f]">当前：08.01–08.27 · 2 个条件 · 6 项总数 · 9 列</span>
+    <button class="h-8 px-2 text-[12px] text-[#8f959e]">重置</button>
+    <button class="h-8 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-6 text-[12px] text-white">查询</button>
+  </div>
+</div>
+
+<!-- ============ 方案C：紧凑表单 ============ -->
+<div id="plan-c" class="plan max-w-[920px] mx-auto rounded-[6px] bg-white overflow-hidden hidden">
+  <div class="flex items-start justify-between gap-3 border-b border-[#f0f0f0] px-[22px] py-4">
+    <div>
+      <h1 class="text-[16px] font-medium text-[#1f2329]">自定义分析</h1>
+      <p class="mt-1 text-[12px] text-[#8f959e]">找出符合条件的客户，看他们的邀约、到店和成交情况</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-[12px] text-[#8f959e]">模板</span>
+      <div class="h-8 w-[180px] rounded-[4px] border border-[#dee0e3] bg-white flex items-center px-2 text-[12px] text-[#a8b1bd]">选择模板</div>
+      <button class="h-8 px-3 rounded-[4px] border border-[#dee0e3] bg-white text-[12px] text-[#4e535a]">保存模板</button>
+    </div>
+  </div>
+
+  <!-- 内联式：用小标题行分隔，不用大块分区，间距紧凑 -->
+  <div class="px-[22px] py-3 space-y-3">
+    <!-- 筛选条件 -->
+    <div>
+      <div class="mb-1.5 flex items-center gap-2">
+        <span class="text-[11px] font-medium text-[#3370ff]">① 筛选客户</span>
+        <div class="ml-1 flex items-center rounded-[4px] border border-[#e1e4e7] p-0.5">
+          <button class="h-5 rounded-[3px] px-2 text-[10px] bg-[#f0f5ff] text-[#3370ff]">全部符合</button>
+          <button class="h-5 rounded-[3px] px-2 text-[10px] text-[#646a73]">任意一条</button>
+        </div>
+        <span class="text-[11px] text-[#79838f]">时间</span>
+        <div class="flex h-6 items-center rounded-[3px] border border-[#e1e4e7] bg-white">
+          <input type="date" value="2026-08-01" class="h-full border-none bg-transparent px-1.5 text-[11px] outline-none w-[100px]" />
+          <span class="text-[10px] text-[#8f959e]">至</span>
+          <input type="date" value="2026-08-27" class="h-full border-none bg-transparent px-1.5 text-[11px] outline-none w-[100px]" />
+        </div>
+        <button class="h-5 rounded-[3px] px-1.5 text-[10px] bg-[#1f2329] text-white">本月</button>
+        <button class="h-5 rounded-[3px] border border-[#e1e4e7] bg-white px-1.5 text-[10px] text-[#646a73]">全部</button>
+        <button class="ml-auto text-[11px] text-[#3370ff]">+ 加条件</button>
+      </div>
+      <div class="space-y-1">
+        <div class="flex items-center gap-2 rounded-[4px] border border-[#eceef0] bg-[#fbfcfd] px-2 py-1">
+          <span class="w-[130px] text-[11px] font-medium">会员身份</span>
+          <span class="w-[80px] text-[11px] text-[#8f959e]">属于</span>
+          <div class="flex-1 text-[11px]">普通会员、体验会员</div>
+          <span class="text-[#b0b5bb]">✕</span>
+        </div>
+        <div class="flex items-center gap-2 rounded-[4px] border border-[#eceef0] bg-[#fbfcfd] px-2 py-1">
+          <span class="w-[130px] text-[11px] font-medium">引流人</span>
+          <span class="w-[80px] text-[11px] text-[#8f959e]">等于</span>
+          <div class="flex-1 text-[11px]">小林</div>
+          <span class="text-[#b0b5bb]">✕</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计指标 -->
+    <div>
+      <div class="mb-1.5 flex items-baseline gap-2">
+        <span class="text-[11px] font-medium text-[#3370ff]">② 统计指标</span>
+        <span class="text-[10px] text-[#8f959e]">勾选后显示在结果上方</span>
+      </div>
+      <div class="flex flex-wrap gap-1">
+        <button class="metric-on flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11px]"><span class="flex h-2.5 w-2.5 items-center justify-center rounded-[1px] border border-[#3370ff] bg-[#3370ff] text-white text-[8px]">✓</span>符合人数</button>
+        <button class="metric-on flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11px]"><span class="flex h-2.5 w-2.5 items-center justify-center rounded-[1px] border border-[#3370ff] bg-[#3370ff] text-white text-[8px]">✓</span>引流人数</button>
+        <button class="metric-on flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11px]"><span class="flex h-2.5 w-2.5 items-center justify-center rounded-[1px] border border-[#3370ff] bg-[#3370ff] text-white text-[8px]">✓</span>邀约人数</button>
+        <button class="metric-on flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11px]"><span class="flex h-2.5 w-2.5 items-center justify-center rounded-[1px] border border-[#3370ff] bg-[#3370ff] text-white text-[8px]">✓</span>到店人数</button>
+        <button class="metric-on flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11px]"><span class="flex h-2.5 w-2.5 items-center justify-center rounded-[1px] border border-[#3370ff] bg-[#3370ff] text-white text-[8px]">✓</span>成交人数</button>
+        <button class="metric-on flex h-6 items-center gap-1 rounded-[3px] border px-2 text-[11px]"><span class="flex h-2.5 w-2.5 items-center justify-center rounded-[1px] border border-[#3370ff] bg-[#3370ff] text-white text-[8px]">✓</span>成交金额</button>
+      </div>
+      <div class="mt-2 flex items-center gap-2 text-[11px] text-[#79838f]">
+        <span>按</span>
+        <div class="h-6 w-[120px] rounded-[3px] border border-[#e1e4e7] bg-white flex items-center px-1.5 text-[11px] text-[#a8b1bd]">不分组</div>
+        <span>拆分对比</span>
+        <span class="text-[10px] text-[#b7bdc6]">每组单独出一张卡</span>
+      </div>
+    </div>
+
+    <!-- 显示列 -->
+    <div>
+      <div class="mb-1.5 flex items-baseline gap-2">
+        <span class="text-[11px] font-medium text-[#3370ff]">③ 显示列</span>
+        <span class="text-[10px] text-[#8f959e]">最多 10 列，拖动排序</span>
+      </div>
+      <div class="flex flex-wrap gap-1">
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 昵称</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 会员身份</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 跟进阶段</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 引流人</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 邀约人</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 期间邀约次数</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 期间到店次数</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 付费产品</span>
+        <span class="chip" style="height:24px; font-size:10px;">⠿ 期间成交金额</span>
+        <span class="add-btn" style="height:24px; font-size:10px;">+ 添加</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作栏 -->
+  <div class="flex items-center gap-3 bg-[#fafbfc] border-t border-[#f0f0f0] px-[22px] py-2.5">
+    <span class="flex-1 truncate text-[11px] text-[#79838f]">当前：08.01–08.27 · 2 个条件 · 6 项总数 · 9 列</span>
+    <button class="h-7 px-2 text-[11px] text-[#8f959e]">重置</button>
+    <button class="h-7 rounded-[4px] border border-[#3370ff] bg-[#3370ff] px-5 text-[11px] text-white">查询</button>
+  </div>
+</div>
+
+<!-- 说明 -->
+<div class="max-w-[920px] mx-auto mt-6 text-[12px] text-[#8f959e] space-y-2">
+  <p>三种方案的<strong>共同改动</strong>：</p>
+  <ul class="list-disc pl-5 space-y-1">
+    <li><strong>②③ 改为从上往下</strong>，不再左右并排，阅读流统一为纵向</li>
+    <li><strong>"分组对比（可选）"改写为"按 [维度] 拆分对比"</strong>，附注"选一个维度，每个分组单独出一张统计卡"</li>
+  </ul>
+  <p class="mt-3">三种方案的<strong>区别</strong>：</p>
+  <ul class="list-disc pl-5 space-y-1">
+    <li><strong>A 纵向分步</strong>：白底一体卡片，分区用细分隔线，间距适中，和现有风格最接近</li>
+    <li><strong>B 卡片分区</strong>：每个区块独立白卡片浮在灰底上，视觉边界最清晰，适合内容多的场景</li>
+    <li><strong>C 紧凑表单</strong>：缩小间距和字号，小标题内联，适合高频使用、想少滚动的场景</li>
+  </ul>
+</div>
+
+<script>
+function show(id) {
+  ['a','b','c'].forEach(p => {
+    document.getElementById('plan-' + p).classList.toggle('hidden', p !== id);
+    const tab = document.getElementById('tab-' + p);
+    tab.classList.toggle('tab-active', p === id);
+    tab.classList.toggle('text-[#646a73]', p !== id);
+    if (p === id) { tab.classList.add('font-medium'); }
+  });
+}
+</script>
+</body>
+</html>

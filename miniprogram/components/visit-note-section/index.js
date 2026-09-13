@@ -1,4 +1,4 @@
-const { visitNoteApi } = require('../../utils/api')
+const { visitNoteApi, customerApi } = require('../../utils/api')
 
 function formatTime(value) {
   if (!value) return ''
@@ -31,6 +31,10 @@ Component({
     previousOpen: false,
     previousLoading: false,
     previousError: '',
+    visitPurpose: null,
+    visitPurposeOpen: false,
+    visitPurposeLoading: false,
+    visitPurposeError: '',
   },
 
   observers: {
@@ -89,6 +93,9 @@ Component({
         previousOpen: false,
         previousNeed: null,
         previousError: '',
+        visitPurpose: null,
+        visitPurposeOpen: false,
+        visitPurposeError: '',
       })
     },
 
@@ -130,13 +137,57 @@ Component({
       this.setData({ editorValue: current ? `${current}\n${previousContent}` : previousContent })
     },
 
+    async onToggleVisitPurpose() {
+      if (this.data.visitPurposeOpen) {
+        this.setData({ visitPurposeOpen: false })
+        return
+      }
+      this.setData({ visitPurposeOpen: true })
+      if (this.data.visitPurpose !== null || !this.properties.customerId || this.data.visitPurposeLoading) return
+      await this.loadVisitPurpose()
+    },
+
+    async loadVisitPurpose() {
+      if (!this.properties.customerId || this.data.visitPurposeLoading) return
+      this.setData({ visitPurposeLoading: true, visitPurposeError: '' })
+      try {
+        const detail = await customerApi.detail(this.properties.customerId)
+        const visitPurpose = String(detail && detail.customer && detail.customer.tags || '').trim()
+        this.setData({ visitPurpose, visitPurposeError: '' })
+      } catch (error) {
+        this.setData({ visitPurpose: null, visitPurposeError: error.message || '加载到访目的失败' })
+      } finally {
+        this.setData({ visitPurposeLoading: false })
+      }
+    },
+
+    onAppendVisitPurpose() {
+      const visitPurpose = this.data.visitPurpose
+      if (!visitPurpose) return
+      const current = (this.data.editorValue || '').trim()
+      if (current.includes(visitPurpose)) {
+        wx.showToast({ title: '已带入', icon: 'none' })
+        return
+      }
+      this.setData({ editorValue: current ? `${current}\n${visitPurpose}` : visitPurpose })
+    },
+
     onEditorInput(event) {
       this.setData({ editorValue: event.detail.value })
     },
 
     onEditorClose() {
       if (this.data.saving) return
-      this.setData({ editorOpen: false, editorValue: '', previousOpen: false, previousNeed: null, previousError: '' })
+      this.setData({
+        editorOpen: false,
+        editorValue: '',
+        previousOpen: false,
+        previousNeed: null,
+        previousError: '',
+        visitPurpose: null,
+        visitPurposeOpen: false,
+        visitPurposeError: '',
+      })
     },
 
     async onSubmit() {

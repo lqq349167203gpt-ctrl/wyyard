@@ -2,9 +2,31 @@
 import uuid
 from types import SimpleNamespace
 
+import pytest
+
 
 def _u():
     return uuid.uuid4().hex[:12]
+
+
+@pytest.fixture
+def reorder_visit_ids(client):
+    """同日真实邀约，按业务约束为三个不同客户各创建一条。"""
+    customer_ids, visit_ids = [], []
+    try:
+        for index in range(3):
+            response = client.post("/api/customers", json={"nickname": f"排序客户{index}_{_u()}"})
+            assert response.status_code == 200, response.text
+            customer_ids.append(response.json()["id"])
+            response = client.post("/api/visits", json={"customer_id": customer_ids[-1], "visit_date": "2026-08-20"})
+            assert response.status_code == 200, response.text
+            visit_ids.append(response.json()["id"])
+        yield visit_ids
+    finally:
+        for visit_id in visit_ids:
+            client.delete(f"/api/visits/{visit_id}")
+        for customer_id in customer_ids:
+            client.delete(f"/api/customers/{customer_id}")
 
 
 class TestVisitCreate:
@@ -128,7 +150,7 @@ class TestVisitUpdate:
         vid = self._create(client, created_customer)
         resp = client.patch(f"/api/visits/{vid}", json={"needs": "更新需求"})
         assert resp.status_code == 200
-        assert resp.json()["needs"] == "更新需求"
+        assert resp.json()["needs"] == "不闹：更新需求"
 
     def test_update_experience(self, client, created_customer):
         vid = self._create(client, created_customer)
@@ -195,7 +217,7 @@ class TestVisitUpdate:
 
         edited = client.patch(f"/api/visits/{vid}", json={"needs": "恢复后可编辑"})
         assert edited.status_code == 200
-        assert edited.json()["needs"] == "恢复后可编辑"
+        assert edited.json()["needs"] == "不闹：恢复后可编辑"
 
     def test_arrived_visit_cannot_be_cancelled(self, client, created_customer):
         """已到店记录不显示取消入口，后端也拒绝取消"""
@@ -261,7 +283,7 @@ class TestVisitUpdate:
         })
         assert resp.status_code == 200
         data = resp.json()
-        assert data["needs"] == "新需求"
+        assert data["needs"] == "不闹：新需求"
         assert data["experience"] == "新体验"
         assert data["feedback"].endswith("不闹：新反馈")
         assert data["healing_notes"].endswith("不闹：新记录")
@@ -345,8 +367,8 @@ class TestVisitArrivalSyncPerformance:
 class TestVisitReorderOperationLog:
     """邀约排序日志不应被误记为新增邀约。"""
 
-    def test_reorder_log_has_readable_content_without_raw_ids(self, client):
-        ids = [_u(), _u(), _u()]
+    def test_reorder_log_has_readable_content_without_raw_ids(self, client, reorder_visit_ids):
+        ids = list(reversed(reorder_visit_ids))
         response = client.post(
             "/api/visits/reorder",
             json={"ids": ids},
@@ -365,13 +387,14 @@ class TestVisitReorderOperationLog:
         assert log["after_data"] is None
         assert all(record_id not in str(log) for record_id in ids)
 
-    def test_reorder_log_records_moved_customer_and_positions(self, client):
-        ids = [_u(), _u(), _u()]
+    def test_reorder_log_records_moved_customer_and_positions(self, client, reorder_visit_ids):
+        ids = [reorder_visit_ids[2], *reorder_visit_ids[:2]]
+        moved_name = client.get(f"/api/visits/{ids[0]}").json()["nickname"]
         response = client.post(
             "/api/visits/reorder",
             json={
                 "ids": ids,
-                "moved_name": "小林",
+                "moved_name": moved_name,
                 "from_position": 3,
                 "to_position": 1,
                 "date": "2026-08-20",
@@ -385,8 +408,9 @@ class TestVisitReorderOperationLog:
         ).json()
         log = next(item for item in logs if item["path"] == "/api/visits/reorder")
 
-        assert log["content"] == "调整邀约排序：2026-08-20，将“小林”从第3位移动到第1位"
+        assert log["content"] == f"调整邀约排序：2026-08-20，将“{moved_name}”从第3位移动到第1位"
         assert log["after_data"] is None
+        assert [client.get(f"/api/visits/{visit_id}").json()["sort_order"] for visit_id in ids] == [0, 1, 2]
 
 
 class TestActivityOrderOperationLog:

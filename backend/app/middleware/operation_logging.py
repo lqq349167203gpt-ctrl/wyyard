@@ -10,7 +10,7 @@ from app.services.operation_log_service import create_log
 from app.utils.request_context import get_client_ip
 
 SECTION_MAP = {
-    "/api/principal": "主理人",
+    "/api/principal": "组织/俱乐部",
     "/api/system-helper-config": "AI 配置",
     "/api/customer-ai-config": "AI 配置",
     "/api/visit-ai-config": "AI 配置",
@@ -141,7 +141,7 @@ PAGE_LABELS: dict[str, str] = {
     "referral-statistics": "引流统计",
     "member-statistics": "会员情况",
     "course-statistics": "课程记录",
-    "principal": "主理人",
+    "principal": "组织/俱乐部",
     "product-sales": "产品销售",
     "statistics": "服务数据",
     "daily-report": "每日报表",
@@ -550,6 +550,7 @@ EDIT_PERMISSION_LABELS = {
     "verified_by_id": "邀约核对人账号",
     "verified_at": "邀约核对时间",
     "payments": "付费项目修改删除范围",
+    "course_records": "课程记录查看范围",
 }
 
 
@@ -558,12 +559,15 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
     new_permissions = new_value if isinstance(new_value, dict) else {}
     changes = []
     for key, label in EDIT_PERMISSION_LABELS.items():
-        default_scope = "all" if key in {"customers", "activity_participants", "payments"} else "own"
+        default_scope = "all" if key in {"customers", "activity_participants", "payments", "course_records"} else "own"
         old_value = str(old_permissions.get(key, default_scope))
         new_value = str(new_permissions.get(key, default_scope))
         if key == "activity_teachers":
             old_scope = "关闭" if old_value == "view" else "允许"
             new_scope = "关闭" if new_value == "view" else "允许"
+        elif key == "course_records":
+            old_scope = "全部记录" if old_value == "all" else "与本人相关"
+            new_scope = "全部记录" if new_value == "all" else "与本人相关"
         else:
             old_scope = "可编辑" if key == "customers" and old_value == "all" else VALUE_LABELS.get(old_value, VALUE_LABELS[default_scope])
             new_scope = "可编辑" if key == "customers" and new_value == "all" else VALUE_LABELS.get(new_value, VALUE_LABELS[default_scope])
@@ -621,6 +625,21 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
     new_transaction = transaction_labels.get(str(new_customer.get("transaction_access", "none")), "不可查看")
     if old_transaction != new_transaction:
         changes.append(f"交易数据权限({old_transaction}→{new_transaction})")
+    old_external = old_permissions.get("principal_external_access") or {}
+    new_external = new_permissions.get("principal_external_access") or {}
+    for group, labels in {
+        "sensitive_fields": {"visit_purpose": "到访目的", "trauma_history": "创伤经历", "current_block": "当下卡点", "work_info": "工作情况", "other_info": "其他信息"},
+        "detail_tabs": {"follow_up": "跟进点", "communication": "沟通记录", "activities": "活动记录", "customer_followups": "客户回访", "card_statistics": "卡次统计", "offline_courses": "线下落地课程"},
+    }.items():
+        for key, label in labels.items():
+            before = (old_external.get(group) or {}).get(key) is True
+            after = (new_external.get(group) or {}).get(key) is True
+            if before != after:
+                changes.append(f"组织/俱乐部外部客户{label}查看权限({'开启' if after else '关闭'})")
+    before = old_external.get("transaction_access", "none")
+    after = new_external.get("transaction_access", "none")
+    if before != after:
+        changes.append(f"组织/俱乐部外部客户交易权限({transaction_labels.get(before, before)}→{transaction_labels.get(after, after)})")
     return changes
 
 def _format_value(val, field_name: str = "") -> str:
@@ -1307,7 +1326,27 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         desc = build_change_description(before or {}, body)
         if desc:
             return f"{position}：{desc}"
-        return f"保存{position}（无变更）"
+        # 没有实际变更时不写日志
+        return ""
+
+    # 角色（岗位）：增删改都按「角色」记录，避免被通用规则写成「新增账号」
+    if (
+        path.rstrip("/") == "/api/positions"
+        or path.startswith("/api/positions/")
+        or path.startswith("/api/accounts/roles")
+    ):
+        position_name = str((body or {}).get("name") or (before or {}).get("name") or "").strip()
+        if path.rstrip("/").endswith("/reorder"):
+            return "调整角色排序"
+        if method == "POST":
+            return f"新增角色 {position_name}".strip()
+        if method == "DELETE":
+            return f"删除角色 {position_name}".strip()
+        desc = build_change_description(before or {}, body or {})
+        if desc:
+            return f"角色 {position_name}：{desc}" if position_name else f"角色：{desc}"
+        # 没有实际变更时不写日志
+        return ""
 
     # 批量操作
     if "/batch/" in path:
@@ -1460,9 +1499,8 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             if suffix_parts:
                 return f"{name}：{desc}（{'，'.join(suffix_parts)}）"
             return f"{name}：{desc}"
-        if suffix_parts:
-            return f"保存{name}（{'，'.join(suffix_parts)}，无变更）"
-        return f"保存{name}（无变更）"
+        # 内容一致、没有实际变更的保存不写日志
+        return ""
     elif method == "DELETE":
         suffix_parts = []
         if before:
@@ -1581,6 +1619,9 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                 if isinstance(log_context, dict)
                 else get_entity_id(path)
             )
+            # 没有实际变更的写操作（例如原样保存）不写日志，避免噪音
+            if not str(content or "").strip():
+                return response
 
             after_data = body.get("permissions", body) if body else None
             if isinstance(log_context, dict) and "after_data" in log_context:

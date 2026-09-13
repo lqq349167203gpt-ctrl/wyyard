@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>组织/俱乐部（小程序）· 三个设计方向</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; padding: 26px; background: #eceef2; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; display: flex; gap: 24px; align-items: flex-start; }
+  .col { width: 366px; }
+  .col-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #111827; }
+  .col-note { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: #6b7280; }
+  .phone { width: 366px; height: 730px; background: #f5f6f8; border-radius: 22px; overflow: hidden; box-shadow: 0 10px 30px rgba(17,24,39,.12); display: flex; flex-direction: column; }
+  .navbar { height: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 500; color: #111827; background: #fff; }
+  .body { flex: 1; overflow-y: auto; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #9ca3af; }
+
+  /* ============ H：看板风（深色头 + 悬浮卡） ============ */
+  .h-top { padding: 18px 18px 46px; background: linear-gradient(135deg, #1f2a44 0%, #2b3a5c 60%, #33507f 100%); color: #fff; }
+  .h-top .t1 { font-size: 12px; letter-spacing: .5px; color: rgba(255,255,255,.62); }
+  .h-top .t2 { margin-top: 6px; font-size: 16px; font-weight: 600; }
+  .h-pills { display: flex; gap: 6px; margin-top: 12px; }
+  .h-pill { height: 26px; padding: 0 10px; border-radius: 999px; background: rgba(255,255,255,.14); font-size: 11px; line-height: 26px; color: #eaf0ff; }
+  .h-body { margin-top: -34px; padding: 0 12px 14px; }
+  .h-sheet { background: #fff; border-radius: 16px; padding: 12px 14px; box-shadow: 0 6px 20px rgba(17,24,39,.08); margin-bottom: 12px; }
+  .h-stats { display: flex; gap: 10px; }
+  .h-stat { flex: 1; min-width: 0; }
+  .h-stat .l { font-size: 11px; color: #6b7280; }
+  .h-stat .v { margin-top: 6px; font-size: 22px; font-weight: 600; color: #111827; }
+  .h-stat .v small { font-size: 11px; font-weight: 400; color: #9ca3af; margin-left: 3px; }
+  .h-bar { height: 5px; border-radius: 3px; background: #eef1f6; margin-top: 8px; overflow: hidden; }
+  .h-bar span { display: block; height: 100%; border-radius: 3px; background: #3370ff; }
+  .h-bar.alt span { background: #7aa2ff; }
+  .h-bar.alt2 span { background: #b9cdf8; }
+  .h-seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #eef0f4; }
+  .h-seg div { flex: 1; height: 34px; line-height: 34px; text-align: center; font-size: 13px; color: #4b5563; border-radius: 9px; }
+  .h-seg div.on { background: #fff; color: #111827; font-weight: 600; box-shadow: 0 1px 4px rgba(17,24,39,.12); }
+  .h-list { background: #fff; border-radius: 16px; padding: 4px 14px 6px; box-shadow: 0 6px 20px rgba(17,24,39,.06); }
+  .h-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; }
+  .h-row + .h-row { border-top: 1px solid #f3f4f6; }
+  .h-avatar { width: 34px; height: 34px; border-radius: 12px; background: #eef4ff; color: #3370ff; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .h-row .main { flex: 1; min-width: 0; }
+  .h-row .l1 { font-size: 14px; font-weight: 600; color: #111827; }
+  .h-row .l2 { margin-top: 3px; font-size: 11px; color: #9ca3af; }
+  .h-row .tag { height: 20px; padding: 0 8px; border-radius: 6px; background: #f3f4f6; color: #6b7280; font-size: 10px; line-height: 20px; }
+
+  /* ============ I：杂志风（大留白 + 大数字） ============ */
+  .i-head { background: #fff; padding: 22px 20px 16px; }
+  .i-kicker { font-size: 11px; letter-spacing: 2px; color: #9ca3af; }
+  .i-title { margin-top: 8px; font-size: 24px; font-weight: 700; letter-spacing: -.3px; color: #111827; }
+  .i-sub { margin-top: 8px; font-size: 12px; color: #6b7280; }
+  .i-filters { display: flex; gap: 8px; margin-top: 14px; }
+  .i-filter { height: 30px; padding: 0 12px; border-radius: 999px; background: #f5f6f8; font-size: 12px; color: #374151; line-height: 30px; }
+  .i-filter.on { background: #111827; color: #fff; }
+  .i-tabs { display: flex; gap: 22px; padding: 14px 20px 0; background: #fff; }
+  .i-tab { position: relative; padding-bottom: 10px; font-size: 14px; color: #9ca3af; }
+  .i-tab.on { color: #111827; font-weight: 600; }
+  .i-tab.on::after { content: ""; position: absolute; left: 0; right: 60%; bottom: 0; height: 3px; border-radius: 2px; background: #111827; }
+  .i-nums { display: flex; gap: 28px; padding: 18px 20px; background: #fff; border-bottom: 1px solid #f3f4f6; }
+  .i-num .v { font-size: 26px; font-weight: 700; letter-spacing: -.5px; color: #111827; }
+  .i-num .v small { font-size: 11px; font-weight: 400; color: #9ca3af; margin-left: 3px; }
+  .i-num .l { margin-top: 5px; font-size: 11px; color: #9ca3af; }
+  .i-body { padding: 0 0 12px; }
+  .i-tools { display: flex; justify-content: flex-end; gap: 14px; padding: 12px 20px 4px; font-size: 12px; color: #6b7280; }
+  .i-row { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; background: #fff; border-bottom: 1px solid #f6f7f9; }
+  .i-row .idx { width: 18px; font-size: 11px; color: #d1d5db; }
+  .i-row .main { flex: 1; min-width: 0; }
+  .i-row .l1 { font-size: 15px; font-weight: 600; color: #111827; }
+  .i-row .l2 { margin-top: 4px; font-size: 11.5px; color: #9ca3af; }
+  .i-row .right { font-size: 12px; color: #6b7280; }
+
+  /* ============ J：主指标大卡 + 胶囊切换 ============ */
+  .j-hero { margin: 12px; padding: 18px; border-radius: 20px; background: linear-gradient(140deg, #3370ff 0%, #5b8cff 55%, #8bb0ff 100%); color: #fff; box-shadow: 0 8px 22px rgba(51,112,255,.28); }
+  .j-hero .l { font-size: 12px; color: rgba(255,255,255,.8); }
+  .j-hero .v { margin-top: 8px; font-size: 34px; font-weight: 700; line-height: 1; }
+  .j-hero .v small { font-size: 13px; font-weight: 400; margin-left: 4px; color: rgba(255,255,255,.85); }
+  .j-hero .mini { display: flex; gap: 22px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.24); }
+  .j-hero .mini .n { font-size: 16px; font-weight: 600; }
+  .j-hero .mini .n small { font-size: 10px; font-weight: 400; color: rgba(255,255,255,.8); margin-left: 2px; }
+  .j-hero .mini .k { margin-top: 3px; font-size: 10.5px; color: rgba(255,255,255,.75); }
+  .j-tabs { display: flex; gap: 8px; padding: 4px 12px 10px; }
+  .j-tab { height: 34px; padding: 0 16px; border-radius: 999px; background: #fff; border: 1px solid #e5e7eb; font-size: 13px; line-height: 32px; color: #4b5563; }
+  .j-tab.on { border-color: transparent; background: #111827; color: #fff; font-weight: 500; }
+  .j-filter { display: flex; gap: 8px; padding: 0 12px 10px; font-size: 12px; color: #4b5563; }
+  .j-filter .box { flex: 1; height: 32px; padding: 0 10px; display: flex; align-items: center; justify-content: space-between; border-radius: 10px; background: #fff; box-shadow: 0 1px 4px rgba(17,24,39,.05); }
+  .j-list { background: #fff; border-radius: 16px; margin: 0 12px 12px; padding: 4px 14px 6px; box-shadow: 0 4px 16px rgba(17,24,39,.06); }
+  .j-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; }
+  .j-row + .j-row { border-top: 1px solid #f5f6f8; }
+  .j-row .main { flex: 1; min-width: 0; }
+  .j-row .l1 { font-size: 14px; font-weight: 600; color: #111827; }
+  .j-row .l2 { margin-top: 4px; font-size: 11px; color: #9ca3af; }
+  .j-row .badge { height: 22px; padding: 0 9px; border-radius: 8px; background: #eef4ff; color: #3370ff; font-size: 11px; line-height: 22px; }
+  .j-row .who { font-size: 12px; color: #6b7280; }
+</style>
+</head>
+<body>
+  <!-- H -->
+  <div class="col">
+    <p class="col-title">方向 H：看板风（深色头 + 悬浮卡 + 占比条）</p>
+    <p class="col-note">顶部深色区放「范围 / 周期 / 概览」，下面白卡叠上来。三张指标卡各带一条浅色占比条，数据有"看图"的感觉；列表每行一个淡蓝圆角头像块。</p>
+    <div class="phone">
+      <div class="navbar">组织/俱乐部</div>
+      <div class="body">
+        <div class="h-top">
+          <div class="t1">当前范围</div>
+          <div class="t2">全部可见组织/俱乐部</div>
+          <div class="h-pills"><span class="h-pill">本月</span><span class="h-pill">2026-09-01 ~ 09-13</span><span class="h-pill">导出</span></div>
+        </div>
+        <div class="h-body">
+          <div class="h-sheet">
+            <div class="h-seg"><div class="on">经营概况</div><div>转化分析</div></div>
+          </div>
+          <div class="h-sheet">
+            <div class="h-stats">
+              <div class="h-stat">
+                <div class="l">引流人数</div><div class="v num">106<small>人</small></div>
+                <div class="h-bar"><span style="width:74%"></span></div>
+              </div>
+              <div class="h-stat">
+                <div class="l">课程数</div><div class="v num">54<small>场</small></div>
+                <div class="h-bar alt"><span style="width:48%"></span></div>
+              </div>
+              <div class="h-stat">
+                <div class="l">成交量</div><div class="v num">58<small>笔</small></div>
+                <div class="h-bar alt2"><span style="width:56%"></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="h-list">
+            <div class="h-row">
+              <div class="h-avatar">李</div>
+              <div class="main"><div class="l1">李丹丹</div><div class="l2">09-12 · 会员卡 · 次卡</div></div>
+              <span class="tag">首购</span>
+            </div>
+            <div class="h-row">
+              <div class="h-avatar">王</div>
+              <div class="main"><div class="l1">王小雅</div><div class="l2">09-12 · 觉醒游戏</div></div>
+              <span class="tag">跨品类</span>
+            </div>
+            <div class="h-row">
+              <div class="h-avatar">周</div>
+              <div class="main"><div class="l1">周星移</div><div class="l2">09-12 · OH卡</div></div>
+              <span class="tag">首购</span>
+            </div>
+            <div class="h-row">
+              <div class="h-avatar">沐</div>
+              <div class="main"><div class="l1">沐沐</div><div class="l2">09-11 · 会员卡 · 月卡</div></div>
+              <span class="tag">复购</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- I -->
+  <div class="col">
+    <p class="col-title">方向 I：杂志风（大留白 + 大数字 + 少边框）</p>
+    <p class="col-note">去掉所有卡片外壳和描边，靠留白和字重分层级；标题大、数字大，筛选是几颗小胶囊。列表行极简（序号 + 客户 + 详情 + 右侧信息），最清爽。</p>
+    <div class="phone">
+      <div class="navbar">组织/俱乐部</div>
+      <div class="body i-body">
+        <div class="i-head">
+          <div class="i-kicker">PRINCIPAL · 经营概况</div>
+          <div class="i-title">全部可见组织/俱乐部</div>
+          <div class="i-sub">2026-09-01 ~ 09-13 · 本月 · 10 位引流人</div>
+          <div class="i-filters">
+            <span class="i-filter on">本月</span>
+            <span class="i-filter">本季</span>
+            <span class="i-filter">本年</span>
+            <span class="i-filter">全部</span>
+            <span class="i-filter">筛选</span>
+          </div>
+        </div>
+        <div class="i-tabs"><div class="i-tab on">经营概况</div><div class="i-tab">转化分析</div></div>
+        <div class="i-nums">
+          <div class="i-num"><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+          <div class="i-num"><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+          <div class="i-num"><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+        </div>
+        <div class="i-tools"><span>排序</span><span>列表设置</span></div>
+        <div class="i-row"><span class="idx">01</span><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+        <div class="i-row"><span class="idx">02</span><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+        <div class="i-row"><span class="idx">03</span><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        <div class="i-row"><span class="idx">04</span><div class="main"><div class="l1">沐沐</div><div class="l2">会员卡 · 月卡 · 同类复购 · 薇薇</div></div><div class="right">09-11</div></div>
+        <div class="i-row"><span class="idx">05</span><div class="main"><div class="l1">璐小娜</div><div class="l2">会员卡 · 30次卡 · 首购 · 余墨</div></div><div class="right">09-11</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- J -->
+  <div class="col">
+    <p class="col-title">方向 J：主指标大卡 + 胶囊切换 + 标签行</p>
+    <p class="col-note">把最重要的数字做成一张品牌蓝大卡（成交量大字 + 下面两个次指标），一眼抓住重点；tab 是胶囊按钮，列表每行带一个购买类型小标签。</p>
+    <div class="phone">
+      <div class="navbar">组织/俱乐部</div>
+      <div class="body">
+        <div class="j-hero">
+          <div class="l">全部可见组织/俱乐部 · 本月</div>
+          <div class="v num">58<small>笔成交</small></div>
+          <div class="mini">
+            <div><div class="n num">106<small>人</small></div><div class="k">引流人数</div></div>
+            <div><div class="n num">54<small>场</small></div><div class="k">课程数</div></div>
+            <div><div class="n num">44<small>人</small></div><div class="k">成交人数</div></div>
+          </div>
+        </div>
+        <div class="j-tabs"><div class="j-tab on">经营概况</div><div class="j-tab">转化分析</div></div>
+        <div class="j-filter">
+          <span class="box">时间：本月 <span>▾</span></span>
+          <span class="box">范围：全部 <span>▾</span></span>
+        </div>
+        <div class="j-list">
+          <div class="j-row">
+            <div class="main"><div class="l1">李丹丹</div><div class="l2">09-12 · 会员卡 · 次卡</div></div>
+            <span class="badge">首购</span><span class="who">苏晴</span>
+          </div>
+          <div class="j-row">
+            <div class="main"><div class="l1">王小雅</div><div class="l2">09-12 · 觉醒游戏</div></div>
+            <span class="badge">跨品类</span><span class="who">潘潘</span>
+          </div>
+          <div class="j-row">
+            <div class="main"><div class="l1">周星移</div><div class="l2">09-12 · OH卡</div></div>
+            <span class="badge">首购</span><span class="who">余墨</span>
+          </div>
+          <div class="j-row">
+            <div class="main"><div class="l1">沐沐</div><div class="l2">09-11 · 会员卡 · 月卡</div></div>
+            <span class="badge">复购</span><span class="who">薇薇</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

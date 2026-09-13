@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>组织/俱乐部（小程序）· 沿用课表/邀约风格</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; padding: 26px; background: #eceef2; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; display: flex; gap: 26px; align-items: flex-start; }
+  .col { width: 366px; }
+  .col-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1f2329; }
+  .col-note { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: #646a73; }
+  .phone { width: 366px; height: 730px; border-radius: 22px; overflow: hidden; box-shadow: 0 10px 30px rgba(17,24,39,.10); display: flex; flex-direction: column; }
+  .body { flex: 1; overflow-y: auto; background: #f7f8fa; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ===== 课表/邀约的头部语言：#f3f7ff + 42rpx 大标题 + 右上白色胶囊 ===== */
+  .head { background: #f3f7ff; padding: 20px 16px 18px; }
+  .head-row { display: flex; align-items: center; min-height: 36px; }
+  .head-title { font-size: 21px; font-weight: 500; letter-spacing: -.5px; color: #1f2329; }
+  .head-sub { margin-top: 6px; font-size: 12px; color: #8f959e; }
+  .head-pill { margin-left: auto; display: flex; gap: 6px; }
+  .pill { height: 34px; padding: 0 11px; border-radius: 10px; background: #fff; color: #646a73; font-size: 12px; display: flex; align-items: center; }
+
+  /* 白色大圆角卡（课表/邀约同款 24-28rpx） */
+  .card { background: #fff; border-radius: 14px; margin: 10px 12px; padding: 4px 14px; }
+  .card.pad { padding: 12px 14px; }
+
+  /* tab：白条 + 蓝字下划线（和课表顶部一致） */
+  .tabs { display: flex; gap: 18px; }
+  .tab { position: relative; padding: 12px 0 12px; font-size: 14px; color: #4e535a; }
+  .tab.on { color: #3370ff; font-weight: 500; }
+  .tab.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: 6px; height: 3px; border-radius: 2px 2px 0 0; background: #3370ff; }
+
+  /* 筛选一行一条：标签灰、控件白底描边 8rpx */
+  .frow { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+  .flabel { width: 42px; flex-shrink: 0; font-size: 12px; color: #8f959e; }
+  .fcontrol { flex: 1; min-width: 0; height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border: 1px solid #dee0e3; border-radius: 8px; font-size: 12px; color: #2b2f36; background: #fff; }
+  .fpresets { display: flex; gap: 6px; flex-wrap: wrap; }
+  /* 选中态用主色（和邀约的 .edit-toggle.active 一致） */
+  .fpreset { height: 30px; padding: 0 12px; border-radius: 8px; background: #f2f3f5; color: #4e535a; font-size: 12px; line-height: 30px; }
+  .fpreset.on { background: #3370ff; color: #fff; font-weight: 500; }
+
+  /* 指标：三列，大数字 + 灰色小标签 */
+  .kpi { display: flex; }
+  .kpi > div { flex: 1; min-width: 0; padding: 14px 0; }
+  .kpi .v { font-size: 22px; font-weight: 500; color: #1f2329; line-height: 1; }
+  .kpi .v small { font-size: 12px; font-weight: 400; color: #8f959e; margin-left: 3px; }
+  .kpi .l { margin-top: 7px; font-size: 12px; color: #8f959e; }
+  .kpi .s { margin-top: 3px; font-size: 11px; color: #a8b1bd; }
+
+  /* 二级项胶囊：浅蓝底选中（和邀约的浅蓝 #eef3ff 一致） */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 12px; }
+  .chip { height: 28px; padding: 0 11px; border-radius: 999px; background: #f2f3f5; color: #4e535a; font-size: 12px; line-height: 28px; }
+  .chip.on { background: #eef3ff; color: #3370ff; }
+
+  /* 列表行：客户名 + 灰色详情 + 右侧信息，行间 1rpx */
+  .listhead { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 2px; }
+  .listhead .c { font-size: 12px; color: #8f959e; }
+  .mini { height: 30px; padding: 0 11px; border-radius: 8px; background: #f2f3f5; color: #4e535a; font-size: 12px; line-height: 30px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1rpx solid #f2f3f5; }
+  .row:first-of-type { border-top: none; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .l1 { font-size: 14px; color: #2b2f36; font-weight: 500; }
+  .row .l2 { margin-top: 4px; font-size: 12px; color: #8f959e; }
+  .row .right { font-size: 12px; color: #646a73; }
+  .row .right.blue { color: #3370ff; }
+
+  /* 底部主按钮 */
+  .foot { display: flex; gap: 10px; padding: 4px 14px 14px; }
+  .btn { flex: 1; height: 42px; border-radius: 8px; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .btn.primary { background: #3370ff; color: #fff; }
+  .btn.ghost { background: #fff; color: #4e535a; flex: 0 0 108px; }
+</style>
+</head>
+<body>
+  <!-- N1 -->
+  <div class="col">
+    <p class="col-title">方案 N1：沿用课表/邀约风格（分区白卡）</p>
+    <p class="col-note">头部浅蓝 #f3f7ff + 大标题，右上白色胶囊放范围和导出；tab 用白条 + 蓝字下划线（和课表顶部完全一致）；筛选一行一条；指标三列；列表行只有一条 1rpx 分隔线。整页和课表、邀约是同一个语言。</p>
+    <div class="phone">
+      <div class="head">
+        <div class="head-row">
+          <div class="head-title">组织/俱乐部</div>
+          <div class="head-pill"><span class="pill">全部组织 ▾</span><span class="pill">导出</span></div>
+        </div>
+        <div class="head-sub">2026-09-01 – 09-13 · 本月 · 10 位引流人</div>
+      </div>
+      <div class="body">
+        <div class="card" style="padding:0 14px;">
+          <div class="tabs"><div class="tab on">经营概况</div><div class="tab">转化分析</div></div>
+        </div>
+
+        <div class="card">
+          <div class="frow">
+            <span class="flabel">范围</span>
+            <span class="fcontrol">全部可见组织/俱乐部 <span>▾</span></span>
+          </div>
+          <div class="frow">
+            <span class="flabel">周期</span>
+            <span class="fpresets">
+              <span class="fpreset">当天</span><span class="fpreset">本周</span><span class="fpreset on">本月</span><span class="fpreset">本年</span><span class="fpreset">全部</span>
+            </span>
+          </div>
+          <div class="frow" style="padding-bottom:12px;">
+            <span class="flabel">自定义</span>
+            <span class="fcontrol">2026-09-01</span><span style="color:#8f959e;font-size:12px">~</span><span class="fcontrol">2026-09-13</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="kpi">
+            <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div><div class="s">10 位引流人</div></div>
+            <div><div class="v num">54<small>场</small></div><div class="l">课程数</div><div class="s">41 课时 · 89 人</div></div>
+            <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div><div class="s">成交 44 人</div></div>
+          </div>
+          <div class="chips">
+            <span class="chip on">会员卡 27</span><span class="chip">觉醒游戏 5</span><span class="chip">OH卡 3</span><span class="chip">升单 8</span>
+          </div>
+        </div>
+
+        <div class="listhead"><span class="c">共 58 条</span><span style="display:flex;gap:8px"><span class="mini">排序</span><span class="mini">列表设置</span></span></div>
+        <div class="card" style="padding:0;margin-top:6px;">
+          <div class="row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">沐沐</div><div class="l2">会员卡 · 月卡 · 同类复购 · 薇薇</div></div><div class="right">09-11</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- N2 -->
+  <div class="col">
+    <p class="col-title">方案 N2：同风格，更紧凑（筛选并进头部）</p>
+    <p class="col-note">头部里直接放「范围 + 周期」胶囊（选中＝蓝底白字，和邀约的排序按钮一致），下面是白卡 tab + 指标 + 列表。比 N1 少一张筛选卡，一屏能多看两条数据。</p>
+    <div class="phone">
+      <div class="head">
+        <div class="head-row">
+          <div class="head-title">组织/俱乐部</div>
+          <div class="head-pill"><span class="pill">导出</span></div>
+        </div>
+        <div class="head-sub">2026-09-01 – 09-13 · 本月</div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          <span class="fpreset" style="background:#fff">全部可见组织/俱乐部 ▾</span>
+          <span class="fpreset on">本月 ▾</span>
+          <span class="fpreset" style="background:#fff">筛选</span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="card" style="padding:0 14px;">
+          <div class="tabs"><div class="tab on">经营概况</div><div class="tab">转化分析</div></div>
+        </div>
+        <div class="card">
+          <div class="kpi">
+            <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+            <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+            <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+          </div>
+          <div class="chips" style="padding-top:0">
+            <span class="chip on">会员卡 27</span><span class="chip">觉醒游戏 5</span><span class="chip">OH卡 3</span><span class="chip">升单 8</span><span class="chip">首购 36</span>
+          </div>
+        </div>
+        <div class="listhead"><span class="c">共 58 条</span><span style="display:flex;gap:8px"><span class="mini">排序</span><span class="mini">列表设置</span></span></div>
+        <div class="card" style="padding:0;margin-top:6px;">
+          <div class="row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">沐沐</div><div class="l2">会员卡 · 月卡 · 同类复购 · 薇薇</div></div><div class="right">09-11</div></div>
+          <div class="row"><div class="main"><div class="l1">璐小娜</div><div class="l2">会员卡 · 30次卡 · 首购 · 余墨</div></div><div class="right blue">09-11</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

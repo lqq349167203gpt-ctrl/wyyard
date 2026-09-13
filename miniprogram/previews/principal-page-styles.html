@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>组织/俱乐部（小程序）· 三版样式</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #eef0f3; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; display: flex; gap: 24px; align-items: flex-start; }
+  .col { width: 375px; }
+  .col-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #1f2329; }
+  .col-note { margin: 0 0 10px; font-size: 12px; line-height: 1.6; color: #646a73; }
+  .phone { width: 375px; height: 720px; background: #f7f8fa; border-radius: 18px; overflow: hidden; box-shadow: 0 6px 22px rgba(31,35,41,.14); display: flex; flex-direction: column; }
+  .navbar { height: 44px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #1f2329; background: #fff; border-bottom: 1px solid #f0f0f0; }
+  .body { flex: 1; overflow-y: auto; }
+  /* 通用小组件 */
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #8f959e; }
+
+  /* ===== 方案 A：白卡分区（当前方向，收拾干净版） ===== */
+  .a-body { padding: 12px; }
+  .a-card { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .a-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+  .a-label { width: 40px; flex-shrink: 0; font-size: 12px; color: #8f959e; }
+  .a-control { flex: 1; min-width: 0; height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; border: 1px solid #dee0e3; border-radius: 4px; font-size: 12px; color: #2b2f36; background: #fff; }
+  .a-presets { display: flex; gap: 5px; flex-wrap: wrap; }
+  .a-preset { padding: 3px 9px; border-radius: 999px; background: #f2f3f5; font-size: 11px; color: #4e535a; }
+  .a-preset.on { background: #eaf1ff; color: #3370ff; }
+  .a-tabs { display: flex; gap: 3px; padding: 3px; border-radius: 8px; background: #eceef1; margin-bottom: 10px; }
+  .a-tab { flex: 1; height: 32px; line-height: 32px; text-align: center; font-size: 13px; color: #4e535a; border-radius: 6px; }
+  .a-tab.on { background: #fff; color: #1f2329; font-weight: 500; box-shadow: 0 1px 3px rgba(31,35,41,.12); }
+  .a-cards { display: flex; gap: 6px; margin-bottom: 10px; }
+  .a-stat { flex: 1; min-width: 0; padding: 10px 8px; border-radius: 10px; background: #fff; border: 1px solid #e8eaed; }
+  .a-stat.on { border-color: #c7d7f7; box-shadow: 0 2px 8px rgba(51,112,255,.08); }
+  .a-stat .t { font-size: 11px; color: #4e535a; }
+  .a-stat .v { margin-top: 4px; font-size: 19px; font-weight: 500; line-height: 1; }
+  .a-stat .v small { margin-left: 3px; font-size: 11px; font-weight: 400; color: #8f959e; }
+  .a-stat .s { margin-top: 4px; font-size: 10px; line-height: 1.4; color: #9aa1a9; }
+  .a-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+  .a-chip { padding: 4px 9px; border: 1px solid #e5e7ea; border-radius: 999px; background: #fafbfc; font-size: 11px; color: #4e535a; }
+  .a-chip.on { border-color: #b9cdf8; background: #f0f5ff; color: #3370ff; }
+  .a-metrics { display: flex; gap: 18px; padding-top: 8px; border-top: 1px solid #f2f3f5; }
+  .a-metric .l { font-size: 11px; color: #8f959e; }
+  .a-metric .n { font-size: 14px; font-weight: 500; margin-left: 4px; }
+  .a-listhead { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 8px; }
+  .a-listhead .c { font-size: 12px; color: #8f959e; }
+  .a-listhead .btns { display: flex; gap: 6px; }
+  .a-mini { height: 26px; padding: 0 10px; border: 1px solid #dee0e3; border-radius: 4px; background: #fff; font-size: 11px; color: #4e535a; line-height: 24px; }
+  .a-rec { background: #fff; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .a-field { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  .a-field .k { flex-shrink: 0; max-width: 40%; font-size: 11px; color: #8f959e; }
+  .a-field .v { flex: 1; text-align: right; font-size: 12px; color: #2b2f36; }
+
+  /* ===== 方案 B：顶部概览头 + 悬浮卡片 ===== */
+  .b-head { padding: 16px 16px 42px; background: linear-gradient(180deg, #3370ff 0%, #4b82ff 100%); color: #fff; }
+  .b-head .scope { font-size: 12px; opacity: .85; }
+  .b-head .rule { margin-top: 6px; font-size: 13px; }
+  .b-head .range { margin-top: 8px; font-size: 12px; opacity: .85; }
+  .b-body { margin-top: -32px; padding: 0 12px 12px; }
+  .b-sheet { background: #fff; border-radius: 14px; padding: 10px 12px; box-shadow: 0 4px 16px rgba(31,35,41,.08); margin-bottom: 10px; }
+  .b-tabs { display: flex; gap: 16px; border-bottom: 1px solid #f0f0f0; margin-bottom: 10px; }
+  .b-tab { position: relative; padding: 8px 0; font-size: 13px; color: #4e535a; }
+  .b-tab.on { color: #3370ff; font-weight: 500; }
+  .b-tab.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; border-radius: 2px 2px 0 0; background: #3370ff; }
+  .b-filter { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #4e535a; padding: 4px 0; }
+  .b-filter .box { height: 26px; padding: 0 8px; border: 1px solid #dee0e3; border-radius: 4px; display: inline-flex; align-items: center; }
+  .b-stat { flex: 1; text-align: center; padding: 8px 4px; border-radius: 10px; background: #f7f9fc; }
+  .b-stat .t { font-size: 11px; color: #4e535a; }
+  .b-stat .v { margin-top: 4px; font-size: 18px; font-weight: 600; color: #1f2329; }
+  .b-stat .v small { font-size: 10px; font-weight: 400; color: #8f959e; margin-left: 2px; }
+  .b-stat .s { margin-top: 3px; font-size: 10px; color: #9aa1a9; }
+  .b-rec { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid #f2f3f5; }
+  .b-rec:last-child { border-bottom: none; }
+  .b-rec .main { flex: 1; min-width: 0; }
+  .b-rec .l1 { font-size: 13px; color: #2b2f36; font-weight: 500; }
+  .b-rec .l2 { margin-top: 3px; font-size: 11px; color: #8f959e; }
+  .b-rec .right { text-align: right; font-size: 12px; color: #2b2f36; }
+
+  /* ===== 方案 C：信息流（无卡片、密度优先） ===== */
+  .c-body { padding: 0 0 12px; }
+  .c-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff; border-bottom: 1px solid #f0f0f0; font-size: 12px; color: #4e535a; }
+  .c-bar .grow { flex: 1; min-width: 0; }
+  .c-bar .pick { padding: 4px 8px; border-radius: 4px; background: #f2f3f5; }
+  .c-summary { display: flex; align-items: baseline; gap: 14px; padding: 10px 14px; background: #fff; }
+  .c-summary .item { display: flex; align-items: baseline; gap: 4px; }
+  .c-summary .n { font-size: 17px; font-weight: 600; }
+  .c-summary .u { font-size: 11px; color: #8f959e; }
+  .c-sec { padding: 8px 14px 4px; }
+  .c-sec-title { font-size: 11px; color: #8f959e; }
+  .c-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .c-chip { padding: 3px 8px; border-radius: 4px; background: #fff; border: 1px solid #e5e7ea; font-size: 11px; color: #4e535a; }
+  .c-chip.on { border-color: #b9cdf8; background: #eaf1ff; color: #3370ff; }
+  .c-rows { background: #fff; margin-top: 8px; }
+  .c-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #f2f3f5; }
+  .c-row .n { flex: 1; min-width: 0; font-size: 13px; color: #2b2f36; }
+  .c-row .sub { font-size: 11px; color: #8f959e; }
+  .c-row .amt { font-size: 13px; font-weight: 500; }
+</style>
+</head>
+<body>
+  <!-- 方案 A -->
+  <div class="col">
+    <p class="col-title">方案 A：白卡分区（当前方向，收拾干净）</p>
+    <p class="col-note">筛选一行一个条件、固定标签宽度；tab 用分段控件；三张卡横排；记录卡片式。信息层级最清楚，开发量最小。</p>
+    <div class="phone">
+      <div class="navbar">组织/俱乐部</div>
+      <div class="body a-body">
+        <div class="a-card">
+          <div class="a-row"><span class="a-label">范围</span><span class="a-control">全部可见组织/俱乐部 <span>▾</span></span></div>
+          <div class="a-row"><span class="a-label">周期</span>
+            <span class="a-presets"><span class="a-preset">当天</span><span class="a-preset">本周</span><span class="a-preset on">本月</span><span class="a-preset">本年</span><span class="a-preset">全部</span></span>
+          </div>
+          <div class="a-row"><span class="a-label">自定义</span><span class="a-control">2026-09-01</span><span class="muted">~</span><span class="a-control">2026-09-13</span></div>
+        </div>
+        <div class="a-tabs"><div class="a-tab on">经营概况</div><div class="a-tab">转化分析</div></div>
+        <div class="a-cards">
+          <div class="a-stat on"><div class="t">引流人数</div><div class="v">106<small>人</small></div><div class="s">10 位引流人 · 成交 32 笔</div></div>
+          <div class="a-stat"><div class="t">课程数</div><div class="v">54<small>场</small></div><div class="s">41 课时 · 到场 89 人</div></div>
+          <div class="a-stat"><div class="t">成交量</div><div class="v">58<small>笔</small></div><div class="s">成交 44 人</div></div>
+        </div>
+        <div class="a-chips">
+          <span class="a-chip on">会员卡 27</span><span class="a-chip on">觉醒游戏 5</span><span class="a-chip">OH卡 3</span><span class="a-chip">其他项目 2</span>
+          <span class="a-chip">首购 36</span><span class="a-chip">同类复购 12</span><span class="a-chip">升单 8</span>
+        </div>
+        <div class="a-card">
+          <div class="a-metrics">
+            <span class="a-metric"><span class="l">成交量</span><span class="n num">58</span></span>
+            <span class="a-metric"><span class="l">成交人数</span><span class="n num">44</span></span>
+            <span class="a-metric"><span class="l">升单人数</span><span class="n num">1</span></span>
+            <span class="a-metric"><span class="l">升单量</span><span class="n num">1</span></span>
+          </div>
+        </div>
+        <div class="a-listhead"><span class="c">共 58 条</span><span class="btns"><span class="a-mini">排序</span><span class="a-mini">列表设置</span></span></div>
+        <div class="a-rec">
+          <div class="a-field"><span class="k">成交日期</span><span class="v num">2026-09-12</span></div>
+          <div class="a-field"><span class="k">客户</span><span class="v">李丹丹</span></div>
+          <div class="a-field"><span class="k">项目</span><span class="v">会员卡 · 次卡</span></div>
+          <div class="a-field"><span class="k">购买类型</span><span class="v">首购</span></div>
+          <div class="a-field"><span class="k">成交人</span><span class="v">苏晴</span></div>
+        </div>
+        <div class="a-rec">
+          <div class="a-field"><span class="k">成交日期</span><span class="v num">2026-09-12</span></div>
+          <div class="a-field"><span class="k">客户</span><span class="v">王小雅</span></div>
+          <div class="a-field"><span class="k">项目</span><span class="v">觉醒游戏</span></div>
+          <div class="a-field"><span class="k">购买类型</span><span class="v">跨品类首购</span></div>
+          <div class="a-field"><span class="k">成交人</span><span class="v">潘潘</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 方案 B -->
+  <div class="col">
+    <p class="col-title">方案 B：顶部概览头 + 悬浮卡片</p>
+    <p class="col-note">顶部一块蓝色区域常驻显示「当前范围 / 周期」，下面白卡往上叠一层；数据卡做成三宫格。层次感强、抬头就知道在看什么范围。</p>
+    <div class="phone">
+      <div class="navbar">组织/俱乐部</div>
+      <div class="body">
+        <div class="b-head">
+          <div class="scope">全部可见组织/俱乐部</div>
+          <div class="rule">2026-09-01 至 2026-09-13 · 本月</div>
+          <div class="range">10 位引流人 · 54 场课程 · 58 笔成交</div>
+        </div>
+        <div class="b-body">
+          <div class="b-sheet">
+            <div class="b-tabs"><div class="b-tab on">经营概况</div><div class="b-tab">转化分析</div></div>
+            <div class="b-filter">
+              <span class="box">全部可见组织/俱乐部 ▾</span>
+              <span class="box">本月 ▾</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <div class="b-stat"><div class="t">引流人数</div><div class="v">106<small>人</small></div><div class="s">10 位引流人</div></div>
+              <div class="b-stat"><div class="t">课程数</div><div class="v">54<small>场</small></div><div class="s">41 课时</div></div>
+              <div class="b-stat"><div class="t">成交量</div><div class="v">58<small>笔</small></div><div class="s">44 人成交</div></div>
+            </div>
+          </div>
+          <div class="b-sheet">
+            <div class="a-chips" style="margin:0 0 6px;">
+              <span class="a-chip on">会员卡 27</span><span class="a-chip">觉醒游戏 5</span><span class="a-chip">OH卡 3</span><span class="a-chip">升单 8</span>
+            </div>
+            <div class="a-metrics">
+              <span class="a-metric"><span class="l">成交量</span><span class="n num">58</span></span>
+              <span class="a-metric"><span class="l">成交人数</span><span class="n num">44</span></span>
+              <span class="a-metric"><span class="l">升单量</span><span class="n num">1</span></span>
+            </div>
+          </div>
+          <div class="b-sheet">
+            <div class="a-listhead" style="padding:0 0 4px;"><span class="c">共 58 条</span><span class="btns"><span class="a-mini">排序</span><span class="a-mini">列表设置</span></span></div>
+            <div class="b-rec">
+              <div class="main"><div class="l1">李丹丹</div><div class="l2">09-12 · 会员卡 · 次卡 · 首购</div></div>
+              <div class="right">苏晴</div>
+            </div>
+            <div class="b-rec">
+              <div class="main"><div class="l1">王小雅</div><div class="l2">09-12 · 觉醒游戏 · 跨品类首购</div></div>
+              <div class="right">潘潘</div>
+            </div>
+            <div class="b-rec">
+              <div class="main"><div class="l1">周星移</div><div class="l2">09-12 · OH卡 · 首购</div></div>
+              <div class="right">余墨</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 方案 C -->
+  <div class="col">
+    <p class="col-title">方案 C：信息流（无卡片、密度优先）</p>
+    <p class="col-note">去掉卡片外壳，筛选收成一条摘要栏（点开才展开），指标横向排、记录用细分割线。一屏能看到最多记录，适合天天翻明细的人。</p>
+    <div class="phone">
+      <div class="navbar">组织/俱乐部</div>
+      <div class="body c-body">
+        <div class="c-bar">
+          <span class="pick">全部可见组织/俱乐部 ▾</span>
+          <span class="pick">本月 ▾</span>
+          <span class="grow"></span>
+          <span class="muted">导出</span>
+        </div>
+        <div class="c-summary">
+          <span class="item"><span class="n num">106</span><span class="u">引流人</span></span>
+          <span class="item"><span class="n num">54</span><span class="u">课程</span></span>
+          <span class="item"><span class="n num">58</span><span class="u">成交量</span></span>
+          <span class="grow" style="flex:1"></span>
+          <span class="muted" style="font-size:11px">经营概况 ▾</span>
+        </div>
+        <div class="c-sec">
+          <div class="c-sec-title">购买类型</div>
+          <div class="c-chips">
+            <span class="c-chip on">首购 36</span><span class="c-chip">同类复购 12</span><span class="c-chip">跨品类首购 5</span><span class="c-chip">升单 8</span>
+          </div>
+          <div class="c-sec-title" style="margin-top:10px;">付费项目</div>
+          <div class="c-chips">
+            <span class="c-chip on">会员卡 27</span><span class="c-chip">觉醒游戏 5</span><span class="c-chip">OH卡 3</span><span class="c-chip">其他 2</span>
+          </div>
+        </div>
+        <div class="c-rows">
+          <div class="c-row"><span class="n">李丹丹<br><span class="sub">09-12 · 会员卡 · 次卡 · 首购</span></span><span class="amt">苏晴</span></div>
+          <div class="c-row"><span class="n">王小雅<br><span class="sub">09-12 · 觉醒游戏 · 跨品类首购</span></span><span class="amt">潘潘</span></div>
+          <div class="c-row"><span class="n">周星移<br><span class="sub">09-12 · OH卡 · 首购</span></span><span class="amt">余墨</span></div>
+          <div class="c-row"><span class="n">沐沐<br><span class="sub">09-11 · 会员卡 · 月卡 · 同类复购</span></span><span class="amt">薇薇</span></div>
+          <div class="c-row"><span class="n">璐小娜<br><span class="sub">09-11 · 会员卡 · 30次卡 · 首购</span></span><span class="amt">余墨</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,109 +1,26 @@
-# 页面模板与数据流模式
+# 页面与刷新参考
 
-当需要新建页面、调整页面生命周期/刷新逻辑、或做客户端视觉改版时读此文件。
+新建页面、调整生命周期/分页或制作设计预览时使用。以目标页面当前结构为准，不复制已删除组件或过期路径。
 
-## 1. 页面 4 文件骨架
+## 页面结构
 
-每个页面是 `pages/<name>/` 下的 `index.js / index.json / index.wxml / index.wxss`。
+- 通常 pages/<name>/ 下有 index.js、index.json、index.wxml、index.wxss；在对应主包或分包注册，组件在 usingComponents 注册。
+- 需登录页面复用当前登录守卫；登录页、游客页除外。onLoad 初始化和 onShow 刷新分工，避免进入页面就请求两次。
+- 下拉刷新开启 enablePullDownRefresh，结束时无论成功失败都调用 wx.stopPullDownRefresh()。
 
-`index.json` 典型内容：
+## 列表请求
 
-```json
-{
-  "navigationBarTitleText": "页面标题",
-  "usingComponents": { "visit-card": "/components/visit-card/index" },
-  "enablePullDownRefresh": true
-}
-```
+- 维护当前条件、页码、总数、是否可加载和请求标识。追加页只拼接新记录，保持滚动位置；筛选变化重置列表时使旧请求失效。
+- 不把 loading 时的所有新查询直接丢掉：用户切换筛选需取消旧请求、使用请求序号或排队执行最新条件。
+- total 为 0 是有效值，不能用 truthy 回退隐藏它。无 total 的响应按接口实际分页协议处理。
+- 编辑单条成功优先更新原条目；必须重新查询时保留合理的滚动/展开状态。加载状态不清空整个容器造成跳动。
 
-- 自定义组件统一放 `<端>/components/`，路径以 `/components/...` 绝对路径注册。员工端现有组件：visit-card、voice-input-popup、customer-picker、payment-form、activity-badge、custom-tab-bar。
-- 下拉刷新必须在 json 里开 `enablePullDownRefresh`，js 里 `onPullDownRefresh` 结尾调 `wx.stopPullDownRefresh()`。
+## 导航与跨页刷新
 
-`index.js` 顶部引入：
+- 普通页面 wx.navigateTo，Tab 页面 wx.switchTab；参数编码并验证 id。
+- 沿用目标页现有 _needRefresh 等机制，更新成功才通知父页；不要每次 onShow 都强制全量刷新。
+- 详情读取失败区分无权限、已删除、网络错误，不统一显示“加载失败”或空白。
 
-```js
-const { xxxApi } = require('../../utils/api')
-const { formatDate } = require('../../utils/util')  // 员工端工具：formatDate/formatTime/getWeekday/getWeekDates/debounce
-```
+## 视觉预览
 
-## 2. 生命周期守卫模式（员工端）
-
-所有需登录页面的固定写法：
-
-```js
-onLoad() {
-  if (!getApp().checkLogin()) return
-  // ...初始化 + loadData()
-},
-onShow() {
-  if (!getApp().checkLogin()) return
-  // 刷新逻辑
-}
-```
-
-onShow/onLoad 竞态处理（visits 页模式）：onLoad 异步初始化期间 onShow 可能先触发，用 `this._initialized` + `this._pendingShowLoad` 标记缓冲，初始化完成后补一次 loadData。
-
-## 3. 列表页数据流模式
-
-状态字段约定：`list / loading / initialized / page / pageSize / total / hasMore`（+ 搜索词 `keyword`）。
-
-```js
-async loadData(reset) {
-  if (this.data.loading) return
-  const page = reset ? 1 : this.data.page + 1
-  this.setData({ loading: true })
-  try {
-    const res = await xxxApi.list({ page, page_size: this.data.pageSize, ... })
-    const items = (res && res.items) || (Array.isArray(res) ? res : [])
-    const total = (res && res.total) || items.length
-    const list = reset ? items : this.data.list.concat(items)
-    this.setData({ list, page, total, hasMore: list.length < total, loading: false, initialized: true })
-  } catch (e) {
-    this.setData({ loading: false, initialized: true })
-  }
-}
-onReachBottom() { if (this.data.hasMore && !this.data.loading) this.loadData(false) }
-```
-
-- 响应兼容 `{ items, total }` 与裸数组两种形态。
-- 客户端列表页模式相同但用 `.then/.catch` 风格（home 页），并常把列表按日期 `_groupByDate` 分组。
-
-## 4. 跨页刷新标记（_needRefresh 模式）
-
-子页面（表单/详情）改了数据，返回列表页要刷新：
-
-```js
-// 子页面操作成功后
-const pages = getCurrentPages()
-const prev = pages[pages.length - 2]
-if (prev) prev._needRefresh = true
-wx.navigateBack()
-
-// 列表页 onShow
-if (this._needRefresh) { this._needRefresh = false; this.loadData(true) }
-```
-
-沿用目标页面已有的标记名，不要新造一套。
-
-## 5. 导航与传参
-
-- 页面间：`wx.navigateTo({ url: '/pages/xxx/index?id=' + id })`，目标页 `onLoad(options)` 取 `options.id`。
-- 详情/编辑页按 id 拉数据；新建页与编辑页通常复用同一页面（如 customer-form：有 id 即编辑，无 id 即新建）。
-- tabBar 页面之间跳转必须 `wx.switchTab`；登录失效统一 `wx.reLaunch` 到 `/pages/login/index`（员工端）。
-
-## 6. 样式约定
-
-- 单位一律 rpx；`app.wxss` 提供全局基色与类：
-  - 背景 `#f7f8fa`、正文 `#1f2329`、次要文字 `#8f959e`、主题蓝 `#3370ff`
-  - `.container`（24rpx 32rpx 内边距）、`.form-card`（白底 12rpx 圆角分组卡）、`.form-item` 系列
-- 页面 wxss 第一行通常是 `.page { min-height: 100vh; background-color: #f7f8fa; }`。
-- 固定定位的顶部控件（如日历条）用 `position: fixed; z-index: 101` 层级约定。
-
-## 7. 客户端视觉改版工作流（重要）
-
-客户端首页目录下有成熟的设计预览流程，用户对美观要求高，改版时必须沿用：
-
-1. 在 `miniprogram-client/pages/home/styles/` 下新建 HTML 预览稿（参照现有 `bg-*.html`、`style-preview.html`：内联 CSS、模拟手机宽度、静态假数据），让设计可在浏览器直接打开对比。
-2. 一次可出多版（现有 bg-a 到 bg-FF 二十余版迭代记录），与用户确认定稿方向。
-3. 定稿后把样式翻译成 WXML/WXSS 写回页面；不要反过来直接在 wxml 里边改边猜效果。
-4. 客户端视觉调性：暖色、柔和、有机形态、多留白（疗愈品牌），区别于员工端的飞书系蓝白灰。
+用户需要候选方案时制作独立 HTML 手机预览，静态数据不得写进业务库。用户已选方案或明确要求微调/实现时直接修改对应源码，不强制再经过预览批准。优先当前端样式与用户选定参考；尺寸、字体、颜色遵循当前设计，不根据旧示例恢复旧风格。

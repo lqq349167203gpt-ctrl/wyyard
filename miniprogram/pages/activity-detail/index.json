@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "活动详情"
+  "navigationBarTitleText": "活动详情",
+  "usingComponents": {
+    "coarse-confirm": "/components/coarse-confirm/index"
+  }
 }

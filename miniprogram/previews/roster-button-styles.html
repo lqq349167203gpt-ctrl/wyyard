@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名单按钮 + 弹窗填写/资料按钮 · 样式方案</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #f1f2f4;
+    --page-bg: #f2f3f5;
+    --primary: #3370ff;
+    --ok: #2f7d43;
+    --ok-bg: #edf8ef;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1280px; margin: 0 auto 32px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 18px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff; border: 1px solid #ebedf0;
+    padding: 7px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px;
+  }
+  .principle b { color: #c4506a; font-weight: 600; }
+
+  .frames { max-width: 1280px; margin: 0 auto; display: flex; gap: 28px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+  .frame { flex: 0 0 375px; }
+  .frame-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .frame-no { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .frame-name { font-size: 15px; font-weight: 600; }
+  .frame-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px; height: 800px; background: #f7f8fa;
+    border: 1px solid #dee2e6; overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: #f3f7ff; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .mask { position: absolute; inset: 0; background: rgba(31,35,41,.34); z-index: 5; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ===== 卡片（含名单条） ===== */
+  .g-card { background: #fff; border-radius: 12px; margin: 8px 12px 0; overflow: hidden; position: relative; z-index: 1; }
+  .ac-top { display: flex; padding: 10px 14px 9px; align-items: center; }
+  .ac-time { width: 46px; flex-shrink: 0; }
+  .ac-time .t1 { font-size: 14px; font-weight: 700; display: block; }
+  .ac-time .t2 { font-size: 10.5px; color: var(--ink-3); display: block; margin-top: 2px; }
+  .ac-mid { flex: 1; min-width: 0; margin-left: 11px; }
+  .ac-name { font-size: 14px; font-weight: 600; }
+  .ac-l2 { margin-top: 4px; font-size: 11.5px; color: var(--ink-2); }
+  .ac-st { flex-shrink: 0; margin-left: 10px; font-size: 10.5px; color: var(--ink-3); }
+
+  .strip { display: flex; align-items: center; border-top: 1px solid var(--hairline); }
+  .strip-names { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--ink-2); }
+  .strip-prog { font-size: 10.5px; color: var(--ink-3); flex-shrink: 0; margin-left: 8px; }
+
+  /* ===== 弹窗通用 ===== */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+    background: #fff; border-radius: 12px 12px 0 0;
+    display: flex; flex-direction: column; max-height: 78%;
+  }
+  .sheet-handle { width: 32px; height: 3px; border-radius: 2px; background: #dfe2e6; margin: 8px auto 2px; flex-shrink: 0; }
+  .sheet-head { display: flex; align-items: center; padding: 12px 16px 9px; flex-shrink: 0; }
+  .sheet-title { font-size: 14.5px; font-weight: 700; }
+  .sheet-title .n { color: var(--ink-3); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .sheet-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; display: block; }
+  .sheet-close {
+    margin-left: auto; width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-3); font-size: 18px; font-weight: 300; background: #f2f3f5; flex-shrink: 0;
+  }
+  .sheet-filter {
+    display: flex; align-items: center; padding: 8px 16px;
+    border-bottom: 1px solid var(--hairline); flex-shrink: 0;
+  }
+  .sheet-filter .hint { font-size: 10.5px; color: var(--ink-4); }
+
+  .p-row { padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
+  .p-row:last-child { border-bottom: none; }
+  .p-l1 { display: flex; align-items: center; }
+  .p-av {
+    width: 30px; height: 30px; border-radius: 50%; background: #f2f3f5;
+    color: var(--ink-2); font-size: 12px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-right: 10px;
+  }
+  .p-name { font-size: 14px; font-weight: 600; }
+  .tag-novisit {
+    font-size: 9.5px; color: var(--ink-3); background: #f2f3f5;
+    border-radius: 2px; padding: 1px 5px; margin-left: 6px; flex-shrink: 0;
+  }
+  .p-meta { margin-top: 5px; font-size: 11px; color: var(--ink-2); }
+  .p-needs { margin-top: 4px; font-size: 11px; color: var(--ink-2); line-height: 1.5; }
+  .p-needs .k { color: var(--ink-3); }
+  .p-status-row { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+  .st-pill {
+    font-size: 10px; padding: 3px 8px; border-radius: 3px;
+    background: #f2f3f5; color: var(--ink-3); flex-shrink: 0;
+  }
+  .st-pill.done { background: var(--ok-bg); color: var(--ok); }
+
+  /* 按钮族（三方案共用零件） */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 30px; padding: 0 14px; border-radius: 4px;
+    font-size: 12px; flex-shrink: 0;
+  }
+  .btn-solid { background: var(--primary); color: #fff; font-weight: 600; }
+  .btn-outline { border: 1px solid #dcdfe4; color: var(--ink-2); background: #fff; }
+  .btn-ghost { background: #f2f3f5; color: var(--ink-2); }
+
+  .notes {
+    margin-top: 14px; background: #fff; border: 1px solid #ebedf0;
+    border-radius: 3px; padding: 12px 14px;
+  }
+  .notes li {
+    font-size: 12px; color: var(--ink-2); line-height: 1.8;
+    list-style: none; padding-left: 12px; position: relative;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 4px; height: 4px; background: var(--primary); border-radius: 1px;
+  }
+  .notes li b { color: var(--ink); }
+
+  .doc-foot { max-width: 1280px; margin: 26px auto 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+
+  /* ================= V1 专用 ================= */
+  .v1-strip { padding: 8px 14px 8px 71px; }
+  .v1-actions { margin-left: auto; display: flex; gap: 8px; }
+
+  /* ================= V2 专用 ================= */
+  .v2-strip { min-height: 44px; padding: 0 14px 0 71px; }
+  .v2-strip .strip-chev { color: var(--ink-4); font-size: 15px; margin-left: 8px; flex-shrink: 0; }
+  .v2-expand-zone {
+    margin-left: auto; display: flex; align-items: center; gap: 4px;
+    color: var(--primary); font-size: 12px; padding: 6px 2px 6px 12px; flex-shrink: 0;
+  }
+  .v2-expand-zone .chev { font-size: 13px; }
+
+  /* ================= V3 专用 ================= */
+  .v3-strip { padding: 8px 14px 8px 71px; }
+  .v3-actbar {
+    display: flex; gap: 10px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--hairline);
+  }
+  .v3-actbar .btn { flex: 1; height: 34px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">名单按钮 + 弹窗填写/资料按钮 · 样式方案</div>
+  <div class="doc-sub">先修"按不到"，再统一风格。三版按钮高度全部 ≥30px（60rpx），且都给足内边距。</div>
+  <div class="principles">
+    <div class="principle"><b>名单 ›</b>　24rpx 纯文字，热区仅约 25×15px（规范 44px）→ 三版都改为整条可点或实体按钮</div>
+    <div class="principle"><b>填写</b>　21rpx 纯文字、无自身绑定只靠冒泡，热区约 22×14px → 三版都改为实体按钮/明确热区</div>
+    <div class="principle"><b>资料 ›</b>　也是 24rpx 纯文字，三个"按钮"三种样子 → 统一进同一按钮族</div>
+    <div class="principle"><b>颜色语义</b>　已填绿/未填灰/动作蓝，全部固定，不再蓝字当按钮使</div>
+  </div>
+</div>
+
+<div class="frames">
+
+  <!-- ================= V1 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">1</span>
+      <span class="frame-name">统一胶囊</span>
+      <span class="frame-desc">改动最小 · 同族按钮</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="g-card">
+        <div class="ac-top">
+          <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+          <div class="ac-mid">
+            <div class="ac-name">觉醒游戏·陈默</div>
+            <div class="ac-l2">周远 · 扣卡 1 次</div>
+          </div>
+          <span class="ac-st">已发布</span>
+        </div>
+        <div class="strip v1-strip">
+          <span class="strip-names tnum">6 人 · 陈默、璐小娜、苏杭…</span>
+          <span class="strip-prog tnum">2/6 已填</span>
+          <span class="btn btn-ghost" style="margin-left: 10px;">名单 ›</span>
+        </div>
+      </div>
+
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="sheet-title">参与人记录<span class="n tnum">2 / 6 已完成</span></span>
+            <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+          </div>
+          <div class="sheet-close">×</div>
+        </div>
+        <div class="sheet-filter">
+          <span class="hint">客户信息和跟进点均填写后计为完成</span>
+          <span class="btn btn-ghost" style="margin-left: auto; height: 26px; font-size: 11px;">只看未填写</span>
+        </div>
+
+        <div class="p-row">
+          <div class="p-l1"><span class="p-av">陈</span><span class="p-name">陈默</span></div>
+          <div class="p-meta tnum">3月卡 · 剩 2 次 · 婷婷邀约 · 预计 14:00</div>
+          <div class="p-needs"><span class="k">需求：</span>睡眠调理，最近夜间易醒加重</div>
+          <div class="p-status-row">
+            <span class="st-pill done">客户信息 · 已填</span>
+            <span class="st-pill">跟进点 · 未填</span>
+            <span class="v1-actions">
+              <span class="btn btn-outline">资料</span>
+              <span class="btn btn-solid">填写</span>
+            </span>
+          </div>
+        </div>
+        <div class="p-row">
+          <div class="p-l1"><span class="p-av">璐</span><span class="p-name">璐小娜</span></div>
+          <div class="p-meta tnum">年卡 · 不限次 · 耀凯邀约 · 预计 14:00</div>
+          <div class="p-needs"><span class="k">需求：</span>带孩子一起来，课后需要开发票</div>
+          <div class="p-status-row">
+            <span class="st-pill done">客户信息 · 已填</span>
+            <span class="st-pill done">跟进点 · 已填</span>
+            <span class="v1-actions">
+              <span class="btn btn-outline">资料</span>
+              <span class="btn btn-ghost">查看</span>
+            </span>
+          </div>
+        </div>
+        <div class="p-row">
+          <div class="p-l1"><span class="p-av">方</span><span class="p-name">方舟</span><span class="tag-novisit">当日无邀约</span></div>
+          <div class="p-meta">体验 · 首次到店</div>
+          <div class="p-status-row">
+            <span class="st-pill">客户信息 · 未填</span>
+            <span class="st-pill">跟进点 · 未填</span>
+            <span class="v1-actions">
+              <span class="btn btn-outline">资料</span>
+              <span class="btn btn-solid">填写</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>一套按钮族走到底</b>：实心蓝=当前要做的（填写）、描边=跳转（资料）、灰底=次要（名单/查看/只看未填写），高度全 30px、同字号同圆角</li>
+      <li>卡片上「名单 ›」变灰底胶囊，整条名单条也可点，热区 44px 高</li>
+      <li>「资料 ›」从名字行撤下，和「填写」一起收进状态行右侧，<b>名字行只留名字</b></li>
+      <li>填写完成后「填写」自动变灰「查看」，展开后变「收起」（同位置，不用找）</li>
+    </ul>
+  </div>
+
+  <!-- ================= V2 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">2</span>
+      <span class="frame-name">整条即按钮</span>
+      <span class="frame-desc">热区最大 · 零小按钮</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="g-card">
+        <div class="ac-top">
+          <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+          <div class="ac-mid">
+            <div class="ac-name">觉醒游戏·陈默</div>
+            <div class="ac-l2">周远 · 扣卡 1 次</div>
+          </div>
+          <span class="ac-st">已发布</span>
+        </div>
+        <div class="strip v2-strip">
+          <span class="strip-names tnum">6 人 · 陈默、璐小娜、苏杭…</span>
+          <span class="strip-prog tnum">2/6 已填</span>
+          <span class="strip-chev">›</span>
+        </div>
+      </div>
+
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="sheet-title">参与人记录<span class="n tnum">2 / 6 已完成</span></span>
+            <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+          </div>
+          <div class="sheet-close">×</div>
+        </div>
+        <div class="sheet-filter">
+          <span class="hint">客户信息和跟进点均填写后计为完成</span>
+          <span class="btn btn-ghost" style="margin-left: auto; height: 26px; font-size: 11px;">只看未填写</span>
+        </div>
+
+        <div class="p-row">
+          <div class="p-l1">
+            <span class="p-av">陈</span><span class="p-name">陈默</span>
+            <span class="btn btn-outline" style="margin-left: auto; height: 28px;">资料</span>
+          </div>
+          <div class="p-meta tnum">3月卡 · 剩 2 次 · 婷婷邀约 · 预计 14:00</div>
+          <div class="p-needs"><span class="k">需求：</span>睡眠调理，最近夜间易醒加重</div>
+          <div class="p-status-row">
+            <span class="st-pill done">客户信息 · 已填</span>
+            <span class="st-pill">跟进点 · 未填</span>
+            <span class="v2-expand-zone">填写 <span class="chev">⌄</span></span>
+          </div>
+        </div>
+        <div class="p-row" style="background: #fafbfc;">
+          <div class="p-l1">
+            <span class="p-av">璐</span><span class="p-name">璐小娜</span>
+            <span class="btn btn-outline" style="margin-left: auto; height: 28px;">资料</span>
+          </div>
+          <div class="p-meta tnum">年卡 · 不限次 · 耀凯邀约 · 预计 14:00</div>
+          <div class="p-status-row">
+            <span class="st-pill done">客户信息 · 已填</span>
+            <span class="st-pill done">跟进点 · 已填</span>
+            <span class="v2-expand-zone" style="color: var(--ink-2);">收起 <span class="chev">⌃</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>卡片上没有"按钮"了</b>：整条名单条就是一个 44px 高的大热区，点名字、点进度、点箭头都能开</li>
+      <li>弹窗里<b>展开区整行可点</b>（沿用现状逻辑），但「填写 ⌄ / 收起 ⌃」给足左侧大 padding，并配方向箭头，不再靠运气点</li>
+      <li>「资料」升级为名字行右侧的 28px 描边胶囊，位置固定好找</li>
+      <li>视觉最干净（几乎看不到按钮），但学习成本靠箭头提示补足</li>
+    </ul>
+  </div>
+
+  <!-- ================= V3 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">3</span>
+      <span class="frame-name">底部操作条</span>
+      <span class="frame-desc">最像按钮 · 绝不会按不到</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="g-card">
+        <div class="ac-top">
+          <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+          <div class="ac-mid">
+            <div class="ac-name">觉醒游戏·陈默</div>
+            <div class="ac-l2">周远 · 扣卡 1 次</div>
+          </div>
+          <span class="ac-st">已发布</span>
+        </div>
+        <div class="strip v3-strip">
+          <span class="strip-names tnum">6 人 · 陈默、璐小娜、苏杭…</span>
+          <span class="strip-prog tnum">2/6 已填</span>
+          <span class="btn btn-solid" style="margin-left: 10px; height: 28px;">名单</span>
+        </div>
+      </div>
+
+      <div class="mask"></div>
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-head">
+          <div>
+            <span class="sheet-title">参与人记录<span class="n tnum">2 / 6 已完成</span></span>
+            <span class="sheet-sub">觉醒游戏·陈默 · 14:00–16:00</span>
+          </div>
+          <div class="sheet-close">×</div>
+        </div>
+        <div class="sheet-filter">
+          <span class="hint">客户信息和跟进点均填写后计为完成</span>
+          <span class="btn btn-ghost" style="margin-left: auto; height: 26px; font-size: 11px;">只看未填写</span>
+        </div>
+
+        <div class="p-row">
+          <div class="p-l1"><span class="p-av">陈</span><span class="p-name">陈默</span></div>
+          <div class="p-meta tnum">3月卡 · 剩 2 次 · 婷婷邀约 · 预计 14:00</div>
+          <div class="p-needs"><span class="k">需求：</span>睡眠调理，最近夜间易醒加重</div>
+          <div class="p-status-row">
+            <span class="st-pill done">客户信息 · 已填</span>
+            <span class="st-pill">跟进点 · 未填</span>
+          </div>
+          <div class="v3-actbar">
+            <span class="btn btn-outline">查看资料</span>
+            <span class="btn btn-solid">填写记录</span>
+          </div>
+        </div>
+        <div class="p-row">
+          <div class="p-l1"><span class="p-av">璐</span><span class="p-name">璐小娜</span></div>
+          <div class="p-meta tnum">年卡 · 不限次 · 耀凯邀约 · 预计 14:00</div>
+          <div class="p-needs"><span class="k">需求：</span>带孩子一起来，课后需要开发票</div>
+          <div class="p-status-row">
+            <span class="st-pill done">客户信息 · 已填</span>
+            <span class="st-pill done">跟进点 · 已填</span>
+          </div>
+          <div class="v3-actbar">
+            <span class="btn btn-outline">查看资料</span>
+            <span class="btn btn-ghost">查看记录</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>每行底部一条 hairline 操作条</b>：「查看资料 / 填写记录」两个 34px 高等宽按钮并排，热区最大、语义最直白，绝对按得到</li>
+      <li>卡片上「名单」用实心蓝小按钮——它是这张卡唯一的主操作，值得突出</li>
+      <li>填写完成后右侧按钮变灰「查看记录」，展开后变「收起记录」</li>
+      <li>代价：每行最高、按钮感最强，<b>风格上最"重"的一版</b>，适合店员年纪偏大或追求零误触</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="doc-foot">
+  说明：纯样式稿，未改代码。三版统一规则：按钮高度 ≥28-34px（56-68rpx）、「已填=绿 / 未填=灰 / 动作=蓝 / 次要=灰底」语义固定。<br>
+  落地时顺带修两个真问题：①「名单 ›」「填写」目前是无 padding 的纯 text，会加大热区（min-height + padding 或整条 catchtap）；②「填写」建议补自己的 catchtap，不再只靠冒泡。选定版本后我只动这两处。
+</div>
+
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>邀约页 · 客户信息/跟进点 多人录入展示设计</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: #f4f5f6;
+    color: #2b2f36;
+    padding: 40px 24px 80px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .page { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 18px; font-weight: 500; color: #1f2329; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #8f959e; margin-bottom: 32px; }
+  h2 { font-size: 14px; font-weight: 500; color: #1f2329; margin: 36px 0 4px; }
+  .desc { font-size: 12px; color: #8f959e; margin-bottom: 14px; }
+  .stage {
+    background: #ffffff;
+    border: 0.5px solid #e8eaed;
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .row { display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+  .tag { font-size: 11px; color: #8f959e; flex-shrink: 0; width: 88px; padding-top: 6px; }
+
+  /* 单元格 */
+  .cell {
+    width: 203px; height: 28px;
+    border: 0.5px solid #e8eaed; border-radius: 4px;
+    padding: 0 8px; background: #fff;
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; font-size: 12px;
+  }
+  .cell:hover { border-color: #3370ff; }
+  .cell .main { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #2b2f36; }
+  .cell .main .author { color: #3370ff; }
+  .cell .count { font-size: 11px; color: #8f959e; flex-shrink: 0; }
+  .cell.empty .main { color: #c9cdd4; }
+  .cell.readonly { color: #646a73; }
+
+  /* 悬停浮层 */
+  .popover {
+    width: 280px; background: #fff;
+    border: 0.5px solid #d3d6db; border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 16px rgba(31,35,41,.08);
+  }
+  .popover .p-head { font-size: 11px; color: #8f959e; margin-bottom: 6px; }
+  .popover .p-item { display: flex; gap: 8px; padding: 4px 0; border-bottom: 0.5px solid #f0f0f0; font-size: 12px; line-height: 1.6; align-items: baseline; }
+  .popover .p-item:last-child { border-bottom: none; }
+  .popover .p-item .p-author { color: #3370ff; flex-shrink: 0; }
+  .popover .p-item .p-author.green { color: #0F6E56; }
+
+  /* 弹窗 */
+  .dialog-wrap { background: rgba(31,35,41,.28); border-radius: 10px; padding: 28px; display: flex; justify-content: center; }
+  .dialog {
+    width: 440px; background: #fff; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(31,35,41,.14);
+  }
+  .dialog .d-head {
+    padding: 12px 18px; border-bottom: 0.5px solid #f0f0f0;
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .dialog .d-title { font-size: 14px; font-weight: 500; color: #1f2329; }
+  .dialog .d-close { margin-left: auto; font-size: 12px; color: #8f959e; cursor: pointer; }
+  .dialog .d-body { padding: 14px 18px 16px; }
+  .d-section-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .d-section-title { font-size: 12px; font-weight: 500; color: #1f2329; }
+  .d-section-hint { font-size: 11px; color: #8f959e; }
+  .d-section-hint .clear { color: #646a73; cursor: pointer; }
+  .d-input {
+    border: 0.5px solid #d3d6db; border-radius: 6px;
+    padding: 8px 10px; font-size: 13px; color: #2b2f36; line-height: 1.6;
+    background: #fff; min-height: 38px;
+  }
+  .d-input.placeholder { color: #c0c4cc; }
+  .d-input:focus-within, .d-input.focus { border-color: #3370ff; }
+  .d-others { margin-top: 16px; }
+  .d-note { padding: 8px 0; border-bottom: 0.5px solid #f0f0f0; }
+  .d-note:last-child { border-bottom: none; }
+  .d-note .n-meta { display: flex; align-items: baseline; gap: 8px; }
+  .d-note .n-name { font-size: 12px; color: #2b2f36; }
+  .d-note .n-time { font-size: 11px; color: #8f959e; }
+  .d-note .n-content { font-size: 13px; color: #2b2f36; line-height: 1.6; margin-top: 2px; }
+  .d-others-list { border-top: 0.5px solid #f0f0f0; }
+
+  /* 规则块 */
+  .rules { background: #fff; border: 0.5px solid #e8eaed; border-radius: 12px; padding: 20px 24px; }
+  .rules li { font-size: 13px; color: #2b2f36; margin: 6px 0 6px 18px; line-height: 1.7; }
+  .rules li b { font-weight: 500; }
+  .rules code { background: #f5f6f8; border-radius: 4px; padding: 1px 5px; font-size: 12px; color: #4e535a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>邀约页 · 客户信息 / 跟进点 多人录入展示设计</h1>
+  <div class="subtitle">数据规则：每人每栏最多一条自己录入的内容，只能改自己的，别人只读。PC 端。</div>
+
+  <!-- 一、外层单元格 -->
+  <h2>一、外层单元格（表格内，宽 203px，高 28px 单行）</h2>
+  <div class="desc">有内容：显示最新一条「作者：内容」，右侧计数「N人」；无内容：灰色占位；悬停整格边框变蓝</div>
+  <div class="stage">
+    <div class="row">
+      <span class="tag">多人已填</span>
+      <div class="cell"><span class="main"><span class="author">阿哲</span>：对颂钵兴趣大，怕吵，建议安排小房间</span><span class="count">3人</span></div>
+    </div>
+    <div class="row">
+      <span class="tag">单条</span>
+      <div class="cell"><span class="main"><span class="author">大熊</span>：首次到店有点紧张</span><span class="count">1人</span></div>
+    </div>
+    <div class="row">
+      <span class="tag">空</span>
+      <div class="cell empty"><span class="main">添加客户信息</span></div>
+    </div>
+  </div>
+
+  <!-- 二、悬停浮层 -->
+  <h2>二、悬停预览浮层（只读，鼠标放上即出）</h2>
+  <div class="desc">按人一行一条平铺全部内容，不用点开就能看全；点击单元格才进弹窗编辑</div>
+  <div class="stage">
+    <div class="row">
+      <span class="tag">悬停态</span>
+      <div class="cell" style="border-color:#3370ff"><span class="main"><span class="author">阿哲</span>：对颂钵兴趣大，怕吵…</span><span class="count">3人</span></div>
+      <div class="popover">
+        <div class="p-head">客户信息 · 3 人已填写 · 点击编辑</div>
+        <div class="p-item"><span class="p-author">阿哲</span><span>对颂钵兴趣大，怕吵，建议安排小房间</span></div>
+        <div class="p-item"><span class="p-author green">大熊</span><span>首次到店有点紧张，接待时多陪聊</span></div>
+        <div class="p-item"><span class="p-author">王姐</span><span>第一次咨询，主诉失眠两年</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 三、弹窗：我已填写 -->
+  <h2>三、弹窗 · 我已填写过</h2>
+  <div class="desc">「我填写的」输入框有内容，改完点别处自动保存；「同事填写的」只读平铺</div>
+  <div class="stage">
+    <div class="dialog-wrap">
+      <div class="dialog">
+        <div class="d-head"><span class="d-title">林小满 · 客户信息</span><span class="d-close">✕</span></div>
+        <div class="d-body">
+          <div class="d-section-head">
+            <span class="d-section-title">我填写的</span>
+            <span class="d-section-hint">改完点别处自动保存 · <span class="clear">清空</span></span>
+          </div>
+          <div class="d-input">对颂钵兴趣大，怕吵，建议安排小房间</div>
+          <div class="d-others">
+            <div class="d-section-head"><span class="d-section-title">同事填写的</span></div>
+            <div class="d-others-list">
+              <div class="d-note">
+                <div class="n-meta"><span class="n-name">大熊</span><span class="n-time">08-22 16:40</span></div>
+                <div class="n-content">首次到店有点紧张，接待时多陪着聊会</div>
+              </div>
+              <div class="d-note">
+                <div class="n-meta"><span class="n-name">王姐</span><span class="n-time">08-20 10:31</span></div>
+                <div class="n-content">第一次咨询，主诉失眠两年，工作压力导致</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四、弹窗：我未填写 -->
+  <h2>四、弹窗 · 我还没填写</h2>
+  <div class="desc">同一个弹窗，唯一区别：输入框为空、显示占位提示，回车保存</div>
+  <div class="stage">
+    <div class="dialog-wrap">
+      <div class="dialog">
+        <div class="d-head"><span class="d-title">林小满 · 跟进点</span><span class="d-close">✕</span></div>
+        <div class="d-body">
+          <div class="d-section-head">
+            <span class="d-section-title">我填写的</span>
+            <span class="d-section-hint">回车保存</span>
+          </div>
+          <div class="d-input placeholder focus">写下你观察到的跟进点…</div>
+          <div class="d-others">
+            <div class="d-section-head"><span class="d-section-title">同事填写的</span></div>
+            <div class="d-others-list">
+              <div class="d-note">
+                <div class="n-meta"><span class="n-name">大熊</span><span class="n-time">08-22 16:40</span></div>
+                <div class="n-content">周五前电话回访睡眠改善情况，约好下次课</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 五、客户详情页 跟进点 tab -->
+  <h2>五、客户详情页 · 跟进点 tab（同步调整）</h2>
+  <div class="desc">现状问题：详情页读的是邀约记录上的旧单条字段（feedback / healing_notes），与邀约页多人录入（visit_notes）是两套数据，新录的内容详情页看不到。改为：每张邀约卡片内两栏按人平铺，查看场景不开弹窗，编辑回邀约页</div>
+  <div class="stage">
+    <div style="background:#fafbfc;border:0.5px solid #eef0f1;border-radius:10px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:13px;font-weight:500;color:#212631;">2026/8/22 14:00</span>
+        <span style="font-size:11px;color:#157a3c;background:#dcf5e4;padding:1px 8px;border-radius:99px;">已到店</span>
+        <span style="margin-left:auto;font-size:11px;color:#3370ff;cursor:pointer;">去编辑</span>
+      </div>
+      <div style="display:grid;grid-template-columns:64px 1fr;gap:6px 12px;font-size:12px;">
+        <span style="color:#a8b1bd;padding-top:1px;">来访需求</span>
+        <span style="color:#3a4150;line-height:1.6;">失眠调理，想做颂钵</span>
+        <span style="color:#a8b1bd;padding-top:1px;">跟进点</span>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:8px;align-items:baseline;line-height:1.6;">
+            <span style="color:#3370ff;flex-shrink:0;">阿哲</span>
+            <span style="color:#3a4150;">对颂钵兴趣大，怕吵，建议安排小房间</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:baseline;line-height:1.6;">
+            <span style="color:#0F6E56;flex-shrink:0;">大熊</span>
+            <span style="color:#3a4150;">周五前电话回访睡眠改善情况</span>
+          </div>
+        </div>
+        <span style="color:#a8b1bd;padding-top:1px;">客户信息</span>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:8px;align-items:baseline;line-height:1.6;">
+            <span style="color:#3370ff;flex-shrink:0;">阿哲</span>
+            <span style="color:#3a4150;">首次咨询，主诉失眠两年，工作压力导致</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:baseline;line-height:1.6;">
+            <span style="color:#0F6E56;flex-shrink:0;">大熊</span>
+            <span style="color:#3a4150;">到店时比较紧张，需要人多陪</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:12px;color:#8f959e;line-height:1.6;">
+      只有一人填过 = 一行「作者 内容」，不加结构；没人填过 = 保持现有空态小横线。<br>
+      后端：<code style="background:#f5f6f8;border-radius:4px;padding:1px 5px;">customer_detail</code> 聚合接口给每条 visit_record 附上按人归并的 visit_notes；旧 feedback / healing_notes 字段迁移并入 visit_notes 后废弃。
+    </div>
+  </div>
+
+  <!-- 六、规则 -->
+  <h2>六、行为规则</h2>
+  <div class="rules">
+    <ul>
+      <li><b>每人一条</b>：同一个人在同一栏（客户信息 / 跟进点）最多一条内容，再次保存即更新自己那条，不产生新记录</li>
+      <li><b>权限</b>：只能修改 / 清空自己那条；同事的只读，无编辑入口；超级管理员不受限</li>
+      <li><b>单元格计数</b>：显示「N人」= 已填写人数，不再用「N条」</li>
+      <li><b>空态</b>：任何人都没填时，单元格显示灰色「添加客户信息 / 添加跟进点」；弹窗里不显示「同事填写的」分区</li>
+      <li><b>撤销的行</b>（已取消邀约）：单元格禁用，不可开弹窗</li>
+      <li><b>后端约束</b>：<code>visit_notes</code> 在 <code>(visit_id, category, created_by_id)</code> 上加唯一约束，保存接口改为 upsert；前端打开弹窗时拉取该 visit 全部 notes 按人归并</li>
+      <li><b>文案</b>：分区标题固定为「我填写的」「同事填写的」；占位提示「写下你观察到的客户信息…」/「写下你观察到的跟进点…」</li>
+      <li><b>视觉</b>：无头像、无彩色边框、无状态标签；hairline <code>#f0f0f0</code>，主色 <code>#3370ff</code> 仅用于作者名与聚焦边框</li>
+      <li><b>客户详情页</b>：跟进点 tab 的邀约卡片同步改为按人平铺展示（数据源换 visit_notes），编辑入口回邀约页；涉及 <code>backend/app/api/customer_detail.py</code> 与 <code>frontend/src/pages/healing-records/components/detail-view.tsx</code></li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小程序 · 取消关联抵扣弹窗</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #eceef1; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; display: flex; gap: 28px; align-items: flex-start; }
+  .phone { width: 375px; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 28px rgba(31,35,41,.14); position: relative; }
+  .phone-head { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #1f2329; border-bottom: 1px solid #f0f0f0; }
+  .page-body { height: 560px; padding: 12px; background: #f7f8fa; }
+  .fake-row { height: 40px; border-radius: 8px; background: #fff; margin-bottom: 8px; }
+  .caption { margin-bottom: 10px; font-size: 12px; color: #646a73; }
+  .col { display: flex; flex-direction: column; }
+
+  /* 小程序样式：1rpx = 0.5px */
+  .coarse-mask { position: absolute; inset: 0; background: rgba(20,24,31,.45); z-index: 400; }
+  .coarse-dialog {
+    position: absolute; top: 50%; left: 50%; z-index: 401; width: 300px; max-width: 86vw;
+    padding: 20px 18px 14px; border-radius: 12px; background: #fff;
+    box-shadow: 0 8px 24px rgba(31,35,41,.18); transform: translate(-50%,-50%);
+  }
+  .coarse-title { font-size: 16px; font-weight: 500; color: #1f2329; }
+  .coarse-desc { margin-top: 6px; font-size: 12px; line-height: 1.5; color: #8f959e; }
+  .coarse-list { max-height: 180px; overflow-y: auto; margin-top: 12px; border-radius: 6px; background: #f7f8fa; }
+  .coarse-item { display: flex; flex-direction: column; padding: 10px 12px; border-bottom: 1px solid #eceef1; }
+  .coarse-item:last-child { border-bottom: none; }
+  .coarse-item-name { font-size: 14px; color: #1f2329; }
+  .coarse-item-meta { margin-top: 3px; font-size: 12px; color: #8f959e; }
+  .coarse-hint { margin-top: 12px; font-size: 13px; line-height: 1.5; color: #4e535a; }
+  .coarse-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .coarse-btn { flex: 1; height: 42px; border-radius: 6px; font-size: 14px; line-height: 42px; text-align: center; }
+  .coarse-btn-cancel { border: 1px solid #dee0e3; background: #fff; color: #4e535a; }
+  .coarse-btn-ok { background: #3370ff; color: #fff; }
+
+  /* 对比：原来的系统弹窗 */
+  .native-modal { position: absolute; top: 50%; left: 50%; z-index: 401; width: 270px; transform: translate(-50%,-50%); border-radius: 12px; background: rgba(255,255,255,.98); overflow: hidden; }
+  .native-title { padding: 22px 20px 0; font-size: 16px; font-weight: 500; text-align: center; color: #000; }
+  .native-content { padding: 8px 20px 20px; font-size: 14px; line-height: 1.45; color: #000; word-break: break-all; }
+  .native-actions { display: flex; border-top: 1px solid #e5e5e5; }
+  .native-actions view { flex: 1; height: 48px; line-height: 48px; text-align: center; font-size: 16px; color: #576b95; }
+  .native-actions view:first-child { border-right: 1px solid #e5e5e5; color: #000; }
+</style>
+</head>
+<body>
+  <div class="col">
+    <div class="caption">旧：系统 wx.showModal（文字糊、层级平）</div>
+    <div class="phone">
+      <div class="phone-head">课表</div>
+      <div class="page-body">
+        <div class="fake-row"></div><div class="fake-row"></div><div class="fake-row"></div><div class="fake-row"></div>
+      </div>
+      <div class="coarse-mask"></div>
+      <div class="native-modal">
+        <div class="native-title">取消关联抵扣</div>
+        <div class="native-content">取消参与后，会同时撤销 1 笔粗门次卡支付记录（共 1 次）：<br>包晓博 · 戏剧解放天性 · 1 次<br>是否继续？</div>
+        <div class="native-actions"><view>取消</view><view>确认继续</view></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="caption">新：自定义弹窗 · 一条抵扣</div>
+    <div class="phone">
+      <div class="phone-head">课表</div>
+      <div class="page-body">
+        <div class="fake-row"></div><div class="fake-row"></div><div class="fake-row"></div><div class="fake-row"></div>
+      </div>
+      <div class="coarse-mask"></div>
+      <div class="coarse-dialog">
+        <div class="coarse-title">取消关联抵扣</div>
+        <div class="coarse-desc">取消参与后，会同时撤销下面这些粗门次卡支付记录。</div>
+        <div class="coarse-list">
+          <div class="coarse-item"><span class="coarse-item-name">包晓博</span><span class="coarse-item-meta">戏剧解放天性 · 1 次</span></div>
+        </div>
+        <div class="coarse-hint">是否继续？</div>
+        <div class="coarse-actions"><div class="coarse-btn coarse-btn-cancel">取消</div><div class="coarse-btn coarse-btn-ok">确认继续</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="caption">新：自定义弹窗 · 多条抵扣（超出可滚动）</div>
+    <div class="phone">
+      <div class="phone-head">课表</div>
+      <div class="page-body">
+        <div class="fake-row"></div><div class="fake-row"></div><div class="fake-row"></div><div class="fake-row"></div>
+      </div>
+      <div class="coarse-mask"></div>
+      <div class="coarse-dialog">
+        <div class="coarse-title">取消关联抵扣</div>
+        <div class="coarse-desc">取消参与后，会同时撤销下面这些粗门次卡支付记录。</div>
+        <div class="coarse-list">
+          <div class="coarse-item"><span class="coarse-item-name">包晓博</span><span class="coarse-item-meta">戏剧解放天性 · 1 次</span></div>
+          <div class="coarse-item"><span class="coarse-item-name">范琳</span><span class="coarse-item-meta">沙龙活动 · 2 次</span></div>
+          <div class="coarse-item"><span class="coarse-item-name">郑千慧</span><span class="coarse-item-meta">觉醒游戏 · 1 次</span></div>
+        </div>
+        <div class="coarse-hint">是否继续？</div>
+        <div class="coarse-actions"><div class="coarse-btn coarse-btn-cancel">取消</div><div class="coarse-btn coarse-btn-ok">确认继续</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

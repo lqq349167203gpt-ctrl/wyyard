@@ -23,10 +23,31 @@ class CoarseDoorCourseDeductionCreate(StrictBaseModel):
 
 
 @router.get("/coarse-door-options")
-def get_coarse_door_options(customer_id: str, request: Request):
+def get_coarse_door_options(customer_id: str, request: Request, editing_id: str = ""):
     customer_access_service.require_transaction_access(request, detail=True)
     customer_access_service.require_customer_scope(request, customer_id)
-    return project_deduction_service.get_coarse_door_options(customer_id)
+    if editing_id:
+        record = next((row for row in project_deduction_service.list_deductions(customer_id) if row.id == editing_id), None)
+        ensure_payment_record_manager(request, record)
+    return project_deduction_service.get_coarse_door_options(customer_id, editing_id)
+
+
+@router.patch("/coarse-door-course/{deduction_id}")
+def edit_coarse_door_course(deduction_id: str, data: CoarseDoorCourseDeductionCreate, request: Request):
+    customer_access_service.require_transaction_access(request, detail=True)
+    record = next((row for row in project_deduction_service.list_deductions() if row.id == deduction_id), None)
+    ensure_payment_record_manager(request, record)
+    customer_access_service.require_customer_scope(request, record.customer_id, action="修改")
+    before = record.model_dump(mode="json")
+    try:
+        result = project_deduction_service.edit_coarse_door_course_deduction(deduction_id, data.model_dump(), get_request_actor(request)[1])
+        request.state.operation_log_context = {
+            "content": f"编辑粗门抵扣：{result.nickname} · {before['source_activity_name']} → {result.source_activity_name} · 成交日期{result.deduction_date}",
+            "entity_id": result.id, "before_data": before, "after_data": result.model_dump(mode="json"),
+        }
+        return result
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
 
 
 @router.post("/coarse-door-course")
@@ -76,7 +97,7 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
 @router.get("")
 def list_deductions(request: Request, customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), card_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), manual_only: bool = Query(False)):
     customer_access_service.require_transaction_access(request, detail=True)
-    items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id, nickname, project_type)]
+    items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id, nickname, project_type, include_cancelled=True)]
     items = customer_access_service.filter_record_dicts(request, items)
     if manual_only:
         items = [i for i in items if i.get("project_name") != project_deduction_service.COARSE_DOOR_CARD_TYPE]

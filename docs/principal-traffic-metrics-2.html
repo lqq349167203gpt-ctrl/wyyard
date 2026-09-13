@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>引流人数面板 · 另外三种更轻的方案</title>
+  <style>
+    :root {
+      --blue: #3370ff;
+      --ink: #1f2329;
+      --text: #2b2f36;
+      --sub: #646a73;
+      --muted: #8f959e;
+      --line: #f0f0f0;
+      --paper: #fff;
+      --blue-soft: #f0f5ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #eef0f2;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; cursor: pointer; }
+    .preview { width: min(1320px, calc(100vw - 36px)); margin: 22px auto 44px; }
+    .preview-title { margin: 0; color: var(--ink); font-size: 18px; font-weight: 500; }
+    .preview-desc { margin: 6px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .variant { margin-bottom: 22px; }
+    .variant-head { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 8px; }
+    .variant-name { color: var(--ink); font-size: 14px; font-weight: 500; }
+    .variant-note { color: var(--muted); font-size: 12px; }
+    .panel { border: 1px solid #e8eaed; border-radius: 8px; background: var(--paper); overflow: hidden; }
+    .filters { display: flex; align-items: center; gap: 12px; padding: 10px 16px 12px; border-bottom: 1px solid #f2f3f5; background: #fafbfc; }
+    .filter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+    .filter-select { display: inline-flex; align-items: center; justify-content: space-between; width: 136px; height: 32px; padding: 0 10px; border: 1px solid #e1e4e7; border-radius: 4px; background: #fff; color: #4e535a; font-size: 12px; }
+    .caret { color: #c0c4cc; font-size: 10px; }
+    .num { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+    .click { border: 0; background: none; padding: 0; color: inherit; font-size: inherit; }
+    .click:hover { color: var(--blue); text-decoration: underline; }
+    .click.on, .click.on .num { color: var(--blue); }
+    .unit { font-size: 11px; font-weight: 400; color: var(--muted); }
+    .sub { font-size: 11px; color: var(--muted); }
+    /* 方案 D：一条汇总灰带（无卡片） */
+    .d-band { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 0; padding: 10px 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fafbfc; font-size: 12px; color: var(--sub); }
+    .d-group { display: inline-flex; align-items: baseline; gap: 6px; padding: 0 14px; border-right: 1px solid #eceef0; }
+    .d-group:first-child { padding-left: 0; }
+    .d-label { color: var(--muted); font-size: 11px; }
+    .d-value { font-size: 14px; }
+    .d-deal { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding-left: 14px; border-left: 1px solid #eceef0; }
+    /* 方案 E：键值列表 */
+    .e-rows { padding: 8px 16px 12px; }
+    .e-row { display: flex; align-items: baseline; gap: 14px; padding: 6px 0; border-bottom: 1px dashed #f4f5f6; }
+    .e-row:last-child { border-bottom: 0; }
+    .e-key { width: 60px; flex-shrink: 0; color: var(--muted); font-size: 11px; }
+    .e-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; min-width: 0; font-size: 12px; color: var(--sub); }
+    .e-main { font-size: 14px; }
+    /* 方案 F：主次分层单行 */
+    .f-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 26px; padding: 12px 16px; border-top: 1px solid var(--line); background: #fff; }
+    .f-item { display: inline-flex; align-items: baseline; gap: 6px; }
+    .f-main { font-size: 20px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .f-label { color: var(--muted); font-size: 11px; }
+    .f-note { color: var(--muted); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="preview">
+    <h1 class="preview-title">引流人数面板 · 另外三种更轻的方案</h1>
+    <p class="preview-desc">
+      同样是无忧茶院的真实数字：引流客户 799 人、成交 313 笔、邀约 330 人 / 895 人次、到店 281 人 / 778 人次、取消邀约 58 人 / 70 人次。<br>
+      三个方案都不再用卡片，靠排版层级区分主次；可点筛选的数字：hover 变蓝加下划线，筛选生效时变蓝（示例里「到店」是选中态）。
+    </p>
+    <section class="variant">
+      <div class="variant-head">
+        <span class="variant-name">方案 D · 一条汇总灰带</span>
+        <span class="variant-note">所有指标和成交挤进同一条灰带，只有上下两条细线、竖线分组；容器从 6 个降到 1 个</span>
+      </div>
+      <div class="panel">
+        <div class="filters">
+          <span class="filter">引流人<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">会员身份<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">跟进阶段<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">流量来源<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">客户标签<span class="filter-select">全部<span class="caret">▾</span></span></span>
+        </div>
+        <div class="d-band">
+          <span class="d-group"><span class="d-label">邀约</span><button class="click"><span class="d-value num">330</span> <span class="unit">人</span></button><span class="sub">/</span><button class="click"><span class="d-value num">895</span> <span class="unit">人次</span></button></span>
+          <span class="d-group"><span class="d-label">到店</span><button class="click on"><span class="d-value num">281</span> <span class="unit">人</span></button><span class="sub">/</span><button class="click"><span class="d-value num">778</span> <span class="unit">人次</span></button></span>
+          <span class="d-group"><span class="d-label">取消邀约</span><button class="click"><span class="d-value num">58</span> <span class="unit">人</span></button><span class="sub">/</span><button class="click"><span class="d-value num">70</span> <span class="unit">人次</span></button></span>
+          <span class="d-deal">
+            <button class="click"><span class="d-label">成交</span> <span class="d-value num">313</span> <span class="unit">笔</span></button>
+            <button class="click"><span>会员卡</span> <b class="num">238</b> <span class="sub">（体验会员162、次卡42、30次卡18、3月卡4、月卡3）</span></button>
+            <button class="click"><span>OH卡</span> <b class="num">32</b></button>
+            <button class="click"><span>觉醒游戏</span> <b class="num">26</b></button>
+            <button class="click"><span>其他项目</span> <b class="num">11</b></button>
+            <button class="click"><span>能量结</span> <b class="num">2</b></button>
+          </span>
+        </div>
+      </div>
+    </section>
+    <section class="variant">
+      <div class="variant-head">
+        <span class="variant-name">方案 E · 键值列表（左标签 / 右数值）</span>
+        <span class="variant-note">四行对齐，左边固定宽度的小标签、右边数值；行间只用极淡虚线，眼睛有固定落点</span>
+      </div>
+      <div class="panel">
+        <div class="filters">
+          <span class="filter">引流人<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">会员身份<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">跟进阶段<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">流量来源<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">客户标签<span class="filter-select">全部<span class="caret">▾</span></span></span>
+        </div>
+        <div class="e-rows">
+          <div class="e-row">
+            <span class="e-key">邀约</span>
+            <div class="e-value"><button class="click"><span class="e-main num">330</span> <span class="unit">人</span></button><button class="click"><span class="e-main num">895</span> <span class="unit">人次</span></button></div>
+          </div>
+          <div class="e-row">
+            <span class="e-key">到店</span>
+            <div class="e-value"><button class="click on"><span class="e-main num">281</span> <span class="unit">人</span></button><button class="click"><span class="e-main num">778</span> <span class="unit">人次</span></button></div>
+          </div>
+          <div class="e-row">
+            <span class="e-key">取消邀约</span>
+            <div class="e-value"><button class="click"><span class="e-main num">58</span> <span class="unit">人</span></button><button class="click"><span class="e-main num">70</span> <span class="unit">人次</span></button></div>
+          </div>
+          <div class="e-row">
+            <span class="e-key">成交</span>
+            <div class="e-value">
+              <button class="click"><span class="e-main num">313</span> <span class="unit">笔</span></button>
+              <button class="click"><span>会员卡</span> <b class="num">238</b> <span class="sub">（体验会员162、次卡42、30次卡18、3月卡4、月卡3）</span></button>
+              <button class="click"><span>OH卡</span> <b class="num">32</b></button>
+              <button class="click"><span>觉醒游戏</span> <b class="num">26</b></button>
+              <button class="click"><span>其他项目</span> <b class="num">11</b></button>
+              <button class="click"><span>能量结</span> <b class="num">2</b></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="variant">
+      <div class="variant-head">
+        <span class="variant-name">方案 F · 主次分层单行</span>
+        <span class="variant-note">只把三个关键数做大（邀约 / 到店 / 成交），人次、取消等降级成小字括注，一眼抓重点</span>
+      </div>
+      <div class="panel">
+        <div class="filters">
+          <span class="filter">引流人<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">会员身份<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">跟进阶段<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">流量来源<span class="filter-select">全部<span class="caret">▾</span></span></span>
+          <span class="filter">客户标签<span class="filter-select">全部<span class="caret">▾</span></span></span>
+        </div>
+        <div class="f-line">
+          <span class="f-item">
+            <span class="f-label">邀约</span>
+            <button class="click"><span class="f-main">330</span></button>
+            <span class="unit">人</span>
+            <span class="f-note">（895 人次）</span>
+          </span>
+          <span class="f-item">
+            <span class="f-label">到店</span>
+            <button class="click on"><span class="f-main">281</span></button>
+            <span class="unit">人</span>
+            <span class="f-note">（778 人次）</span>
+          </span>
+          <span class="f-item">
+            <span class="f-label">成交</span>
+            <button class="click"><span class="f-main">313</span></button>
+            <span class="unit">笔</span>
+            <span class="f-note">会员卡 238 / OH卡 32 / 觉醒游戏 26 / 其他 11</span>
+          </span>
+          <span class="f-item">
+            <span class="f-label">取消邀约</span>
+            <button class="click"><span class="num">58</span></button>
+            <span class="unit">人</span>
+            <span class="f-note">（70 人次）</span>
+          </span>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

@@ -28,6 +28,8 @@ def _row(customer_id: str, **overrides):
         "invitation_dates": [],
         "invitation_created_dates": [],
         "inviter_names": [],
+        "invitation_creators": [],
+        "schedule_creators": [],
         "first_visit_date": "",
         "last_visit_date": "",
         "invitation_count": 0,
@@ -446,12 +448,15 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
         _row(
             "c1",
             inviter_names=["奥雅", "耀凯"],
+            invitation_creators=["潘潘", "娟娟"],
             invitation_count_period=2,
             visit_count_period=2,
             arrival_count_period=2,
             _invitation_events_period=[
-                {"inviter_names": ["奥雅"], "visit_date": "2026-01-05", "arrived": True, "cancelled": False},
-                {"inviter_names": ["耀凯"], "visit_date": "2026-01-08", "arrived": True, "cancelled": False},
+                {"inviter_names": ["奥雅"], "invitation_creators": ["潘潘"], "visit_date": "2026-01-05",
+                 "arrived": True, "cancelled": False},
+                {"inviter_names": ["耀凯"], "invitation_creators": ["娟娟"], "visit_date": "2026-01-08",
+                 "arrived": True, "cancelled": False},
             ],
         ),
     ]
@@ -472,6 +477,99 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
     assert result["items"][0]["invitation_count_period"] == 1
     assert result["items"][0]["visit_count_period"] == 1
     assert result["items"][0]["arrival_count_period"] == 1
+
+
+def test_invitation_creator_condition_scopes_invitation_metrics(monkeypatch):
+    """「邀约创建人」按单条邀约判断，命中的那一条才计入邀约/到场口径。"""
+    rows = [
+        _row(
+            "c1",
+            inviter_names=["奥雅", "耀凯"],
+            invitation_creators=["潘潘", "娟娟"],
+            invitation_count_period=2,
+            visit_count_period=2,
+            arrival_count_period=2,
+            _invitation_events_period=[
+                {"inviter_names": ["奥雅"], "invitation_creators": ["潘潘"], "visit_date": "2026-01-05",
+                 "arrived": True, "cancelled": False},
+                {"inviter_names": ["耀凯"], "invitation_creators": ["娟娟"], "visit_date": "2026-01-08",
+                 "arrived": True, "cancelled": False},
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="invitation_creators", operator="eq", value="潘潘")],
+        metrics=["invited_customers", "arrived_customers", "arrival_visits"],
+        columns=["nickname", "invitation_creators"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "invited_customers": 1,
+        "arrived_customers": 1,
+        "arrival_visits": 1,
+    }
+    assert result["items"][0]["invitation_count_period"] == 1
+    # 展示出来的创建人只剩命中那一条，不会把「娟娟」也带出来
+    assert result["items"][0]["invitation_creators"] == ["潘潘"]
+
+
+def test_schedule_creator_condition_scopes_activity_metrics(monkeypatch):
+    """「课表创建人」按课表记录判断，命中后活动类指标跟着收窄。"""
+    rows = [
+        _row(
+            "c1",
+            schedule_creators=["苏晴", "阿宁"],
+            activity_count_period=2,
+            _activity_events_period=[
+                {"activity_types": ["内部课程"], "activity_names": ["课程A"],
+                 "course_teachers": ["奥雅"], "schedule_creators": ["苏晴"]},
+                {"activity_types": ["沙龙活动"], "activity_names": ["活动B"],
+                 "course_teachers": ["耀凯"], "schedule_creators": ["阿宁"]},
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="schedule_creators", operator="eq", value="苏晴")],
+        metrics=["total_customers", "activity_customers", "activity_participations"],
+        columns=["nickname", "schedule_creators"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert {card["key"]: card["count"] for card in result["cards"]} == {
+        "total_customers": 1,
+        "activity_customers": 1,
+        "activity_participations": 1,
+    }
+    assert result["items"][0]["activity_count_period"] == 1
+    assert result["items"][0]["activity_names"] == ["课程A"]
+    assert result["items"][0]["schedule_creators"] == ["苏晴"]
+
+
+def test_empty_value_operators_are_not_treated_as_incomplete(monkeypatch):
+    """「未填写 / 已填写」不需要填值，不能被当成没填完的条件丢掉。"""
+    rows = [
+        _row("c1", customer_tags=["高意向"]),
+        _row("c2", customer_tags=[]),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="customer_tags", operator="is_empty", value="")],
+        metrics=["total_customers"],
+        columns=["nickname"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    assert result["total"] == 1
+    assert [item["id"] for item in result["items"]] == ["c2"]
 
 
 def test_invitation_created_date_filters_and_splits_by_inviter(monkeypatch):
@@ -974,7 +1072,9 @@ def test_analysis_template_crud(client):
             if item["log_type"] == "template_created"
             and item["config"].get("模板名称") == payload["name"]
         )
-        assert saved_log["operator"] == "不闹"
+        # 分析日志的操作人按「显示名（账号）」记录，便于区分同名账号
+        assert saved_log["operator"].startswith("不闹")
+        assert saved_log["operator"].endswith("）")
         assert saved_log["config"]["模板简介"] == payload["description"]
         assert saved_log["config"]["可见范围"] == "仅自己可见"
 
@@ -992,3 +1092,79 @@ def test_analysis_template_crud(client):
     finally:
         deleted = client.delete(f"/api/custom-analysis/templates/{template_id}")
         assert deleted.status_code == 200
+
+
+def test_condition_fields_hide_identity_and_retired_amounts(client):
+    """「加条件」不再提供昵称/姓名/创建日期/期间成交金额/消费金额；
+    期间成交金额在「显示列」里同样不再提供，其余列表字段保留。"""
+    response = client.get("/api/custom-analysis/metadata")
+    assert response.status_code == 200, response.text
+    data = response.json()
+    hidden = {"nickname", "name", "created_at", "payment_amount_period", "total_consumption",
+              "payment_methods", "invitation_count_period", "visit_count_period"}
+    condition_fields = {field["value"] for field in data["fields"]}
+    column_fields = {field["value"] for field in data["column_fields"]}
+    assert hidden.isdisjoint(condition_fields), hidden & condition_fields
+    # 显示列里只有期间成交金额被去掉
+    assert "payment_amount_period" not in column_fields
+    assert (hidden - {"payment_amount_period"}) <= column_fields, (hidden - {"payment_amount_period"}) - column_fields
+    # 成交金额也不再作为统计指标的候选项，只用于历史模板回显
+    metric_values = {metric["value"] for metric in data["metrics"] if not metric.get("legacy_only")}
+    assert "payment_amount" not in metric_values
+    assert "payment_amount" in {metric["value"] for metric in data["metrics"]}
+
+
+def test_blank_conditions_do_not_break_query(client):
+    """另一种模式里遗留的空条件、以及当前模式里没填完的条件，都不该让查询失败。"""
+    body = {
+        "plan": {
+            "analysis_mode": "single",
+            "conditions": [
+                {"field": "gender", "operator": "eq", "value": "女"},
+                {"field": "age", "operator": "eq", "value": ""},
+            ],
+            "comparison_groups": [
+                {"name": "A组", "conditions": [{"field": "age", "operator": "eq", "value": ""}]},
+            ],
+        },
+    }
+    response = client.post("/api/custom-analysis/execute", json=body)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    # 空条件被忽略，不会把结果清空成 0 人（等价于只用「性别=女」筛）
+    assert data["plan"]["conditions"][0]["value"] == "女"
+    # 另一模式里已配置的内容要原样带回来，前端不能丢
+    assert data["plan"]["comparison_groups"][0]["conditions"][0]["field"] == "age"
+
+    empty = client.post("/api/custom-analysis/execute", json={"plan": {"analysis_mode": "single", "conditions": []}})
+    assert empty.status_code == 200, empty.text
+
+
+def test_analysis_template_plan_update(client):
+    """页面「更新模板」只提交 plan：不能退化成 dict，否则写操作日志时会 500。"""
+    payload = {
+        "name": "更新口径测试模板",
+        "description": "",
+        "scope": "private",
+        "plan": AnalysisPlan(card_dimension="none").model_dump(mode="json"),
+    }
+    created = client.post("/api/custom-analysis/templates", json=payload)
+    assert created.status_code == 200, created.text
+    template_id = created.json()["id"]
+    try:
+        next_plan = AnalysisPlan(card_dimension="none", row_display_mode="arrival_visits")
+        updated = client.patch(f"/api/custom-analysis/templates/{template_id}", json={"plan": next_plan.model_dump(mode="json")})
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["plan"]["row_display_mode"] == "arrival_visits"
+        assert updated.json()["name"] == payload["name"]
+
+        reloaded = next(item for item in client.get("/api/custom-analysis/templates").json() if item["id"] == template_id)
+        assert reloaded["plan"]["row_display_mode"] == "arrival_visits"
+
+        logs = client.get("/api/analysis-logs?record_type=template").json()["items"]
+        assert any(
+            item["log_type"] == "template_updated" and item["config"].get("模板名称") == payload["name"]
+            for item in logs
+        )
+    finally:
+        assert client.delete(f"/api/custom-analysis/templates/{template_id}").status_code == 200

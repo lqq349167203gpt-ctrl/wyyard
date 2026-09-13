@@ -3,7 +3,8 @@
   "navigationBarBackgroundColor": "#f3f7ff",
   "navigationBarTextStyle": "black",
   "usingComponents": {
-    "draggable-fab": "/components/draggable-fab/index"
+    "draggable-fab": "/components/draggable-fab/index",
+    "coarse-confirm": "/components/coarse-confirm/index"
   },
   "enablePullDownRefresh": true
 }

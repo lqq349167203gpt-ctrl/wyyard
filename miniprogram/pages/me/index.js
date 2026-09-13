@@ -18,6 +18,7 @@ Page({
     canCustomerTags: false,
     canCustomAnalysis: false,
     canServiceTeacher: false,
+    canOrganizations: false,
   },
 
   async onShow() {
@@ -41,6 +42,7 @@ Page({
       canServiceTeacher: app.checkPagePermission('service-teacher'),
       canCourseRecords: app.checkPagePermission('course-statistics'),
       canPrincipal: app.checkPagePermission('principal'),
+      canOrganizations: app.checkPagePermission('organizations'),
     })
   },
 
@@ -72,6 +74,9 @@ Page({
   },
   onPrincipalTap() {
     wx.navigateTo({ url: '/pages/principal/index' })
+  },
+  onOrganizationsTap() {
+    wx.navigateTo({ url: '/pages/organizations/index' })
   },
 
   onLogout() {

@@ -16,9 +16,12 @@ from app.services import (
     customer_service,
     login_record_service,
     operation_log_service,
+    position_edit_permission_service,
     service_teacher_customer_service,
 )
+from app.utils.record_ownership import request_actor_customer_ids
 from app.utils.request_context import get_client_ip, get_client_source
+from app.utils.request_roles import get_request_roles
 
 router = APIRouter(
     prefix="/api/service-teacher-customers",
@@ -122,6 +125,10 @@ def get_metadata(request: Request):
             if customer.id in teaching_counts or service_teacher_customer_service.TEACHER_POSITIONS.intersection(customer.positions or [])
         ]
         options.sort(key=lambda item: (-teaching_counts[item["customer_id"]], item["name"], item["customer_id"]))
+        # 角色限定“与本人相关”时，课程老师下拉只保留本人。
+        if position_edit_permission_service.get_permissions(get_request_roles(request))["course_records"] == "own":
+            own_customer_ids = request_actor_customer_ids(request)
+            options = [item for item in options if item["customer_id"] in own_customer_ids]
         return {
             "current_teacher": options[0]["name"] if options else "",
             "teachers": [item["name"] for item in options],

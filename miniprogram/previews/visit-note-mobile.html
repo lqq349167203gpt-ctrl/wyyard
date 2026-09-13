@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序 · 邀约详情 客户信息/跟进点 新样式预览</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: #f4f5f6; padding: 40px 16px 80px; color: #2b2f36;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  h1 { font-size: 17px; font-weight: 500; color: #1f2329; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #8f959e; margin-bottom: 28px; }
+  .phones { display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .phone-label { font-size: 12px; color: #8f959e; }
+  .phone {
+    width: 300px; border-radius: 28px; border: 1px solid #e1e4e7; background: #f7f8fa;
+    padding: 14px 12px 20px; box-shadow: 0 4px 16px rgba(31,35,41,.06);
+  }
+  .statusbar { height: 20px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #8f959e; margin-bottom: 8px; }
+  .visit-head { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .visit-head .name { font-size: 15px; font-weight: 500; color: #1f2329; }
+  .visit-head .meta { font-size: 11px; color: #8f959e; margin-top: 3px; }
+
+  /* 组件卡片 */
+  .note-card { background: #fff; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .note-header { display: flex; align-items: center; justify-content: space-between; }
+  .note-title { font-size: 13px; font-weight: 500; color: #1f2329; }
+  .note-count { font-size: 10px; color: #8f959e; }
+  .section-label { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 4px; }
+  .section-label.others { margin-top: 10px; padding-top: 8px; border-top: 0.5px solid #f0f0f0; }
+  .section-label-text { font-size: 11px; font-weight: 500; color: #1f2329; }
+  .section-label-hint { font-size: 10px; color: #8f959e; }
+  .section-label-hint .clear { color: #646a73; }
+  .mine-box { border: 0.5px solid #dee0e3; border-radius: 6px; padding: 8px; background: #fff; }
+  .mine-content { font-size: 13px; color: #2b2f36; line-height: 1.55; }
+  .mine-placeholder { color: #c0c4cc; }
+  .note-item { padding: 6px 0; border-bottom: 0.5px solid #f0f0f0; }
+  .note-item:last-child { border-bottom: none; padding-bottom: 2px; }
+  .note-meta { display: flex; align-items: center; gap: 8px; }
+  .note-creator { font-size: 11px; color: #4e535a; }
+  .note-time { font-size: 10px; color: #8f959e; margin-left: auto; }
+  .note-content { font-size: 13px; color: #2b2f36; line-height: 1.55; margin-top: 2px; }
+
+  /* 编辑弹层 */
+  .editor-wrap { position: relative; }
+  .editor-mask { position: absolute; inset: 0; border-radius: 28px; background: rgba(0,0,0,.35); }
+  .editor-panel {
+    position: absolute; left: 12px; right: 12px; bottom: 12px;
+    background: #fff; border-radius: 8px; overflow: hidden;
+  }
+  .editor-header { display: flex; justify-content: space-between; align-items: center; padding: 13px 14px; border-bottom: 0.5px solid #f0f0f0; }
+  .editor-title { font-size: 14px; font-weight: 500; color: #1f2329; }
+  .editor-close { font-size: 13px; color: #8f959e; }
+  .editor-input { margin: 14px; padding: 10px; border: 0.5px solid #dee0e3; border-radius: 6px; font-size: 14px; color: #c0c4cc; height: 80px; }
+  .editor-footer { display: flex; justify-content: space-between; align-items: center; padding: 0 14px 14px; }
+  .editor-hint { font-size: 11px; color: #8f959e; }
+  .editor-submit { background: #3370ff; color: #fff; font-size: 13px; border-radius: 6px; padding: 7px 18px; }
+
+  .notes { max-width: 720px; margin-top: 36px; background: #fff; border: 0.5px solid #e8eaed; border-radius: 10px; padding: 16px 20px; }
+  .notes li { font-size: 13px; color: #2b2f36; margin: 5px 0 5px 18px; line-height: 1.7; }
+  .notes b { font-weight: 500; }
+</style>
+</head>
+<body>
+
+  <h1>小程序 · 邀约详情「客户信息 / 跟进点」新样式</h1>
+  <div class="subtitle">与 PC 端同一规则：每人一条、只改自己的；我填写的 / 同事填写的 纯文字分区</div>
+
+  <div class="phones">
+
+    <div class="phone-col">
+      <div class="phone">
+        <div class="statusbar">9:41</div>
+        <div class="visit-head">
+          <div class="name">林小满</div>
+          <div class="meta">08-22 14:00 · 已到店 · 邀约 阿哲</div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-header"><span class="note-title">客户信息</span><span class="note-count">3人已填写</span></div>
+          <div class="section-label"><span class="section-label-text">我填写的</span><span class="section-label-hint">08/23 14:02 更新 · <span class="clear">清空</span></span></div>
+          <div class="mine-box"><div class="mine-content">对颂钵兴趣大，怕吵，建议安排小房间</div></div>
+          <div class="section-label others"><span class="section-label-text">同事填写的</span></div>
+          <div class="note-item">
+            <div class="note-meta"><span class="note-creator">大熊</span><span class="note-time">08/22 16:40</span></div>
+            <div class="note-content">首次到店有点紧张，接待时多陪着聊会</div>
+          </div>
+          <div class="note-item">
+            <div class="note-meta"><span class="note-creator">王姐</span><span class="note-time">08/20 10:31</span></div>
+            <div class="note-content">第一次咨询，主诉失眠两年，工作压力导致</div>
+          </div>
+        </div>
+
+        <div class="note-card">
+          <div class="note-header"><span class="note-title">跟进点</span><span class="note-count">1人已填写</span></div>
+          <div class="section-label"><span class="section-label-text">我填写的</span></div>
+          <div class="mine-box"><div class="mine-content mine-placeholder">写下你观察到的跟进点…</div></div>
+          <div class="section-label others"><span class="section-label-text">同事填写的</span></div>
+          <div class="note-item">
+            <div class="note-meta"><span class="note-creator">大熊</span><span class="note-time">08/22 16:40</span></div>
+            <div class="note-content">周五前电话回访睡眠改善情况，约好下次课</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">已填写（上）/ 未填写（下）</div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone editor-wrap" style="min-height: 560px;">
+        <div class="statusbar">9:41</div>
+        <div class="visit-head">
+          <div class="name">林小满</div>
+          <div class="meta">08-22 14:00 · 已到店 · 邀约 阿哲</div>
+        </div>
+        <div class="note-card">
+          <div class="note-header"><span class="note-title">客户信息</span><span class="note-count">3人已填写</span></div>
+          <div class="section-label"><span class="section-label-text">我填写的</span><span class="section-label-hint">08/23 14:02 更新 · <span class="clear">清空</span></span></div>
+          <div class="mine-box"><div class="mine-content">对颂钵兴趣大，怕吵，建议安排小房间</div></div>
+        </div>
+        <div class="editor-mask"></div>
+        <div class="editor-panel">
+          <div class="editor-header"><span class="editor-title">我填写的客户信息</span><span class="editor-close">取消</span></div>
+          <div class="editor-input">对颂钵兴趣大，怕吵，建议安排小房间</div>
+          <div class="editor-footer"><span class="editor-hint">18 / 5000</span><span class="editor-submit">保存</span></div>
+        </div>
+      </div>
+      <div class="phone-label">点"我填写的"框 → 底部弹层编辑</div>
+    </div>
+
+  </div>
+
+  <ul class="notes">
+    <li><b>每人一条</b>：列表按创建人归并，同一人只显示最新一条；头部计数从"N条"改为"N人已填写"</li>
+    <li><b>我填写的</b>永远在最上面：有内容点框直接改（底部弹层）、可清空；没内容就是占位提示，点框开始写</li>
+    <li><b>同事填写的</b>纯只读：名字 + 时间 + 内容，没有任何按钮</li>
+    <li>去掉了原来的右上角"新增"按钮和每条记录上的修改/删除——入口只剩"我填写的"那一框</li>
+    <li>无头像、无彩色边框、无状态标签，和 PC 端简化版弹窗同一语言</li>
+  </ul>
+
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>「我的」页面 · 邀约风格 + PC 同款图标</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --hairline: #f0f1f2;
+    --page-bg: #f7f8fa;
+    --primary: #3370ff;
+    --head-blue: #f3f7ff;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: #f2f3f5;
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 520px; margin: 0 auto 28px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-title span { color: var(--ink-3); font-weight: 400; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 16px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff; border: 1px solid var(--hairline);
+    padding: 7px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px;
+  }
+  .principle b { color: var(--ink); font-weight: 600; }
+
+  .frames { display: flex; justify-content: center; gap: 28px; align-items: flex-start; }
+  .frame { flex: 0 0 375px; }
+  .frame-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .frame-no { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .frame-name { font-size: 15px; font-weight: 600; }
+  .frame-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px; height: 812px; background: var(--page-bg);
+    border: 1px solid #dee2e6; overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: #fff; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    position: relative; font-size: 16px; font-weight: 600; flex-shrink: 0;
+  }
+
+  /* 通栏浅蓝头：头像左对齐 + 名字 + 角色 pill */
+  .head {
+    background: var(--head-blue);
+    padding: 22px 18px 26px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #fff; color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 600; flex-shrink: 0;
+  }
+  .info { min-width: 0; flex: 1; }
+  .name { font-size: 20px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+  .pill {
+    display: inline-flex; align-items: center;
+    margin-top: 7px; padding: 3px 12px;
+    background: rgba(255, 255, 255, 0.78);
+    border-radius: 999px;
+    font-size: 11px; color: var(--primary); font-weight: 500;
+  }
+
+  /* 功能入口：白卡 + 图标 */
+  .body { flex: 1; padding: 14px 12px 20px; overflow: hidden; }
+  .menu {
+    background: #fff; border-radius: 12px;
+    padding: 0 16px; margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  }
+  .mi { display: flex; align-items: center; height: 50px; border-bottom: 1px solid var(--hairline); }
+  .mi:last-child { border-bottom: none; }
+  .ic { width: 20px; height: 20px; margin-right: 12px; flex-shrink: 0; }
+  .tx { flex: 1; font-size: 15px; color: var(--ink); }
+  .ar { font-size: 18px; color: #c0c4cc; flex-shrink: 0; }
+  .logout {
+    height: 52px; background: #fff; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: var(--ink);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  }
+</style>
+</head>
+<body>
+  <div class="doc-head">
+    <div class="doc-title">「我的」页面 · 邀约风格 <span>（+ PC 同款图标）</span></div>
+    <div class="doc-sub">通栏浅蓝头 <b>#f3f7ff</b>、白底蓝字头像、名字 + 白色半透明角色 pill；下方白卡功能列表，每项带 PC 端同款 tabler 线性图标；退出白卡。</div>
+    <div class="principles">
+      <span class="principle"><b>通栏浅蓝头</b> 顶满屏幕边</span>
+      <span class="principle"><b>白底蓝字头像</b> + 角色 pill</span>
+      <span class="principle">菜单 <b>白卡 + tabler 图标</b></span>
+      <span class="principle">退出白卡</span>
+    </div>
+  </div>
+
+  <div class="frames">
+    <div class="frame">
+      <div class="frame-tag">
+        <span class="frame-no">F</span>
+        <span class="frame-name">邀约风格 · 带图标</span>
+        <span class="frame-desc">顶部保持不动</span>
+      </div>
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●● ▲ 🔋</span></div>
+        <div class="navbar"><span>我的</span></div>
+        <div class="head">
+          <div class="avatar">王</div>
+          <div class="info">
+            <div class="name">王老师</div>
+            <div class="pill">超级管理员</div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="menu">
+            <div class="mi"><img class="ic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTMgOGEzIDMgMCAwIDEgMyAtM2gxMmEzIDMgMCAwIDEgMyAzdjhhMyAzIDAgMCAxIC0zIDNoLTEyYTMgMyAwIDAgMSAtMyAtM2wwIC04Ii8+PHBhdGggZD0iTTMgMTBsMTggMCIvPjxwYXRoIGQ9Ik03IDE1bC4wMSAwIi8+PHBhdGggZD0iTTExIDE1bDIgMCIvPjwvc3ZnPg==" /><span class="tx">付费项目</span><span class="ar">›</span></div>
+            <div class="mi"><img class="ic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTUgMjF2LTE2YTIgMiAwIDAgMSAyIC0yaDEwYTIgMiAwIDAgMSAyIDJ2MTZsLTMgLTJsLTIgMmwtMiAtMmwtMiAybC0yIC0ybC0zIDJtNCAtMTRoNm0tNiA0aDZtLTIgNGgyIi8+PC9zdmc+" /><span class="tx">支出</span><span class="ar">›</span></div>
+            <div class="mi"><img class="ic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTMgMjBsMS4zIC0zLjljLTIuMzI0IC0zLjQzNyAtMS40MjYgLTcuODcyIDIuMSAtMTAuMzc0YzMuNTI2IC0yLjUwMSA4LjU5IC0yLjI5NiAxMS44NDUgLjQ4YzMuMjU1IDIuNzc3IDMuNjk1IDcuMjY2IDEuMDI5IDEwLjUwMWMtMi42NjYgMy4yMzUgLTcuNjE1IDQuMjE1IC0xMS41NzQgMi4yOTNsLTQuNyAxIi8+PC9zdmc+" /><span class="tx">沟通记录</span><span class="ar">›</span></div>
+            <div class="mi"><img class="ic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgNWgtMmEyIDIgMCAwIDAgLTIgMnYxMmEyIDIgMCAwIDAgMiAyaDEwYTIgMiAwIDAgMCAyIC0ydi0xMmEyIDIgMCAwIDAgLTIgLTJoLTIiLz48cGF0aCBkPSJNOSA1YTIgMiAwIDAgMSAyIC0yaDJhMiAyIDAgMCAxIDIgMmEyIDIgMCAwIDEgLTIgMmgtMmEyIDIgMCAwIDEgLTIgLTIiLz48cGF0aCBkPSJNOSAxMmg2Ii8+PHBhdGggZD0iTTkgMTZoNiIvPjwvc3ZnPg==" /><span class="tx">每日报表</span><span class="ar">›</span></div>
+            <div class="mi"><img class="ic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTMgOHY0LjE3MmEyIDIgMCAwIDAgLjU4NiAxLjQxNGw1LjcxIDUuNzFhMi40MSAyLjQxIDAgMCAwIDMuNDA4IDBsMy41OTIgLTMuNTkyYTIuNDEgMi40MSAwIDAgMCAwIC0zLjQwOGwtNS43MSAtNS43MWEyIDIgMCAwIDAgLTEuNDE0IC0uNTg2aC00LjE3MmEyIDIgMCAwIDAgLTIgMiIvPjxwYXRoIGQ9Ik0xOCAxOWwxLjU5MiAtMS41OTJhNC44MiA0LjgyIDAgMCAwIDAgLTYuODE2bC00LjU5MiAtNC41OTIiLz48cGF0aCBkPSJNNyAxMGgtLjAxIi8+PC9zdmc+" /><span class="tx">客户标签</span><span class="ar">›</span></div>
+            <div class="mi"><img class="ic" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzk4MzhmIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTMgM3YxOGgxOCIvPjxwYXRoIGQ9Ik03IDlhMiAyIDAgMSAwIDQgMGEyIDIgMCAxIDAgLTQgMCIvPjxwYXRoIGQ9Ik0xNyA3YTIgMiAwIDEgMCA0IDBhMiAyIDAgMSAwIC00IDAiLz48cGF0aCBkPSJNMTIgMTVhMiAyIDAgMSAwIDQgMGEyIDIgMCAxIDAgLTQgMCIvPjxwYXRoIGQ9Ik0xMC4xNiAxMC42MmwyLjM0IDIuODgiLz48cGF0aCBkPSJNMTUuMDg4IDEzLjMyOGwyLjgzNyAtNC41ODYiLz48L3N2Zz4=" /><span class="tx">自定义筛选</span><span class="ar">›</span></div>
+          </div>
+          <div class="logout">退出登录</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

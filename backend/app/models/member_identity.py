@@ -7,13 +7,15 @@ from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class IdentityCondition(SafeBaseModel):
-    type: Literal["arrival", "activity", "card", "course", "payment", "teacher", "fixed", "amount"]
+    type: Literal["invitation", "arrival", "activity", "card", "course", "payment", "teacher", "fixed", "amount"]
     payment_categories: List[str] = []
     items: List[str] = []
     count_op: Literal[">", "=", "<", ">=", "<="] = ">"
     count_value: int = 0
     validity: Literal["active", "all"] = "active"
     activity_scope: Literal["all", "welfare"] = "all"
+    # 邀约情况：active＝正常邀约（未取消），cancelled＝已取消的邀约；与是否到店无关
+    invitation_scope: Literal["active", "cancelled"] = "active"
 
 
 class MemberIdentityBase(SafeBaseModel):

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>邀约 + 课表 · 样式方案</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #646a73;
+    --ink-3: #8f959e;
+    --ink-4: #b0b5bb;
+    --hairline: #ebedf0;
+    --page-bg: #f2f3f5;
+    --phone-bg: #f7f8fa;
+    --primary: #3370ff;
+    --warn: #d97070;
+    --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    --c-juexing: #7c5cfc;
+    --c-qingxu: #d97070;
+    --c-ohcard: #c772a0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--page-bg);
+    color: var(--ink);
+    padding: 40px 32px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .doc-head { max-width: 1280px; margin: 0 auto 32px; }
+  .doc-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .doc-sub { font-size: 13px; color: var(--ink-2); margin-bottom: 18px; line-height: 1.7; }
+  .principles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .principle {
+    background: #fff; border: 1px solid var(--hairline);
+    padding: 7px 12px; font-size: 12px; color: var(--ink-2); border-radius: 3px;
+  }
+  .principle b { color: var(--ink); font-weight: 600; }
+
+  .frames { max-width: 1280px; margin: 0 auto; display: flex; gap: 28px; align-items: flex-start; overflow-x: auto; padding-bottom: 12px; }
+  .frame { flex: 0 0 375px; }
+  .frame-tag { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .frame-no { font-size: 17px; font-weight: 700; color: var(--primary); }
+  .frame-name { font-size: 15px; font-weight: 600; }
+  .frame-desc { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+
+  .phone {
+    width: 375px; height: 780px; background: var(--phone-bg);
+    border: 1px solid #dee2e6; overflow: hidden; position: relative;
+    display: flex; flex-direction: column;
+  }
+  .statusbar {
+    height: 24px; background: #fff; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; flex-shrink: 0;
+  }
+  .navbar {
+    height: 44px; background: #fff; display: flex; align-items: center; justify-content: center;
+    position: relative; font-size: 16px; font-weight: 600; flex-shrink: 0;
+  }
+  .capsule {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    width: 74px; height: 28px; border: 1px solid #e6e9ed; border-radius: 14px;
+    display: flex; align-items: center; justify-content: space-evenly;
+  }
+  .capsule::before { content: "•••"; font-size: 10px; letter-spacing: 1px; }
+  .capsule::after { content: "◉"; font-size: 11px; }
+  .screen { flex: 1; position: relative; overflow: hidden; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* 头部（两页统一） */
+  .head {
+    background: #fff; padding: 12px 16px 10px; border-bottom: 1px solid var(--hairline);
+  }
+  .head-row { display: flex; align-items: center; }
+  .head-date { font-size: 15px; font-weight: 600; }
+  .head-date .wk { font-weight: 400; color: var(--ink-2); margin-left: 5px; font-size: 13px; }
+  .head-date .drop { color: var(--ink-3); font-size: 11px; margin-left: 3px; }
+  .head-space {
+    margin-left: auto; font-size: 12px; color: var(--ink-2);
+    background: #f2f3f5; padding: 4px 9px; border-radius: 3px;
+  }
+  .head-sub { margin-top: 7px; font-size: 11.5px; color: var(--ink-3); display: flex; align-items: center; }
+  .head-sub b { color: var(--ink-2); font-weight: 500; }
+  .head-actions { margin-left: auto; display: flex; gap: 8px; }
+  .head-btn {
+    font-size: 11.5px; color: var(--ink-2); border: 1px solid var(--hairline);
+    border-radius: 3px; padding: 3px 10px;
+  }
+
+  .fab {
+    position: absolute; right: 16px; bottom: 20px; width: 46px; height: 46px;
+    border-radius: 50%; background: var(--primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 300; box-shadow: 0 4px 16px rgba(51,112,255,.25);
+  }
+
+  /* 通用小签 */
+  .pill {
+    display: inline-flex; align-items: center; padding: 1px 6px;
+    font-size: 10.5px; font-weight: 500; border-radius: 3px; line-height: 1.6; flex-shrink: 0;
+  }
+  .pill-gray { background: #f2f3f5; color: var(--ink-2); }
+  .pill-blue { background: rgba(51,112,255,.09); color: var(--primary); }
+  .pill-warn { background: rgba(217,112,112,.10); color: var(--warn); }
+  .pill-lock { background: transparent; border: 1px solid #dcdfe4; color: var(--ink-3); }
+
+  /* 到店按钮（主操作） */
+  .arrive-btn {
+    flex-shrink: 0; font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 4px;
+  }
+  .arrive-btn.todo { background: var(--primary); color: #fff; }
+  .arrive-btn.done { background: rgba(51,112,255,.09); color: var(--primary); font-weight: 500; }
+
+  /* ============ 邀约 A · 信息内联卡 ============ */
+  .vcard {
+    background: #fff; border: 1px solid var(--hairline); border-radius: 4px;
+    margin: 0 12px 8px; padding: 12px 14px;
+  }
+  .vcard.cancelled { background: #fafbfc; }
+  .vcard.cancelled .v-name, .vcard.cancelled .v-meta, .vcard.cancelled .v-needs { color: var(--ink-4); }
+  .v-row1 { display: flex; align-items: center; gap: 6px; }
+  .v-name { font-size: 15px; font-weight: 700; }
+  .v-row2 { margin-top: 6px; font-size: 12px; color: var(--ink-2); display: flex; gap: 5px; align-items: baseline; flex-wrap: wrap; }
+  .v-row2 .sep { color: #ccd3da; }
+  .v-needs { margin-top: 5px; font-size: 12px; color: var(--ink-2); line-height: 1.6; display: flex; }
+  .v-needs .k { color: var(--ink-3); flex-shrink: 0; margin-right: 4px; }
+  .v-row3 {
+    margin-top: 9px; padding-top: 8px; border-top: 1px solid #f5f6f7;
+    display: flex; align-items: center; font-size: 11px; color: var(--ink-3);
+  }
+  .v-ops { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); }
+  .v-ops .danger { color: var(--warn); }
+  .v-ops .disabled { color: var(--ink-4); }
+
+  /* ============ 邀约 B · 状态分组 ============ */
+  .g-head {
+    display: flex; align-items: baseline; gap: 8px; padding: 12px 16px 6px;
+  }
+  .g-title { font-size: 13px; font-weight: 700; }
+  .g-count { font-size: 11px; color: var(--ink-3); }
+  .g-head::after { content: ""; flex: 1; height: 1px; background: var(--hairline); align-self: center; }
+  .g-head.done .g-title { color: var(--ink-3); }
+  .grow {
+    background: #fff; border: 1px solid var(--hairline); border-radius: 4px;
+    margin: 0 12px 6px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .grow-main { flex: 1; min-width: 0; }
+  .grow-l1 { display: flex; align-items: center; gap: 6px; }
+  .grow-name { font-size: 14.5px; font-weight: 600; }
+  .grow-l2 { margin-top: 4px; font-size: 11.5px; color: var(--ink-2); display: flex; gap: 5px; align-items: baseline; }
+  .grow-l2 .sep { color: #ccd3da; }
+  .grow.done { background: #fafbfc; }
+  .grow.done .grow-name, .grow.done .grow-l2 { color: var(--ink-4); }
+  .g-restore { font-size: 12px; color: var(--ink-2); flex-shrink: 0; }
+  .lock-inline { font-size: 10.5px; color: var(--ink-4); flex-shrink: 0; }
+
+  /* ============ 课表 ============ */
+  .ac-group-label { font-size: 11px; color: var(--ink-3); padding: 12px 16px 5px; }
+  .acard {
+    background: #fff; border: 1px solid var(--hairline); border-radius: 4px;
+    margin: 0 12px 8px; padding: 11px 12px; display: flex; align-items: center;
+  }
+  .ac-time { width: 46px; flex-shrink: 0; }
+  .ac-time .t1 { font-size: 14px; font-weight: 700; display: block; }
+  .ac-time .t2 { font-size: 10.5px; color: var(--ink-3); display: block; margin-top: 2px; }
+  .ac-mid { flex: 1; min-width: 0; margin-left: 11px; }
+  .ac-l1 { display: flex; align-items: center; }
+  .ac-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .ac-name { font-size: 14px; font-weight: 600; margin-left: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-type { font-size: 11px; color: var(--ink-3); margin-left: 6px; flex-shrink: 0; }
+  .ac-l2 { margin-top: 4px; font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ac-ppl {
+    margin-top: 4px; font-size: 11px; color: var(--ink-3);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ac-ppl b { color: var(--ink-2); font-weight: 500; }
+  .ac-right { flex-shrink: 0; margin-left: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+  .notes {
+    margin-top: 14px; background: #fff; border: 1px solid var(--hairline);
+    border-radius: 3px; padding: 12px 14px;
+  }
+  .notes li {
+    font-size: 12px; color: var(--ink-2); line-height: 1.8;
+    list-style: none; padding-left: 12px; position: relative;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 4px; height: 4px; background: var(--primary); border-radius: 1px;
+  }
+  .notes li b { color: var(--ink); }
+
+  .doc-foot { max-width: 1280px; margin: 26px auto 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <div class="doc-title">邀约 + 课表 · 样式方案</div>
+  <div class="doc-sub">围绕新权限规则（只能改自己创建的）重做权限显示，并把「要点进详情页/来回翻 tab」的信息提到卡片上。</div>
+  <div class="principles">
+    <div class="principle"><b>权限标记去补丁化</b>　去掉内嵌灰条和「仅到店可改/只读」小字；自己创建的不做任何标记（默认态），别人的只挂一个 <span class="pill pill-lock" style="font-size:10px;">仅查看</span> 描边小签</div>
+    <div class="principle"><b>信息上卡</b>　预计时间、当日需求直接显示在邀约卡上，不再点进详情页左右滑</div>
+    <div class="principle"><b>课表带人名</b>　课表卡片直接预览参与者（前几位 +N），不用翻邀约页对名单</div>
+    <div class="principle"><b>到店是主操作</b>　「未到店」从描边小字升级为实心按钮，一眼找到要点的地方</div>
+  </div>
+</div>
+
+<div class="frames">
+
+  <!-- ================= 邀约 A ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">A</span>
+      <span class="frame-name">邀约 · 信息内联卡</span>
+      <span class="frame-desc">结构不变 · 信息补齐</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">邀约<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="head">
+          <div class="head-row">
+            <span class="head-date tnum">8月20日<span class="wk">周四</span><span class="drop">▾</span></span>
+            <span class="head-space">三楼茶室 ▾</span>
+          </div>
+          <div class="head-sub">
+            今日 <b class="tnum">5</b> 位邀约 · <b class="tnum">1</b> 已到店
+            <span class="head-actions">
+              <span class="head-btn">排序</span>
+              <span class="head-btn">导出</span>
+            </span>
+          </div>
+        </div>
+
+        <div style="height: 10px;"></div>
+        <div class="vcard">
+          <div class="v-row1">
+            <span class="v-name">璐小娜</span>
+            <span class="pill pill-blue">组长</span>
+            <span class="pill pill-gray">年卡 · 剩8次</span>
+            <span class="arrive-btn todo" style="margin-left:auto;">未到店</span>
+          </div>
+          <div class="v-row2">预计 14:00<span class="sep">·</span>到店 12 次</div>
+          <div class="v-needs"><span class="k">需求</span>睡眠调理，最近夜间易醒加重</div>
+          <div class="v-row3">
+            创建人 耀凯
+            <span class="v-ops"><span>取消</span><span>资料</span><span class="danger">删除</span></span>
+          </div>
+        </div>
+
+        <div class="vcard">
+          <div class="v-row1">
+            <span class="v-name">陈默</span>
+            <span class="pill pill-gray">璐小娜组员</span>
+            <span class="pill pill-gray">3月卡 · 剩2次</span>
+            <span class="arrive-btn done" style="margin-left:auto;">已到店 13:52</span>
+          </div>
+          <div class="v-row2">预计 14:00<span class="sep">·</span>到店 8 次</div>
+          <div class="v-row3">
+            创建人 耀凯
+            <span class="v-ops"><span>资料</span><span class="danger">删除</span></span>
+          </div>
+        </div>
+
+        <div class="vcard">
+          <div class="v-row1">
+            <span class="v-name">林晓</span>
+            <span class="pill pill-gray">3月卡 · 剩2次</span>
+            <span class="pill pill-lock">仅查看</span>
+            <span class="arrive-btn todo" style="margin-left:auto;">未到店</span>
+          </div>
+          <div class="v-row2">预计 15:30<span class="sep">·</span>到店 5 次</div>
+          <div class="v-needs"><span class="k">需求</span>情绪释放专场</div>
+          <div class="v-row3">
+            创建人 婷婷
+            <span class="v-ops"><span>资料</span></span>
+          </div>
+        </div>
+
+        <div class="vcard cancelled">
+          <div class="v-row1">
+            <span class="v-name">苏杭</span>
+            <span class="pill pill-gray">月卡</span>
+            <span class="pill pill-gray" style="margin-left:auto;">已取消</span>
+          </div>
+          <div class="v-row2">预计 19:00<span class="sep">·</span>到店 3 次</div>
+          <div class="v-row3">
+            创建人 耀凯
+            <span class="v-ops"><span>恢复</span><span>资料</span></span>
+          </div>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>一行看懂一个人</b>：L1 名字+身份签+到店按钮，L2 时间/次数，L3 需求，L4 创建人+操作</li>
+      <li><b>「未到店」实心蓝按钮</b>是当前唯一主操作；到店后变淡蓝「已到店 13:52」（带时间）</li>
+      <li><b>权限规则</b>：别人的卡挂「仅查看」描边小签 + 操作只剩「资料」；自己的卡无任何标记，删除/取消正常</li>
+      <li>已取消整卡转灰下沉视觉，操作只剩「恢复/资料」</li>
+    </ul>
+  </div>
+
+  <!-- ================= 邀约 B ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">B</span>
+      <span class="frame-name">邀约 · 状态分组</span>
+      <span class="frame-desc">待办优先 · 完成下沉</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">邀约<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="head">
+          <div class="head-row">
+            <span class="head-date tnum">8月20日<span class="wk">周四</span><span class="drop">▾</span></span>
+            <span class="head-space">三楼茶室 ▾</span>
+          </div>
+          <div class="head-sub">
+            今日 <b class="tnum">5</b> 位邀约 · <b class="tnum">1</b> 已到店
+            <span class="head-actions">
+              <span class="head-btn">排序</span>
+              <span class="head-btn">导出</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="g-head"><span class="g-title">待到店</span><span class="g-count tnum">3 人</span></div>
+        <div class="grow">
+          <div class="grow-main">
+            <div class="grow-l1">
+              <span class="grow-name">璐小娜</span>
+              <span class="pill pill-blue">组长</span>
+              <span class="pill pill-gray">年卡 · 剩8次</span>
+            </div>
+            <div class="grow-l2">预计 14:00<span class="sep">·</span>需求：睡眠调理</div>
+          </div>
+          <span class="arrive-btn todo">未到店</span>
+        </div>
+        <div class="grow">
+          <div class="grow-main">
+            <div class="grow-l1">
+              <span class="grow-name">林晓</span>
+              <span class="pill pill-gray">3月卡 · 剩2次</span>
+              <span class="pill pill-lock">仅查看</span>
+            </div>
+            <div class="grow-l2">预计 15:30<span class="sep">·</span>需求：情绪释放<span class="sep">·</span>婷婷创建</div>
+          </div>
+          <span class="arrive-btn todo">未到店</span>
+        </div>
+        <div class="grow">
+          <div class="grow-main">
+            <div class="grow-l1">
+              <span class="grow-name">何青</span>
+              <span class="pill pill-gray">体验 · 首次</span>
+              <span class="pill pill-lock">仅查看</span>
+            </div>
+            <div class="grow-l2">预计 19:00<span class="sep">·</span>婷婷创建</div>
+          </div>
+          <span class="arrive-btn todo">未到店</span>
+        </div>
+
+        <div class="g-head done"><span class="g-title">已到店</span><span class="g-count tnum">1 人</span></div>
+        <div class="grow done">
+          <div class="grow-main">
+            <div class="grow-l1">
+              <span class="grow-name">陈默</span>
+              <span class="pill pill-gray">璐小娜组员</span>
+            </div>
+            <div class="grow-l2">13:52 到店<span class="sep">·</span>耀凯创建</div>
+          </div>
+          <span class="arrive-btn done">已到店</span>
+        </div>
+
+        <div class="g-head done"><span class="g-title">已取消</span><span class="g-count tnum">1 人</span></div>
+        <div class="grow done">
+          <div class="grow-main">
+            <div class="grow-l1">
+              <span class="grow-name">苏杭</span>
+              <span class="pill pill-gray">月卡</span>
+            </div>
+            <div class="grow-l2">预计 19:00<span class="sep">·</span>耀凯创建</div>
+          </div>
+          <span class="g-restore">恢复</span>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>按状态分三区</b>：待到店 / 已到店 / 已取消，处理完的自然下沉，待办区永远是干净的清单</li>
+      <li>行更紧凑（两行一卡），<b>右侧永远只有一个大按钮</b>，店员站着点也不容易误触</li>
+      <li>操作（取消/资料/删除）收进长按或右滑，卡面更干净 —— 适合邀约量大的一天</li>
+      <li>注意：分组后<b>手动排序只在「待到店」区内有意义</b></li>
+    </ul>
+  </div>
+
+  <!-- ================= 课表 ================= -->
+  <div class="frame">
+    <div class="frame-tag">
+      <span class="frame-no">C</span>
+      <span class="frame-name">课表 · 权限 + 人名预览</span>
+      <span class="frame-desc">小改现有卡片</span>
+    </div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+      <div class="navbar">课表<div class="capsule"></div></div>
+      <div class="screen">
+        <div class="head">
+          <div class="head-row">
+            <span class="head-date tnum">8月20日<span class="wk">周四</span><span class="drop">▾</span></span>
+            <span class="head-space">三楼茶室 ▾</span>
+          </div>
+          <div class="head-sub">今日 <b class="tnum">15</b> 位参与者</div>
+        </div>
+
+        <div class="ac-group-label">下午</div>
+        <div class="acard">
+          <div class="ac-time tnum"><span class="t1">14:00</span><span class="t2">16:00</span></div>
+          <div class="ac-mid">
+            <div class="ac-l1">
+              <span class="ac-dot" style="background: var(--c-juexing);"></span>
+              <span class="ac-name">觉醒游戏·陈默</span>
+              <span class="ac-type">觉醒</span>
+            </div>
+            <div class="ac-l2">周远 · 扣卡 1 次</div>
+            <div class="ac-ppl"><b class="tnum">6 人</b>　陈默、璐小娜、苏杭、林晓…</div>
+          </div>
+          <div class="ac-right">
+            <span class="pill pill-gray">已发布</span>
+          </div>
+        </div>
+
+        <div class="acard">
+          <div class="ac-time tnum"><span class="t1">15:30</span><span class="t2">17:00</span></div>
+          <div class="ac-mid">
+            <div class="ac-l1">
+              <span class="ac-dot" style="background: var(--c-qingxu);"></span>
+              <span class="ac-name">情绪释放·小满</span>
+              <span class="ac-type">情绪释放</span>
+            </div>
+            <div class="ac-l2">何青</div>
+            <div class="ac-ppl"><b class="tnum">4 人</b>　林晓、方舟、顾一帆…</div>
+          </div>
+          <div class="ac-right">
+            <span class="pill pill-lock">仅查看</span>
+          </div>
+        </div>
+
+        <div class="ac-group-label">晚上</div>
+        <div class="acard">
+          <div class="ac-time tnum"><span class="t1">19:00</span><span class="t2">21:00</span></div>
+          <div class="ac-mid">
+            <div class="ac-l1">
+              <span class="ac-dot" style="background: var(--c-ohcard);"></span>
+              <span class="ac-name">OH卡·星空夜谈</span>
+              <span class="ac-type">OH卡</span>
+            </div>
+            <div class="ac-l2">白鹭 · 扣卡 2 次</div>
+            <div class="ac-ppl"><b class="tnum">5 人</b>　苏杭、何青、陈默…</div>
+          </div>
+          <div class="ac-right">
+            <span class="pill pill-gray">已发布</span>
+            <span class="pill pill-lock">仅查看</span>
+          </div>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+    <ul class="notes">
+      <li><b>去掉内嵌灰条</b>：read-only 不再改卡片外观，只在右上挂「仅查看」描边小签（和邀约页同一规则）</li>
+      <li><b>新增参与者预览行</b>：「6 人　陈默、璐小娜、苏杭…」，看课表就知道谁来，不再翻邀约页对名单</li>
+      <li>「已发布」与「仅查看」两个签可共存，右侧竖排对齐</li>
+      <li>时段分组、时间栏、类型圆点维持现状不动</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="doc-foot">
+  说明：纯样式稿，未改代码。权限显示规则两页统一：<b>自己创建 = 无标记（默认态）；他人创建 = 「仅查看」描边小签 + 隐藏编辑类操作</b>（到店标记任何人都可以点，与现规则一致）。<br>
+  邀约 A / B 二选一，课表 C 可直接搭任意一个。确认方向后我落地 wxml/wxss（涉及 visits、visit-card 组件、activities 三处）。
+</div>
+
+</body>
+</html>

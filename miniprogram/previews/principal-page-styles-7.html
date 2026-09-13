@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>组织/俱乐部（小程序）· 顶部栏三种做法</title>
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body { margin: 0; padding: 26px; background: #eceef2; font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; display: flex; gap: 26px; align-items: flex-start; }
+  .col { width: 366px; }
+  .col-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1f2329; }
+  .col-note { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: #646a73; }
+  .phone { width: 366px; height: 640px; border-radius: 22px; overflow: hidden; box-shadow: 0 10px 30px rgba(17,24,39,.10); display: flex; flex-direction: column; background: #f7f8fa; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- 共用头部（浅蓝） ---------- */
+  .head { background: #f3f7ff; padding: 18px 16px 0; }
+  .head-row { display: flex; align-items: center; }
+  .title { font-size: 21px; font-weight: 500; letter-spacing: -.4px; color: #1f2329; }
+  .head-actions { margin-left: auto; }
+  .pill-white { height: 32px; padding: 0 12px; border-radius: 10px; background: #fff; color: #646a73; font-size: 12px; display: flex; align-items: center; box-shadow: 0 1px 2px rgba(31,35,41,.04); }
+  .head-sub { margin-top: 7px; font-size: 12px; color: #8f959e; }
+  .presets { display: flex; gap: 6px; margin-top: 11px; align-items: center; }
+  .preset { height: 30px; padding: 0 12px; border-radius: 8px; background: #fff; color: #4e535a; font-size: 12px; line-height: 30px; }
+  .preset.on { background: #3370ff; color: #fff; font-weight: 500; }
+  .preset.ghost { background: transparent; color: #3370ff; padding: 0 4px; }
+
+  /* ---------- T1：白条 tab（均分居中 + 下划线） ---------- */
+  .t1-bar { background: #fff; display: flex; border-bottom: 1px solid #f0f0f0; }
+  .t1-tab { flex: 1; text-align: center; padding: 13px 0 11px; font-size: 14px; color: #646a73; position: relative; }
+  .t1-tab.on { color: #3370ff; font-weight: 500; }
+  .t1-tab.on::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%); width: 26px; bottom: 0; height: 3px; border-radius: 2px 2px 0 0; background: #3370ff; }
+
+  /* ---------- T2：浅蓝底槽分段 ---------- */
+  .t2-wrap { background: #f3f7ff; padding: 2px 16px 12px; }
+  .t2-seg { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #e6edfb; }
+  .t2-item { flex: 1; height: 34px; line-height: 34px; text-align: center; font-size: 13px; color: #5a6473; border-radius: 9px; }
+  .t2-item.on { background: #fff; color: #3370ff; font-weight: 500; box-shadow: 0 1px 3px rgba(31,35,41,.10); }
+
+  /* ---------- T3：极简文字 tab ---------- */
+  .t3-bar { background: #f3f7ff; display: flex; gap: 22px; padding: 2px 16px 12px; border-bottom: 1px solid #e7eefb; }
+  .t3-tab { position: relative; padding-bottom: 10px; font-size: 14px; color: #97a0ad; }
+  .t3-tab.on { color: #1f2329; font-weight: 600; }
+  .t3-tab.on::after { content: ""; position: absolute; left: 0; width: 18px; bottom: 0; height: 2px; background: #1f2329; }
+
+  /* ---------- 下方内容（三版一致） ---------- */
+  .card { background: #fff; border-radius: 14px; margin: 12px 12px 0; padding: 14px 16px; }
+  .kpi { display: flex; }
+  .kpi > div { flex: 1; min-width: 0; }
+  .kpi .v { font-size: 23px; font-weight: 600; color: #1f2329; line-height: 1; letter-spacing: -.4px; }
+  .kpi .v small { font-size: 11px; font-weight: 400; color: #8f959e; margin-left: 3px; }
+  .kpi .l { margin-top: 7px; font-size: 12px; color: #8f959e; }
+  .divider { height: 1rpx; background: #f2f3f5; margin: 14px -16px 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { height: 28px; padding: 0 11px; border-radius: 999px; background: #f2f3f5; color: #4e535a; font-size: 12px; line-height: 28px; }
+  .chip.on { background: #eef3ff; color: #3370ff; }
+  .card-label { font-size: 12px; color: #8f959e; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 13px 0; border-top: 1rpx solid #f2f3f5; }
+  .row:first-of-type { border-top: none; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .l1 { font-size: 14px; font-weight: 500; color: #2b2f36; }
+  .row .l2 { margin-top: 4px; font-size: 12px; color: #8f959e; }
+  .row .right { font-size: 12px; color: #646a73; }
+</style>
+</head>
+<body>
+  <!-- T1 -->
+  <div class="col">
+    <p class="col-title">T1：tab 单独一条白条（均分居中 + 短下划线）</p>
+    <p class="col-note">浅蓝头部只留标题 / 摘要 / 周期胶囊，tab 移到下面独立的白条里、两颗均分居中，选中蓝字 + 26px 短下划线。层次最清楚，和付费项目 PC 的 tab 一个感觉。</p>
+    <div class="phone">
+      <div class="head">
+        <div class="head-row"><div class="title">组织/俱乐部</div><div class="head-actions"><span class="pill-white">导出</span></div></div>
+        <div class="head-sub">2026-09-01 – 09-13 · 全部可见组织/俱乐部</div>
+        <div class="presets">
+          <span class="preset">当天</span><span class="preset on">本月</span><span class="preset">本年</span><span class="preset">全部</span>
+          <span class="preset ghost" style="margin-left:auto">筛选</span>
+        </div>
+      </div>
+      <div class="t1-bar"><div class="t1-tab on">经营概况</div><div class="t1-tab">转化分析</div></div>
+      <div style="flex:1;overflow-y:auto">
+        <div class="card">
+          <div class="kpi">
+            <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+            <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+            <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+          </div>
+          <div class="divider"></div>
+          <div class="card-label">付费项目</div>
+          <div class="chips"><span class="chip on">会员卡 27</span><span class="chip">觉醒游戏 5</span><span class="chip">OH卡 3</span></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- T2 -->
+  <div class="col">
+    <p class="col-title">T2：浅蓝底槽里的分段控件</p>
+    <p class="col-note">tab 做成头部下沿的分段控件（底槽用比头部略深的浅蓝 #e6edfb，选中是白底 + 蓝字 + 细阴影）。顶部因此是一整块，不出现"白条断一层"的感觉。</p>
+    <div class="phone">
+      <div class="head">
+        <div class="head-row"><div class="title">组织/俱乐部</div><div class="head-actions"><span class="pill-white">导出</span></div></div>
+        <div class="head-sub">2026-09-01 – 09-13 · 全部可见组织/俱乐部</div>
+        <div class="presets">
+          <span class="preset">当天</span><span class="preset on">本月</span><span class="preset">本年</span><span class="preset">全部</span>
+          <span class="preset ghost" style="margin-left:auto">筛选</span>
+        </div>
+      </div>
+      <div class="t2-wrap"><div class="t2-seg"><div class="t2-item on">经营概况</div><div class="t2-item">转化分析</div></div></div>
+      <div style="flex:1;overflow-y:auto">
+        <div class="card">
+          <div class="kpi">
+            <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+            <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+            <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+          </div>
+          <div class="divider"></div>
+          <div class="card-label">付费项目</div>
+          <div class="chips"><span class="chip on">会员卡 27</span><span class="chip">觉醒游戏 5</span><span class="chip">OH卡 3</span></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- T3 -->
+  <div class="col">
+    <p class="col-title">T3：极简文字 tab（最轻）</p>
+    <p class="col-note">tab 只是一行文字，选中用近黑加粗 + 18px 短横线，头部整体变轻、不再有第二种蓝色块。适合"数据为主、切换为辅"的用法。</p>
+    <div class="phone">
+      <div class="head" style="padding-bottom:0">
+        <div class="head-row"><div class="title">组织/俱乐部</div><div class="head-actions"><span class="pill-white">导出</span></div></div>
+        <div class="head-sub">2026-09-01 – 09-13 · 全部可见组织/俱乐部 · 10 位引流人</div>
+        <div class="presets">
+          <span class="preset">当天</span><span class="preset on">本月</span><span class="preset">本年</span><span class="preset">全部</span>
+          <span class="preset ghost" style="margin-left:auto">筛选</span>
+        </div>
+      </div>
+      <div class="t3-bar"><div class="t3-tab on">经营概况</div><div class="t3-tab">转化分析</div></div>
+      <div style="flex:1;overflow-y:auto;background:#f7f8fa">
+        <div class="card">
+          <div class="kpi">
+            <div><div class="v num">106<small>人</small></div><div class="l">引流人数</div></div>
+            <div><div class="v num">54<small>场</small></div><div class="l">课程数</div></div>
+            <div><div class="v num">58<small>笔</small></div><div class="l">成交量</div></div>
+          </div>
+          <div class="divider"></div>
+          <div class="card-label">付费项目</div>
+          <div class="chips"><span class="chip on">会员卡 27</span><span class="chip">觉醒游戏 5</span><span class="chip">OH卡 3</span></div>
+        </div>
+        <div class="card">
+          <div class="row"><div class="main"><div class="l1">李丹丹</div><div class="l2">会员卡 · 次卡 · 首购 · 苏晴</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">王小雅</div><div class="l2">觉醒游戏 · 跨品类首购 · 潘潘</div></div><div class="right">09-12</div></div>
+          <div class="row"><div class="main"><div class="l1">周星移</div><div class="l2">OH卡 · 首购 · 余墨</div></div><div class="right">09-12</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

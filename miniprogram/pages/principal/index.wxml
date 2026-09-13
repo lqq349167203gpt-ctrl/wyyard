@@ -1,42 +1,360 @@
+<!-- 弹层打开时锁住页面滚动，避免上下滑动带动背景 -->
+<page-meta page-style="{{condSheet || showSaveRule || detail ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
-  <view class="panel filters">
-    <view class="toolbar"><picker range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrg"><view class="control">{{organizations[orgIndex].name}} ▾</view></picker><button class="small" disabled="{{busy || loading || error}}" bindtap="exportData">导出表格</button></view>
-    <view class="toolbar"><picker mode="date" value="{{query.date_from}}" data-field="date_from" bindchange="onDate"><view class="control">{{query.date_from || '开始日期'}}</view></picker><text>~</text><picker mode="date" value="{{query.date_to}}" data-field="date_to" bindchange="onDate"><view class="control">{{query.date_to || '结束日期'}}</view></picker><text class="link" bindtap="clearDates">全部</text></view>
-    <picker wx:if="{{query.tab === 'overview' || query.tab === 'orders'}}" range="{{productOptions}}" range-key="label" value="{{productIndex}}" bindchange="onProduct"><view class="control">{{productOptions[productIndex].label}} ▾</view></picker>
-    <view class="muted">{{metadata.scope === 'all' ? '全部组织权限' : '仅本人所属组织'}} · 客户及交易权限同时生效</view>
-  </view>
-  <view class="tabs"><view wx:for="{{tabs}}" wx:key="key" class="tab {{query.tab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onTab">{{item.label}}</view></view>
-  <view wx:if="{{query.tab === 'conversion'}}" class="panel">
-    <view class="toolbar"><picker range="{{ruleOptions}}" value="{{ruleIndex}}" bindchange="onRule"><view class="control">{{ruleOptions[ruleIndex]}} ▾</view></picker><button class="small" bindtap="openEditor">配置规则</button></view>
-    <view class="toolbar"><picker range="{{statusOptions}}" value="{{statusIndex}}" bindchange="onStatus"><view class="control">{{statusOptions[statusIndex]}} ▾</view></picker><text wx:if="{{ruleId}}" class="link" bindtap="removeRule">删除规则</text></view>
-    <view class="muted">{{query.rule.name}} · {{query.rule.window_days}} 天内 · {{query.rule.same_organization ? '同一组织' : '跨可见组织'}} · {{query.rule.target_mode === 'all' ? '满足全部目标' : '满足任意目标'}}</view>
-    <view class="muted">按人数去重；目标可发生在筛选结束日期之后。</view>
-  </view>
-  <picker wx:if="{{query.tab === 'orders'}}" range="{{orderOptions}}" value="{{orderIndex}}" bindchange="onOrder"><view class="control order-filter">{{orderOptions[orderIndex]}} ▾</view></picker>
-  <view wx:if="{{error}}" class="error">{{error}}</view>
-  <view wx:if="{{metadata &amp;&amp; !metadata.organizations.length}}" class="muted empty">暂无可查看组织，请检查账号归属人和组织成员配置。同名归属人需先消除歧义。</view>
-  <view class="stats"><view wx:for="{{summary}}" wx:key="label" class="stat"><view class="muted">{{item.label}}</view><view class="number">{{item.value}}</view></view></view>
-  <view class="muted count">共 {{total}} 条</view>
-  <view wx:for="{{list}}" wx:key="id" class="panel record" data-index="{{index}}" bindtap="showDetails">
-    <view wx:for="{{item.cells}}" wx:for-item="cell" wx:key="label" class="field"><text class="muted">{{cell.label}}</text><text class="value">{{cell.value}}</text></view>
-    <view class="link detail-link">查看关联明细 ›</view>
-  </view>
-  <view wx:if="{{loading}}" class="empty muted">加载中…</view><view wx:elif="{{!list.length &amp;&amp; !error}}" class="empty muted">暂无符合条件的数据</view>
-  <view class="muted notice">{{notice}}</view>
-  <view wx:if="{{editing}}" class="mask" bindtap="closeEditor"><view class="sheet" catchtap="noop"><view class="sheet-title">配置转化规则<text class="link" bindtap="closeEditor">关闭</text></view><scroll-view scroll-y class="editor-scroll">
-    <input class="control" placeholder="规则名称" value="{{draft.name}}" data-field="name" bindinput="onRuleField" />
-    <view wx:for="{{actionEditors}}" wx:key="index" class="action">
-      <view class="toolbar"><text>{{item.title}}</text><text wx:if="{{item.index > 0 &amp;&amp; draft.targets.length > 1}}" class="link" data-index="{{item.index}}" bindtap="removeTarget">移除</text></view>
-      <picker range="{{kindLabels}}" value="{{item.kindIndex}}" data-index="{{item.index}}" data-field="kind" bindchange="onAction"><view class="control">{{kindLabels[item.kindIndex]}} ▾</view></picker>
-      <picker wx:if="{{item.products.length > 1}}" range="{{item.products}}" range-key="label" value="{{item.productIndex}}" data-index="{{item.index}}" data-field="product" bindchange="onAction"><view class="control">{{item.products[item.productIndex].label}} ▾</view></picker>
-      <picker wx:if="{{item.subtypes.length > 1}}" range="{{item.subtypeLabels}}" value="{{item.subtypeIndex}}" data-index="{{item.index}}" data-field="subtype" bindchange="onAction"><view class="control">{{item.subtypeLabels[item.subtypeIndex]}} ▾</view></picker>
-      <picker range="{{occurrenceLabels}}" value="{{item.occurrenceIndex}}" data-index="{{item.index}}" data-field="occurrence" bindchange="onAction"><view class="control">{{occurrenceLabels[item.occurrenceIndex]}} ▾</view></picker>
+  <!-- 顶部 tab：白条 + 蓝字下划线（和课表/付费项目一致），放在筛选项上面 -->
+  <view class="seg-tabs"><view wx:for="{{tabs}}" wx:key="key" class="seg-tab {{query.tab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onTab">{{item.label}}</view></view>
+  <view class="card filter-card">
+    <view class="filter-row">
+      <text class="filter-label">范围</text>
+      <picker class="filter-control" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrg"><view class="control"><text class="control-text">{{organizations[orgIndex].name}}</text><view class="chevron"></view></view></picker>
     </view>
-    <button class="small add" disabled="{{draft.targets.length >= 8}}" bindtap="addTarget">增加目标</button>
-    <picker range="{{modeLabels}}" value="{{draft.target_mode === 'all' ? 1 : 0}}" bindchange="onMode"><view class="control">{{draft.target_mode === 'all' ? '满足全部目标' : '满足任意目标'}} ▾</view></picker>
-    <view class="field"><text>观察天数</text><input class="control days" type="number" value="{{draft.window_days}}" data-field="window_days" bindinput="onRuleField" /></view>
-    <view class="field"><text>限同一组织</text><switch checked="{{draft.same_organization}}" data-field="same_organization" bindchange="onRuleField" color="#3370ff" /></view>
-    <view class="muted">0 表示当天；会员卡按具体卡种识别，不按成交金额。“再次”指所选产品范围的非首次日。跨组织不超出账号权限。</view>
-  </scroll-view><view class="footer"><button class="small" disabled="{{busy}}" data-mode="once" bindtap="applyRule">仅本次</button><button wx:if="{{ruleId}}" class="small" disabled="{{busy}}" data-mode="new" bindtap="applyRule">另存为</button><button class="small primary" disabled="{{busy}}" data-mode="save" bindtap="applyRule">保存并计算</button></view></view></view>
-  <view wx:if="{{detail}}" class="mask" bindtap="closeDetails"><view class="sheet" catchtap="noop"><view class="sheet-title">关联明细<text class="link" bindtap="closeDetails">关闭</text></view><scroll-view scroll-y class="editor-scroll"><view wx:for="{{detail.details}}" wx:key="index" class="evidence">{{item}}</view><view wx:if="{{!detail.details.length}}" class="empty muted">暂无关联明细</view></scroll-view></view></view>
+    <view class="filter-row">
+      <text class="filter-label">周期</text>
+      <view class="preset-row">
+        <text wx:for="{{rangePresets}}" wx:key="key" class="preset {{rangePreset === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onRangePreset">{{item.label}}</text>
+      </view>
+    </view>
+    <view class="filter-row">
+      <text class="filter-label">自定义</text>
+      <picker mode="date" value="{{query.date_from}}" data-field="date_from" bindchange="onDate"><view class="control date-control">{{query.date_from || '开始日期'}}</view></picker>
+      <text class="muted">~</text>
+      <picker mode="date" value="{{query.date_to}}" data-field="date_to" bindchange="onDate"><view class="control date-control">{{query.date_to || '结束日期'}}</view></picker>
+    </view>
+    <view class="filter-foot">
+      <text class="muted">{{metadata.scope === 'all' ? '全部组织权限' : '仅本人所属组织'}} · 客户及交易权限同时生效</text>
+    </view>
+  </view>
+  <!-- 转化分析：规则、条件、期限、状态全在页面里就地改，不单独拉弹窗（和 PC 一致） -->
+  <block wx:if="{{query.tab === 'conversion'}}">
+    <view class="section-card">
+      <view class="conv-head">
+        <text class="conv-title">转化规则</text>
+        <view class="conv-head-actions">
+          <text class="conv-btn" bindtap="openSaveRule">保存规则</text>
+          <text class="conv-btn danger" wx:if="{{ruleId && canManageRule}}" bindtap="removeRule">删除规则</text>
+        </view>
+      </view>
+      <picker class="conv-picker" range="{{ruleOptions}}" value="{{ruleIndex}}" bindchange="onRule">
+        <view class="control"><text class="control-text">{{ruleOptions[ruleIndex]}}</text><view class="chevron"></view></view>
+      </picker>
+      <view class="conv-tips">
+        <text class="conv-desc" wx:if="{{query.rule.description}}">规则说明：{{query.rule.description}}</text>
+        <text class="conv-note">决定什么算转化；改完点「查询」重算，要长期使用请点「保存规则」</text>
+      </view>
+
+      <view class="rule-line" wx:for="{{actionEditors}}" wx:key="index" wx:for-item="act">
+        <view class="rule-line-head">
+          <text class="rule-line-label">{{act.title}}</text>
+          <text class="rule-line-remove" wx:if="{{act.index > 0 && canRemoveTarget}}" data-index="{{act.index}}" bindtap="removeTarget">✕</text>
+        </view>
+        <view class="rule-line-body">
+          <view class="rule-controls">
+            <picker class="rule-pick" range="{{kindLabels}}" value="{{act.kindIndex}}" data-index="{{act.index}}" data-field="kind" bindchange="onAction">
+              <view class="control"><text class="control-text">{{kindLabels[act.kindIndex]}}</text><view class="chevron"></view></view>
+            </picker>
+            <picker class="rule-pick" wx:if="{{act.products.length > 1}}" range="{{act.products}}" range-key="label" value="{{act.productIndex}}" data-index="{{act.index}}" data-field="product" bindchange="onAction">
+              <view class="control"><text class="control-text">{{act.products[act.productIndex].label}}</text><view class="chevron"></view></view>
+            </picker>
+            <picker class="rule-pick" wx:if="{{act.subtypes.length > 1}}" range="{{act.subtypeLabels}}" value="{{act.subtypeIndex}}" data-index="{{act.index}}" data-field="subtype" bindchange="onAction">
+              <view class="control"><text class="control-text">{{act.subtypeLabels[act.subtypeIndex]}}</text><view class="chevron"></view></view>
+            </picker>
+            <picker class="rule-pick" range="{{act.occurrenceLabels}}" value="{{act.occurrenceIndex}}" data-index="{{act.index}}" data-field="occurrence" bindchange="onAction">
+              <view class="control"><text class="control-text">{{act.occurrenceLabels[act.occurrenceIndex]}}</text><view class="chevron"></view></view>
+            </picker>
+          </view>
+
+          <!-- 附加条件：字段 / 规则 / 值与自定义筛选同一套，可以加多条 -->
+          <view class="cond-card" wx:for="{{act.conditions}}" wx:key="index" wx:for-item="cond" wx:for-index="ci">
+            <view class="cond-head">
+              <view class="cond-choice" data-index="{{act.index}}" data-ci="{{ci}}" data-sheet="field" bindtap="onConditionPick">
+                <text class="cond-choice-text">{{cond.fieldLabel}}</text>
+                <view class="chevron light"></view>
+              </view>
+              <view class="cond-choice secondary" data-index="{{act.index}}" data-ci="{{ci}}" data-sheet="operator" bindtap="onConditionPick">
+                <text class="cond-choice-text">{{cond.operatorLabel}}</text>
+                <view class="chevron light"></view>
+              </view>
+              <text class="cond-remove" data-index="{{act.index}}" data-ci="{{ci}}" bindtap="onConditionRemove">✕</text>
+            </view>
+            <view class="cond-value" wx:if="{{!cond.noValue}}">
+              <block wx:if="{{cond.isBetween}}">
+                <picker wx:if="{{cond.isDate}}" class="cond-half" mode="date" value="{{cond.valueStart}}" data-index="{{act.index}}" data-ci="{{ci}}" data-part="start" bindchange="onConditionValue">
+                  <view class="cond-input {{cond.valueStart ? '' : 'placeholder'}}">{{cond.valueStart || '开始日期'}}</view>
+                </picker>
+                <input wx:else class="cond-input cond-half" type="{{cond.isNumber ? 'digit' : 'text'}}" value="{{cond.valueStart}}" placeholder="起始值" data-index="{{act.index}}" data-ci="{{ci}}" data-part="start" bindinput="onConditionValue" />
+                <text class="cond-sep">至</text>
+                <picker wx:if="{{cond.isDate}}" class="cond-half" mode="date" value="{{cond.valueEnd}}" data-index="{{act.index}}" data-ci="{{ci}}" data-part="end" bindchange="onConditionValue">
+                  <view class="cond-input {{cond.valueEnd ? '' : 'placeholder'}}">{{cond.valueEnd || '结束日期'}}</view>
+                </picker>
+                <input wx:else class="cond-input cond-half" type="{{cond.isNumber ? 'digit' : 'text'}}" value="{{cond.valueEnd}}" placeholder="结束值" data-index="{{act.index}}" data-ci="{{ci}}" data-part="end" bindinput="onConditionValue" />
+              </block>
+              <picker wx:elif="{{cond.isDate}}" class="cond-full" mode="date" value="{{cond.value}}" data-index="{{act.index}}" data-ci="{{ci}}" data-part="single" bindchange="onConditionValue">
+                <view class="cond-input {{cond.value ? '' : 'placeholder'}}">{{cond.value || '选择日期'}}</view>
+              </picker>
+              <view wx:elif="{{cond.hasOptions}}" class="cond-input cond-input-picker {{(cond.isMulti ? cond.multiLabel : cond.valueLabel) ? '' : 'placeholder'}}" data-index="{{act.index}}" data-ci="{{ci}}" data-sheet="{{cond.isMulti ? 'multi' : 'value'}}" bindtap="onConditionPick">
+                <text class="cond-value-text">{{cond.isMulti ? cond.multiLabel : cond.valueLabel || '选择筛选值'}}</text>
+                <view class="chevron light"></view>
+              </view>
+              <input wx:else class="cond-input" type="{{cond.isNumber ? 'digit' : 'text'}}" value="{{cond.value}}" placeholder="填写筛选值" data-index="{{act.index}}" data-ci="{{ci}}" data-part="single" bindinput="onConditionValue" />
+            </view>
+          </view>
+          <text class="cond-add" wx:if="{{act.canAddCondition}}" data-index="{{act.index}}" bindtap="onConditionAdd">＋ 筛选条件</text>
+        </view>
+      </view>
+      <text class="cond-add target" wx:if="{{canAddTarget}}" bindtap="addTarget">＋ 再加一项条件</text>
+
+      <view class="conv-meta">
+        <picker wx:if="{{canRemoveTarget}}" class="conv-mode" range="{{modeLabels}}" value="{{targetModeIndex}}" bindchange="onMode">
+          <view class="control"><text class="control-text">{{modeLabels[targetModeIndex]}}</text><view class="chevron"></view></view>
+        </picker>
+        <view class="conv-days">
+          <text class="conv-days-label">转化间隔期限</text>
+          <input class="control days" type="digit" value="{{query.rule.window_days}}" data-field="window_days" data-number="1" bindinput="onRuleField" />
+          <text class="conv-days-unit">天</text>
+        </view>
+        <view class="conv-check" bindtap="onToggleSameOrg">
+          <view class="conv-check-box {{query.rule.same_organization ? 'checked' : ''}}">{{query.rule.same_organization ? '✓' : ''}}</view>
+          <text class="conv-check-text">同一组织/俱乐部</text>
+        </view>
+        <text class="conv-meta-note">0 表示当天（多项目之间的先后不限天数）；不勾选时算所有有权查看的组织/俱乐部。</text>
+      </view>
+
+      <view class="conv-status">
+        <text class="conv-status-label">结果状态</text>
+        <view class="conv-status-tabs">
+          <view class="conv-status-tab {{query.status === item.value ? 'active' : ''}}" wx:for="{{statusFilters}}" wx:key="value" data-value="{{item.value}}" bindtap="onStatusTap">{{item.label}}</view>
+        </view>
+        <text class="conv-status-note">已转化：达到条件；未转化：到期还没达到；观察中：还没到截止日期。</text>
+      </view>
+
+      <view class="conv-foot">
+        <text class="conv-sentence">当前：{{ruleSentence}}</text>
+        <view class="conv-foot-actions">
+          <text class="conv-reset" bindtap="onScopeReset">重置</text>
+          <text class="conv-query {{loading ? 'disabled' : ''}}" bindtap="runScopeQuery">{{loading ? '查询中' : '查询'}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{metadata && !metadata.organizations.length}}" class="muted empty">暂无可查看组织，请检查账号归属人和组织成员配置。同名归属人需先消除歧义。</view>
+
+  <!-- 经营概况：三张卡点开看二级明细（与 PC 一致） -->
+  <block wx:if="{{query.tab === 'overview' && cards.length}}">
+    <view class="cards">
+      <view wx:for="{{cards}}" wx:key="key" class="card {{overviewGroup === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onOverviewCard">
+        <view class="card-title-line">
+          <text class="card-title">{{item.title}}</text>
+          <text class="card-help" wx:if="{{item.help}}" data-key="{{item.key}}" catchtap="toggleCardHelp">?</text>
+        </view>
+        <view class="card-value"><text class="card-number">{{item.value}}</text><text class="card-unit">{{item.unit}}</text></view>
+        <text class="card-sub">{{item.sub}}</text>
+        <text class="card-help-text" wx:if="{{helpKey === item.key}}">{{item.help}}</text>
+      </view>
+    </view>
+    <view class="panel" wx:if="{{overviewGroup}}">
+      <view class="panel-head"><text class="panel-title">{{panelTitle}}</text><text class="muted">按下面的维度筛选列表</text></view>
+      <!-- 每个维度一个下拉（和 PC 的面板筛选、自定义筛选同一套）：选了某一维再出现它的子级 -->
+      <!-- 面板筛选：用底部弹层选，选项后面带数量（和 PC 的下拉一致） -->
+      <view class="panel-grid">
+        <view class="panel-cell" wx:for="{{panelSelects}}" wx:key="label" wx:for-item="sel" wx:for-index="si">
+          <text class="panel-cell-label">{{sel.label}}</text>
+          <view class="control" data-index="{{si}}" bindtap="openPanelSelect">
+            <text class="control-text">{{sel.options[sel.index].label}}</text>
+            <view class="chevron"></view>
+          </view>
+        </view>
+      </view>
+      <view class="metrics" wx:if="{{panelMetrics.length}}">
+        <view class="metric {{item.action ? 'tappable' : ''}} {{item.active ? 'active' : ''}}" wx:for="{{panelMetrics}}" wx:key="label" data-action="{{item.action}}" bindtap="onMetricTap">
+          <view class="metric-main"><text class="muted">{{item.label}}</text><text class="metric-value">{{item.value}}</text></view>
+          <text class="metric-sub" wx:if="{{item.sub}}">{{item.sub}}</text>
+        </view>
+        <!-- 内/外解释放在统计数值这个框里（和 PC 端一字不差），两个视图都显示 -->
+        <view class="metric-hint" wx:if="{{panelHint.length}}">
+          <text class="metric-hint-line" wx:for="{{panelHint}}" wx:key="*this">{{item}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <view class="stats" wx:if="{{query.tab !== 'overview'}}"><view wx:for="{{summary}}" wx:key="label" class="stat"><view class="muted">{{item.label}}</view><view class="number">{{item.value}}</view></view></view>
+  <!-- 已筛选：点 ✕ 取消这一项，和 PC 一致 -->
+  <view class="chips" wx:if="{{picks.length || (query.course_view === 'participant' && query.participant_scope)}}">
+    <text class="chip active" wx:for="{{pickChips}}" wx:key="value" data-value="{{item.value}}" bindtap="clearPick">已筛选：{{item.label}} ✕</text>
+    <text class="chip active" wx:if="{{query.course_view === 'participant' && query.participant_scope}}" bindtap="clearFilters">已筛选：{{query.participant_scope === 'internal' ? '内部人员' : '外部人员'}} ✕</text>
+  </view>
+  <!-- 列表：一行两行式（主标题 + 灰字详情 + 右侧日期），点行进明细 -->
+  <!-- 课程数：课程记录 / 参与者 切换放到列表上面 -->
+  <view class="course-view-bar" wx:if="{{query.tab === 'overview' && overviewGroup === 'courses'}}">
+    <view class="course-view-tabs">
+      <view class="course-view-tab {{query.course_view !== 'participant' ? 'active' : ''}}" data-view="course" bindtap="onCourseView">课程记录</view>
+      <view class="course-view-tab {{query.course_view === 'participant' ? 'active' : ''}}" data-view="participant" bindtap="onCourseView">参与者</view>
+    </view>
+  </view>
+  <view class="record-card" wx:if="{{list.length}}">
+    <!-- 工具按钮放在列表白卡里面（和课程记录页一致），不再浮在灰底上 -->
+    <view class="list-head">
+      <text class="list-count">共 {{total}} 条</text>
+      <view class="list-actions" wx:if="{{sortFields.length}}">
+        <picker wx:if="{{overviewGroup === 'deals'}}" range="{{listViewOptions}}" value="{{listViewIndex}}" bindchange="onListView"><view class="tool-btn tool-btn-flex"><text class="control-text">{{listViewOptions[listViewIndex]}}</text><view class="chevron"></view></view></picker>
+        <picker wx:if="{{query.tab === 'overview' && overviewGroup === 'courses' && query.course_view === 'participant'}}" range="{{participantOptions}}" value="{{participantIndex}}" bindchange="onParticipantScope">
+          <view class="tool-btn tool-btn-flex"><text class="control-text">{{participantOptions[participantIndex]}}</text><view class="chevron"></view></view>
+        </picker>
+        <text class="tool-btn" bindtap="openSortSheet">排序</text>
+        <!-- 列表设置只给引流客户列表用（课程/交易列表按固定列展示） -->
+        <text class="tool-btn" wx:if="{{overviewGroup === 'traffic'}}" bindtap="openColumnSheet">列表设置</text>
+        <text class="tool-btn" bindtap="exportData">导出</text>
+      </view>
+    </view>
+    <view wx:for="{{list}}" wx:key="id" class="record-row" data-index="{{index}}" bindtap="showDetails">
+      <view class="record-main">
+        <view class="record-top">
+          <text class="record-title" wx:if="{{item.rowLinkId}}" data-id="{{item.rowLinkId}}" data-course="{{item.course_id}}" catchtap="{{query.course_view === 'participant' ? 'openParticipantProfile' : 'openCustomerProfile'}}">{{item.rowTitle}}</text>
+          <text class="record-title" wx:else>{{item.rowTitle}}</text>
+          <text class="record-identity" wx:if="{{item.rowIdentity}}">{{item.rowIdentity}}</text>
+        </view>
+        <!-- 分类值做成小标签 -->
+        <view class="record-tags" wx:if="{{item.rowTags.length}}">
+          <view class="record-tag" wx:for="{{item.rowTags}}" wx:key="label">
+            <text class="record-tag-label">{{item.label}}</text>
+            <text class="record-tag-value">{{item.value}}</text>
+          </view>
+        </view>
+        <!-- 数字单独一行，带短前缀 -->
+        <view class="record-numbers" wx:if="{{item.rowNumbers.length}}">
+          <text class="record-number" wx:for="{{item.rowNumbers}}" wx:key="label"><text class="record-number-label">{{item.label}}</text>{{item.value}}</text>
+        </view>
+        <!-- 客户档案类字段：单独成块、不加底色，放在数字下面、日期上面 -->
+        <view class="record-profiles" wx:if="{{item.rowProfiles.length}}">
+          <view class="record-profile" wx:for="{{item.rowProfiles}}" wx:key="label">
+            <text class="record-profile-label">{{item.label}}</text>
+            <text class="record-profile-value">{{item.value}}</text>
+          </view>
+        </view>
+        <text class="record-right" wx:if="{{item.rowRight}}">{{item.rowRight}}</text>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{loading}}" class="empty muted">加载中…</view><view wx:elif="{{!list.length && !error}}" class="empty muted">暂无符合条件的数据</view>
+  <view class="muted notice">{{notice}}</view>
+  <!-- 条件字段 / 规则 / 值：底部弹层，和自定义筛选同一套 -->
+  <view class="sheet-mask" wx:if="{{condSheet}}" catchtouchmove="noop" bindtap="closeCondSheet"></view>
+  <view class="column-sheet" wx:if="{{condSheet}}">
+    <view class="sheet-head"><text class="sheet-title">{{condSheet.title}}</text><text class="sheet-done" bindtap="closeCondSheet">{{condSheet.kind === 'multi' ? '完成' : '关闭'}}</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <view class="sheet-item" wx:for="{{condSheet.options}}" wx:key="value" data-index="{{index}}" bindtap="onCondSheetOption">
+        <text class="sheet-item-name {{item.checked ? 'selected' : ''}}">{{item.label}}</text>
+        <text class="sheet-item-note" wx:if="{{item.note}}">{{item.note}}</text>
+        <view class="sheet-check {{item.checked ? 'selected' : ''}}">{{item.checked ? '✓' : ''}}</view>
+      </view>
+      <view class="empty muted" wx:if="{{!condSheet.options.length}}">暂无可选项</view>
+    </scroll-view>
+  </view>
+
+  <!-- 保存规则：名称 / 说明 / 可见范围（和自定义筛选的「保存模板」一致） -->
+  <view class="save-rule-mask" wx:if="{{showSaveRule}}" bindtap="closeSaveRule">
+    <view class="save-rule-dialog" catchtap="noop">
+      <view class="save-rule-head"><text class="save-rule-title">保存转化规则</text></view>
+      <view class="save-rule-body">
+        <view class="save-rule-row">
+          <text class="save-rule-label">规则名称</text>
+          <input class="save-rule-input" value="{{ruleNameDraft}}" maxlength="80" placeholder="例如：粗门首次到场 → 会员卡首购" placeholder-class="save-rule-placeholder" bindinput="onRuleNameInput" />
+        </view>
+        <view class="save-rule-row">
+          <text class="save-rule-label">规则说明</text>
+          <input class="save-rule-input" value="{{ruleDescriptionDraft}}" maxlength="200" placeholder="简要说明这条规则的用途（选填）" placeholder-class="save-rule-placeholder" bindinput="onRuleDescriptionInput" />
+        </view>
+        <view class="save-rule-row">
+          <text class="save-rule-label">可见范围</text>
+          <view class="save-rule-scope">
+            <view class="save-rule-scope-item {{ruleScopeDraft === 'private' ? 'active' : ''}}" data-scope="private" bindtap="onRuleScopeTap">仅自己可见</view>
+            <view class="save-rule-scope-item {{ruleScopeDraft === 'shared' ? 'active' : ''}}" data-scope="shared" bindtap="onRuleScopeTap">团队共享</view>
+          </view>
+        </view>
+        <text class="save-rule-note">保存时会一并记住当前的筛选范围（组织/俱乐部 + 统计周期），下次选用这条规则会一起还原。</text>
+      </view>
+      <view class="save-rule-actions">
+        <text class="save-rule-button cancel" bindtap="closeSaveRule">取消</text>
+        <text class="save-rule-button confirm {{savingRule ? 'disabled' : ''}}" bindtap="confirmSaveRule">{{savingRule ? '保存中' : '保存'}}</text>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{detail}}" class="mask" bindtap="closeDetails"><view class="sheet" catchtap="noop"><view class="sheet-title">关联明细<text class="link" bindtap="closeDetails">关闭</text></view><scroll-view scroll-y class="editor-scroll">
+    <view wx:for="{{detail.detailRows}}" wx:key="index" class="evidence-row">
+      <text class="evidence">{{item.text}}</text>
+      <text class="record-link" wx:if="{{item.id}}" data-id="{{item.id}}" data-course="{{detail.id}}" catchtap="openParticipantProfile">资料 ›</text>
+    </view>
+    <view wx:if="{{!detail.detailRows.length}}" class="empty muted">暂无关联明细</view>
+  </scroll-view></view></view>
+
+  <!-- 列表设置：与「自定义筛选 → 选择显示内容」同一套底部弹层样式 -->
+  <view class="sheet-mask" wx:if="{{columnSheetOpen}}" catchtouchmove="noop" bindtap="closeColumnSheet"></view>
+  <view class="column-sheet" wx:if="{{columnSheetOpen}}">
+    <view class="sheet-head"><text class="sheet-title">选择显示内容</text><text class="sheet-done" bindtap="closeColumnSheet">完成</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <view class="sheet-item" wx:for="{{columnSheetItems}}" wx:key="key">
+        <text class="sheet-item-name" data-key="{{item.key}}" bindtap="onToggleColumn">{{item.label}}</text>
+        <text class="column-move" data-key="{{item.key}}" data-offset="-1" bindtap="onMoveColumn">↑</text>
+        <text class="column-move" data-key="{{item.key}}" data-offset="1" bindtap="onMoveColumn">↓</text>
+        <view class="sheet-check {{item.visible ? 'selected' : ''}}" data-key="{{item.key}}" bindtap="onToggleColumn">{{item.visible ? '✓' : ''}}</view>
+      </view>
+    </scroll-view>
+    <view class="sheet-foot"><text class="sheet-done" bindtap="resetColumns">恢复默认</text><text class="muted">↑ ↓ 调整顺序</text></view>
+  </view>
+
+  <!-- 排序：按某一列升/降序，整批数据一起排 -->
+  <view wx:if="{{sortSheetOpen}}" class="mask" bindtap="closeSortSheet"><view class="sheet" catchtap="noop">
+    <view class="sheet-title">排序<text class="link" bindtap="closeSortSheet">关闭</text></view>
+    <view class="muted">按哪一列排序</view>
+    <scroll-view scroll-y class="editor-scroll">
+      <view class="column-row" wx:for="{{sortFields}}" wx:key="key" data-key="{{item.key}}" bindtap="onSortField">
+        <text class="column-label">{{item.label}}</text>
+        <text class="link" wx:if="{{sortField === item.key}}">✓</text>
+      </view>
+    </scroll-view>
+    <view class="footer">
+      <text class="small {{sortOrder === 'desc' ? 'primary' : ''}}" data-order="desc" bindtap="onSortOrder">降序</text>
+      <text class="small {{sortOrder === 'asc' ? 'primary' : ''}}" data-order="asc" bindtap="onSortOrder">升序</text>
+    </view>
+  </view></view>
+
+  <!-- 成交笔数：这个客户在这批数据里的每一笔成交 -->
+  <view wx:if="{{dealSheet}}" class="mask" bindtap="closeDealSheet"><view class="sheet" catchtap="noop">
+    <view class="sheet-title">{{dealSheet.name}} · 成交明细<text class="link" bindtap="closeDealSheet">关闭</text></view>
+    <view wx:if="{{dealLoading}}" class="empty muted">加载中…</view>
+    <scroll-view scroll-y class="editor-scroll" wx:else>
+      <view class="deal-row" wx:for="{{dealSheet.rows}}" wx:key="id">
+        <text class="deal-main">{{item.date}} · {{item.label}}</text>
+        <text class="muted">{{item.organization}} · {{item.classification}} · {{item.closers}}</text>
+      </view>
+      <view wx:if="{{!dealSheet.rows.length}}" class="empty muted">暂无成交记录</view>
+    </scroll-view>
+  </view></view>
+
+  <!-- 邀约 / 取消 / 到店 / 参与活动记录 -->
+  <!-- 面板筛选项弹层：选项名 + 数量 -->
+  <view class="sheet-mask" wx:if="{{panelSheet}}" catchtouchmove="noop" bindtap="closePanelSheet"></view>
+  <view class="column-sheet" wx:if="{{panelSheet}}">
+    <view class="sheet-head"><text class="sheet-title">{{panelSheet.title}}</text><text class="sheet-done" bindtap="closePanelSheet">完成</text></view>
+    <scroll-view class="sheet-list" scroll-y>
+      <view class="sheet-item" wx:for="{{panelSheet.options}}" wx:key="label" data-index="{{index}}" bindtap="onPanelOption">
+        <text class="sheet-item-name {{index === panelSelects[panelSheet.index].index ? 'selected' : ''}}">{{item.label}}</text>
+        <text class="sheet-item-note">{{item.text}}</text>
+        <view class="sheet-check {{index === panelSelects[panelSheet.index].index ? 'selected' : ''}}">{{index === panelSelects[panelSheet.index].index ? '✓' : ''}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view wx:if="{{recordSheet}}" class="mask" bindtap="closeRecordSheet"><view class="sheet" catchtap="noop">
+    <view class="sheet-title">{{recordSheet.name}} · {{recordSheet.type === 'invited' ? '受邀记录' : recordSheet.type === 'cancelled' ? '取消记录' : recordSheet.type === 'arrived' ? '到店记录' : '参与活动'}}<text class="link" bindtap="closeRecordSheet">关闭</text></view>
+    <view wx:if="{{recordLoading}}" class="empty muted">加载中…</view>
+    <scroll-view scroll-y class="editor-scroll" wx:else>
+      <view class="deal-row" wx:for="{{recordSheet.rows}}" wx:key="index">
+        <text class="deal-main">{{item.main}}</text>
+        <text class="muted">{{item.sub}}</text>
+      </view>
+      <view wx:if="{{!recordSheet.rows.length}}" class="empty muted">暂无记录</view>
+    </scroll-view>
+  </view></view>
 </view>

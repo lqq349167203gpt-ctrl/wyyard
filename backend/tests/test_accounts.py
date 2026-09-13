@@ -7,6 +7,38 @@ import pytest
 from app.services import position_edit_permission_service, position_permission_service
 
 
+def test_my_permissions_merge_multiple_roles(client):
+    """多角色账号的有效页面权限取并集（对应 qintong：引流人 + 邀约信息）。"""
+    role_a, role_b = "引流人", "邀约信息"
+    previous_a = position_permission_service.get_all().get(role_a, [])
+    previous_b = position_permission_service.get_all().get(role_b, [])
+    position_permission_service.set_permissions(role_a, ["daily-activities"])
+    position_permission_service.set_permissions(role_b, ["class-records"])
+
+    u = _unique()
+    pwd = _password(u)
+    created = client.post("/api/accounts", json={
+        "owner": f"owner_{u}", "role": role_a, "roles": [role_a, role_b],
+        "username": f"user_{u}", "password": pwd, "enabled": True,
+    })
+    assert created.status_code == 200, created.text
+    account = created.json()
+    try:
+        login = _login(client, f"user_{u}", pwd).json()
+        headers = {"Authorization": f"Bearer {login['token']}"}
+        result = client.get("/api/accounts/me/permissions", headers=headers).json()
+        assert "daily-activities" in result["pages"]
+        assert "class-records" in result["pages"]
+
+        # 只按主要角色取权限时会丢掉另一个角色的页面（这是本次修复的根因）
+        only_primary = client.get(f"/api/position-permissions/{role_a}").json()
+        assert "class-records" not in only_primary["pages"]
+    finally:
+        position_permission_service.set_permissions(role_a, previous_a)
+        position_permission_service.set_permissions(role_b, previous_b)
+        client.delete(f"/api/accounts/{account['id']}")
+
+
 def _unique(suffix=""):
     return f"{uuid.uuid4().hex[:12]}{suffix}"
 

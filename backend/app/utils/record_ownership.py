@@ -61,6 +61,22 @@ def _record_teacher_ids(record) -> set[str]:
     return teacher_ids
 
 
+def request_actor_customer_ids(request: Request) -> set[str]:
+    """当前账号归属人对应的客户 ID 集合（按昵称/姓名匹配）。"""
+    _, actor_name = get_request_actor(request)
+    normalized_actor = _normalized_name(actor_name)
+    if not normalized_actor:
+        return set()
+    return {
+        customer.id
+        for customer in customer_service.list_all_customers()
+        if normalized_actor in {
+            _normalized_name(customer.nickname),
+            _normalized_name(customer.name),
+        }
+    }
+
+
 def is_request_activity_teacher(request: Request, record) -> bool:
     """当前账号归属人是否为该堂课已配置的老师。"""
     if record is None:
@@ -70,14 +86,7 @@ def is_request_activity_teacher(request: Request, record) -> bool:
     if not normalized_actor:
         return False
 
-    actor_customer_ids = {
-        customer.id
-        for customer in customer_service.list_all_customers()
-        if normalized_actor in {
-            _normalized_name(customer.nickname),
-            _normalized_name(customer.name),
-        }
-    }
+    actor_customer_ids = request_actor_customer_ids(request)
     if actor_customer_ids.intersection(_record_teacher_ids(record)):
         return True
 

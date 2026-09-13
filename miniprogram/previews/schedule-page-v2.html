@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课表页 · 优化两版样式（A 紧凑清单 / B 时段分组）</title>
+<style>
+  :root{
+    --ink:#1f2329; --ink2:#646a73; --ink3:#8f959e; --ink4:#b0b5bb;
+    --line:#f1f2f4; --line2:#e8eaed; --page:#f7f8fa; --head:#f3f7ff;
+    --blue:#3370ff; --tag:#f2f3f5; --tag-blue-bg:#f5f7ff;
+    --yellow:#f4dc84;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;padding:30px 22px 54px;background:#eceef1;color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+  .intro{max-width:840px;margin:0 auto 20px}
+  .intro h1{margin:0 0 6px;font-size:19px;font-weight:600;letter-spacing:-.2px}
+  .intro p{margin:0;color:var(--ink2);font-size:12.5px;line-height:1.75}
+  .plans{max-width:840px;margin:auto;display:grid;grid-template-columns:repeat(2,minmax(0,375px));justify-content:center;gap:30px;align-items:start}
+  .plan-head{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+  .letter{color:var(--blue);font-size:15px;font-weight:600}
+  .plan-name{font-size:14px;font-weight:600}
+  .plan-desc{margin-left:auto;color:var(--ink3);font-size:11px}
+
+  /* 手机外壳：375pt 宽，1px = 2rpx */
+  .phone{width:100%;height:784px;position:relative;overflow:hidden;border:1px solid #dfe3e8;border-radius:18px;background:var(--page)}
+  .status{height:26px;padding:0 17px;display:flex;align-items:center;justify-content:space-between;background:var(--head);font-size:10.5px;font-weight:600}
+  .nav{height:46px;position:relative;display:flex;align-items:center;justify-content:center;background:var(--head);font-size:16px;font-weight:600}
+  .capsule{position:absolute;right:9px;width:76px;height:29px;display:flex;align-items:center;justify-content:space-around;padding:0 9px;border:1px solid rgba(31,35,41,.12);border-radius:15px}
+  .dots{display:flex;gap:3px}
+  .dots i{width:3px;height:3px;border-radius:50%;background:var(--ink)}
+  .cap-line{width:1px;height:15px;background:rgba(31,35,41,.1)}
+  .cap-circle{width:9px;height:9px;position:relative;border:1.5px solid var(--ink);border-radius:50%}
+
+  /* 头部（两版共用，已压扁） */
+  .head{padding:10px 16px 14px;background:var(--head)}
+  .head-row{min-height:36px;display:flex;align-items:center}
+  .date{font-size:21px;font-weight:500;letter-spacing:-.5px}
+  .wk{margin-left:7px;font-size:12px;color:var(--ink3);font-weight:400}
+  .arrow{width:6px;height:6px;margin:-3px 0 0 8px;border-right:1.5px solid var(--ink3);border-bottom:1.5px solid var(--ink3);transform:rotate(45deg)}
+  .space{margin-left:auto;height:30px;padding:0 11px;display:flex;align-items:center;gap:5px;border-radius:9px;background:#fff;color:var(--ink2);font-size:12px}
+  .pin{width:8px;height:10px;position:relative;border:1px solid var(--blue);border-radius:5px 5px 6px 6px}
+  .pin:after{content:"";position:absolute;top:2px;left:2px;width:2px;height:2px;border-radius:50%;background:var(--blue)}
+  .week{margin-top:10px;padding:10px 7px 8px;display:grid;grid-template-columns:repeat(7,1fr);border-radius:14px;background:rgba(255,255,255,.78)}
+  .day{display:flex;flex-direction:column;align-items:center;color:var(--ink3);font-size:10px}
+  .num{width:28px;height:28px;margin-top:4px;display:flex;align-items:center;justify-content:center;border-radius:9px;color:var(--ink2);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+  .day.active{color:var(--blue)}
+  .day.active .num{background:var(--blue);color:#fff}
+  .daydot{width:4px;height:4px;margin-top:4px;border-radius:50%;background:#b9c8e7}
+  .day.active .daydot{background:var(--blue)}
+
+  /* 列表容器 */
+  .content{height:calc(100% - 208px - 58px);overflow:hidden}
+
+  /* 列表标题行 */
+  .list-head{height:38px;padding:0 20px;display:flex;align-items:center;gap:6px}
+  .dot-y{width:5px;height:5px;flex:none;border-radius:50%;background:var(--yellow)}
+  .list-title{font-size:12px;font-weight:500;color:var(--ink2);letter-spacing:.4px}
+  .list-count{margin-left:2px;font-size:11px;color:var(--ink4);font-variant-numeric:tabular-nums}
+  .list-act{margin-left:auto;font-size:11.5px;color:var(--ink2)}
+
+  /* 课程行：共用骨架 */
+  .card{margin:0 12px;overflow:hidden;border-radius:12px;background:#fff}
+  .course{display:grid;grid-template-columns:46px minmax(0,1fr) auto;align-items:center;column-gap:10px}
+  .t-start{display:block;font-size:14px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+  .t-end{display:block;margin-top:2px;font-size:10px;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .main{min-width:0}
+  .line1{display:flex;align-items:center;gap:6px;min-width:0}
+  .cdot{width:6px;height:6px;flex:none;border-radius:50%}
+  .cname{min-width:0;overflow:hidden;font-size:14px;font-weight:600;color:var(--ink);text-overflow:ellipsis;white-space:nowrap}
+  .ctype{flex:none;font-size:10.5px;color:var(--ink3)}
+  .line2{margin-top:4px;overflow:hidden;font-size:11.5px;color:var(--ink2);text-overflow:ellipsis;white-space:nowrap}
+  .line2 .cr{color:var(--ink3)}
+  .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:34px}
+  .ppl{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .tag{padding:1px 5px;border-radius:5px;background:var(--tag);color:var(--ink3);font-size:10px;line-height:1.5}
+  .tag.blue{background:var(--tag-blue-bg);color:var(--blue)}
+  .mute{font-size:10px;color:var(--ink4)}
+
+  /* A 版：一屏扫完 */
+  .a .course{min-height:52px;padding:9px 13px}
+  .a .course + .course{border-top:1px solid var(--line)}
+
+  /* B 版：分时段定位 */
+  .b .period{height:34px;padding:0 20px;display:flex;align-items:center;gap:6px}
+  .b .period .pname{font-size:12px;font-weight:500;color:var(--ink2);letter-spacing:.4px}
+  .b .period .pcount{font-size:11px;color:var(--ink4);font-variant-numeric:tabular-nums}
+  .b .period .pact{margin-left:auto;font-size:11.5px;color:var(--ink2)}
+  .b .card{margin:0 12px 8px}
+  .b .course{min-height:60px;padding:10px 14px}
+  .b .course + .course{border-top:1px solid var(--line)}
+  .b .cname{font-size:14.5px}
+  .b .line2{margin-top:5px}
+  .b .ppl{font-size:15px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+  .b .unit{font-size:10.5px;font-weight:400;color:var(--ink3);margin-left:1px}
+
+  .fab{position:absolute;right:16px;bottom:70px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--blue);color:#fff;font-size:28px;font-weight:300;line-height:1;padding-bottom:2px}
+  .tabbar{position:absolute;right:0;bottom:0;left:0;height:58px;padding-top:6px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #e6e8eb;background:#fff}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink3);font-size:10px}
+  .tab.active{color:var(--blue)}
+  .tab-icon{width:17px;height:17px;position:relative}
+  .people-icon:before,.people-icon:after,.person-icon:before,.person-icon:after{content:"";position:absolute;border:1.5px solid currentColor}
+  .people-icon:before,.person-icon:before{width:6px;height:6px;left:5px;top:0;border-radius:50%}
+  .people-icon:after,.person-icon:after{width:14px;height:7px;left:1px;bottom:1px;border-radius:7px 7px 3px 3px}
+  .plus-icon{border:1.5px solid currentColor;border-radius:50%}
+  .plus-icon:before,.plus-icon:after{content:"";position:absolute;background:currentColor}
+  .plus-icon:before{width:7px;height:1.5px;left:4px;top:7.5px}
+  .plus-icon:after{width:1.5px;height:7px;left:7px;top:4.5px}
+  .cal-icon{border:1.5px solid currentColor;border-radius:3px}
+  .cal-icon:before{content:"";position:absolute;left:2px;right:2px;top:4px;border-top:1.5px solid currentColor}
+  .cal-icon:after{content:"";position:absolute;width:2.5px;height:2.5px;left:3.5px;top:8px;border-radius:50%;background:currentColor;box-shadow:5px 0 0 currentColor}
+
+  .notes{margin-top:11px;padding:12px 13px;border:1px solid #e0e3e7;border-radius:10px;background:#fff}
+  .notes .row{display:flex;gap:6px;font-size:11.5px;line-height:1.7;color:var(--ink2)}
+  .notes .row + .row{margin-top:3px}
+  .notes b{flex:none;color:var(--ink);font-weight:600}
+  .shared{max-width:840px;margin:32px auto 0;padding:15px 17px;border:1px solid #e0e3e7;border-radius:10px;background:#fff}
+  .shared h2{margin:0 0 9px;font-size:13px;font-weight:600}
+  .shared ul{margin:0;padding-left:16px;color:var(--ink2);font-size:12px;line-height:1.9}
+  .shared code{padding:1px 4px;border-radius:4px;background:#f4f5f7;font-size:11px;color:var(--ink)}
+  @media(max-width:820px){body{padding:22px 12px 44px}.plans{grid-template-columns:minmax(0,375px);gap:34px}}
+</style>
+</head>
+<body>
+<header class="intro">
+  <h1>课表页 · 优化两版样式</h1>
+  <p>两版共用同一套精简后的头部（删掉「今日 N 位参与者」整行、顶部占位收紧）。区别在课程列表的组织方式：A 一屏扫完全部课程，B 按上午/下午/晚上分段定位。</p>
+</header>
+
+<main class="plans">
+
+  <!-- ============ A ============ -->
+  <section class="a">
+    <div class="plan-head"><span class="letter">A</span><span class="plan-name">紧凑清单</span><span class="plan-desc">密度优先 · 一屏 7–8 场</span></div>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G&nbsp;&nbsp;100%</span></div>
+      <div class="nav">课表<div class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="cap-line"></span><span class="cap-circle"></span></div></div>
+
+      <div class="head">
+        <div class="head-row">
+          <span class="date">8月30日</span><span class="wk">周日</span><span class="arrow"></span>
+          <span class="space"><span class="pin"></span>三楼茶室</span>
+        </div>
+        <div class="week">
+          <div class="day"><span>一</span><span class="num">24</span><span class="daydot"></span></div>
+          <div class="day"><span>二</span><span class="num">25</span><span class="daydot"></span></div>
+          <div class="day"><span>三</span><span class="num">26</span><span class="daydot"></span></div>
+          <div class="day"><span>四</span><span class="num">27</span><span class="daydot"></span></div>
+          <div class="day"><span>五</span><span class="num">28</span><span class="daydot"></span></div>
+          <div class="day"><span>六</span><span class="num">29</span><span class="daydot"></span></div>
+          <div class="day active"><span>日</span><span class="num">30</span><span class="daydot"></span></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="list-head">
+          <span class="dot-y"></span><span class="list-title">今日课表</span>
+          <span class="list-count">5 场 · 28 人</span>
+          <span class="list-act">退课</span>
+        </div>
+        <div class="card">
+          <div class="course">
+            <div><span class="t-start">09:30</span><span class="t-end">11:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#bfa060"></span><span class="cname">周日下午茶话会</span><span class="ctype">沙龙</span></div>
+              <div class="line2">林知 · 扣卡 1 次 · <span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">5 人</span><span class="tag">已发布</span></div>
+          </div>
+          <div class="course">
+            <div><span class="t-start">14:00</span><span class="t-end">16:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#8b72c7"></span><span class="cname">觉醒游戏 · 陈默</span><span class="ctype">觉醒</span></div>
+              <div class="line2">周远 · 扣卡 1 次 · <span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">6 人</span><span class="tag">已发布</span></div>
+          </div>
+          <div class="course">
+            <div><span class="t-start">15:30</span><span class="t-end">17:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#d97070"></span><span class="cname">情绪释放 · 小满</span><span class="ctype">情绪释放</span></div>
+              <div class="line2">何青 · 扣卡 1 次 · <span class="cr">婷婷创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">4 人</span><span class="mute">仅浏览</span></div>
+          </div>
+          <div class="course">
+            <div><span class="t-start">19:00</span><span class="t-end">21:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#c772a0"></span><span class="cname">颂钵 · 星空夜谈</span><span class="ctype">颂钵</span></div>
+              <div class="line2">白鹭 · 扣卡 2 次 · <span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">5 人</span><span class="tag">已发布</span></div>
+          </div>
+          <div class="course">
+            <div><span class="t-start">20:00</span><span class="t-end">21:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#5ba88a"></span><span class="cname">新人内部培训</span><span class="ctype">内部课程</span></div>
+              <div class="line2"><span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">8 人</span><span class="tag">已发布</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fab">+</div>
+      <div class="tabbar">
+        <div class="tab"><span class="tab-icon people-icon"></span><span>客户</span></div>
+        <div class="tab"><span class="tab-icon plus-icon"></span><span>邀约</span></div>
+        <div class="tab active"><span class="tab-icon cal-icon"></span><span>课表</span></div>
+        <div class="tab"><span class="tab-icon person-icon"></span><span>我的</span></div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="row"><b>结构：</b>一个总标题「今日课表 5 场 · 28 人」+ 退课，下面一张白卡连续排完，时间形成一条固定纵列。</div>
+      <div class="row"><b>层级：</b>时间是唯一高对比列（14px/500 + 等宽数字），课程名 14px/600，其余全部降到 11–12px 灰阶。</div>
+      <div class="row"><b>状态：</b>「已发布」收成灰色小签，「仅浏览」只留一行灰字，不再和人数抢右列。</div>
+      <div class="row"><b>取舍：</b>课程很多时，下午与晚上之间只有一条分隔线，时段边界不如 B 明确。</div>
+    </div>
+  </section>
+
+  <!-- ============ B ============ -->
+  <section class="b">
+    <div class="plan-head"><span class="letter">B</span><span class="plan-name">时段分组</span><span class="plan-desc">结构优先 · 一屏 5–6 场</span></div>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G&nbsp;&nbsp;100%</span></div>
+      <div class="nav">课表<div class="capsule"><span class="dots"><i></i><i></i><i></i></span><span class="cap-line"></span><span class="cap-circle"></span></div></div>
+
+      <div class="head">
+        <div class="head-row">
+          <span class="date">8月30日</span><span class="wk">周日</span><span class="arrow"></span>
+          <span class="space"><span class="pin"></span>三楼茶室</span>
+        </div>
+        <div class="week">
+          <div class="day"><span>一</span><span class="num">24</span><span class="daydot"></span></div>
+          <div class="day"><span>二</span><span class="num">25</span><span class="daydot"></span></div>
+          <div class="day"><span>三</span><span class="num">26</span><span class="daydot"></span></div>
+          <div class="day"><span>四</span><span class="num">27</span><span class="daydot"></span></div>
+          <div class="day"><span>五</span><span class="num">28</span><span class="daydot"></span></div>
+          <div class="day"><span>六</span><span class="num">29</span><span class="daydot"></span></div>
+          <div class="day active"><span>日</span><span class="num">30</span><span class="daydot"></span></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="period"><span class="dot-y"></span><span class="pname">上午</span><span class="pcount">1 场</span><span class="pact">退课</span></div>
+        <div class="card">
+          <div class="course">
+            <div><span class="t-start">09:30</span><span class="t-end">11:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#bfa060"></span><span class="cname">周日下午茶话会</span><span class="tag blue">已发布</span></div>
+              <div class="line2">林知 · 扣卡 1 次 · <span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">5<span class="unit">人</span></span></div>
+          </div>
+        </div>
+
+        <div class="period"><span class="dot-y"></span><span class="pname">下午</span><span class="pcount">2 场</span></div>
+        <div class="card">
+          <div class="course">
+            <div><span class="t-start">14:00</span><span class="t-end">16:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#8b72c7"></span><span class="cname">觉醒游戏 · 陈默</span><span class="tag blue">已发布</span></div>
+              <div class="line2">周远 · 扣卡 1 次 · <span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">6<span class="unit">人</span></span></div>
+          </div>
+          <div class="course">
+            <div><span class="t-start">15:30</span><span class="t-end">17:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#d97070"></span><span class="cname">情绪释放 · 小满</span><span class="mute">仅浏览</span></div>
+              <div class="line2">何青 · 扣卡 1 次 · <span class="cr">婷婷创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">4<span class="unit">人</span></span></div>
+          </div>
+        </div>
+
+        <div class="period"><span class="dot-y"></span><span class="pname">晚上</span><span class="pcount">2 场</span></div>
+        <div class="card">
+          <div class="course">
+            <div><span class="t-start">19:00</span><span class="t-end">21:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#c772a0"></span><span class="cname">颂钵 · 星空夜谈</span><span class="tag blue">已发布</span></div>
+              <div class="line2">白鹭 · 扣卡 2 次 · <span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">5<span class="unit">人</span></span></div>
+          </div>
+          <div class="course">
+            <div><span class="t-start">20:00</span><span class="t-end">21:00</span></div>
+            <div class="main">
+              <div class="line1"><span class="cdot" style="background:#5ba88a"></span><span class="cname">新人内部培训</span><span class="tag blue">已发布</span></div>
+              <div class="line2"><span class="cr">耀凯创建</span></div>
+            </div>
+            <div class="right"><span class="ppl">8<span class="unit">人</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fab">+</div>
+      <div class="tabbar">
+        <div class="tab"><span class="tab-icon people-icon"></span><span>客户</span></div>
+        <div class="tab"><span class="tab-icon plus-icon"></span><span>邀约</span></div>
+        <div class="tab active"><span class="tab-icon cal-icon"></span><span>课表</span></div>
+        <div class="tab"><span class="tab-icon person-icon"></span><span>我的</span></div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="row"><b>结构：</b>上午/下午/晚上各一段，段标题给出「N 场」，段与段之间留 8px 呼吸，看空档最直接。</div>
+      <div class="row"><b>层级：</b>右列人数放大到 15px/500 作为每行锚点，课程名 14.5px/600，其余同 A 降为灰阶。</div>
+      <div class="row"><b>状态：</b>「已发布」内联到课程名右侧的淡蓝小签（沿用客户页标签色 <code>#f5f7ff / #3370ff</code>），不占右列。</div>
+      <div class="row"><b>取舍：</b>一屏少看 1–2 场；退课仍挂在第一个时段标题右侧，位置随「上午是否有课」漂移。</div>
+    </div>
+  </section>
+</main>
+
+<section class="shared">
+  <h2>两版共用的改动（相对现在的代码）</h2>
+  <ul>
+    <li>删除日期下方「今日 N 位参与者」整行（邀约页同款处理），人数并入列表标题（A）或不再单列（B）；顶部占位从 <code>334rpx</code> 收到约 <code>292rpx</code>，空态 / 加载态的 <code>470rpx</code> 同步收到 <code>420rpx</code>。</li>
+    <li>空间名称前补一个邀约页同款定位小图标（<code>#3370ff</code> 描边），胶囊高度 64rpx → 60rpx、圆角 20rpx → 18rpx；点击仍是 picker。</li>
+    <li>课程第二行的「创建人」去掉竖线分隔，统一用「·」连接，字号 21rpx → 22rpx、颜色统一 <code>#8f959e</code>。</li>
+    <li>状态收敛为两类：已发布（A 灰签 <code>#f2f3f5</code>／B 淡蓝签 <code>#f5f7ff</code>）、仅浏览（灰字 <code>#b0b5bb</code>，无签）。</li>
+    <li>时间列加 <code>font-variant-numeric: tabular-nums</code>，宽度固定 92rpx → 时间纵列严格对齐。</li>
+    <li>卡片与分隔维持现状：白底、24rpx 圆角、<code>#f1f2f4</code> hairline，不加阴影、不加渐变。</li>
+  </ul>
+</section>
+
+</body>
+</html>
