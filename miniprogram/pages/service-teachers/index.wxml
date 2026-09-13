@@ -142,13 +142,13 @@
     </block>
 
     <block wx:elif="{{activeTab === 'courses' && courseViewTab === 'participants'}}">
-      <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 场课 · {{participantTotalParticipants}} 人（含其他人填写的内容，点内容可以填自己那份）</view>
+      <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 场课 · {{participantTotalParticipants}} 人</view>
 
       <!-- 按课程分组：一组 = 一堂课，下面是这堂课的参与者 -->
       <view class="p-group" wx:for="{{participantGroups}}" wx:key="course_id" wx:for-item="group" wx:for-index="gi">
         <view class="p-group-head">
           <text class="p-group-course">{{group.dateText}} · {{group.course_name || '未命名课程'}}</text>
-          <text class="p-group-count">{{group.activity_type_label ? group.activity_type_label + ' · ' : ''}}{{group.participants.length}} 人</text>
+          <text class="p-group-count">{{group.participants.length}} 人</text>
         </view>
         <view class="p-record" wx:for="{{group.participants}}" wx:key="id" wx:for-item="item" wx:for-index="index">
           <view class="p-head">

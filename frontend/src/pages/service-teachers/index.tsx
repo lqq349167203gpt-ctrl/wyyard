@@ -786,8 +786,12 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-4 border-b border-[#f0f0f0] px-4 py-2.5">
           <div className="text-[12px] font-medium text-[#4e535a]">
-            {courseListTitle}
-            <span className="font-normal text-[#8f959e]">（{courseListCount}{courseListUnit}）</span>
+            {courseViewTab === "participants" ? "参与者" : courseListTitle}
+            <span className="font-normal text-[#8f959e]">
+              {courseViewTab === "participants"
+                ? ` · 共 ${participantTotal} 场课 · ${participantTotalParticipants} 人`
+                : `（${courseListCount}${courseListUnit}）`}
+            </span>
           </div>
           {courseViewTab === "reviews" ? (
             <button
@@ -822,10 +826,6 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
           ) : courseViewTab === "participants" ? (
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between gap-3 border-b border-[#f0f0f0] px-4 py-2">
-                <span className="text-[12px] text-[#8f959e]">参与者列表（含其他人填写的内容，点内容可以填写自己那份）</span>
-                <span className="text-[12px] text-[#8f959e]">共 {participantTotal} 场课 · {participantTotalParticipants} 人</span>
-              </div>
                 {participantLoading ? (
                 <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
               ) : participantGroups.length === 0 ? (
@@ -852,9 +852,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                           <TableRow className="bg-[#f7f8fa] hover:bg-[#f7f8fa]">
                             <TableCell colSpan={6} className="py-1.5 pl-4 text-[12px] font-medium text-[#2b2f36]">
                               {group.course_date || ""} · {group.course_name || "未命名课程"}
-                              <span className="ml-2 font-normal text-[#8f959e]">
-                                {group.activity_type_label ? `${group.activity_type_label} · ` : ""}{group.participants.length} 人
-                              </span>
+                              <span className="ml-2 font-normal text-[#8f959e]">{group.participants.length} 人</span>
                             </TableCell>
                           </TableRow>
                           {group.participants.map(row => (
