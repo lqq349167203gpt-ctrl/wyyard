@@ -839,7 +839,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                         {/* 列宽按百分比分配，合计 100%，表格永远不超过页面宽度 */}
                         <TableHead className="h-9 w-[10%] px-2 pl-4 text-[11px] font-normal">昵称</TableHead>
                         <TableHead className="h-9 w-[9%] px-2 text-[11px] font-normal">身份</TableHead>
-                        <TableHead className="h-9 w-[11%] px-2 text-[11px] font-normal">同类课程参与次数</TableHead>
+                        <TableHead className="h-9 w-[11%] px-2 text-[11px] font-normal">同类活动参与数</TableHead>
                         <TableHead className="h-9 w-[23%] px-2 text-[11px] font-normal">当天的来访需求</TableHead>
                         <TableHead className="h-9 w-[23%] px-2 text-[11px] font-normal">客户信息</TableHead>
                         <TableHead className="h-9 w-[24%] px-2 pr-4 text-[11px] font-normal">跟进点</TableHead>

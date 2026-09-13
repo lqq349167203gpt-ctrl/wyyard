@@ -248,7 +248,7 @@ def list_course_participants(
     rows.sort(key=lambda item: (item["course_date"], item["nickname"]), reverse=True)
 
     def same_course_key(row: dict) -> str:
-        """同类课程的口径：沙龙活动/内部课程有二级分类（按具体课程算），
+        """同类活动的口径：沙龙活动/内部课程有二级分类（按具体课程算），
         觉醒游戏、情绪释放、能量结没有二级（按整个活动类型算）。"""
         if row.get("activity_type") in ("class", "ics"):
             name = str(row.get("course_name") or "")
@@ -256,7 +256,7 @@ def list_course_participants(
             return re.sub(r"[\s《》〈〉()（）\[\]【】·・\-—_/、,，.。：:]+", "", name).casefold()
         return str(row.get("activity_type") or "")
 
-    # 同类课程参与次数：先算全部参与者，不受昵称/身份/人员筛选影响
+    # 同类活动参与数：先算全部参与者，不受昵称/身份/人员筛选影响
     same_course_counts = Counter((row["customer_id"], same_course_key(row)) for row in rows)
     for row in rows:
         row["same_course_count"] = same_course_counts[(row["customer_id"], same_course_key(row))]
