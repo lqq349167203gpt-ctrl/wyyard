@@ -562,7 +562,7 @@
 
 /* ---- 课程记录 → 参与者 页签 ---- */
 .p-count { padding: 4rpx 0 8rpx; font-size: 22rpx; color: #8f959e; }
-.p-record { padding: 20rpx 0; border-bottom: 1rpx solid #f2f3f5; }
+.p-record { padding: 18rpx 18rpx; border-bottom: 1rpx solid #f5f6f7; }
 .p-head { display: flex; align-items: center; gap: 12rpx; }
 .p-date { flex-shrink: 0; font-size: 23rpx; color: #8f959e; }
 .p-title { display: flex; align-items: center; gap: 8rpx; flex: 1; min-width: 0; }
@@ -598,8 +598,8 @@
 .filter-input-placeholder { color: #b0b5bb; font-size: 26rpx; }
 
 /* 参与者：按课程分组 */
-.p-group { margin-bottom: 16rpx; }
-.p-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 12rpx 16rpx; border-radius: 8rpx; background: #f2f3f5; }
+.p-group { margin-bottom: 16rpx; border: 1rpx solid #eceef0; border-radius: 12rpx; overflow: hidden; background: #fff; }
+.p-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 14rpx 18rpx; background: #fafbfc; border-bottom: 1rpx solid #f2f3f5; }
 .p-group-course { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24rpx; font-weight: 500; color: #2b2f36; }
 .p-group-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
 .p-same-count { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
