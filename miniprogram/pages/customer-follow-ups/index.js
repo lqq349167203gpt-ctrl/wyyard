@@ -19,7 +19,7 @@ function formatTime(value) {
 Page({
   data: {
     keyword: '', searchKeyword: '',
-    list: [], page: 1, total: 0, hasMore: false,
+    list: [], dateGroups: [], page: 1, total: 0, hasMore: false,
     loading: false, error: '',
     // 修改自己填的内容
     editing: null, draft: '', saving: false,
@@ -48,8 +48,16 @@ Page({
         updatedText: formatTime(row.updated_at),
       }))
       const list = reset ? items : this.data.list.concat(items)
+      // 按到店日期分组
+      const dateMap = {}
+      const dateGroups = []
+      list.forEach(row => {
+        const key = row.visit_date || '未记录日期'
+        if (!dateMap[key]) { dateMap[key] = { date: key, items: [] }; dateGroups.push(dateMap[key]) }
+        dateMap[key].items.push(row)
+      })
       this.setData({
-        list, page: result.page || page, total: result.total || 0,
+        list, dateGroups, page: result.page || page, total: result.total || 0,
         hasMore: list.length < (result.total || 0),
       })
     } catch (e) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { Fragment, useCallback, useEffect, useState } from "react"
 import { Search } from "lucide-react"
 
 import { PaginationBar } from "@/components/pagination-bar"
@@ -111,6 +111,17 @@ export default function CustomerFollowUpsPage() {
 
   const startIndex = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const endIndex = Math.min(page * PAGE_SIZE, total)
+  // 按到店日期分组（同一天的人放一起，一眼看出哪天来了谁）
+  const dateGroups = (() => {
+    const map = new Map<string, CustomerFollowUpRow[]>()
+    rows.forEach(row => {
+      const key = row.visit_date || ""
+      const list = map.get(key)
+      if (list) list.push(row)
+      else map.set(key, [row])
+    })
+    return [...map.entries()].map(([date, items]) => ({ date, items }))
+  })()
   const dialogSaveLabel = editing && !editing.row[editing.field] ? "填写" : "保存"
 
   return (
@@ -149,20 +160,27 @@ export default function CustomerFollowUpsPage() {
         <Table className="w-full table-fixed" style={{ minWidth: 1440 }}>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[92px] !pl-4">到店日期</TableHead>
-              <TableHead className="w-[110px]">客户</TableHead>
-              <TableHead className="w-[100px]">客户身份</TableHead>
-              <TableHead className="w-[160px]">当天参加的活动</TableHead>
+              <TableHead className="w-[120px] !pl-4">客户</TableHead>
+              <TableHead className="w-[104px]">客户身份</TableHead>
+              <TableHead className="w-[170px]">当天参加的活动</TableHead>
               <TableHead className="w-[250px]">来访需求</TableHead>
               <TableHead className="w-[250px]">客户信息</TableHead>
               <TableHead className="w-[250px]">跟进点</TableHead>
-              <TableHead className="w-[130px]">更新时间</TableHead>
+              <TableHead className="w-[130px] pr-4">更新时间</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(row => (
+            {dateGroups.map(group => (
+              <Fragment key={group.date}>
+                <TableRow className="bg-[#fafbfc] hover:bg-[#fafbfc]">
+                  <TableCell colSpan={7} className="py-1.5 !pl-4 text-[12px] font-medium text-[#2b2f36]">
+                    <span className="mr-2 inline-block h-3 w-[3px] translate-y-[2px] rounded-[1px] bg-[#3370ff]" />
+                    {group.date || "未记录日期"}
+                    <span className="ml-2 font-normal text-[#8f959e]">{group.items.length} 人</span>
+                  </TableCell>
+                </TableRow>
+                {group.items.map(row => (
               <TableRow key={row.id} className="align-top">
-                <TableCell className="!pl-4 align-top whitespace-normal text-[12.5px] text-[#4e535a]">{formatDate(row.visit_date)}</TableCell>
                 <TableCell className="align-top whitespace-normal">
                   <button
                     type="button"
@@ -211,19 +229,21 @@ export default function CustomerFollowUpsPage() {
                     </TableCell>
                   )
                 })}
-                <TableCell className="align-top whitespace-normal text-[12px] text-[#8f959e]">{formatTime(row.updated_at)}</TableCell>
+                <TableCell className="align-top whitespace-normal pr-4 text-[12px] text-[#8f959e]">{formatTime(row.updated_at)}</TableCell>
               </TableRow>
+                ))}
+              </Fragment>
             ))}
             {!rows.length && !loading && (
               <TableRow>
-                <TableCell colSpan={8} className="py-16 text-center text-[13px] text-[#8f959e]">
+                <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">
                   {searchKeyword ? "没有匹配的跟进记录" : "你还没有填写过来访需求、客户信息或跟进点"}
                 </TableCell>
               </TableRow>
             )}
             {loading && !rows.length && (
               <TableRow>
-                <TableCell colSpan={8} className="py-16 text-center text-[13px] text-[#8f959e]">加载中…</TableCell>
+                <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">加载中…</TableCell>
               </TableRow>
             )}
           </TableBody>

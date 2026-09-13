@@ -20,9 +20,14 @@
   </view>
 
   <!-- 一条 = 一次邀约：给谁填的、哪天来的、当天参加的活动 + 来访需求/客户信息/跟进点 -->
-  <view class="record-card" wx:for="{{list}}" wx:key="id">
+  <block wx:for="{{dateGroups}}" wx:key="date" wx:for-item="day">
+  <view class="date-head">
+    <text class="date-title">{{day.date}}</text>
+    <text class="date-meta">{{day.items.length}} 人</text>
+  </view>
+  <view class="record-card" wx:for="{{day.items}}" wx:key="id" wx:for-item="item" wx:for-index="index">
     <view class="record-head">
-      <text class="record-date">{{item.dateText}}</text>
+      <text class="record-date" wx:if="{{false}}">{{item.dateText}}</text>
       <!-- 昵称后面紧挨着身份，不要再拉开 -->
       <view class="record-title">
         <text class="record-name" data-id="{{item.customer_id}}" bindtap="openCustomer">{{item.customer_name || '未命名'}}</text>
@@ -51,6 +56,7 @@
     </view>
     <text class="record-updated" wx:if="{{item.updatedText}}">更新于 {{item.updatedText}}</text>
   </view>
+  </block>
 
   <view class="loading muted" wx:if="{{loading}}">加载中…</view>
   <view class="muted end" wx:elif="{{list.length && !hasMore}}">没有更多了</view>
