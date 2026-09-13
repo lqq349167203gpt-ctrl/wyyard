@@ -157,26 +157,27 @@ export default function CustomerFollowUpsPage() {
 
       <div className="rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         {/* 固定列宽 + 允许换行：长文本不再把整张表撑出屏幕（表格组件默认 nowrap） */}
-        <Table className="w-full table-fixed" style={{ minWidth: 1440 }}>
+        <Table className="w-full table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[120px] !pl-4">客户</TableHead>
-              <TableHead className="w-[104px]">客户身份</TableHead>
-              <TableHead className="w-[170px]">当天参加的活动</TableHead>
-              <TableHead className="w-[250px]">来访需求</TableHead>
-              <TableHead className="w-[250px]">客户信息</TableHead>
-              <TableHead className="w-[250px]">跟进点</TableHead>
-              <TableHead className="w-[130px] pr-4">更新时间</TableHead>
+              <TableHead className="w-[9%] !pl-4">客户</TableHead>
+              <TableHead className="w-[7%]">客户身份</TableHead>
+              <TableHead className="w-[11%]">当天参加的活动</TableHead>
+              <TableHead className="w-[21%]">来访需求</TableHead>
+              <TableHead className="w-[21%]">客户信息</TableHead>
+              <TableHead className="w-[22%]">跟进点</TableHead>
+              <TableHead className="w-[9%] pr-4">更新时间</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {dateGroups.map(group => (
               <Fragment key={group.date}>
-                <TableRow className="bg-[#fafbfc] hover:bg-[#fafbfc]">
-                  <TableCell colSpan={7} className="py-1.5 !pl-4 text-[12px] font-medium text-[#2b2f36]">
-                    <span className="mr-2 inline-block h-3 w-[3px] translate-y-[2px] rounded-[1px] bg-[#3370ff]" />
-                    {group.date || "未记录日期"}
-                    <span className="ml-2 font-normal text-[#8f959e]">{group.items.length} 人</span>
+                <TableRow className="h-0 border-0 hover:bg-transparent">
+                  <TableCell colSpan={7} className="border-0 p-0">
+                    <div className="mx-4 mt-3 flex items-center justify-between rounded-t-[6px] border border-b-0 border-[#eceef0] bg-[#fafbfc] px-3 py-2">
+                      <span className="text-[12.5px] font-medium text-[#2b2f36]">{group.date || "未记录日期"}</span>
+                      <span className="text-[11px] text-[#9aa1a9]">{group.items.length} 人</span>
+                    </div>
                   </TableCell>
                 </TableRow>
                 {group.items.map(row => (
