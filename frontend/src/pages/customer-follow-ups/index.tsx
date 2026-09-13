@@ -181,6 +181,7 @@ export default function CustomerFollowUpsPage() {
         </div>
         {/* 列标题只出现一次，每个日期一张卡片 */}
         <div className="px-4 pt-3">
+          <div className="px-[1px] pb-1">
           <table className="w-full table-fixed border-collapse text-[11px] text-[#9aa1a9]">
             <colgroup>{LIST_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
             <thead>
@@ -191,6 +192,7 @@ export default function CustomerFollowUpsPage() {
               </tr>
             </thead>
           </table>
+          </div>
         </div>
         <div className="space-y-3 px-4 pb-3">
           {!rows.length && !loading && (
