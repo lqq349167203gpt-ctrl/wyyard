@@ -50,6 +50,9 @@
 .edit-button.disabled { opacity: .6; }
 
 /* 按日期分组 */
-.date-head { display: flex; align-items: baseline; gap: 12rpx; padding: 10rpx 0 10rpx 12rpx; border-left: 6rpx solid #3370ff; margin-bottom: 10rpx; }
+/* 每个日期一张卡片：浅灰日期头 + 下面的人（和 PC 同一套） */
+.date-card { margin-bottom: 16rpx; border: 1rpx solid #eceef0; border-radius: 12rpx; overflow: hidden; background: #fff; }
+.date-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 14rpx 18rpx; background: #fafbfc; border-bottom: 1rpx solid #f2f3f5; }
+.date-card .record-card { margin: 0; border-radius: 0; border-bottom: 1rpx solid #f5f6f7; }
 .date-title { font-size: 25rpx; font-weight: 500; color: #1f2329; }
 .date-meta { font-size: 21rpx; color: #9aa1a9; }
