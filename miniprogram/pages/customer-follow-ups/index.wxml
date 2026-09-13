@@ -14,6 +14,19 @@
     <view class="search-reset" wx:if="{{searchKeyword}}" bindtap="onResetSearch">重置</view>
   </view>
 
+  <!-- 日期筛选：改完即时查询 -->
+  <view class="date-filter">
+    <text class="date-filter-label">日期</text>
+    <picker mode="date" value="{{dateFrom}}" end="{{dateTo}}" bindchange="onDateFrom">
+      <view class="date-filter-value {{dateFrom ? '' : 'placeholder'}}">{{dateFrom || '开始日期'}}</view>
+    </picker>
+    <text class="date-filter-sep">~</text>
+    <picker mode="date" value="{{dateTo}}" start="{{dateFrom}}" bindchange="onDateTo">
+      <view class="date-filter-value {{dateTo ? '' : 'placeholder'}}">{{dateTo || '结束日期'}}</view>
+    </picker>
+    <text class="date-filter-clear" wx:if="{{dateFrom || dateTo}}" bindtap="onClearDate">清除</text>
+  </view>
+
   <view wx:if="{{error}}" class="error">{{error}}</view>
   <view class="empty muted" wx:if="{{!list.length && !loading}}">
     {{searchKeyword ? '没有匹配的跟进记录' : '你还没有填写过来访需求、客户信息或跟进点'}}

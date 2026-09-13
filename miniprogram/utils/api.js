@@ -913,6 +913,8 @@ module.exports = {
     list: (params = {}) => {
       const query = [`page=${params.page || 1}`, `page_size=${params.pageSize || 20}`]
       if (params.keyword) query.push(`keyword=${encodeURIComponent(params.keyword)}`)
+      if (params.dateFrom) query.push(`date_from=${params.dateFrom}`)
+      if (params.dateTo) query.push(`date_to=${params.dateTo}`)
       return request(`/api/customer-follow-ups?${query.join('&')}`)
     },
     update: (noteId, content) => request(`/api/customer-follow-ups/${noteId}`, { method: 'PATCH', data: { content } }),

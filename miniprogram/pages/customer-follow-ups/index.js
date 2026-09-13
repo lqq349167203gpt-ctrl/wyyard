@@ -18,7 +18,7 @@ function formatTime(value) {
 
 Page({
   data: {
-    keyword: '', searchKeyword: '',
+    keyword: '', searchKeyword: '', dateFrom: '', dateTo: '',
     list: [], dateGroups: [], page: 1, total: 0, hasMore: false,
     loading: false, error: '',
     // 修改自己填的内容
@@ -40,7 +40,7 @@ Page({
     const page = reset ? 1 : this.data.page + 1
     this.setData({ loading: true, error: '', ...(reset ? { list: [], page: 1 } : {}) })
     try {
-      const result = await customerFollowUpApi.list({ keyword: this.data.searchKeyword, page, pageSize: PAGE_SIZE })
+      const result = await customerFollowUpApi.list({ keyword: this.data.searchKeyword, dateFrom: this.data.dateFrom, dateTo: this.data.dateTo, page, pageSize: PAGE_SIZE })
       const items = (result.items || []).map(row => ({
         ...row,
         dateText: formatDate(row.visit_date),
@@ -67,6 +67,9 @@ Page({
     }
   },
   onKeywordInput(e) { this.setData({ keyword: e.detail.value }) },
+  onDateFrom(e) { this.setData({ dateFrom: e.detail.value }); this.load(true) },
+  onDateTo(e) { this.setData({ dateTo: e.detail.value }); this.load(true) },
+  onClearDate() { this.setData({ dateFrom: '', dateTo: '' }); this.load(true) },
   onSearch() {
     this.setData({ searchKeyword: (this.data.keyword || '').trim() })
     this.load(true)
