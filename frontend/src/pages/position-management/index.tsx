@@ -219,8 +219,8 @@ export default function PositionManagementPage() {
   const loadData = async () => {
     try {
       const [p, a, perm, editPerm] = await Promise.all([
-        positionApi.list(),
-        accountApi.list(),
+        positionApi.list().then(p => { setPositions(p); return p }),
+        accountApi.list().then(a => { setAccounts(a); return a }),
         positionPermissionApi.getAll(),
         positionPermissionApi.getEditPermissions(),
       ])
@@ -626,7 +626,7 @@ export default function PositionManagementPage() {
         </div>
       </div>
 
-      {activeTab === "accounts" && <AccountsContent embedded />}
+      {activeTab === "accounts" && <AccountsContent embedded sharedAccounts={accounts} sharedPositions={positions} onAccountsChange={setAccounts} />}
 
       {activeTab === "roles" && (
         <div className="flex gap-3" style={{ height: "calc(100vh - 180px)" }}>

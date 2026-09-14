@@ -46,6 +46,14 @@ def get_summary(_role: str = Depends(require_login_records)):
     return login_record_service.get_account_summary()
 
 
+@router.get("/overview")
+def get_overview(date_from: date, date_to: date, source: str = Query("", pattern="^(pc|miniprogram)?$"), account_id: str = "", _role: str = Depends(require_login_records)):
+    if date_to < date_from:
+        raise HTTPException(400, "结束日期不能早于开始日期")
+    from app.services.usage_analytics_service import overview
+    return overview(date_from.isoformat(), date_to.isoformat(), source, account_id)
+
+
 @router.get("")
 def list_records(
     account_id: Optional[str] = None,
@@ -54,11 +62,12 @@ def list_records(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     keyword: Optional[str] = None,
+    page_name: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     _role: str = Depends(require_login_records),
 ):
-    if event_type == "operation":
+    if event_type == "operation" and not page_name:
         return login_record_service.list_operation_activity_paginated(
             account_id=account_id,
             source=source,
@@ -76,4 +85,7 @@ def list_records(
         date_to=date_to.isoformat() if date_to else None,
         keyword=keyword,
     )
+    if page_name:
+        from app.services.usage_analytics_service import canonical_page
+        items = [item for item in items if canonical_page(item.get("page_name", "")) == page_name]
     return paginate(items, page, page_size)

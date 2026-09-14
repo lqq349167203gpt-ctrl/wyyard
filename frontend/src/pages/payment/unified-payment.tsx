@@ -18,7 +18,7 @@ import {
 import {
   customerApi, membershipCardApi, groupCaseApi, emotionalReleaseApi,
   ohCardReadingApi, teaSeatFeeApi, offlineCourseApi, energyKnotApi, internalCourseApi, otherProjectApi, projectRefundApi,
-  type Customer, type MembershipCard, type GroupCase, type EmotionalRelease,
+  type CustomerLight, type MembershipCard, type GroupCase, type EmotionalRelease,
   type OhCardReading, type TeaSeatFee, type OfflineCourse, type EnergyKnot, type InternalCourse, type OtherProject,
 } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -326,13 +326,11 @@ export function UnifiedPaymentContent({
   const appliedCloserNameRef = useRef("")
 
   // 客户
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [customersReady, setCustomersReady] = useState(false)
+  const [customers, setCustomers] = useState<CustomerLight[]>([])
   const { organizations, hasAnyOrganization, loading: organizationsLoading } = useOrganizations()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
   const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
-  const customersReadyRef = useRef(false)
   const [refundedKeys, setRefundedKeys] = useState(new Set<string>())
 
   const courseTeachers = useMemo(() =>
@@ -342,9 +340,6 @@ export function UnifiedPaymentContent({
 
   // 分页数据获取
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
-    if (!customersReadyRef.current) {
-      return { items: [] as UnifiedItem[], total: 0, page: 1, page_size: pageSize, total_pages: 0 }
-    }
     const params: any = {}
     if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
     if (appliedCloserNameRef.current) params.closer_name = appliedCloserNameRef.current
@@ -377,27 +372,25 @@ export function UnifiedPaymentContent({
   const paginatedItems = rawItems as unknown as UnifiedItem[]
 
   // 类型切换或会员卡类型筛选变化时回到第 1 页
-  useEffect(() => { goToPage(1) }, [activeType, mcTypeFilter, goToPage])
+  const previousPaymentFilter = useRef(fetchFn)
+  useEffect(() => {
+    if (previousPaymentFilter.current === fetchFn) return
+    previousPaymentFilter.current = fetchFn
+    goToPage(1)
+  }, [fetchFn, goToPage])
 
   // 加载客户
   useEffect(() => {
-    customerApi.list().then((data) => {
+    customerApi.light().then((data) => {
       setCustomers(data)
-      customersReadyRef.current = true
-      setCustomersReady(true)
-      refresh()
-      // 加载退费记录，构建已退费项目集合
-      projectRefundApi.listPaginated(1, 100).then((res: any) => {
-        const refunds = res?.items || res || []
-        const keys = new Set<string>()
-        ;(Array.isArray(refunds) ? refunds : []).forEach((r: any) => keys.add(`${r.project_type}:${r.project_id}`))
-        setRefundedKeys(keys)
-      }).catch(() => {})
-    }).catch(() => {
-      customersReadyRef.current = true
-      setCustomersReady(true)
-      refresh()
-    })
+    }).catch(() => {})
+    // 退费状态与客户选项并行加载，不阻塞付费列表。
+    projectRefundApi.listPaginated(1, 100).then((res: any) => {
+      const refunds = res?.items || res || []
+      const keys = new Set<string>()
+      ;(Array.isArray(refunds) ? refunds : []).forEach((r: any) => keys.add(`${r.project_type}:${r.project_id}`))
+      setRefundedKeys(keys)
+    }).catch(() => {})
   }, [])
 
   // 搜索
@@ -1050,7 +1043,7 @@ export function UnifiedPaymentContent({
   }
 
   // 校验单行数据
-  const validateRow = (type: ProjectTypeKey, get: (col: string) => string, customerMap: Map<string, Customer>, orgMap: Map<string, any>) => {
+  const validateRow = (type: ProjectTypeKey, get: (col: string) => string, customerMap: Map<string, CustomerLight>, orgMap: Map<string, any>) => {
     const errors: string[] = []
     const dealDate = get("成交日期")
     const nickname = get("用户昵称")
@@ -1510,7 +1503,7 @@ export function UnifiedPaymentContent({
         </div>
 
         {/* 表格 */}
-        {loading || !customersReady ? (
+        {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
         ) : paginatedItems.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无记录</div>

@@ -55,6 +55,21 @@ def get_last_visit_date(customer_id: str) -> str:
     return max(dates) if dates else ""
 
 
+def customer_visit_summary(customer_ids: set[str]) -> dict[str, tuple[int, str]]:
+    """一遍扫描生成客户列表到店统计；保留原计次和最近日期口径。"""
+    dates: dict[str, set[str]] = {}
+    latest: dict[str, str] = {}
+    for visit in _visits.values():
+        if visit.customer_id not in customer_ids or not visit.arrived:
+            continue
+        cid = visit.customer_id
+        if not visit.is_deleted:
+            dates.setdefault(cid, set()).add(visit.visit_date)
+        # 与 get_last_visit_date 一致，暂不改变历史已删除记录的日期口径。
+        latest[cid] = max(latest.get(cid, ""), visit.visit_date)
+    return {cid: (len(dates.get(cid, set())), latest.get(cid, "")) for cid in customer_ids}
+
+
 def get_arrived_customer_ids(date_from: str, date_to: str) -> set[str]:
     """获取日期范围内实际到店的客户 ID，按客户去重。"""
     return {

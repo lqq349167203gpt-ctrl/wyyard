@@ -1,402 +1,101 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import { X } from "lucide-react"
-
-import { PaginationBar } from "@/components/pagination-bar"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { loginRecordApi, type UsageOverview, type AccountActivityRecord, type AccountActivityType } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { PaginationBar } from "@/components/pagination-bar"
 import { useServerPagination } from "@/hooks/use-server-pagination"
-import {
-  loginRecordApi,
-  type AccountActivityRecord,
-  type AccountActivityType,
-  type LoginAccountSummary,
-} from "@/lib/api"
 
-const PAGE_SIZE = 20
-type SummarySource = "pc" | "miniprogram"
+type Filters = { date_from: string; date_to: string; source: string; account_id: string }
+const day = (d: Date) => d.toLocaleDateString("sv-SE")
+const duration = (n: number) => n > 0 ? n < 60 ? `${n}秒` : `${Math.floor(n / 60)}分钟` : "—"
+const dateTime = (s: string | null) => s ? new Date(s).toLocaleString("zh-CN", { hour12: false }) : "—"
+const labels: Record<string, string> = { login: "登录", page_view: "访问页面", operation: "业务操作", usage: "页面时长", pc: "PC端", miniprogram: "管理端小程序" }
 
-const SOURCE_LABELS: Record<string, string> = {
-  pc: "PC端",
-  miniprogram: "管理端小程序",
-}
-
-const EVENT_LABELS: Record<AccountActivityType, string> = {
-  login: "登录",
-  page_view: "访问页面",
-  operation: "业务操作",
-  usage: "使用时长",
-}
-
-const EVENT_COLORS: Record<AccountActivityType, string> = {
-  login: "text-[#3370ff]",
-  page_view: "text-[#4e535a]",
-  operation: "text-[#c4506a]",
-  usage: "text-[#3370ff]",
-}
-
-const formatDateTime = (value: string | null) => {
-  if (!value) return ""
-  return new Date(value).toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  })
-}
-
-const EmptyValue = () => <span className="text-[#d0d3d6]">-</span>
-
-const formatDuration = (seconds: number) => {
-  const value = Math.max(0, Math.round(seconds || 0))
-  if (value < 60) return value > 0 ? `${value}秒` : "-"
-  const hours = Math.floor(value / 3600)
-  const minutes = Math.floor((value % 3600) / 60)
-  if (hours > 0) return minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`
-  return `${minutes}分钟`
-}
-
-function getTerminalSummary(item: LoginAccountSummary, source: SummarySource) {
-  if (source === "pc") {
-    return {
-      todayUsageSeconds: item.pc_today_usage_seconds,
-      monthUsageSeconds: item.pc_month_usage_seconds,
-      todayLoginCount: item.pc_today_count,
-      monthLoginCount: item.pc_month_count,
-      latestActiveAt: item.pc_latest_active_at,
-      latestActiveIp: item.pc_latest_active_ip,
-    }
-  }
-  return {
-    todayUsageSeconds: item.miniprogram_today_usage_seconds,
-    monthUsageSeconds: item.miniprogram_month_usage_seconds,
-    todayLoginCount: item.miniprogram_today_count,
-    monthLoginCount: item.miniprogram_month_count,
-    latestActiveAt: item.miniprogram_latest_active_at,
-    latestActiveIp: item.miniprogram_latest_active_ip,
-  }
+function Details({ filters, pageName = "" }: { filters: Filters; pageName?: string }) {
+  const [kind, setKind] = useState("")
+  const [keyword, setKeyword] = useState("")
+  const [search, setSearch] = useState("")
+  const fetch = useCallback((p: number, size: number) => loginRecordApi.listPaginated({ ...filters, source: filters.source as "pc" | "miniprogram" || undefined, account_id: filters.account_id || undefined, event_type: kind as AccountActivityType || undefined, page_name: pageName || undefined, keyword: search || undefined }, p, size), [filters, kind, pageName, search])
+  const paging = useServerPagination<AccountActivityRecord>(fetch, { pageSize: 20 })
+  const previous = useRef(fetch)
+  useEffect(() => { if (previous.current !== fetch) { previous.current = fetch; paging.resetPage() } }, [fetch, paging.resetPage])
+  return <div className="space-y-3">
+    <SelectDropdown value={kind} onChange={setKind} options={[{ value: "", label: "全部记录" }, ...["login", "page_view", "operation", "usage"].map(value => ({ value, label: labels[value] }))]} className="w-36" />
+    <form className="flex gap-2" onSubmit={e => { e.preventDefault(); setSearch(keyword.trim()) }}><input aria-label="搜索操作内容" placeholder="搜索页面或操作内容" value={keyword} onChange={e => setKeyword(e.target.value)} className="h-8 rounded border px-2" /><Button size="sm" variant="outline">查询</Button></form>
+    <p className="text-xs text-[#8f959e]">页面时长为所在活跃区间，不代表单次操作耗时；登录仅列实际登录记录。</p>
+    {paging.error && <p role="alert" className="text-red-600">明细加载失败，请重试。</p>}
+    <Table><TableHeader><TableRow>{["时间", "使用人", "类型", "页面", "内容", "终端", "IP"].map(t => <TableHead key={t}>{t}</TableHead>)}</TableRow></TableHeader><TableBody>
+      {paging.paginatedItems.map(r => <TableRow key={r.id}><TableCell className="whitespace-nowrap text-xs">{dateTime(r.created_at)}</TableCell><TableCell>{r.owner}</TableCell><TableCell>{labels[r.event_type]}</TableCell><TableCell>{r.page_name || "—"}</TableCell><TableCell className="max-w-[320px] truncate" title={r.content}>{r.content}{r.event_type === "usage" ? ` · ${duration(r.duration_seconds)}` : ""}</TableCell><TableCell>{labels[r.source] || r.source}</TableCell><TableCell className="text-xs">{r.ip || "—"}</TableCell></TableRow>)}
+      {!paging.paginatedItems.length && <TableRow><TableCell colSpan={7} className="h-48 text-center text-[#8f959e]">{paging.loading ? "加载中…" : "未采集到相关记录"}</TableCell></TableRow>}
+    </TableBody></Table>
+    <PaginationBar currentPage={paging.currentPage} totalPages={paging.totalPages} totalItems={paging.totalItems} startIndex={paging.startIndex} endIndex={paging.endIndex} onPageChange={paging.goToPage} />
+  </div>
 }
 
 export default function LoginRecordsPage() {
-  const [summary, setSummary] = useState<LoginAccountSummary[]>([])
-  const [summaryLoading, setSummaryLoading] = useState(true)
-  const [summarySource, setSummarySource] = useState<SummarySource>("pc")
-  const [accountId, setAccountId] = useState("")
-  const [eventType, setEventType] = useState("")
-  const [source, setSource] = useState("")
-  // 默认只看最近 7 天：全部时间要扫两万多条操作日志，加载很慢
-  const defaultDateRange = (() => {
-    const today = new Date()
-    const from = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)
-    const toText = (value: Date) => value.toLocaleDateString("sv-SE")
-    return { from: toText(from), to: toText(today) }
-  })()
-  const [dateFrom, setDateFrom] = useState(defaultDateRange.from)
-  const [dateTo, setDateTo] = useState(defaultDateRange.to)
-  const [keyword, setKeyword] = useState("")
-  const filtersRef = useRef({ accountId, eventType, source, dateFrom, dateTo, keyword })
-
+  const [filters, setFilters] = useState<Filters>(() => ({ date_from: day(new Date(Date.now() - 6 * 86400000)), date_to: day(new Date()), source: "", account_id: "" }))
+  const [data, setData] = useState<UsageOverview | null>(null)
+  const [names, setNames] = useState<{ value: string; label: string }[]>([])
+  const [tab, setTab] = useState("people")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+  const [reload, setReload] = useState(0)
+  const [status, setStatus] = useState("")
+  const [sort, setSort] = useState("days")
+  const [selected, setSelected] = useState<{ name: string; id?: string; personId?: string } | null>(null)
+  const [personData, setPersonData] = useState<UsageOverview | null>(null)
+  const [detailError, setDetailError] = useState(false)
   useEffect(() => {
-    loginRecordApi.summary()
-      .then(setSummary)
-      .finally(() => setSummaryLoading(false))
-  }, [])
-
-  const fetchRecords = useCallback(async (page: number, pageSize: number) => {
-    const filters = filtersRef.current
-    return loginRecordApi.listPaginated({
-      account_id: filters.accountId || undefined,
-      event_type: (filters.eventType || undefined) as AccountActivityType | undefined,
-      source: (filters.source || undefined) as "pc" | "miniprogram" | undefined,
-      date_from: filters.dateFrom || undefined,
-      date_to: filters.dateTo || undefined,
-      keyword: filters.keyword || undefined,
-    }, page, pageSize)
-  }, [])
-
-  const {
-    paginatedItems: records,
-    currentPage,
-    totalPages,
-    totalItems,
-    goToPage,
-    startIndex,
-    endIndex,
-    loading,
-    error,
-  } = useServerPagination<AccountActivityRecord>(fetchRecords, { pageSize: PAGE_SIZE })
-
-  const updateFilter = (field: keyof typeof filtersRef.current, value: string) => {
-    filtersRef.current = { ...filtersRef.current, [field]: value }
-    if (field === "accountId") setAccountId(value)
-    if (field === "eventType") setEventType(value)
-    if (field === "source") setSource(value)
-    if (field === "dateFrom") setDateFrom(value)
-    if (field === "dateTo") setDateTo(value)
-    if (field === "keyword") setKeyword(value)
-    goToPage(1)
-  }
-
-  const clearFilters = () => {
-    const empty = { accountId: "", eventType: "", source: "", dateFrom: "", dateTo: "", keyword: "" }
-    filtersRef.current = empty
-    setAccountId("")
-    setEventType("")
-    setSource("")
-    setDateFrom("")
-    setDateTo("")
-    setKeyword("")
-    goToPage(1)
-  }
-
-  return (
-    <div className="px-6 pt-4 pb-6 space-y-5">
-      <div>
-        <h1 className="text-lg font-medium text-[#1f2329]">使用统计</h1>
-        <p className="mt-1 text-[12px] text-[#8f959e]">查看账号登录、页面访问及业务操作轨迹</p>
-      </div>
-
-      <section className="space-y-2">
-        <div>
-          <h2 className="text-[14px] font-medium text-[#2b2f36]">账号使用概览</h2>
-          <p className="mt-1 text-[12px] text-[#8f959e]">
-            正常登录和心跳优先；缺失时以实际访问、操作补足，5 分钟无操作后暂停计时
-          </p>
-        </div>
-        <div className="flex min-h-[39px] items-center border-b border-[#e8e8e8]">
-          <div className="flex items-center gap-6">
-            {(["pc", "miniprogram"] as SummarySource[]).map((terminal) => (
-              <button
-                key={terminal}
-                type="button"
-                className={`relative px-1 pb-2 text-[14px] transition-colors ${
-                  summarySource === terminal
-                    ? "text-[#3370ff]"
-                    : "text-[#2b2f36] hover:text-[#4e535a]"
-                }`}
-                onClick={() => setSummarySource(terminal)}
-              >
-                {SOURCE_LABELS[terminal]}
-                {summarySource === terminal && (
-                  <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="overflow-hidden border border-[#e8e8e8] rounded-[4px]">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[150px] pl-4">使用人</TableHead>
-                <TableHead className="w-[130px] text-right">今日时长</TableHead>
-                <TableHead className="w-[110px] text-right">今日登录</TableHead>
-                <TableHead className="w-[130px] text-right">本月时长</TableHead>
-                <TableHead className="w-[110px] text-right">本月登录</TableHead>
-                <TableHead className="w-[200px]">最近活跃</TableHead>
-                <TableHead className="pr-4">IP</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {summaryLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">加载中...</TableCell>
-                </TableRow>
-              ) : summary.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">暂无账号</TableCell>
-                </TableRow>
-              ) : summary.map((item) => {
-                const terminalSummary = getTerminalSummary(item, summarySource)
-                return (
-                  <TableRow
-                    key={item.account_id}
-                    className={`cursor-pointer ${accountId === item.account_id ? "bg-[#f7f8fa]" : ""}`}
-                    onClick={() => updateFilter("accountId", accountId === item.account_id ? "" : item.account_id)}
-                  >
-                    <TableCell className="pl-4 font-medium text-[#1f2329]">{item.owner || <EmptyValue />}</TableCell>
-                    <TableCell className="text-right font-medium text-[#1f2329] tabular-nums">
-                      {terminalSummary.todayUsageSeconds > 0
-                        ? formatDuration(terminalSummary.todayUsageSeconds)
-                        : <EmptyValue />}
-                    </TableCell>
-                    <TableCell className="text-right text-[#646a73] tabular-nums">
-                      {terminalSummary.todayLoginCount} 次
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-[#1f2329] tabular-nums">
-                      {terminalSummary.monthUsageSeconds > 0
-                        ? formatDuration(terminalSummary.monthUsageSeconds)
-                        : <EmptyValue />}
-                    </TableCell>
-                    <TableCell className="text-right text-[#646a73] tabular-nums">
-                      {terminalSummary.monthLoginCount} 次
-                    </TableCell>
-                    <TableCell className="text-[12px] text-[#8f959e]">
-                      {terminalSummary.latestActiveAt ? formatDateTime(terminalSummary.latestActiveAt) : <EmptyValue />}
-                    </TableCell>
-                    <TableCell className="pr-4 font-mono text-[12px]">
-                      {terminalSummary.latestActiveIp || <EmptyValue />}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-[14px] font-medium text-[#2b2f36]">访问、使用与操作明细</h2>
-        <div className="flex items-end gap-3 flex-wrap">
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-[#8f959e]">使用人</label>
-            <SelectDropdown
-              value={accountId}
-              options={[{ value: "", label: "全部" }, ...summary.map(item => ({
-                value: item.account_id,
-                label: item.owner || "未设置姓名",
-              }))]}
-              onChange={(value) => updateFilter("accountId", value)}
-              className="w-40"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-[#8f959e]">记录类型</label>
-            <SelectDropdown
-              value={eventType}
-              options={[
-                { value: "", label: "全部" },
-                { value: "login", label: "登录" },
-                { value: "page_view", label: "访问页面" },
-                { value: "operation", label: "业务操作" },
-                { value: "usage", label: "使用时长" },
-              ]}
-              onChange={(value) => updateFilter("eventType", value)}
-              className="w-28"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-[#8f959e]">登录端</label>
-            <SelectDropdown
-              value={source}
-              options={[
-                { value: "", label: "全部" },
-                { value: "pc", label: "PC端" },
-                { value: "miniprogram", label: "管理端小程序" },
-              ]}
-              onChange={(value) => updateFilter("source", value)}
-              className="w-36"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-[#8f959e]">日期范围</label>
-            <div className="flex items-center h-8 rounded-[4px] border border-input overflow-hidden">
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => updateFilter("dateFrom", event.target.value)}
-                className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${dateFrom ? "text-[#2b2f36]" : "text-[#8f959e] date-empty"}`}
-              />
-              <span className="px-1 text-[12px] text-[#8f959e]">~</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => updateFilter("dateTo", event.target.value)}
-                className={`h-full px-2 text-[12px] border-none outline-none bg-transparent ${dateTo ? "text-[#2b2f36]" : "text-[#8f959e] date-empty"}`}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[12px] text-[#8f959e]">内容搜索</label>
-            <input
-              value={keyword}
-              onChange={(event) => updateFilter("keyword", event.target.value)}
-              placeholder="页面或操作内容"
-              className="h-8 w-40 rounded-[4px] border border-input px-2.5 text-[12px] text-[#2b2f36] outline-none placeholder:text-[#c0c4cc] focus:border-[#3370ff]"
-            />
-          </div>
-          <button
-            onClick={clearFilters}
-            className="h-8 px-4 rounded-[4px] border border-input text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] flex items-center gap-1"
-          >
-            <X className="h-3.5 w-3.5" /> 清空
-          </button>
-        </div>
-
-        {error && (
-          <div className="rounded-[4px] border border-[#f0f0f0] bg-white px-3 py-2 text-[12px] text-[#c4506a]">
-            数据更新失败，请稍后重试
-          </div>
-        )}
-        <div className="relative overflow-hidden border border-[#e8e8e8] rounded-[4px]">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 w-[150px]">时间</TableHead>
-                <TableHead className="w-[110px]">使用人</TableHead>
-                <TableHead className="w-[90px]">类型</TableHead>
-                <TableHead className="w-[118px]">页面</TableHead>
-                <TableHead>具体内容</TableHead>
-                <TableHead className="w-[110px]">登录端</TableHead>
-                <TableHead className="pr-4 w-[120px]">IP</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && records.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">加载中...</TableCell>
-                </TableRow>
-              ) : !loading && records.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-[13px] text-[#8f959e]">暂无访问、使用或操作记录</TableCell>
-                </TableRow>
-              ) : records.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell className="pl-4 text-[12px] text-[#8f959e] tabular-nums">{formatDateTime(record.created_at)}</TableCell>
-                  <TableCell className="font-medium text-[#1f2329]">{record.owner || <EmptyValue />}</TableCell>
-                  <TableCell className={EVENT_COLORS[record.event_type]}>{EVENT_LABELS[record.event_type]}</TableCell>
-                  <TableCell>{record.page_name || <EmptyValue />}</TableCell>
-                  <TableCell className="max-w-[440px]">
-                    <div className="flex min-w-0 items-center gap-2" title={record.content}>
-                      <span className="truncate">{record.content || <EmptyValue />}</span>
-                      {record.duration_seconds > 0 && (
-                        <span className="shrink-0 text-[12px] text-[#8f959e] tabular-nums">
-                          · 活跃 {formatDuration(record.duration_seconds)}
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{SOURCE_LABELS[record.source] || record.source || <EmptyValue />}</TableCell>
-                  <TableCell className="pr-4 font-mono text-[12px]">{record.ip || <EmptyValue />}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {loading && records.length > 0 && (
-            <div className="pointer-events-none absolute inset-x-0 top-[42px] bottom-0 flex items-center justify-center bg-white/80 text-[12px] text-[#8f959e]">
-              正在更新...
-            </div>
-          )}
-        </div>
-
-        <PaginationBar
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          startIndex={startIndex}
-          endIndex={endIndex}
-          onPageChange={(page) => { if (!loading) goToPage(page) }}
-        />
-      </section>
+    let current = true
+    if (!filters.date_from || !filters.date_to || filters.date_from > filters.date_to) { setError("请选择有效的日期范围"); setBusy(false); return }
+    setBusy(true); setError("")
+    loginRecordApi.overview(filters).then(result => {
+      if (!current) return
+      setData(result)
+      if (!filters.account_id) setNames(result.people.map(p => ({ value: p.account_id, label: p.owner })))
+    }).catch(() => { if (current) setError("统计加载失败，请重试") }).finally(() => { if (current) setBusy(false) })
+    return () => { current = false }
+  }, [filters, reload])
+  useEffect(() => {
+    let current = true
+    setPersonData(null); setDetailError(false)
+    const id = selected?.id || selected?.personId
+    if (id) loginRecordApi.overview({ ...filters, account_id: id }).then(result => { if (current) setPersonData(result) }).catch(() => { if (current) setDetailError(true) })
+    return () => { current = false }
+  }, [selected, filters])
+  const detailFilters = useMemo(() => ({ ...filters, account_id: selected?.personId || filters.account_id }), [filters, selected?.personId])
+  const drawerData = selected?.personId ? personData : data
+  const update = (key: keyof Filters, value: string) => { setFilters(f => ({ ...f, [key]: value })); setSelected(null) }
+  const preset = (count: number) => setFilters(f => ({ ...f, date_from: day(new Date(Date.now() - (count - 1) * 86400000)), date_to: day(new Date()) }))
+  const people = [...(data?.people || [])].filter(p => !status || (status === "used" ? p.days > 0 : p.days === 0)).sort((a, b) => sort === "seconds" ? b.seconds - a.seconds : sort === "latest" ? (b.latest || "").localeCompare(a.latest || "") : b.days - a.days)
+  const functions = [...(data?.functions || [])].sort((a, b) => sort === "operations" ? b.operations - a.operations : sort === "visits" ? b.visits - a.visits : b.people - a.people)
+  const cards = data?.cards
+  const functionTable = (rows: UsageOverview["functions"]) => <Table><TableHeader><TableRow>{["功能页面", "使用人数 / 当前有权限", "使用人天", "访问次数", "操作记录数"].map(t => <TableHead key={t}>{t}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map(p => <TableRow key={p.name}><TableCell><button className="text-[#3370ff]" onClick={() => setSelected({ name: p.name, personId: selected?.id || selected?.personId })}>{p.name}</button></TableCell><TableCell>{p.people} / {p.eligible ?? "未确认"}</TableCell><TableCell>{p.days}</TableCell><TableCell>{p.visits}</TableCell><TableCell>{p.operations}</TableCell></TableRow>)}</TableBody></Table>
+  return <div className="space-y-4 px-6 pb-6 pt-4 text-[13px] text-[#2b2f36]">
+    <header><h1 className="text-lg font-medium">使用统计</h1><p className="mt-1 text-xs text-[#8f959e]">了解谁在使用系统、经常使用哪些功能；时长与操作量不直接代表功能价值。</p></header>
+    <div className="flex flex-wrap items-center gap-3 rounded border border-[#e8e8e8] bg-white p-3">
+      <span>统计范围</span><input aria-label="开始日期" type="date" value={filters.date_from} onChange={e => update("date_from", e.target.value)} className="h-8 rounded border px-2" /><span className="text-[#8f959e]">至</span><input aria-label="结束日期" type="date" value={filters.date_to} onChange={e => update("date_to", e.target.value)} className="h-8 rounded border px-2" />
+      <Button variant="outline" size="sm" onClick={() => preset(1)}>今天</Button><Button variant="outline" size="sm" onClick={() => preset(7)}>近7天</Button><Button variant="outline" size="sm" onClick={() => preset(30)}>近30天</Button>
+      <SelectDropdown value={filters.account_id} onChange={v => update("account_id", v)} options={[{ value: "", label: "全部使用人" }, ...names]} className="w-36" />
+      <SelectDropdown value={filters.source} onChange={v => update("source", v)} options={[{ value: "", label: "全部终端" }, { value: "pc", label: "PC端" }, { value: "miniprogram", label: "管理端小程序" }]} className="w-40" />
+      <Button variant="outline" size="sm" onClick={() => setReload(n => n + 1)}>刷新</Button>
     </div>
-  )
+    {error && <p role="alert" className="text-red-600">{error}（原数据未更新）</p>}
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{[["已使用人数", cards?.used], ["本期未使用人数", cards?.unused], ["经常使用人数", cards?.frequent], ["人均使用天数", cards?.average_days]].map(([label, value]) => <div key={label} className="rounded border border-[#e8e8e8] bg-white px-4 py-3"><div className="text-xs text-[#8f959e]">{label}</div><div className="mt-2 text-2xl font-medium tabular-nums">{value ?? "—"}</div></div>)}</div>
+    <p className="text-xs text-[#8f959e]">仅统计当前启用且在所选结束日期前创建的账号。经常使用：本期至少使用 {cards?.frequent_threshold ?? "—"} 天（每7天折算3天，向上取整）。无记录不代表从未使用；权限人数为当前参考，非历史覆盖率。</p>
+    <div className="flex items-center gap-6 border-b border-[#e8e8e8]">{[["people", "人员使用"], ["functions", "功能使用"], ["details", "使用明细"]].map(([key, label]) => <button key={key} onClick={() => { setTab(key); setSort("days") }} className={`border-b-2 pb-2 text-sm ${tab === key ? "border-[#3370ff] text-[#3370ff]" : "border-transparent"}`}>{label}</button>)}<span className="ml-auto text-xs text-[#8f959e]">{busy ? "正在更新…" : ""}</span></div>
+    <section className="min-h-[380px] space-y-3 rounded border border-[#e8e8e8] bg-white p-3">
+      {tab !== "details" && <div className="flex gap-3">{tab === "people" && <SelectDropdown value={status} onChange={setStatus} options={[{ value: "", label: "全部人员" }, { value: "used", label: "本期已使用" }, { value: "unused", label: "本期未使用" }]} className="w-36" />}<SelectDropdown value={sort} onChange={setSort} options={tab === "people" ? [{ value: "days", label: "使用天数排序" }, { value: "seconds", label: "有效时长排序" }, { value: "latest", label: "最近使用排序" }] : [{ value: "days", label: "使用人数排序" }, { value: "visits", label: "访问次数排序" }, { value: "operations", label: "操作记录排序" }]} className="w-40" /></div>}
+      {tab === "people" && <Table><TableHeader><TableRow>{["姓名", "使用状态", "使用天数", "常用功能", "最近使用", "有效时长", "额外估算"].map(t => <TableHead key={t}>{t}</TableHead>)}</TableRow></TableHeader><TableBody>{people.map(p => <TableRow key={p.account_id}><TableCell><button className="text-[#3370ff]" onClick={() => setSelected({ id: p.account_id, name: p.owner })}>{p.owner}</button></TableCell><TableCell>{p.status}</TableCell><TableCell>{p.days}</TableCell><TableCell className="max-w-[260px] truncate" title={p.pages.join("、")}>{p.pages.join("、") || <span className="text-[#d0d3d6]">—</span>}</TableCell><TableCell className="text-xs">{dateTime(p.latest)}</TableCell><TableCell>{duration(p.seconds)}</TableCell><TableCell className="text-[#8f959e]">{duration(p.estimated_seconds)}</TableCell></TableRow>)}</TableBody></Table>}
+      {tab === "functions" && <>{functionTable(functions)}<p className="text-xs text-[#8f959e]">使用人天：每人每天使用该页面计1次。操作记录可能包含自动保存，不等于主动点击次数；未出现的功能不能直接判断为无人使用。</p></>}
+      {tab !== "details" && !busy && !(tab === "people" ? people.length : functions.length) && <p className="py-20 text-center text-[#8f959e]">当前范围内暂无统计记录</p>}
+      {tab === "details" && <Details key={reload} filters={filters} />}
+    </section>
+    <p className="text-xs text-[#8f959e]">有效时长来自活跃心跳，同一人的重叠时段合并；额外估算仅展示心跳未覆盖的访问/操作后最多5分钟，不计入有效时长。</p>
+    <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelected(null) }}><DialogContent className="left-auto right-0 top-0 h-full max-h-screen w-[min(900px,95vw)] max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none" initialFocus={false}><DialogHeader><DialogTitle>{selected?.name} · 使用详情</DialogTitle></DialogHeader>
+      {selected?.id ? <>{detailError ? <p role="alert">人员详情加载失败，请关闭后重试。</p> : personData ? functionTable(personData.functions) : <p>加载中…</p>}<Button variant="outline" onClick={() => { update("account_id", selected.id!); setTab("details") }}>查看此人的操作明细</Button></> : selected && <><div className="flex flex-wrap gap-2">{drawerData?.functions.find(f => f.name === selected.name)?.actions.map(a => <span key={a.name} className="rounded border px-3 py-2">{a.name}：{a.count}</span>)}</div><p className="text-xs text-[#8f959e]">使用人员：{drawerData?.people.filter(p => drawerData.functions.find(f => f.name === selected.name)?.account_ids.includes(p.account_id)).map(p => p.owner).join("、") || "未采集到记录"}</p><Details filters={detailFilters} pageName={selected.name} /></>}
+    </DialogContent></Dialog>
+  </div>
 }

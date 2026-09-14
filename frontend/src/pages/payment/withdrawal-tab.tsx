@@ -69,7 +69,9 @@ export function WithdrawalTab() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      nicknameRef.current = searchNickname.trim()
+      const nickname = searchNickname.trim()
+      if (nicknameRef.current === nickname) return
+      nicknameRef.current = nickname
       resetPage()
     }, 250)
     return () => window.clearTimeout(timer)

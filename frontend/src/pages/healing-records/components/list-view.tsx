@@ -78,17 +78,13 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
     }
   }, [refreshKey, refresh])
 
-  // 筛选条件变化时回到第一页（跳过首次挂载）
-  const filterInitRef = useRef(true)
+  // 筛选和排序统一触发一次重查，首次加载由分页 hook 完成。
+  const previousFetchFn = useRef(fetchFn)
   useEffect(() => {
-    if (filterInitRef.current) { filterInitRef.current = false; return }
+    if (previousFetchFn.current === fetchFn) return
+    previousFetchFn.current = fetchFn
     resetPage()
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, resetPage])
-
-  // 排序变化时回到第一页
-  useEffect(() => {
-    resetPage()
-  }, [sortField, sortOrder, resetPage])
+  }, [fetchFn, resetPage])
 
   return (
       <div className="dv-list w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">

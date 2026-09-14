@@ -31,7 +31,12 @@ from app.services import (
 )
 from app.services.chat_parser import generate_tags, parse_chat_log
 from app.services.excel_parser import parse_excel
-from app.services.visit_service import _count_customer_activities, count_customer_visits, get_last_visit_date
+from app.services.visit_service import (
+    _count_customer_activities,
+    count_customer_visits,
+    customer_visit_summary,
+    get_last_visit_date,
+)
 from app.utils.pagination import paginate
 from app.utils.request_context import get_client_ip
 from app.utils.request_roles import get_request_roles
@@ -113,6 +118,22 @@ def _build_transaction_counts() -> dict[str, int]:
     return dict(counts)
 
 
+def _customer_list_base(customer) -> dict:
+    """不查询关联记录，先完成基础筛选与分页。"""
+    _SLIM_FIELDS = (
+        "id", "nickname", "name", "gender", "phone", "wechat", "age",
+        "member_type", "positions", "self_tags", "paid_content",
+        "referrer", "referral_date", "referrer_handler", "service_teacher",
+        "follow_up_status",
+        "traffic_source", "traffic_source_detail",
+        "need_tags", "follow_up_node", "follow_up_action",
+        "core_situation", "tags", "work_status", "work_description",
+        "basic_info", "assessment", "other_info", "tracking_plan",
+        "created_at", "created_by", "space_id", "position_sort_orders",
+    )
+    return {key: getattr(customer, key, None) for key in _SLIM_FIELDS}
+
+
 def _build_enriched_items(customers) -> list[dict]:
     """批量构建客户列表，一次性扫描所有项目，避免 N*7 次全表扫描"""
     from collections import defaultdict
@@ -148,26 +169,16 @@ def _build_enriched_items(customers) -> list[dict]:
     for r in project_refund_service.list_refunds():
         payment_map[r.customer_id] -= r.refund_amount
 
-    _SLIM_FIELDS = (
-        "id", "nickname", "name", "gender", "phone", "wechat", "age",
-        "member_type", "positions", "self_tags", "paid_content",
-        "referrer", "referral_date", "referrer_handler", "service_teacher",
-        "follow_up_status",
-        "traffic_source", "traffic_source_detail",
-        "need_tags", "follow_up_node", "follow_up_action",
-        "core_situation", "tags", "work_status", "work_description",
-        "basic_info", "assessment", "other_info", "tracking_plan",
-        "created_at", "created_by", "space_id", "position_sort_orders",
-    )
     remaining_map = membership_card_service.list_current_card_remaining({c.id for c in customers})
+    visits = customer_visit_summary({c.id for c in customers})
     items = []
     for c in customers:
-        data = {k: getattr(c, k, None) for k in _SLIM_FIELDS}
-        data["visit_count"] = count_customer_visits(c.id)
+        data = _customer_list_base(c)
+        data["visit_count"] = visits[c.id][0]
         data["activity_count"] = _count_customer_activities(c.id)
         data["total_payment"] = max(payment_map.get(c.id, 0), 0)
         data["transaction_count"] = transaction_counts.get(c.id, 0)
-        data["last_visit_date"] = get_last_visit_date(c.id)
+        data["last_visit_date"] = visits[c.id][1]
         data["card_remaining"] = remaining_map.get(c.id)
         items.append(data)
     return items
@@ -233,7 +244,8 @@ async def list_customers(
     sort_order: str | None = Query(None),
 ):
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
-    items = _build_enriched_items(customers)
+    customers_by_id = {customer.id: customer for customer in customers}
+    items = [_customer_list_base(customer) for customer in customers]
 
     # Apply filters
     if nickname:
@@ -271,7 +283,14 @@ async def list_customers(
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         items = [item for item in items if item["id"] in matched_customer_ids]
+    needs_enrichment_for_sort = sort_by in {"visit_count", "activity_count", "total_payment", "transaction_count", "last_visit_date"}
+    if needs_enrichment_for_sort:
+        items = _build_enriched_items([customers_by_id[item["id"]] for item in items])
     if last_visit_days_min is not None or last_visit_days_max is not None:
+        if not needs_enrichment_for_sort:
+            visit_summary = customer_visit_summary({item["id"] for item in items})
+            for item in items:
+                item["last_visit_date"] = visit_summary[item["id"]][1]
         today = date.today()
         filtered = []
         for c in items:
@@ -301,6 +320,15 @@ async def list_customers(
     else:
         items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
 
+    # 默认列表先分页再补统计；按统计字段排序时仍先算整批，保证跨页排序正确。
+    paginated = paginate(items, page, page_size or 10) if page is not None else None
+    if paginated is not None:
+        items = paginated["items"]
+    if not needs_enrichment_for_sort:
+        items = _build_enriched_items([customers_by_id[item["id"]] for item in items])
+        for item in items:
+            item["customer_tags"] = visible_tags.get(item["id"], [])
+
     protected_items = []
     for item in items:
         protected = customer_access_service.protect_sensitive_data(item, role)
@@ -310,8 +338,8 @@ async def list_customers(
         protected_items.append(customer_contact_service.protect_customer_data(protected, role))
     items = protected_items
 
-    if page is not None:
-        return paginate(items, page, page_size or 10)
+    if paginated is not None:
+        return {**paginated, "items": items}
     return items
 
 
@@ -349,6 +377,7 @@ async def list_customers_light(request: Request):
             "id": c.id,
             "nickname": c.nickname,
             "name": c.name or "",
+            "gender": c.gender or "",
             "member_type": c.member_type or "",
             "positions": c.positions or [],
             "created_at": c.created_at.isoformat() if c.created_at else "",

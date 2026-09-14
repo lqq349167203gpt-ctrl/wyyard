@@ -307,10 +307,10 @@ def _payment_events() -> list[dict[str, Any]]:
     return events
 
 
-def _payment_summary() -> tuple[dict[str, float], dict[str, set[str]]]:
+def _payment_summary(events: list[dict[str, Any]] | None = None) -> tuple[dict[str, float], dict[str, set[str]]]:
     totals: dict[str, float] = defaultdict(float)
     projects: dict[str, set[str]] = defaultdict(set)
-    for event in _payment_events():
+    for event in _payment_events() if events is None else events:
         customer_id = event["customer_id"]
         totals[customer_id] += event["amount"]
         detail = event["product"]
@@ -494,7 +494,8 @@ def build_customer_dataset(
             if record_date > last_communication_dates.get(nickname, ""):
                 last_communication_dates[nickname] = record_date
 
-    payment_totals, _ = _payment_summary()
+    payment_events = _payment_events()
+    payment_totals, _ = _payment_summary(payment_events)
     period_payment_amounts: dict[str, float] = defaultdict(float)
     period_payment_counts: dict[str, int] = defaultdict(int)
     period_payment_categories: dict[str, set[str]] = defaultdict(set)
@@ -507,7 +508,7 @@ def build_customer_dataset(
     period_payment_events: dict[str, list[dict[str, Any]]] = defaultdict(list)
     all_payment_dates: dict[str, set[str]] = defaultdict(set)
     latest_payment_dates: dict[str, str] = {}
-    for event in _payment_events():
+    for event in payment_events:
         customer_id = event["customer_id"]
         if event["date"]:
             all_payment_dates[customer_id].add(event["date"])
@@ -1126,8 +1127,9 @@ def _execute_single_plan(
     page: int,
     page_size: int,
     allowed_customer_ids: set[str] | None = None,
+    dataset: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    rows = build_customer_dataset(actor_id, plan.date_from, plan.date_to, allowed_customer_ids)
+    rows = build_customer_dataset(actor_id, plan.date_from, plan.date_to, allowed_customer_ids) if dataset is None else dataset
     if plan.conditions:
         rows = [row for row in rows if _matches_plan_row(row, plan)]
     rows = _scope_payment_metrics(rows, plan)
@@ -1158,6 +1160,8 @@ def _execute_comparison_plan(
     allowed_customer_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     group_results: list[dict[str, Any]] = []
+    # 仅在本次查询内复用同时间范围的数据，不跨账号/请求缓存，避免权限或数据过期。
+    datasets: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for index, group in enumerate(plan.comparison_groups):
         group_plan = plan.model_copy(deep=True, update={
             "analysis_mode": "single",
@@ -1169,12 +1173,16 @@ def _execute_comparison_plan(
             "card_dimension": "none",
             "row_display_mode": "unique_customers",
         })
+        period = (group.date_from, group.date_to)
+        if period not in datasets:
+            datasets[period] = build_customer_dataset(actor_id, *period, allowed_customer_ids)
         result = _execute_single_plan(
             group_plan,
             actor_id,
             page=1,
             page_size=100,
             allowed_customer_ids=allowed_customer_ids,
+            dataset=datasets[period],
         )
         metric_cards = [card for card in result["cards"] if not str(card["key"]).startswith("dimension-")]
         group_results.append({

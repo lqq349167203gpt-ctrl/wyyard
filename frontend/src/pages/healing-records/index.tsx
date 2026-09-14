@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { Plus, Tags, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -81,14 +81,17 @@ export default function HealingRecordsPage() {
   }, [inviteTarget, inviteSpaceId, spaces])
 
   // 从编辑页返回时自动刷新列表
+  const previousLocationKey = useRef(location.key)
   useEffect(() => {
+    if (previousLocationKey.current === location.key) return
+    previousLocationKey.current = location.key
     if (location.pathname === "/healing-records") {
       setRefreshKey(k => k + 1)
       customerApi.clearLightCache()
       customerApi.light().then(setCustomers).catch(() => {})
       loadSummary()
     }
-  }, [location.key, loadSummary])
+  }, [location.key, location.pathname, loadSummary])
 
   const handleClear = () => {
     setSearchNickname("")

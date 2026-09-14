@@ -674,6 +674,31 @@ def test_comparison_groups_use_independent_periods_and_conditions(monkeypatch):
     assert result["comparison_rows"][2]["difference_rate"] == 200.0
 
 
+def test_comparison_reuses_dataset_only_within_same_request(monkeypatch):
+    calls = []
+
+    def dataset(actor, start, end, allowed):
+        calls.append((actor, start, end, allowed))
+        return [_row("c1", referrer="甲"), _row("c2", referrer="乙")]
+
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", dataset)
+    plan = AnalysisPlan(
+        analysis_mode="comparison",
+        metrics=["total_customers"],
+        comparison_groups=[
+            AnalysisComparisonGroup(
+                id=name, name=name, date_from="2026-09-01", date_to="2026-09-30",
+                conditions=[AnalysisCondition(field="referrer", operator="eq", value=name)],
+            ) for name in ["甲", "乙"]
+        ],
+    )
+    allowed = {"c1", "c2"}
+    for _ in range(2):
+        result = custom_analysis_service.execute_plan(plan, "actor", 1, 20, allowed)
+        assert result["comparison_rows"][0]["values"] == [1, 1]
+    assert calls == [("actor", "2026-09-01", "2026-09-30", allowed)] * 2
+
+
 def test_payment_date_condition_matches_any_transaction_date():
     row = _row("c1", payment_dates=["2026-05-12", "2026-08-20"])
 

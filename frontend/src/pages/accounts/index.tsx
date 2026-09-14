@@ -14,13 +14,20 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { accountApi, positionApi, customerApi } from "@/lib/api"
-import type { Account, AccountCreate, Position, Customer } from "@/lib/api"
+import type { Account, AccountCreate, Position, CustomerLight } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 
-export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
+export function AccountsContent({ embedded, sharedAccounts, sharedPositions, onAccountsChange }: {
+  embedded?: boolean
+  sharedAccounts?: Account[]
+  sharedPositions?: Position[]
+  onAccountsChange?: (accounts: Account[]) => void
+} = {}) {
   const enterToNext = useEnterToNext()
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [positions, setPositions] = useState<Position[]>([])
+  const [localAccounts, setAccounts] = useState<Account[]>([])
+  const [localPositions, setPositions] = useState<Position[]>([])
+  const accounts = sharedAccounts ?? localAccounts
+  const positions = sharedPositions ?? localPositions
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -28,7 +35,7 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const [showFormPassword, setShowFormPassword] = useState(false)
   const [isEditingSystem, setIsEditingSystem] = useState(false)
   const [formErrors, setFormErrors] = useState<{ owner?: string; role?: string; username?: string; password?: string }>({})
-  const [customerList, setCustomerList] = useState<Customer[]>([])
+  const [customerList, setCustomerList] = useState<CustomerLight[]>([])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -37,12 +44,19 @@ export function AccountsContent({ embedded }: { embedded?: boolean } = {}) {
   const [changePwdErrors, setChangePwdErrors] = useState<{ old?: string; new?: string; confirm?: string }>({})
   const [changePwdSaving, setChangePwdSaving] = useState(false)
 
-  useEffect(() => { loadData(); customerApi.list().then(setCustomerList).catch(() => {}) }, [])
+  useEffect(() => {
+    if (!sharedAccounts) accountApi.list().then(setAccounts).catch(() => {})
+    if (!sharedPositions) positionApi.list().then(setPositions).catch(() => {})
+  }, [sharedAccounts, sharedPositions])
+
+  useEffect(() => {
+    if (showForm) customerApi.light().then(setCustomerList).catch(() => {})
+  }, [showForm])
 
   const loadData = async () => {
-    const [a, p] = await Promise.all([accountApi.list(), positionApi.list()])
+    const a = await accountApi.list()
     setAccounts(a)
-    setPositions(p)
+    onAccountsChange?.(a)
   }
 
   const handleSave = async () => {

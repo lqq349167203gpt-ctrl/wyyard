@@ -14,7 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, projectDeductionApi, type Customer, type ProjectDeduction } from "@/lib/api"
+import { customerApi, projectDeductionApi, type CustomerLight, type ProjectDeduction } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 
@@ -64,10 +64,10 @@ type AvailableDeductionItem = {
 }
 
 export function ProjectDeductionTab() {
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customers, setCustomers] = useState<CustomerLight[]>([])
 
   const nicknameToCustomer = useMemo(() => {
-    const map: Record<string, Customer> = {}
+    const map: Record<string, CustomerLight> = {}
     customers.forEach(c => { if (c.nickname) map[c.nickname] = c })
     return map
   }, [customers])
@@ -158,7 +158,7 @@ export function ProjectDeductionTab() {
 
   // 加载客户列表
   useEffect(() => {
-    customerApi.list().then((data) => {
+    customerApi.light().then((data) => {
       setCustomers(data)
     }).catch(() => {})
   }, [])
@@ -166,7 +166,7 @@ export function ProjectDeductionTab() {
   // 扣次记录加载由 useServerPagination hook 自动处理
 
   // 选中用户后加载可销卡项目
-  const handleSelectCustomer = useCallback(async (c: Customer) => {
+  const handleSelectCustomer = useCallback(async (c: CustomerLight) => {
     const requestId = ++availableItemsRequestRef.current
     setCustomerId(c.id)
     setCustomerName(c.nickname)

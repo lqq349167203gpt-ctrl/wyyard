@@ -557,6 +557,7 @@ export type CustomerCreate = Omit<Customer, "id" | "created_at" | "updated_at">
 
 export interface CustomerLight {
   id: string
+  gender?: string
   nickname: string
   name: string
   member_type: string
@@ -2768,6 +2769,7 @@ export interface AccountActivityRecord {
 }
 
 export interface LoginRecordQuery {
+  page_name?: string
   account_id?: string
   event_type?: AccountActivityType
   source?: "pc" | "miniprogram"
@@ -2776,7 +2778,14 @@ export interface LoginRecordQuery {
   keyword?: string
 }
 
+export interface UsageOverview {
+  people: { account_id: string; owner: string; days: number; latest: string | null; seconds: number; estimated_seconds: number; status: string; pages: string[] }[]
+  functions: { name: string; people: number; days: number; visits: number; operations: number; actions: { name: string; count: number }[]; account_ids: string[]; eligible: number | null }[]
+  cards: { used: number; unused: number; frequent: number; average_days: number; frequent_threshold: number }
+}
+
 export const loginRecordApi = {
+  overview: (params: { date_from: string; date_to: string; source: string; account_id: string }) => request<UsageOverview>(`/api/login-records/overview?${new URLSearchParams(params)}`),
   summary: () => request<LoginAccountSummary[]>("/api/login-records/summary"),
   heartbeat: (data: { client_session_id: string; page_path: string; active: boolean }, keepalive = false) =>
     request<{ success: boolean; last_heartbeat_at: string }>("/api/login-records/heartbeat", {
@@ -2792,6 +2801,7 @@ export const loginRecordApi = {
     if (params.date_from) qs.set("date_from", params.date_from)
     if (params.date_to) qs.set("date_to", params.date_to)
     if (params.keyword) qs.set("keyword", params.keyword)
+    if (params.page_name) qs.set("page_name", params.page_name)
     qs.set("page", String(page))
     qs.set("page_size", String(pageSize))
     return request<PaginatedResponse<AccountActivityRecord>>(`/api/login-records?${qs.toString()}`)
