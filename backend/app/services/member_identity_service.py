@@ -145,12 +145,45 @@ def _compare_count(actual, op: str, target) -> bool:
 
 def _get_payment_categories(condition: IdentityCondition) -> list:
     """获取付费项目类别，兼容旧 card/course 类型"""
+    if isinstance(condition, dict):
+        condition = IdentityCondition(**condition)
     if condition.type == "card":
         return ["会员卡"]
     if condition.type == "course":
         return ["内部课程"]
     cats = condition.payment_categories or []
     return ["会员卡" if c == "会员活动" else c for c in cats]
+
+
+def _extra_payment_counts(identities) -> dict:
+    """仅在使用新项目条件时加载流水，批量刷新共用一次统计。"""
+    categories = {cat for identity in identities for condition in identity.conditions
+                  for cat in _get_payment_categories(condition)}
+    counts: dict[str, dict[str, int]] = {}
+    from app.services import offline_course_service, project_deduction_service, tea_seat_fee_service
+
+    sources = {}
+    if "粗门次卡" in categories:
+        sources["粗门次卡"] = [row for row in project_deduction_service.list_deductions()
+                             if row.project_name == project_deduction_service.COARSE_DOOR_CARD_TYPE]
+    if "茶位费" in categories:
+        sources["茶位费"] = tea_seat_fee_service.list_fees()
+    if "线下课程" in categories:
+        sources["线下课程"] = offline_course_service.list_courses()
+    for category, rows in sources.items():
+        for row in rows:
+            if getattr(row, "is_deleted", False) or getattr(row, "cancelled", False) or getattr(row, "voided", False):
+                continue
+            customer_counts = counts.setdefault(row.customer_id, {})
+            customer_counts[category] = customer_counts.get(category, 0) + 1
+    return counts
+
+
+def refresh_coarse_identity(customer_id: str):
+    """粗门流水变化仅刷新配置了对应条件的系统，旧规则不受影响。"""
+    if any("粗门次卡" in _get_payment_categories(condition)
+           for identity in list_identities() for condition in identity.conditions):
+        refresh_member_type(customer_id)
 
 
 def _check_condition(condition, customer_id: str,
@@ -160,7 +193,8 @@ def _check_condition(condition, customer_id: str,
                      customer_oh_card_readings, customer_other_projects, today_str: str,
                      welfare_count: int = 0, customer_positions: list = None,
                      customer_nickname: str = "", customer_total_payment: float = 0,
-                     invite_count: int = 0, cancel_count: int = 0) -> bool:
+                     invite_count: int = 0, cancel_count: int = 0,
+                     extra_payment_counts: Optional[dict] = None) -> bool:
     if isinstance(condition, dict):
         condition = IdentityCondition(**condition)
     t = condition.type
@@ -214,8 +248,12 @@ def _check_condition(condition, customer_id: str,
                 total = sum(c.purchase_count for c in customer_energy_knots)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
-            elif cat == "OH卡诊断":
+            elif cat in ("OH卡诊断", "OH卡梳理"):
                 total = sum(c.purchase_count for c in customer_oh_card_readings)
+                if _compare_count(total, condition.count_op, condition.count_value):
+                    return True
+            elif cat in ("粗门次卡", "茶位费", "线下课程"):
+                total = (extra_payment_counts or {}).get(cat, 0)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
             elif cat == "其他项目":
@@ -329,6 +367,7 @@ def refresh_member_type(customer_id: str):
         return
 
     identities = list_identities()
+    extra_counts = _extra_payment_counts(identities)
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     # 预计算用户数据
@@ -440,7 +479,7 @@ def refresh_member_type(customer_id: str):
                                     customer_other_projects, today_str,
                                     welfare_count, customer_positions,
                                     customer.nickname or "", customer_total_payment,
-                                    invite_count, cancel_count)
+                                    invite_count, cancel_count, extra_counts.get(customer_id))
                    for cond in identity.conditions]
         if identity.operator == "any":
             matched = any(results)
@@ -475,6 +514,7 @@ def refresh_all():
     )
 
     identities = list_identities()
+    extra_counts = _extra_payment_counts(identities)
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     # 全局数据只加载一次
@@ -624,7 +664,7 @@ def refresh_all():
                                         customer_other_projects, today_str,
                                         welfare_count, customer_positions,
                                         c.nickname or "", customer_total_payment,
-                                        invite_map.get(c.id, 0), cancel_map.get(c.id, 0))
+                                        invite_map.get(c.id, 0), cancel_map.get(c.id, 0), extra_counts.get(c.id))
                        for cond in identity.conditions]
             if identity.operator == "any":
                 matched = any(results)

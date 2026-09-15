@@ -645,16 +645,19 @@ export default function PrincipalPage() {
     // 只有使用者主动点「查询」这一次才让后端记分析日志（切 tab、翻页不记）
     const logAnalysis = logAnalysisRef.current
     logAnalysisRef.current = false
-    const response = await principalApi.query(
+    const responsePromise = principalApi.query(
       logAnalysis && listQuery.tab === "conversion" ? { ...listQuery, log_analysis: true } : listQuery,
       page,
       size,
     )
     // 经营概况展开「成交」时列表来自「交易记录」，但卡片与二级拆分必须仍用概况自己的口径
+    const panelPromise = listTab !== query.tab
+      ? principalApi.query({ ...listQuery, tab: query.tab }, page, size)
+      : null
+    const [response, panel] = await Promise.all([responsePromise, panelPromise])
     let resolved = response
     if (listTab !== query.tab) {
-      const panel = await principalApi.query({ ...listQuery, tab: query.tab }, page, size)
-      resolved = { ...response, summary: panel.summary, breakdown: panel.breakdown }
+      if (panel) resolved = { ...response, summary: panel.summary, breakdown: panel.breakdown }
     }
     if (current === version.current) {
       setResult(resolved); setRuleError("")
@@ -680,9 +683,13 @@ export default function PrincipalPage() {
   // 转化分析这一屏：范围与规则都等使用者点「查询」才重新拉数据（切 tab 例外，必须立刻出结果）；
   // 其他三个 tab 没有查询按钮，改了筛选即时生效。
   const previousQueryRef = useRef(query)
+  const previousListTabRef = useRef(listTab)
   useEffect(() => {
     const previous = previousQueryRef.current
+    const previousListTab = previousListTabRef.current
     previousQueryRef.current = query
+    previousListTabRef.current = listTab
+    if (previous === query && previousListTab === listTab) return
     // 转化分析不自动查询：范围与规则都等使用者点「查询」才出结果（切 tab 也不自动跑）
     if (query.tab === "conversion") return
     version.current++

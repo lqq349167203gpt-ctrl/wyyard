@@ -121,7 +121,7 @@ def conversion_log_snapshot(request: Request, data: PrincipalQuery, result: dict
 
 @router.get("/metadata")
 def metadata(request: Request):
-    organizations, permissions, events, _ = principal_service.collect_data(request)
+    organizations, permissions, events, _ = principal_service.collect_data(request, metadata_only=True)
     options = []
     for key, label, _, _field in principal_service.PRODUCTS:
         options.append({"key": key, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "purchase" and e["product"] == key and e["subtype"]})})

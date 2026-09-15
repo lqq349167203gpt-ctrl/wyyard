@@ -530,7 +530,7 @@ def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monk
     monkeypatch.setattr(service.course_type_service, "list_course_types", lambda: [])
     course = ClassRecord(id="course-record", date="2026-01-01", course_id="course", course_name="公益", teacher_ids=["teacher"], participant_ids=["c1", "c2", "c3", "hidden"], withdrawn_participant_ids=["c2"], membership_deduction_count=0, created_at="2026-01-01T00:00:00Z", updated_at="2026-01-01T00:00:00Z")
     monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (("class", "沙龙活动", lambda: [course]),))
-    monkeypatch.setattr(service.visit_service, "get_arrived_customer_ids", lambda *_: {"c1", "c2", "hidden"})
+    monkeypatch.setattr(service.visit_service, "_visits", {cid: NS(customer_id=cid, visit_date="2026-01-01", arrived=True, is_deleted=False) for cid in ("c1", "c2", "hidden")})
     payments = [NS(id="zero", customer_id="c1", organization_id="a", deal_date="2026-01-02", card_type="398会员", price=0),
                 NS(id="hidden", customer_id="hidden", organization_id="a"),
                 NS(id="foreign", customer_id="c1", organization_id="b"),
@@ -543,6 +543,13 @@ def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monk
     assert courses[0]["hours"] == 0
     assert courses[0]["participant_ids"] == ["c1"]
     assert [e["id"] for e in events if e["kind"] == "purchase"] == ["purchase:membership:zero"]
+    # 筛选选项保留相同的可见活动/产品，但无需计算课程详情、课时和粗门关联。
+    monkeypatch.setattr(statistics, "_course_owner_details", lambda *_: pytest.fail("元数据不应计算案主详情"))
+    monkeypatch.setattr(statistics, "_course_activity_hours", lambda *_: pytest.fail("元数据不应计算课时"))
+    monkeypatch.setattr(service.project_deduction_service, "list_deductions", lambda: pytest.fail("元数据不应加载销卡记录"))
+    _, _, metadata_events, metadata_courses = service.collect_data(request, metadata_only=True)
+    assert metadata_events == events
+    assert metadata_courses == []
 
 
 @pytest.mark.parametrize("mode,expected", [

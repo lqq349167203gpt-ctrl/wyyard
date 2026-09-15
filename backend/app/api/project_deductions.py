@@ -41,6 +41,8 @@ def edit_coarse_door_course(deduction_id: str, data: CoarseDoorCourseDeductionCr
     before = record.model_dump(mode="json")
     try:
         result = project_deduction_service.edit_coarse_door_course_deduction(deduction_id, data.model_dump(), get_request_actor(request)[1])
+        from app.services.member_identity_service import refresh_coarse_identity
+        refresh_coarse_identity(result.customer_id)
         request.state.operation_log_context = {
             "content": f"编辑粗门抵扣：{result.nickname} · {before['source_activity_name']} → {result.source_activity_name} · 成交日期{result.deduction_date}",
             "entity_id": result.id, "before_data": before, "after_data": result.model_dump(mode="json"),
@@ -70,6 +72,8 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
             actor_name,
         )
         result = deduction.model_dump(mode="json")
+        from app.services.member_identity_service import refresh_coarse_identity
+        refresh_coarse_identity(deduction.customer_id)
         course_summary = " · ".join(
             value
             for value in (
@@ -166,6 +170,8 @@ def delete_deduction(deduction_id: str, request: Request):
     customer_access_service.require_customer_scope(request, existing.customer_id, action="删除")
     try:
         project_deduction_service.delete_deduction(deduction_id)
+        from app.services.member_identity_service import refresh_coarse_identity
+        refresh_coarse_identity(existing.customer_id)
         return {"ok": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -127,6 +127,9 @@ class CourseDeductionConsistencyMiddleware:
                             row.cancelled_at = datetime.now(timezone.utc)
                             row.cancelled_by = get_request_actor(request)[1]
                             deductions._save(row.id)
+                        from app.services.member_identity_service import refresh_coarse_identity
+                        for customer_id in {row.customer_id for row in removed}:
+                            refresh_coarse_identity(customer_id)
                         request.state.operation_log_context = {
                             "content": "课程参与变更；同步取消粗门抵扣：" + "；".join(f"{r.nickname} · {r.source_activity_name} · {r.count}次 · 已从课程移除或取消参与" for r in removed),
                             "after_data": {"cancelled_deductions": [r.model_dump(mode="json") for r in removed]},

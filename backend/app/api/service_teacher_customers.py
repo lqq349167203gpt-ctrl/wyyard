@@ -19,6 +19,7 @@ from app.services import (
     operation_log_service,
     position_edit_permission_service,
     service_teacher_customer_service,
+    visit_note_service,
 )
 from app.utils.record_ownership import request_actor_customer_ids
 from app.utils.pagination import paginate
@@ -270,6 +271,17 @@ def list_course_participants(
         rows = [row for row in rows if row["member_type"] == member_type]
     if identity_group:
         rows = [row for row in rows if row["identity_group"] == identity_group]
+    # 同一个字段可能是不同人分别填写的：按填写人拆成多条，前端逐人换行展示
+    notes_by_visit = visit_note_service.group_notes_by_visit(
+        [row["visit_id"] for row in rows if row["visit_id"]]
+    )
+    for row in rows:
+        for field in ("visit_need", "customer_info", "follow_up"):
+            entries = (notes_by_visit.get(row["visit_id"]) or {}).get(field, [])
+            if not entries and row[field]:
+                # 兼容还没有独立填写记录的历史内容
+                entries = [{"author": "", "content": row[field], "at": ""}]
+            row[f"{field}_entries"] = entries
     # 按课程分组：一组 = 一堂课，下面是这堂课的所有参与者（分页按课程分）
     groups = []
     for course in result["courses"]:

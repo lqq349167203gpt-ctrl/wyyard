@@ -677,6 +677,13 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
 }
 
 // 课程记录的「参与者」页签：一行 = 某场课的一个参与者 + 当天的邀约备注
+/** 备注条目：同一条备注可能是不同人分别填写的，按填写人拆开 */
+export interface CourseParticipantNoteEntry {
+  author: string
+  content: string
+  at: string
+}
+
 export interface CourseParticipantRow {
   id: string
   course_id: string
@@ -690,6 +697,9 @@ export interface CourseParticipantRow {
   visit_need: string
   customer_info: string
   follow_up: string
+  visit_need_entries?: CourseParticipantNoteEntry[]
+  customer_info_entries?: CourseParticipantNoteEntry[]
+  follow_up_entries?: CourseParticipantNoteEntry[]
   visit_id: string
   /** 同一门课（同名课程）在当前筛选范围内的参与次数 */
   same_course_count: number

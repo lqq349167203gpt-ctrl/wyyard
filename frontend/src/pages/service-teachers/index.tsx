@@ -15,6 +15,7 @@ import {
   serviceTeacherCustomerApi,
   statisticsApi,
   customerFollowUpApi,
+  type CourseParticipantNoteEntry,
   type CourseParticipantGroup,
   type CourseParticipantRow,
   type CourseStatistics,
@@ -146,6 +147,60 @@ function NoteContent({ author, content, expanded }: { author: string; content: s
       >
         {content}
       </span>
+    </div>
+  )
+}
+
+/**
+ * 参与者备注：同一条备注可能是不同人分别填写的，按填写人逐行展示。
+ * 单人填写的保留三行预览，多人填写的每人最多两行，超过三条时提示剩余条数。
+ */
+function ParticipantNoteLines({
+  entries,
+  fallback,
+  expanded,
+}: {
+  entries: CourseParticipantNoteEntry[]
+  fallback: string
+  expanded?: boolean
+}) {
+  const list = entries.length > 0 ? entries : (fallback ? [{ author: "", content: fallback, at: "" }] : [])
+  if (list.length === 0) return null
+  if (expanded) {
+    return (
+      <div className="space-y-1.5">
+        {list.map((entry, index) => (
+          <div key={`${entry.author}-${index}`} className="flex min-w-0 items-baseline gap-2">
+            {entry.author && (
+              <span className="max-w-[88px] shrink-0 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>
+            )}
+            <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{entry.content}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  const visible = list.slice(0, 3)
+  const lineClamp = list.length > 1 ? 2 : 3
+  return (
+    <div className="space-y-0.5">
+      {visible.map((entry, index) => (
+        <div key={`${entry.author}-${index}`} className="flex min-w-0 items-baseline gap-2">
+          {entry.author && (
+            <span className="max-w-[72px] shrink-0 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>
+          )}
+          <span
+            className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a] group-hover:text-[#3370ff]"
+            style={{ display: "-webkit-box", WebkitLineClamp: lineClamp, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            title={entry.content}
+          >
+            {entry.content}
+          </span>
+        </div>
+      ))}
+      {list.length > visible.length && (
+        <div className="text-[11px] text-[#9aa1a9]">还有 {list.length - visible.length} 条，点击查看全部</div>
+      )}
     </div>
   )
 }
@@ -872,26 +927,29 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                               </td>
                               <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</td>
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
-                              {(["visit_need", "customer_info", "follow_up"] as const).map(field => (
-                                <td key={field} className="px-3 py-2.5">
-                                  {row[field] ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => openParticipantEditor(row, field)}
-                                      className="block w-full break-words text-left text-[12px] leading-5 text-[#4e535a] hover:text-[#3370ff]"
-                                      title="点击填写自己的内容"
-                                    >
-                                      <span style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{row[field]}</span>
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => openParticipantEditor(row, field)}
-                                      className="flex h-8 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[12px] text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
-                                    >点击填写</button>
-                                  )}
-                                </td>
-                              ))}
+                              {(["visit_need", "customer_info", "follow_up"] as const).map(field => {
+                                const entries = row[`${field}_entries`] || []
+                                return (
+                                  <td key={field} className="px-3 py-2.5">
+                                    {(entries.length > 0 || row[field]) ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => openParticipantEditor(row, field)}
+                                        className="group block w-full text-left"
+                                        title="点击填写自己的内容"
+                                      >
+                                        <ParticipantNoteLines entries={entries} fallback={row[field]} />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => openParticipantEditor(row, field)}
+                                        className="flex h-8 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[12px] text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
+                                      >点击填写</button>
+                                    )}
+                                  </td>
+                                )
+                              })}
                             </tr>
                           ))}
                         </tbody>
@@ -1233,10 +1291,14 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             <p className="text-[12px] text-[#8f959e]">
               {participantEditing?.row.course_date} · {participantEditing?.row.nickname} · {participantEditing?.row.course_name}
             </p>
-            {participantEditing && participantEditing.row[participantEditing.field] && (
-              <div className="max-h-[180px] overflow-y-auto rounded-[4px] bg-[#f7f8fa] px-3 py-2">
+            {participantEditing && (participantEditing.row[participantEditing.field] || (participantEditing.row[`${participantEditing.field}_entries`] || []).length > 0) && (
+              <div className="max-h-[220px] overflow-y-auto rounded-[4px] bg-[#f7f8fa] px-3 py-2">
                 <div className="mb-1 text-[11px] text-[#8f959e]">这一条已经填写的内容（含其他人填写的）</div>
-                <div className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{participantEditing.row[participantEditing.field]}</div>
+                <ParticipantNoteLines
+                  entries={participantEditing.row[`${participantEditing.field}_entries`] || []}
+                  fallback={participantEditing.row[participantEditing.field]}
+                  expanded
+                />
               </div>
             )}
             <div>

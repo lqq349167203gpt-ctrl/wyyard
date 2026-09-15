@@ -228,6 +228,59 @@ def test_follow_up_definition_filters_each_note_category_independently(monkeypat
     assert {item["id"] for item in unrestricted_result["items"]} == {"c1", "c2"}
 
 
+def test_course_participants_split_notes_by_author(monkeypatch):
+    """参与者页签的备注要按填写人拆开，前端才能逐人换行展示。"""
+    from starlette.requests import Request
+
+    from app.api import service_teacher_customers, statistics
+    from app.models.visit_note import VisitNote
+    from app.services import visit_note_service
+
+    now = datetime.now(timezone.utc)
+    courses = [{
+        "id": "c1",
+        "date": "2026-09-01",
+        "name": "沙龙活动",
+        "activity_type": "class",
+        "activity_type_label": "沙龙活动",
+        "participants": [{
+            "id": "cust1",
+            "nickname": "小安",
+            "member_type": "普通会员",
+            "identity_group": "新人",
+            "daily_need": "潘潘：想了解课程\n沁桐：想改善睡眠",
+            "daily_customer_info": "潘潘：第一次到店",
+            "daily_follow_up": "",
+            "daily_visit_id": "v1",
+        }],
+    }]
+    monkeypatch.setattr(statistics, "get_course_statistics", lambda **_: {"courses": courses})
+    monkeypatch.setattr(visit_note_service, "list_notes", lambda _ids, ensure_legacy=True: [
+        VisitNote(id="n2", visit_id="v1", category="visit_need", content="想改善睡眠", created_by="沁桐", created_at=now, updated_at=now),
+        VisitNote(id="n1", visit_id="v1", category="visit_need", content="想了解课程", created_by="潘潘", created_at=now, updated_at=now),
+    ])
+
+    result = service_teacher_customers.list_course_participants(
+        request=Request({"type": "http", "path": "/api/service-teacher-customers/course-participants", "headers": []}),
+        teacher_id="",
+        date_from=None,
+        date_to=None,
+        all_dates=False,
+        activity_type="all",
+        keyword="",
+        member_type="",
+        identity_group="",
+        page=1,
+        page_size=20,
+    )
+    row = result["items"][0]["participants"][0]
+    assert [entry["author"] for entry in row["visit_need_entries"]] == ["潘潘", "沁桐"]
+    assert [entry["content"] for entry in row["visit_need_entries"]] == ["想了解课程", "想改善睡眠"]
+    # 没有独立填写记录时回退到原来的整段内容，保证历史数据仍可见
+    assert row["customer_info_entries"] == [{"author": "", "content": "潘潘：第一次到店", "at": ""}]
+    assert row["follow_up_entries"] == []
+
+
 def test_available_teachers_includes_current_account_owner():
     teachers = service_teacher_customer_service.available_teachers(
         [_customer("c1", "婷婷"), _customer("c2", "潘潘"), _customer("c3", "潘潘")],

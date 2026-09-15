@@ -103,9 +103,10 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
                     _sync_visit_cache(visit_id, typed_category)
 
 
-def list_notes(visit_ids: Iterable[str]) -> list[VisitNote]:
+def list_notes(visit_ids: Iterable[str], ensure_legacy: bool = True) -> list[VisitNote]:
     ids = {visit_id for visit_id in visit_ids if visit_id}
-    ensure_legacy_entries(ids)
+    if ensure_legacy:
+        ensure_legacy_entries(ids)
     return sorted(
         (
             note
@@ -115,6 +116,22 @@ def list_notes(visit_ids: Iterable[str]) -> list[VisitNote]:
         key=lambda note: (note.created_at, note.id),
         reverse=True,
     )
+
+
+def group_notes_by_visit(visit_ids: Iterable[str]) -> Dict[str, Dict[str, list[dict]]]:
+    """按「邀约 → 分类」分组，每条带上填写人；课表「参与者」页签据此按人换行展示。
+
+    列表页不触发历史内容回填，避免一次查询产生大量写入；没有独立记录的内容由前端回退展示。
+    """
+    grouped: Dict[str, Dict[str, list[dict]]] = {}
+    for note in sorted(list_notes(visit_ids, ensure_legacy=False), key=lambda item: (item.created_at, item.id)):
+        entries = grouped.setdefault(note.visit_id, {}).setdefault(note.category, [])
+        entries.append({
+            "author": note.created_by or "历史记录",
+            "content": note.content,
+            "at": (note.updated_at or note.created_at).isoformat(),
+        })
+    return grouped
 
 
 def list_notes_by_creator(

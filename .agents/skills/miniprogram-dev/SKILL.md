@@ -1,38 +1,30 @@
 ---
 name: miniprogram-dev
-description: 开发或排查 wyyard 管理端 miniprogram/ 与客户端 miniprogram-client/ 时使用，涵盖页面、API、登录权限与样式；不要求仅后端修改时自动重做两个小程序。
+description: 开发或排查 wyyard 管理端 miniprogram/ 与客户端 miniprogram-client/ 的页面、API、登录权限和样式；不用于仅后端修改。
 ---
 
-# 微信小程序开发规范
+# 小程序开发
 
-自主性、批准和交付标准遵循根目录 AGENTS.md；此处只保留小程序特有约束。
+任务边界、数据安全与相关端联动遵循根目录 AGENTS.md。
 
-## 确定端与环境
+## 环境与登录
 
-- miniprogram/ 是管理端，miniprogram-client/ 是客户端，两个独立发布包。根据用户描述、当前文件和已有上下文确定端；能确认就继续，只有仍存在影响实现的歧义才问。
-- appid、页面清单、BASE_URL、envVersion/devMode 行为以对应 project.config.json、app.json、app.js、utils/api.js 的当前源码为准。本 skill 不保存易过期的地址和页面数量。
-- 不改变 appid，不混用两端登录态/token。管理端常用 auth_token，客户端常用 client_token；修改登录前核对实际封装。
-- 用户明确指定本地或服务器即已有切换授权，核对目标后执行，不重复确认。否则保留现状；不因调试便利切换到正式数据或开启自动登录。
-- 手机的 localhost 指向手机自身，本地调试需使用手机可达的已确认开发地址；不将网络错误误判为登录失效。
+- miniprogram/ 是管理端，miniprogram-client/ 是客户端。核对对应 project.config.json、app.json、app.js 和 utils/api.js 中的 appid、页面、BASE_URL 及 envVersion/devMode，不写死历史配置。
+- 不改变 appid，不混用两端 token；沿用当前登录守卫和续期封装，游客页不强制登录，不将网络错误或 403 当作登录失效。
+- 保留现有环境，不为调试开启自动登录或切到正式数据；已授权切换时核实目标与可达性。手机 localhost 指手机自身。
 
-## 页面与接口
+## 页面与请求
 
-- 请求统一通过该端 utils/api.js 的现有封装，不在页面直接添加 wx.request；新接口按资源命名空间组织。
-- 先核对后端路由、HTTP 方法、参数与响应，再接封装和页面；后端校验权限，前端显隐不能代替授权。
-- 需要登录的管理端页面沿用当前登录守卫，处理初始化顺序，避免 onLoad/onShow 重复请求或错误清 token；登录页和允许游客访问的页面不要套用登录守卫。
-- 新页面检查 JS/JSON/WXML/WXSS 与 app.json 主包或分包注册；组件检查 usingComponents；只有 tabBar 变更才处理相应图标。
-- 列表追加保留已加载记录与滚动位置；条件变化重置分页并避免旧请求覆盖新结果。小范围更新优先同步当前记录，避免整页刷新。
-- 涉及共享业务口径时核对用户要求的 PC/管理端/客户端调用方，不自动扩展未要求的页面。
+- 请求走本端 utils/api.js，不在页面新增 wx.request；先核对后端路径、方法、参数及响应。
+- 协调 onLoad/onShow，避免重复请求；条件变化重置分页，防止旧响应覆盖新条件，追加与局部更新保留滚动和已加载记录。
+- 新页面核对 JS/JSON/WXML/WXSS 和 app.json 分包注册；组件核对 usingComponents；仅 tabBar 变更时处理相应图标。
+- 样式复用本端 app.wxss 和相邻页面，通常用 rpx；两端调性独立，不用历史配色覆盖用户指定样式。
 
-## 样式与交付
+## 验证与参考
 
-- 优先复用该端 app.wxss 和相邻页面，尺寸通常用 rpx，细线/安全区等可沿用 px 或平台单位。
-- 管理端与客户端调性独立；用户给的设计稿和已确认样式优先，不能凭本 skill 的历史配色覆盖。
-- 用户要方案才制作必要的 HTML 预览；已指定方案、直接实现或局部微调时直接改源码，不强制增加“预览—确认”轮次。
-- 验证使用 wyyard-verify。Git 推送与微信上传/发布不是同一件事；涉及小程序源码变更需说明要重新编译/上传，未经授权不发布。
+验证使用 wyyard-verify。小程序源码变更交付时说明需要重新编译/上传；Git 推送不等于微信上传或发布。
 
-## 按需参考
+- 新建页面或修改生命周期、分页/刷新：读 [page-patterns.md](references/page-patterns.md)。
+- 新增 API 或调整请求封装/登录：读 [api-patterns.md](references/api-patterns.md)。
 
-- 新建页面或修改生命周期、分页/刷新：读 references/page-patterns.md。
-- 新增 API、调整请求封装/登录：读 references/api-patterns.md。
-- 参考文件是结构示例，不是现行环境/业务规则；与源码不一致时先核对相关实现，勿恢复过时逻辑。
+参考是结构示例，运行时配置和业务规则以当前源码为准。

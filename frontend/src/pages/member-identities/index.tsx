@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, ArrowUp, ArrowDown, ShieldCheck, Loader2 } from "lucide-react"
 import {
@@ -11,18 +11,17 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { memberIdentityApi, customerApi, type MemberIdentity, type MemberIdentityCreate, type IdentityCondition, type Customer } from "@/lib/api"
+import { memberIdentityApi, customerApi, type MemberIdentity, type MemberIdentityCreate, type IdentityCondition, type CustomerLight } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
-import { ActivityConfigContent } from "@/pages/activity-config"
 import { HEALING_POSITIONS } from "@/lib/positions"
 
 // 与 membership_card.card_type 实际值对齐；新增卡类型时需同步更新
-const CARD_TYPES = ["次卡", "粗门次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "45次卡", "半年卡", "年卡"]
+const CARD_TYPES = ["次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "45次卡", "半年卡", "年卡"]
 const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
-const PAYMENT_CATEGORIES = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "OH卡诊断", "内部课程", "其他项目"]
+const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "茶位费", "线下课程", "其他项目"]
 
 const TYPE_LABELS: Record<string, string> = {
   invitation: "邀约情况",
@@ -38,13 +37,15 @@ const TYPE_LABELS: Record<string, string> = {
 
 const TEACHER_POSITIONS = [...HEALING_POSITIONS]
 
-const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于", ">=": "大于等于", "<=": "小于等于" }
-const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结", "OH卡诊断", "其他项目"]
+const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于", ">=": "不少于", "<=": "不超过" }
+const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结", "OH卡诊断", "OH卡梳理", "其他项目", "粗门次卡", "茶位费", "线下课程"]
+const RECORD_CATEGORIES = ["粗门次卡", "茶位费", "线下课程", "其他项目"]
+const COUNT_OPTIONS = Object.entries(COUNT_OP_LABELS).map(([value, label]) => ({ value, label }))
 
 function getPaymentCategories(c: IdentityCondition): string[] {
   if (c.type === "card") return ["会员卡"]
   if (c.type === "course") return ["内部课程"]
-  return c.payment_categories || []
+  return (c.payment_categories || []).map(category => category === "OH卡诊断" ? "OH卡梳理" : category === "会员活动" ? "会员卡" : category)
 }
 
 function conditionSummary(c: IdentityCondition): string {
@@ -56,14 +57,15 @@ function conditionSummary(c: IdentityCondition): string {
   }
   if (c.type === "arrival" || c.type === "activity") {
     const isWelfare = c.type === "activity" && c.activity_scope === "welfare"
-    const label = c.type === "arrival" ? "到店情况" : (isWelfare ? "公益活动" : "活动参与")
+    const label = c.type === "arrival" ? "到店" : (isWelfare ? "参与公益活动" : "参与活动")
+    const unit = isWelfare ? "场" : "天"
     if (c.count_value === 0 && c.count_op === "=") return `未${c.type === "arrival" ? "到店" : (isWelfare ? "参加公益活动" : "参与活动")}`
-    if (c.count_value === 0 && c.count_op === ">") return `${label} ≥ 1 次`
-    return `${label} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`
+    if (c.count_value === 0 && c.count_op === ">") return `${label}至少 1 ${unit}`
+    return `${label} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} ${unit}`
   }
   if (c.type === "teacher") {
     if (!c.items || c.items.length === 0) return "疗愈老师（未选择）"
-    return `疗愈老师：${c.items[0]}`
+    return `疗愈老师：${c.items.join("或")}`
   }
   if (c.type === "fixed") {
     if (!c.items || c.items.length === 0) return "固定人员（未选择）"
@@ -74,15 +76,13 @@ function conditionSummary(c: IdentityCondition): string {
     const parts: string[] = []
     for (const cat of categories) {
       if (cat === "会员卡" || cat === "内部课程") {
-        const prefix = cat === "会员卡" ? "持有" : "购买"
-        const subItems = c.items.length > 0 ? c.items.join("、") : "任意"
-        const validity = c.validity === "active" ? "有效" : "含过期"
-        parts.push(`${prefix}${validity}：${subItems}`)
+        const subItems = c.items.length > 0 ? c.items.join("或") : `任意${cat}`
+        parts.push(`${cat === "会员卡" ? "持有" : "购买"}${c.validity === "active" ? "有效的" : ""}${subItems}${c.validity === "all" ? "（含过期）" : ""}`)
       } else {
-        parts.push(`${cat} 购买场次 ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 次`)
+        parts.push(`${cat} ${RECORD_CATEGORIES.includes(cat) ? "交易笔数" : "购买场次"} ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} ${RECORD_CATEGORIES.includes(cat) ? "笔" : "次"}`)
       }
     }
-    return parts.join("，")
+    return parts.join("；或 ") || "请选择付费项目"
   }
   if (c.type === "amount") {
     return `消费金额 ${COUNT_OP_LABELS[c.count_op]} ${c.count_value} 元`
@@ -96,16 +96,12 @@ function defaultCondition(): IdentityCondition {
 
 export default function MemberIdentitiesPage() {
   const enterToNext = useEnterToNext()
-  const [activeTab, setActiveTab] = useState(() => {
-    try { return localStorage.getItem("tab_member-identities") || "identities" } catch { return "identities" }
-  })
-
-  const handleTabChange = (key: string) => {
-    setActiveTab(key)
-    try { localStorage.setItem("tab_member-identities", key) } catch {}
-  }
   const [identities, setIdentities] = useState<MemberIdentity[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [keyword, setKeyword] = useState("")
+  const [typeFilter, setTypeFilter] = useState("")
+  const [conditionFilter, setConditionFilter] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<MemberIdentity | null>(null)
   const [saving, setSaving] = useState(false)
@@ -116,16 +112,29 @@ export default function MemberIdentitiesPage() {
   const [formType, setFormType] = useState("")
   const [formConditions, setFormConditions] = useState<IdentityCondition[]>([defaultCondition()])
   const [formOperator, setFormOperator] = useState<"all" | "any">("all")
-  const [customerList, setCustomerList] = useState<Customer[]>([])
+  const [customerList, setCustomerList] = useState<CustomerLight[]>([])
 
-  useEffect(() => { customerApi.list().then(setCustomerList).catch(() => {}) }, [])
+  useEffect(() => {
+    if (!dialogOpen) return
+    let active = true
+    customerApi.light().then(items => { if (active) setCustomerList(items) }).catch(() => {})
+    return () => { active = false }
+  }, [dialogOpen])
 
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(identities)
+  const filteredIdentities = useMemo(() => identities.filter(item =>
+    item.name.toLowerCase().includes(keyword.trim().toLowerCase()) &&
+    (!typeFilter || item.type === typeFilter) &&
+    (!conditionFilter || (conditionFilter === "none" ? item.conditions.length === 0 : item.conditions.some(c =>
+      (c.type === "card" || c.type === "course" ? "payment" : c.type) === conditionFilter)))
+  ), [identities, keyword, typeFilter, conditionFilter])
+
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredIdentities)
 
   const load = () => {
+    setError("")
     memberIdentityApi.list()
       .then(setIdentities)
-      .catch(() => {})
+      .catch(e => setError(e instanceof Error ? e.message : "身份加载失败，请重试"))
       .finally(() => setLoading(false))
   }
 
@@ -158,6 +167,7 @@ export default function MemberIdentitiesPage() {
   const handleSave = async () => {
     if (!formName.trim() || !formType) return
     setSaving(true)
+    setError("")
     try {
       const validConditions = formConditions.filter(c => c.type).map(c => ({
         ...c,
@@ -177,7 +187,7 @@ export default function MemberIdentitiesPage() {
       setDialogOpen(false)
       load()
     } catch (error) {
-      console.error("保存失败:", error)
+      setError(error instanceof Error ? error.message : "保存失败，请重试")
     } finally {
       setSaving(false)
     }
@@ -190,7 +200,7 @@ export default function MemberIdentitiesPage() {
       setDeleteId(null)
       load()
     } catch (error) {
-      console.error("删除失败:", error)
+      setError(error instanceof Error ? error.message : "删除失败，请重试")
     }
   }
 
@@ -199,7 +209,7 @@ export default function MemberIdentitiesPage() {
     try {
       await memberIdentityApi.refreshAll()
     } catch (error) {
-      console.error("刷新失败:", error)
+      setError(error instanceof Error ? error.message : "刷新失败，请重试")
     } finally {
       setRefreshing(false)
     }
@@ -273,57 +283,25 @@ export default function MemberIdentitiesPage() {
 
   return (
     <div className="px-6 pt-4 pb-6 space-y-3">
-      {/* Tab 切换 */}
-      <div className="flex items-center border-b-[0.5px] border-[#e8e8e8] -mx-6 px-6 min-h-[39px]">
-        <div className="flex items-center gap-6">
-          {[
-            { key: "identities", label: "会员身份" },
-            { key: "activity-permissions", label: "会员权限" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              className={`relative px-1 pb-2 text-[14px] transition-colors ${
-                activeTab === tab.key
-                  ? "text-[#3370ff]"
-                  : "text-[#2b2f36] hover:text-[#4e535a]"
-              }`}
-              onClick={() => handleTabChange(tab.key)}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-[-5px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
-              )}
-            </button>
-          ))}
-        </div>
+      <h1 className="text-[18px] font-medium text-[#1f2329]">会员身份</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input className="h-8 w-52 text-xs" value={keyword} placeholder="搜索身份名称" onChange={e => { setKeyword(e.target.value); goToPage(1) }} />
+        <SelectDropdown value={typeFilter} options={[{ value: "", label: "全部分类" }, { value: "新人", label: "新人" }, { value: "老人", label: "老人" }]} onChange={v => { setTypeFilter(v); goToPage(1) }} />
+        <SelectDropdown value={conditionFilter} options={[{ value: "", label: "全部条件" }, ...Object.entries(TYPE_LABELS).filter(([key]) => key !== "card" && key !== "course").map(([value, label]) => ({ value, label })), { value: "none", label: "默认匹配" }]} onChange={v => { setConditionFilter(v); goToPage(1) }} />
+        {(keyword || typeFilter || conditionFilter) && <Button variant="ghost" size="sm" onClick={() => { setKeyword(""); setTypeFilter(""); setConditionFilter(""); goToPage(1) }}>重置</Button>}
+        <Button size="sm" className="ml-auto h-8 text-xs" onClick={handleOpenCreate}><Plus className="mr-1 h-3.5 w-3.5" />新增身份</Button>
       </div>
-
-      {activeTab === "identities" && (
-        <>
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          共 {identities.length} 个身份
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={handleRefreshAll}
-            disabled={refreshing}
-          >
-            {refreshing ? (
-              <><Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> 刷新中...</>
-            ) : (
-              "刷新全部用户身份"
-            )}
-          </Button>
-          <Button size="sm" className="h-8 text-xs" onClick={handleOpenCreate}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> 新增身份
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>显示 {filteredIdentities.length} / {identities.length} 个身份 · 从上到下，首个命中生效{keyword || typeFilter || conditionFilter ? " · 清空筛选后可调整顺序" : ""}</span>
+        <div className="flex items-center gap-2">
+          <span>保存后自动更新，通常无需手动刷新</span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleRefreshAll} disabled={refreshing}>
+            {refreshing && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}{refreshing ? "刷新中…" : "手动刷新"}
           </Button>
         </div>
       </div>
-
+      {error && <div role="alert" className="text-xs text-destructive">{error} <button onClick={load}>重新加载</button></div>}
+      {!loading && identities.length > 0 && filteredIdentities.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">没有符合筛选条件的身份</p>}
       <div className="bg-white rounded-lg">
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
@@ -345,22 +323,23 @@ export default function MemberIdentitiesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedItems.map((item, index) => {
-                const globalIndex = startIndex - 1 + index
+              {paginatedItems.map((item) => {
+                const globalIndex = identities.findIndex(identity => identity.id === item.id)
                 return (
                 <TableRow key={item.id}>
                   <TableCell className="pl-4">
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground tabular-nums">{globalIndex + 1}</span>
                       <button
                         className="h-5 w-5 flex items-center justify-center rounded hover:bg-[#f0f0f0] transition-colors disabled:opacity-30"
-                        disabled={globalIndex === 0}
+                        title="提高优先级" aria-label="提高优先级" disabled={globalIndex === 0 || !!keyword || !!typeFilter || !!conditionFilter}
                         onClick={() => handleMoveUp(globalIndex)}
                       >
                         <ArrowUp className="h-3 w-3 text-[#8f959e]" />
                       </button>
                       <button
                         className="h-5 w-5 flex items-center justify-center rounded hover:bg-[#f0f0f0] transition-colors disabled:opacity-30"
-                        disabled={globalIndex === identities.length - 1}
+                        title="降低优先级" aria-label="降低优先级" disabled={globalIndex === identities.length - 1 || !!keyword || !!typeFilter || !!conditionFilter}
                         onClick={() => handleMoveDown(globalIndex)}
                       >
                         <ArrowDown className="h-3 w-3 text-[#8f959e]" />
@@ -386,7 +365,7 @@ export default function MemberIdentitiesPage() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-[12px] text-[#8f959e] font-light">无条件（直接匹配）</span>
+                      <span className="text-[12px] text-[#8f959e] font-light">默认匹配 · 接收前面未命中的客户</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right pr-4">
@@ -417,17 +396,19 @@ export default function MemberIdentitiesPage() {
 
       {/* 新增/编辑弹窗 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg p-0 gap-0">
+        <DialogContent initialFocus={false} className="sm:max-w-[640px] p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 border-b">
             <DialogTitle className="text-[14px]">{editingItem ? "编辑身份" : "新增身份"}</DialogTitle>
           </DialogHeader>
           <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto" {...enterToNext}>
+            {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+            <h2 className="text-[13px] font-medium">基本信息</h2>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">身份名称</span>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入会员身份名称" />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">类型</span>
+              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">分类</span>
               <SelectDropdown
                 value={formType}
                 options={[{value: "老人", label: "老人"}, {value: "新人", label: "新人"}]}
@@ -436,11 +417,12 @@ export default function MemberIdentitiesPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3 border-t pt-4">
+              <h2 className="text-[13px] font-medium">匹配规则</h2>
               <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">匹配条件</span>
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">满足方式</span>
                 <div className="flex items-center justify-between gap-2">
-                  {formConditions.length > 1 && (
+                  {(
                     <SelectDropdown
                       value={formOperator}
                       options={[{value: "all", label: "全部满足"}, {value: "any", label: "满足任意一项"}]}
@@ -457,14 +439,14 @@ export default function MemberIdentitiesPage() {
               {formConditions.length === 0 ? (
                 <div className="grid grid-cols-[70px_1fr] items-start gap-2">
                   <span />
-                  <p className="text-[12px] text-[#8f959e] py-4">无条件则直接匹配所有用户</p>
+                  <p className="text-[12px] text-[#8f959e] py-4">默认匹配前面规则未命中的客户，建议放在最后。</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {formConditions.map((cond, ci) => (
-                    <div key={ci} className="grid grid-cols-[70px_1fr] items-start gap-2">
-                      <span />
-                      <div className="border border-[#e5e6eb] rounded-lg p-3 space-y-3">
+                    <div key={ci} className="grid grid-cols-[28px_1fr] items-start gap-2">
+                      <span className="pt-3 text-xs text-muted-foreground">{ci + 1}</span>
+                      <div className="border border-[#e5e6eb] rounded-md p-3 space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
@@ -490,10 +472,10 @@ export default function MemberIdentitiesPage() {
                       {cond.type && (cond.type === "invitation" || cond.type === "arrival" || cond.type === "activity") && (
                         <>
                         <div className="flex items-center gap-2">
-                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">次数</span>
+                          <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">{cond.type === "arrival" || (cond.type === "activity" && cond.activity_scope !== "welfare") ? "天数" : cond.type === "activity" ? "场数" : "次数"}</span>
                           <SelectDropdown
                             value={cond.count_op}
-                            options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}
+                            options={COUNT_OPTIONS}
                             onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
                           />
                           <Input
@@ -503,7 +485,7 @@ export default function MemberIdentitiesPage() {
                             onChange={(e) => updateCondition(ci, { count_value: e.target.value.replace(/[^0-9]/g, "") } as any)}
                             className="w-20 h-8 text-[12px]"
                           />
-                          <span className="text-[12px] text-[#4e535a]">次</span>
+                          <span className="text-[12px] text-[#4e535a]">{cond.type === "arrival" || (cond.type === "activity" && cond.activity_scope !== "welfare") ? "天" : cond.type === "activity" ? "场" : "次"}</span>
                         </div>
                         {cond.type === "activity" && (
                           <label className="flex items-center gap-1.5 cursor-pointer">
@@ -597,7 +579,7 @@ export default function MemberIdentitiesPage() {
                             <div className="flex items-start gap-2">
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right pt-1.5">会员卡</span>
                               <div className="flex flex-wrap gap-1.5">
-                                {CARD_TYPES.map((item) => (
+                                {Array.from(new Set([...CARD_TYPES, ...cond.items.filter(item => !COURSE_TYPES.includes(item))])).map((item) => (
                                   <label
                                     key={item}
                                     className={`flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] cursor-pointer transition-colors ${
@@ -630,10 +612,10 @@ export default function MemberIdentitiesPage() {
                           {/* 觉醒游戏/情绪释放/能量结 → 购买场次 */}
                           {getPaymentCategories(cond).some((cat: string) => COUNT_CATEGORIES.includes(cat)) && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">购买场次</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">{getPaymentCategories(cond).some(cat => RECORD_CATEGORIES.includes(cat)) ? "交易笔数" : "购买场次"}</span>
                               <SelectDropdown
                                 value={cond.count_op}
-                                options={[{value: ">", label: "大于"}, {value: "=", label: "等于"}, {value: "<", label: "小于"}]}
+                                options={COUNT_OPTIONS}
                                 onChange={(v) => updateCondition(ci, { count_op: v as IdentityCondition["count_op"] })}
                               />
                               <Input
@@ -643,10 +625,11 @@ export default function MemberIdentitiesPage() {
                                 onChange={(e) => updateCondition(ci, { count_value: e.target.value.replace(/[^0-9]/g, "") } as any)}
                                 className="w-20 h-8 text-[12px]"
                               />
-                              <span className="text-[12px] text-[#4e535a]">次</span>
+                              <span className="text-[12px] text-[#4e535a]">{getPaymentCategories(cond).some(cat => RECORD_CATEGORIES.includes(cat)) ? "笔" : "次"}</span>
                             </div>
                           )}
 
+                          {getPaymentCategories(cond).some(cat => ["粗门次卡", "茶位费", "线下课程"].includes(cat)) && <p className="text-xs text-muted-foreground">按未删除、未取消的交易记录计笔数，不按扣卡次数；不判断有效期。</p>}
                           {/* 有效期（会员卡或内部课程选中时显示） */}
                           {getPaymentCategories(cond).some((cat: string) => cat === "会员卡" || cat === "内部课程") && (
                             <div className="flex items-center gap-2">
@@ -667,6 +650,18 @@ export default function MemberIdentitiesPage() {
               )}
             </div>
 
+            <section aria-live="polite" className="rounded-md border border-[#e5e6eb] bg-[#f7f8fa] p-3 space-y-2">
+              <h2 className="text-[13px] font-medium">规则预览</h2>
+              <p className="text-xs text-muted-foreground">{formName.trim() || "未命名身份"}{formType ? " · " + formType : ""}</p>
+              {formConditions.some(c => c.type) ? (
+                <div className="space-y-1 text-[13px] leading-6 text-[#4e535a]">
+                  {formConditions.filter(c => c.type).map((c, index) => (
+                    <p key={index}>{index > 0 && <span className="mr-1 text-[#3370ff]">{formOperator === "all" ? "并且" : "或者"}</span>}{conditionSummary({ ...c, count_value: Number(c.count_value) || 0 })}</p>
+                  ))}
+                </div>
+              ) : <p className="text-[13px] text-[#4e535a]">默认匹配：接收前面规则未命中的客户，建议放在最后。</p>}
+              <p className="text-xs text-muted-foreground">保存后自动更新客户身份；数量未填时按 0 保存。</p>
+            </section>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setDialogOpen(false)}>取消</Button>
               <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !formName.trim() || !formType}>
@@ -683,7 +678,7 @@ export default function MemberIdentitiesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>删除身份</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除该身份规则吗？已匹配的用户身份不会自动清除，需手动刷新。
+              确定删除该身份规则吗？系统会重新计算客户身份，并移除该身份关联的权限配置。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -692,10 +687,6 @@ export default function MemberIdentitiesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-        </>
-      )}
-
-      {activeTab === "activity-permissions" && <ActivityConfigContent embedded />}
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import json
 import locale
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -125,7 +125,7 @@ def valid_day(value) -> str:
         return ""
 
 
-def collect_data(request):
+def collect_data(request, *, metadata_only=False):
     from app.api.statistics import (
         COURSE_ACTIVITY_TYPES,
         _course_activity_hours,
@@ -148,7 +148,10 @@ def collect_data(request):
     def customer_name(cid):
         return (customers[cid].nickname or customers[cid].name or "未命名") if cid in customers else ""
     today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
-    arrived_cache = {}
+    arrived_cache = defaultdict(set)
+    for visit in visit_service._visits.values():
+        if visit.arrived and not visit.is_deleted:
+            arrived_cache[visit.visit_date].add(visit.customer_id)
     for kind, label, loader in COURSE_ACTIVITY_TYPES:
         for activity in loader():
             day = valid_day(activity.date)
@@ -175,24 +178,23 @@ def collect_data(request):
                     # 能量结的案主（可能多个）同样不算到场人数、不进新人/老人名单
                     participants -= {o.get("id", "") for o in owners if isinstance(o, dict)}
             participants -= set(getattr(activity, "withdrawn_participant_ids", []) or [])
-            if day not in arrived_cache:
-                arrived_cache[day] = visit_service.get_arrived_customer_ids(day, day)
             participants &= set(customers) & arrived_cache[day]
             name = _course_activity_name(kind, label, activity)
             key = f"{kind}:{activity.id}"
-            details = _course_owner_details(kind, activity, customers, set(customers))
-            row = {
-                "id": key, "date": day, "name": name, "type": label, "organization_id": org_id,
-                "organization": org_names[org_id], "teachers": "、".join(filter(None, (customer_name(t) for t in sorted(teachers)))),
-                "hours": _course_activity_hours(kind, activity),
-                "owner": details["owner_name"], "parts": details["body_part_count"] if kind == "eks" else "",
-                "participants": len(participants), "participant_ids": sorted(participants),
-                "participant_names": [(cid, customer_name(cid)) for cid in sorted(participants)],
-                "activity_type": kind,
-                "course_subtype": getattr(activity, "course_type", "") or "",
-                "details": ["到场｜" + customer_name(cid) for cid in sorted(participants)],
-            }
-            courses.append(row)
+            if not metadata_only:
+                details = _course_owner_details(kind, activity, customers, set(customers))
+                row = {
+                    "id": key, "date": day, "name": name, "type": label, "organization_id": org_id,
+                    "organization": org_names[org_id], "teachers": "、".join(filter(None, (customer_name(t) for t in sorted(teachers)))),
+                    "hours": _course_activity_hours(kind, activity),
+                    "owner": details["owner_name"], "parts": details["body_part_count"] if kind == "eks" else "",
+                    "participants": len(participants), "participant_ids": sorted(participants),
+                    "participant_names": [(cid, customer_name(cid)) for cid in sorted(participants)],
+                    "activity_type": kind,
+                    "course_subtype": getattr(activity, "course_type", "") or "",
+                    "details": ["到场｜" + customer_name(cid) for cid in sorted(participants)],
+                }
+                courses.append(row)
             for cid in sorted(participants):
                 events.append({"id": f"attendance:{key}:{cid}", "kind": "attendance", "product": kind,
                                "subtype": getattr(activity, "course_type", "") or "", "date": day,
@@ -216,6 +218,8 @@ def collect_data(request):
                                "subtype": subtype, "date": day, "customer_id": cid, "customer": customer_name(cid),
                                "organization_id": org_id, "organization": org_names[org_id],
                                "label": f"{label} · {subtype}" if subtype else label, "closers": closers})
+    if metadata_only:
+        return organizations, permissions, events, courses
     attendance = {(e["course_key"], e["customer_id"]): e for e in events if e["kind"] == "attendance"}
     seen_usage = set()
     for deduction in project_deduction_service.list_deductions():
@@ -485,6 +489,9 @@ def analyze(request, query: PrincipalQuery, *, export=False):
     for usage in coarse_usages:
         if usage.get("course_key"):
             course_related[usage["course_key"]].append(usage)
+    purchases_by_day_org = defaultdict(list)
+    for purchase in purchases:
+        purchases_by_day_org[(purchase["date"], purchase["organization_id"])].append(purchase)
     for course in selected_courses:
         ids = set(course["participant_ids"])
         # 明细里先放一条课程本身，保证点任何一个数字都能看到这门课的信息
@@ -509,7 +516,7 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         course["order_count"] = len(related) if access == "detail" else "—"
         course["related_deals"] = len(related)
         # 课程当天的成交＝这门课的到场客户当天成交了多少笔（同组织）
-        following = [p for p in purchases if p["customer_id"] in ids and p["organization_id"] == course["organization_id"] and course["date"] <= p["date"] <= (date.fromisoformat(course["date"]) + timedelta(days=query.rule.window_days)).isoformat()]
+        following = [p for p in purchases_by_day_org[(course["date"], course["organization_id"])] if p["customer_id"] in ids]
         course["same_day_deals"] = sum(1 for p in following if p["date"] == course["date"])
         if access == "detail":
             course["details"] += [f'关联成交｜{p["customer"]}｜{p["deal_date"]}｜{p["label"]}｜{p["settlement"]}' for p in related]
