@@ -891,6 +891,8 @@
   bottom: 0;
   left: 0;
   z-index: 121;
+  /* 固定高度：里面的 scroll-view 必须有确定高度才能滚动 */
+  height: 78vh;
   max-height: 78vh;
   display: flex;
   flex-direction: column;
@@ -1005,7 +1007,9 @@
 
 .participant-sheet-list {
   min-height: 0;
-  flex: 1;
+  flex: 1 1 0;
+  /* 兜底给个确定的最大高度，避免个别机型下 scroll-view 拿不到高度而不滚动 */
+  max-height: 64vh;
 }
 
 .participant-sheet-item {
