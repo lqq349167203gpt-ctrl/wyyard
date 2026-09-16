@@ -61,6 +61,7 @@ PERMISSION_PAGE_MAP = {
     "class-records-arrival": ("邀约", "/courses/class-records"),
     "class-records-activities": ("课表", "/courses/daily-activities"),
     "daily-activities": ("课表", "/courses/daily-activities"),
+    "audit-check": ("信息核对", "/audit-check"),
     "offline-course-records": ("落地课程", "/offline-course-records"),
     "communication-records": ("沟通记录", "/communication-records"),
     "followup-records": ("回访记录", "/followup-records"),

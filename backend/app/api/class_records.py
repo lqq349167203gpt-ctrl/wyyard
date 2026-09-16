@@ -481,7 +481,9 @@ def update_record(record_id: str, data: dict, request: Request, conversion: bool
     old_record = class_record_service.get_record(record_id)
     if not old_record:
         raise HTTPException(status_code=404, detail="记录不存在")
-    activity_lock_service.ensure_update_unlocked(old_record, data)
+    activity_lock_service.ensure_update_unlocked(
+        old_record, data, exempt_fields=activity_lock_service.REVIEW_EXEMPT_FIELDS
+    )
     ensure_activity_update_access(request, old_record, data)
     if "participant_ids" in data or "groups" in data:
         old_participants = _participant_scope_ids(old_record.participant_ids, old_record.groups)

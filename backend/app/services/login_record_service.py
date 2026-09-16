@@ -49,6 +49,7 @@ PAGE_NAMES = {
     "/healing-records": "客户资料",
     "/courses/class-records": "邀约",
     "/courses/daily-activities": "课表",
+    "/audit-check": "信息核对",
     "/offline-course-records": "落地课程",
     "/communication-records": "沟通记录",
     "/followup-records": "回访记录",

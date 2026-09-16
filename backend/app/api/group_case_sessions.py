@@ -109,7 +109,9 @@ def update_session(session_id: str, data: dict, request: Request):
     old_session = group_case_session_service.get_session(session_id)
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
-    activity_lock_service.ensure_update_unlocked(old_session, data)
+    activity_lock_service.ensure_update_unlocked(
+        old_session, data, exempt_fields=activity_lock_service.REVIEW_EXEMPT_FIELDS
+    )
     ensure_activity_update_access(request, old_session, data)
     if data.get("owner_id") and data["owner_id"] != old_session.owner_id:
         customer_access_service.require_customer_scope(request, data["owner_id"], action="设置为案主")

@@ -14,6 +14,7 @@ from app.api.activity_withdrawals import router as activity_withdrawals_router
 from app.api.agents import router as agents_router
 from app.api.ai_configs import router as ai_configs_router
 from app.api.analysis_logs import router as analysis_logs_router
+from app.api.audit_check import router as audit_check_router
 from app.api.business_reminders import router as business_reminders_router
 from app.api.chat_history import router as chat_history_router
 from app.api.chat_logs import router as chat_logs_router
@@ -120,6 +121,7 @@ app.include_router(activity_ai_config_router)
 app.include_router(miniapp_ai_config_router)
 app.include_router(visits_router)
 app.include_router(visit_verifications_router)
+app.include_router(audit_check_router)
 app.include_router(courses_router)
 app.include_router(spaces_router)
 app.include_router(course_types_router)

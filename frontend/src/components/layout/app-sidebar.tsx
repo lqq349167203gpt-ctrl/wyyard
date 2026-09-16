@@ -63,6 +63,7 @@ const courseItems = [
   { title: "客户资料", icon: IconUser, path: "/healing-records", permission: "healing-records" },
   { title: "邀约", icon: IconCalendarEvent, path: "/courses/class-records", permission: "class-records" },
   { title: "课表", icon: IconCalendar, path: "/courses/daily-activities", permission: "daily-activities" },
+  { title: "信息核对", icon: IconAlertTriangle, path: "/audit-check", permission: "audit-check" },
   { title: "落地课程", icon: IconBook, path: "/offline-course-records", permission: "offline-course-records" },
 ]
 

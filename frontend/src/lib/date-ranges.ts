@@ -5,12 +5,12 @@ function formatLocalDate(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`
 }
 
+/** 本月：当月 1 日到今天（未来还没有数据，不把日期铺到月底） */
 export function monthRange(): DateRange {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, "0")
-  const lastDay = String(new Date(year, now.getMonth() + 1, 0).getDate()).padStart(2, "0")
-  return { date_from: `${year}-${month}-01`, date_to: `${year}-${month}-${lastDay}` }
+  return { date_from: `${year}-${month}-01`, date_to: formatLocalDate(now) }
 }
 
 export function weekRange(): DateRange {
@@ -25,14 +25,21 @@ export function todayRange(): DateRange {
   return { date_from: today, date_to: today }
 }
 
+/** 本年：当年 1 月 1 日到今天（未来还没有数据，不把日期铺到年底） */
 export function yearRange(year = new Date().getFullYear()): DateRange {
-  return { date_from: `${year}-01-01`, date_to: `${year}-12-31` }
+  const currentYear = new Date().getFullYear()
+  return {
+    date_from: `${year}-01-01`,
+    date_to: year === currentYear ? formatLocalDate(new Date()) : `${year}-12-31`,
+  }
 }
 
 export function selectedMonthRange(value: string): DateRange | null {
   const [year, month] = value.split("-").map(Number)
   if (!year || !month) return null
-  const lastDay = new Date(year, month, 0).getDate()
+  const now = new Date()
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
+  const lastDay = isCurrentMonth ? now.getDate() : new Date(year, month, 0).getDate()
   return {
     date_from: `${year}-${String(month).padStart(2, "0")}-01`,
     date_to: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
@@ -47,7 +54,7 @@ export function selectedPeriodValue(dateFrom: string, dateTo: string) {
     && selectedMonthRange(monthKey)?.date_to === dateTo
   const yearMatched = dateFrom && dateTo
     && dateFrom === `${dateFrom.slice(0, 4)}-01-01`
-    && dateTo === `${dateFrom.slice(0, 4)}-12-31`
+    && dateTo === yearRange(Number(dateFrom.slice(0, 4))).date_to
   return yearMatched ? `year-${dateFrom.slice(0, 4)}` : monthMatched ? `month-${monthKey}` : ""
 }
 

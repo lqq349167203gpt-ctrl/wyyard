@@ -3164,6 +3164,133 @@ export const visitVerificationApi = {
     }),
 }
 
+// 信息核对：课表 / 邀约里漏填的信息，按天汇总
+export interface AuditCheckItem {
+  key: string
+  label: string
+  scope: "course" | "visit"
+  default: boolean
+}
+
+export interface AuditCheckCourseRow {
+  id: string
+  activity_type: string
+  activity_type_label: string
+  time: string
+  end_time: string
+  title: string
+  type_label: string
+  teacher_ids: string[]
+  teacher_names: string[]
+  owner_id: string
+  owner_name: string
+  body_parts: number
+  activity_mode: string
+  intro: string
+  published: boolean
+  public_welfare: boolean
+  deduction_count: number
+  participant_ids: string[]
+  participant_names: string[]
+  space_id: string
+  creator: string
+  created_by_id: string
+  kinds: string[]
+}
+
+export interface AuditCheckVisitRow {
+  id: string
+  customer_id: string
+  time: string
+  nickname: string
+  member_type: string
+  is_leader: boolean
+  has_leader: boolean
+  leader_name: string
+  arrived: boolean
+  arrival_time: string
+  has_needs: boolean
+  needs: string
+  needs_hidden: boolean
+  has_customer_info: boolean
+  customer_info: string
+  has_follow_up: boolean
+  follow_up: string
+  inviter: string
+  receptionist: string
+  goal: string
+  creator: string
+  created_by_id: string
+  cancelled: boolean
+  kinds: string[]
+}
+
+export interface AuditCheckDayCourse {
+  locked: boolean
+  locked_by: string
+  locked_at: string
+  total: number
+  rows: AuditCheckCourseRow[]
+  missing_count: number
+  day_kinds: string[]
+}
+
+export interface AuditCheckDayVisit {
+  verified: boolean
+  verified_by: string
+  verified_at: string
+  total: number
+  rows: AuditCheckVisitRow[]
+  missing_count: number
+  day_kinds: string[]
+}
+
+export interface AuditCheckDay {
+  date: string
+  missing_count: number
+  unchecked: boolean
+  course?: AuditCheckDayCourse
+  visit?: AuditCheckDayVisit
+}
+
+export interface AuditCheckResult {
+  start_date: string
+  end_date: string
+  /** 核对（锁定）的起算日期：更早的历史数据不参与核对 */
+  lock_start_date: string
+  space_id: string
+  scopes: string[]
+  kinds: string[]
+  days: AuditCheckDay[]
+  summary: {
+    missing_count: number
+    missing_day_count: number
+    unchecked_day_count: number
+    day_count: number
+  }
+}
+
+export const auditCheckApi = {
+  catalog: (scope: string = "") =>
+    request<{ items: AuditCheckItem[]; defaults: string[] }>(
+      `/api/audit-check/catalog${scope ? `?scope=${scope}` : ""}`,
+    ),
+  list: (params: {
+    start_date: string
+    end_date: string
+    space_id?: string
+    scope?: string
+    kinds?: string[]
+  }) => {
+    const query = new URLSearchParams({ start_date: params.start_date, end_date: params.end_date })
+    if (params.space_id) query.set("space_id", params.space_id)
+    if (params.scope) query.set("scope", params.scope)
+    // 始终带上：空数组表示「一项都不检查」，只核对锁定状态
+    query.set("kinds", (params.kinds ?? []).join(","))
+    return request<AuditCheckResult>(`/api/audit-check?${query.toString()}`)
+  },
+}
+
 export const activityOrderApi = {
   get: (date: string, spaceId?: string) => {
     const params = new URLSearchParams({ date })

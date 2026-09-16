@@ -32,6 +32,7 @@ const PAGE_LABELS: Record<string, string> = {
   "member-statistics": "会员情况",
   "course-statistics": "课程记录",
   "customer-follow-ups": "客户跟进",
+  "audit-check": "信息核对",
   "principal": "组织/俱乐部",
   "product-sales": "产品销售",
   "statistics": "服务数据",

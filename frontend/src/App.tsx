@@ -36,6 +36,7 @@ import DisabledCustomersPage from "@/pages/disabled-customers"
 import ChatHistoryPage from "@/pages/chat-history"
 import ServiceTeachersPage from "@/pages/service-teachers"
 import DailyReportPage from "@/pages/daily-report"
+import AuditCheckPage from "@/pages/audit-check"
 import CourseStatisticsPage from "@/pages/course-statistics"
 import PrincipalPage from "@/pages/principal"
 import CommunicationRecordsPage from "@/pages/communication-records"
@@ -84,6 +85,7 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/chat-history": "chat-history",
   "/service-teachers": "service-teacher",
   "/course-statistics": "course-statistics",
+  "/audit-check": "audit-check",
   "/principal": "principal",
   "/communication-records": "communication-records",
   "/followup-records": "followup-records",
@@ -204,6 +206,9 @@ function App() {
               <Route path="/chat-history" element={<ChatHistoryPage />} />
               <Route path="/service-teachers" element={<ServiceTeachersPage />} />
               <Route path="/course-statistics" element={<CourseStatisticsPage />} />
+              <Route path="/audit-check" element={<AuditCheckPage />} />
+              <Route path="/audit-check/course" element={<Navigate to="/audit-check" replace />} />
+              <Route path="/audit-check/visit" element={<Navigate to="/audit-check" replace />} />
               <Route path="/principal" element={<PrincipalPage />} />
               <Route path="/communication-records" element={<CommunicationRecordsPage />} />
               <Route path="/followup-records" element={<FollowupRecordsPage />} />

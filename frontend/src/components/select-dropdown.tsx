@@ -349,11 +349,12 @@ export function SelectDropdown({
                   )}
                   {opt.rightLabel ? (
                     <>
-                      <span className={`truncate ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
+                      {/* flex-1 + text-left：多选带勾选框时名字也要贴在左边，不能被 justify-between 挤到中间 */}
+                      <span className={`min-w-0 flex-1 truncate text-left ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
                       <span className="text-[#8f959e] ml-2 shrink-0">{opt.rightLabel}</span>
                     </>
                   ) : (
-                    <span className={`flex-1 truncate ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
+                    <span className={`min-w-0 flex-1 truncate text-left ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
                   )}
                   {hasChildren && <ChevronRight className="h-3 w-3 text-[#8f959e] ml-1 shrink-0" />}
                 </div>

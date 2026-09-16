@@ -44,6 +44,21 @@ def get_request_actor(request: Request) -> tuple[str, str]:
     return actor_id, actor_name
 
 
+def has_audit_check_permission(request: Request) -> bool:
+    """核对人豁免：持有「信息核对」页面权限的账号负责逐条核对，可以修正他人录入的课表/邀约。
+
+    页面权限由服务端按账号角色查得，客户端无法伪造；只影响课表、参与人、邀约三类归属校验。
+    """
+    if request is None:
+        return False
+    roles = get_request_roles(request)
+    if "超级管理员" in roles:
+        return True
+    from app.services import position_permission_service
+
+    return "audit-check" in position_permission_service.get_permissions(roles)
+
+
 def _normalized_name(value: object) -> str:
     return str(value or "").strip().casefold()
 
@@ -146,6 +161,10 @@ def ensure_record_creator(
     if record is None:
         raise HTTPException(status_code=404, detail="记录不存在")
 
+    # 核对人（有信息核对页面权限）可以修正任意人的课表/邀约记录
+    if has_audit_check_permission(request):
+        return
+
     roles = get_request_roles(request)
     if position_edit_permission_service.has_all_edit(roles, edit_area):
         return
@@ -175,6 +194,9 @@ def ensure_creator_for_changed_fields(
     if record is None:
         raise HTTPException(status_code=404, detail="记录不存在")
 
+    if has_audit_check_permission(request):
+        return
+
     changed_protected_fields = {
         field
         for field in protected_fields.intersection(data)
@@ -188,6 +210,8 @@ def ensure_creator_for_changed_fields(
 
 def ensure_activity_participant_access(request: Request, record=None) -> None:
     """校验课表老人/新人参与名单的配置范围。新建课表时“仅本人”视为本人记录。"""
+    if has_audit_check_permission(request):
+        return
     roles = get_request_roles(request)
     scope = position_edit_permission_service.get_permissions(roles)["activity_participants"]
     if "超级管理员" in roles or scope == "all":
@@ -200,6 +224,8 @@ def ensure_activity_participant_access(request: Request, record=None) -> None:
 
 def ensure_activity_update_access(request: Request, record, data: dict) -> None:
     """课表仅浏览时，只放行授课老师的课程内容或独立获权的参与人字段。"""
+    if has_audit_check_permission(request):
+        return
     roles = get_request_roles(request)
     if "超级管理员" in roles:
         return

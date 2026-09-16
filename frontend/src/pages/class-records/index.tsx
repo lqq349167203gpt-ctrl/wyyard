@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, useRef, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
-import { ChevronRight, ChevronLeft, Lock, Unlock } from "lucide-react"
+import { Check, ChevronRight, ChevronLeft, Unlock } from "lucide-react"
 import VisitsDetailView from "@/components/visits/detail-view"
 
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -261,8 +261,8 @@ export default function ClassRecordsPage() {
             disabled={!selectedSpaceId || verificationSubmitting}
             className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] text-[#4e535a] transition-colors hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isDayVerified ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-            {isDayVerified ? "解锁" : "核对并锁定"}
+            {isDayVerified ? <Unlock className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+            {isDayVerified ? "解锁" : "确认核对"}
           </button>
         )}
         <div className="flex-1" />
@@ -355,7 +355,7 @@ export default function ClassRecordsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>{isDayVerified ? "解锁当天邀约" : "确认当天邀约无误"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {isDayVerified ? "解锁后可继续修改当天全部邀约资料。" : "核对后，除来访需求、客户信息和跟进点外，其余资料及操作都会锁定。"}
+              {isDayVerified ? "解锁后可继续修改当天全部邀约资料。" : "锁定后当天该空间的邀约资料将不能修改（来访需求、客户信息、跟进点除外）"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

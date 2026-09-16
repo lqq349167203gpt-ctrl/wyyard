@@ -136,6 +136,7 @@ PAGE_LABELS: dict[str, str] = {
     "class-records-activities": "邀约",
     "class-records-arrival": "邀约",
     "daily-activities": "课表",
+    "audit-check": "信息核对",
     "offline-course-records": "落地课程",
     "communication-records": "沟通记录",
     "followup-records": "回访记录",

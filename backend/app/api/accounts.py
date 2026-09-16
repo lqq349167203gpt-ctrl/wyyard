@@ -91,6 +91,7 @@ ALL_PAGE_KEYS = [
     # 业务
     "healing-records", "class-records-visitors", "class-records-activities",
     "class-records-arrival", "class-records", "daily-activities",
+    "audit-check",
     "communication-records", "followup-records", "offline-course-records",
     # 付费
     "payment-deductions", "payment-refunds", "debt-records",

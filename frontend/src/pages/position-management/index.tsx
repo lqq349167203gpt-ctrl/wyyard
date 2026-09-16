@@ -37,6 +37,7 @@ const ALL_PAGES = [
   { key: "healing-records", label: "客户资料" },
   { key: "class-records", label: "邀约" },
   { key: "daily-activities", label: "课表" },
+  { key: "audit-check", label: "信息核对" },
   { key: "offline-course-records", label: "落地课程" },
   // 沟通
   { key: "communication-records", label: "沟通记录" },
@@ -72,7 +73,7 @@ const ALL_PAGES = [
 const PERMISSION_GROUPS = [
   { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "customer-follow-ups", "principal"] },
   { label: "报表", keys: ["daily-report"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "audit-check", "offline-course-records"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "debt-records"] },
   { label: "信息配置", keys: ["member-identities", "customer-tags", "upsell-config", "healing-identities", "organizations", "spaces"] },

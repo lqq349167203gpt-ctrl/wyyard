@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock, UserMinus, Lock, Unlock } from "lucide-react"
+import { Plus, Trash2, Edit, ChevronRight, ChevronLeft, FileUp, Download, File, ChevronDown, Loader2, BookOpen, X, Sparkles, Heart, Zap, GraduationCap, Layers, Undo2, Redo2, Clock, UserMinus, Check, Unlock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -2734,8 +2734,8 @@ export default function DailyActivitiesPage() {
               className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] text-[#4e535a] transition-colors hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:opacity-40"
               title={!selectedSpaceId ? "请先选择空间" : savingCount > 0 ? "请等待当前内容保存完成" : undefined}
             >
-              {isDayLocked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-              {isDayLocked ? "解锁" : "核对并锁定"}
+              {isDayLocked ? <Unlock className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+              {isDayLocked ? "解锁" : "确认核对"}
             </button>
           )}
           <div className="flex-1" />
@@ -2945,7 +2945,7 @@ export default function DailyActivitiesPage() {
             <AlertDialogDescription className="text-[13px] leading-6 text-[#646a73]">
               {isDayLocked
                 ? "解锁后，拥有相应操作权限的员工可以继续修改课程内容、参与人、发布状态和退课记录。"
-                : `${formatDateChinese(detailDate)}的课程安排、参与人、发布状态和退课记录将被锁定；周主题和每日主题仍可继续修改。`}
+                : "锁定后当天该空间的活动将不能修改（课程复盘除外）"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

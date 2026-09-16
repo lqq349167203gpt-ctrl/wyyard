@@ -39,6 +39,37 @@ def _create_other_account_headers(client):
     return account, position, {"Authorization": f"Bearer {login.json()['token']}"}
 
 
+def test_audit_check_role_can_fix_records_created_by_others(client):
+    """持有「信息核对」页面权限的账号可以修正他人录入的课表记录（核对页的修正能力）。"""
+    created = client.post("/api/class-records", json={
+        "date": "2026-09-14",
+        "course_id": "course-audit-fix",
+        "course_name": "核对修正测试课",
+        "start_time": "09:00",
+    })
+    assert created.status_code == 200
+    record_id = created.json()["id"]
+
+    _, position, headers = _create_other_account_headers(client)
+
+    # 没有信息核对权限时：改别人的记录被拦
+    blocked = client.patch(f"/api/class-records/{record_id}", json={"start_time": "10:00"}, headers=headers)
+    assert blocked.status_code == 403
+
+    # 加上「信息核对」页面权限后即可修改
+    updated = client.put("/api/position-permissions/full", json={
+        "position": position["name"],
+        "pages": ["class-records", "daily-activities", "audit-check"],
+        "edit_permissions": {"visits": "own", "activities": "own"},
+    })
+    assert updated.status_code == 200
+    allowed = client.patch(f"/api/class-records/{record_id}", json={"start_time": "10:00"}, headers=headers)
+    assert allowed.status_code == 200
+    assert allowed.json()["start_time"] == "10:00"
+
+    assert client.delete(f"/api/class-records/{record_id}").status_code == 200
+
+
 def test_visit_receptionist_and_goal_are_shared_for_non_view_accounts(client, created_customer):
     visit_response = client.post("/api/visits", json={
         "visit_date": "2026-09-04",

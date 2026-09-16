@@ -75,7 +75,9 @@ def update_session(session_id: str, data: dict, request: Request, conversion: bo
     old_session = internal_course_session_service.get_session(session_id)
     if not old_session:
         raise HTTPException(status_code=404, detail="记录不存在")
-    activity_lock_service.ensure_update_unlocked(old_session, data)
+    activity_lock_service.ensure_update_unlocked(
+        old_session, data, exempt_fields=activity_lock_service.REVIEW_EXEMPT_FIELDS
+    )
     ensure_activity_update_access(request, old_session, data)
     if "participant_ids" in data:
         if list(data.get("participant_ids") or []) != list(old_session.participant_ids):

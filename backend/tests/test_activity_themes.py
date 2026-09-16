@@ -70,6 +70,47 @@ def test_schedule_lock_is_scoped_and_preserves_theme(monkeypatch):
     assert unlocked.day_theme == "当天主题"
 
 
+class _RecordStub:
+    """最小记录替身：核对锁的豁免判断只看 model_dump 快照。"""
+
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+
+    def model_dump(self, mode: str = "json"):
+        return {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
+
+
+def test_lock_allows_review_only_updates(monkeypatch):
+    from app.services import activity_theme_service
+
+    monkeypatch.setattr(activity_theme_service, "is_locked", lambda date, space_id="": True)
+    record = _RecordStub(
+        date="2099-07-24",
+        space_id="space-a",
+        course_review="",
+        start_time="14:00",
+        activity_name="读书会",
+    )
+
+    # 只补课程复盘（其余字段原样回传）：放行
+    activity_lock_service.ensure_update_unlocked(
+        record,
+        {"course_review": "课后复盘：效果不错", "start_time": "14:00", "activity_name": "读书会"},
+        exempt_fields=activity_lock_service.REVIEW_EXEMPT_FIELDS,
+    )
+    # 借补复盘夹带其它修改：拦住
+    with pytest.raises(HTTPException) as error:
+        activity_lock_service.ensure_update_unlocked(
+            record,
+            {"course_review": "课后复盘", "activity_name": "偷改活动名"},
+            exempt_fields=activity_lock_service.REVIEW_EXEMPT_FIELDS,
+        )
+    assert error.value.status_code == 423
+    # 不传 exempt_fields 时维持原来的行为
+    with pytest.raises(HTTPException):
+        activity_lock_service.ensure_update_unlocked(record, {"course_review": "课后复盘"})
+
+
 def test_schedule_lock_blocks_business_writes_but_allows_theme_updates(client):
     date = "2099-07-23"
     space_id = "space-lock-api"
@@ -94,6 +135,16 @@ def test_schedule_lock_blocks_business_writes_but_allows_theme_updates(client):
 
     update = client.patch(f"/api/class-records/{record_id}", json={"activity_name": "不应保存"})
     assert update.status_code == 423
+    # 课程复盘不受核对锁限制：课后补复盘要能保存
+    review = client.patch(f"/api/class-records/{record_id}", json={"course_review": "课后复盘：效果不错"})
+    assert review.status_code == 200
+    assert review.json()["course_review"] == "课后复盘：效果不错"
+    # 借补复盘夹带其它修改仍然会被锁拦住
+    smuggled = client.patch(
+        f"/api/class-records/{record_id}",
+        json={"course_review": "复盘", "activity_name": "偷改活动名"},
+    )
+    assert smuggled.status_code == 423
     reorder = client.post("/api/activity-orders", json={"date": date, "space_id": space_id, "order": []})
     assert reorder.status_code == 423
     theme = client.post("/api/activity-themes", json={"date": date, "space_id": space_id, "day_theme": "核对后仍可修改主题"})
