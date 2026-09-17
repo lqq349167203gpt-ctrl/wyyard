@@ -79,14 +79,14 @@ Page({
       const statusText = isCourse ? "" : (row.cancelled ? "已取消" : (row.arrived ? "已到店" : "未到店"))
       const statusClass = isCourse ? "" : (row.cancelled ? "cancel" : (row.arrived ? "ok" : "wait"))
       const fields = isCourse ? [
-        { label: "老师", value: (row.teacher_names || []).join("、"), missing: has("course_teacher") },
-        { label: "案主", value: row.owner_name, missing: has("course_owner") },
-        { label: "部位", value: row.body_parts ? `${row.body_parts}` : "" },
+        { label: "老师", kind: "course_teacher", value: (row.teacher_names || []).join("、") },
+        { label: "案主", kind: "course_owner", value: row.owner_name },
+        { label: "部位", kind: "course_body_parts", value: row.body_parts ? `${row.body_parts}` : "" },
         { label: "简介", value: row.intro },
       ] : [
         { label: "到场时间", value: row.arrived && !row.cancelled ? (row.arrival_time || "已到店") : "" },
-        { label: "邀约人", value: row.inviter },
-        { label: "接待人", value: row.receptionist },
+        { label: "邀约人", kind: "visit_inviter", value: row.inviter },
+        { label: "接待人", kind: "visit_receptionist", value: row.receptionist },
         { label: "目标", value: row.goal },
         { label: "所属组长", value: row.has_leader ? (row.leader_name || "") : "" },
         { label: "创建人", value: row.creator },
@@ -100,8 +100,11 @@ Page({
         statusClass,
         missingTags,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
-        // 缺的字段也照样显示（标签 + 未填），不隐藏
-        fields: isCourse ? fields.map(item => item.value ? item : { ...item, value: "未填", missing: true }) : fields.filter(item => item.value),
+        // 只有 PC 判定为「缺」的项才显示成未填（比如能量结才检查部位、沙龙没有案主就不提示）；
+        // 简介等没有检查项的字段，空着就整行不显示
+        fields: fields
+          .filter(item => item.value || (item.kind && has(item.kind)))
+          .map(item => item.value ? item : { ...item, value: "未填", missing: true }),
 
         // 参与人全部显示，不做缩略
         peopleText: isCourse && (row.participant_names || []).length
