@@ -59,6 +59,12 @@ Page({
     if (!block) return null
     const rows = (block.rows || []).map(row => {
       const has = key => (row.kinds || []).indexOf(key) >= 0
+      const MISSING_LABELS = {
+        course_time: "缺时间", course_type: "缺类型", course_name: "缺名称", course_teacher: "缺老师",
+        course_owner: "缺案主", course_body_parts: "缺部位", course_intro: "缺简介", course_no_participant: "无参与人",
+        visit_time: "缺时间", visit_nickname: "缺昵称", visit_inviter: "缺邀约人", visit_receptionist: "缺接待人",
+      }
+      const missingTags = (row.kinds || []).map(key => MISSING_LABELS[key] || key)
       // 时间 / 类型 / 方式（线上线下）一看就懂，放在同一行、不用标题
       const headline = isCourse
         ? [
@@ -92,9 +98,11 @@ Page({
         headline,
         statusText,
         statusClass,
+        missingTags,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
-        fields: fields.filter(item => item.value),
-        missingCount: (row.kinds || []).length,
+        // 缺的字段也照样显示（标签 + 未填），不隐藏
+        fields: isCourse ? fields.map(item => item.value ? item : { ...item, value: "未填", missing: true }) : fields.filter(item => item.value),
+
         // 参与人全部显示，不做缩略
         peopleText: isCourse && (row.participant_names || []).length
           ? `${row.participant_names.join("、")}（${row.participant_names.length} 人）`

@@ -62,7 +62,7 @@
 .rec:last-child { border-bottom: none; }
 .rec-head { display: flex; align-items: center; gap: 10rpx; }
 .rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 25rpx; font-weight: 500; color: #1f2329; }
-.rec-badge { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; background: #fff1ec; font-size: 20rpx; color: #d4380d; }
+.rec-miss { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; background: #fff1ec; font-size: 20rpx; color: #d4380d; }
 .rec-edit { flex-shrink: 0; padding: 4rpx 12rpx; border: 1rpx solid #e8eaed; border-radius: 6rpx; font-size: 21rpx; color: #4e535a; }
 .rec-headline { display: block; margin-top: 6rpx; font-size: 23rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
 .rec-fields { margin-top: 10rpx; }
