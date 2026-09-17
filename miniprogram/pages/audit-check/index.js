@@ -19,11 +19,6 @@ Page({
   data: {
     mode: 'course',
     dateFrom: '', dateTo: '',
-    timePresets: [
-      { value: 'today', label: '当天' }, { value: 'week', label: '本周' },
-      { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
-      { value: 'all', label: '全部' },
-    ],
     timePreset: 'all', timePresetIndex: 4,
     // 核对起算日：接口会返回（默认 2026-07-01），本年/全部都从这个日期算到今天
     lockStart: '2026-07-01',
