@@ -88,8 +88,8 @@ Page({
         { label: "到场时间", value: row.arrived && !row.cancelled ? (row.arrival_time || "已到店") : "" },
         { label: "邀约人", kind: "visit_inviter", value: row.inviter },
         { label: "接待人", kind: "visit_receptionist", value: row.receptionist },
-        { label: "目标", value: row.goal },
-        { label: "所属组长", value: row.has_leader ? (row.leader_name || "") : "" },
+        { label: "目标", kind: "visit_goal", value: row.goal },
+        { label: "所属组长", kind: "visit_leader", value: row.has_leader ? (row.leader_name || "") : "" },
         { label: "创建人", value: row.creator },
       ]
       return {
@@ -99,6 +99,7 @@ Page({
         headline,
         statusText,
         statusClass,
+        titleMissing: !isCourse && has("visit_nickname") ? "缺昵称" : "",
         missingTags,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
         // 只有 PC 判定为「缺」的项才显示成未填（比如能量结才检查部位、沙龙没有案主就不提示）；

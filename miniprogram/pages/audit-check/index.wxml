@@ -46,6 +46,7 @@
       <view class="rec-head">
         <text class="rec-status {{row.statusClass}}" wx:if="{{row.statusText}}">{{row.statusText}}</text>
         <text class="rec-title">{{row.title}}</text>
+        <text class="rec-tag" wx:if="{{row.titleMissing}}">{{row.titleMissing}}</text>
         <text class="rec-statustag" wx:if="{{row.statusTag}}">{{row.statusTag}}</text>
         <text class="rec-edit" data-id="{{row.id}}" data-date="{{day.date}}" bindtap="goEdit">编辑</text>
       </view>
