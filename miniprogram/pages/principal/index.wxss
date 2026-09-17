@@ -55,9 +55,9 @@
 .filter-control { flex: 1; min-width: 0; }
 .date-control { min-width: 180rpx; }
 .preset-row { display: flex; flex-wrap: wrap; gap: 10rpx; flex: 1; }
-/* 日期快捷项：未选中的不带底色/边框，只保留选中态的蓝底白字 */
-.preset { padding: 6rpx 14rpx; border-radius: 8rpx; background: transparent; font-size: 22rpx; color: #646a73; }
-.preset.active { background: #3370ff; color: #ffffff; font-weight: 500; }
+/* 日期快捷项：与「信息核对」「自定义筛选」同一套选中样式 */
+.preset { padding: 6rpx 14rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fff; font-size: 22rpx; color: #646a73; }
+.preset.active { border-color: #d5d9de; background: #f5f6f7; color: #1f2329; font-weight: 500; }
 .filter-foot { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding-top: 12rpx; border-top: 1rpx solid #f2f3f5; }
 
 /* 顶部 tab：白条，两个页签居中均分，选中是蓝字 + 居中短下划线 */
