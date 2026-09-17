@@ -12,10 +12,9 @@
 .filter-control { flex: 1; min-width: 0; }
 .filter-value { height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e8eaed; border-radius: 8rpx; font-size: 23rpx; color: #2b2f36; }
 .filter-sep { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
-/* 状态筛选：小胶囊（描边 + 浅蓝底），刻意和上面的「课表/邀约」页签不一样，避免看成同一级 */
-.seg { display: flex; gap: 10rpx; flex: 1; }
-.seg-item { height: 52rpx; line-height: 50rpx; padding: 0 24rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fff; font-size: 22rpx; color: #4e535a; }
-.seg-item.active { border-color: #3370ff; background: #f0f5ff; color: #3370ff; font-weight: 500; }
+.seg { display: flex; gap: 4rpx; padding: 4rpx; border-radius: 10rpx; background: #f2f3f5; flex: 1; }
+.seg-item { flex: 1; height: 56rpx; line-height: 56rpx; text-align: center; font-size: 23rpx; color: #4e535a; border-radius: 8rpx; }
+.seg-item.active { background: #fff; color: #1f2329; font-weight: 500; box-shadow: 0 1rpx 3rpx rgba(31,35,41,.10); }
 
 .summary { padding: 4rpx 8rpx 12rpx; font-size: 22rpx; color: #8f959e; }
 .error { padding: 12rpx 8rpx; color: #c4506a; font-size: 24rpx; }
