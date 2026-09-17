@@ -22,10 +22,11 @@ Page({
     timePreset: 'all', timePresetIndex: 4,
     // 核对起算日：接口会返回（默认 2026-07-01），本年/全部都从这个日期算到今天
     lockStart: '2026-07-01',
-    timeOptions: [
+    // 点选式时间快捷项（自定义由下面的日期框决定，不占一格）
+    timePresets: [
       { value: 'today', label: '当天' }, { value: 'week', label: '本周' },
       { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
-      { value: 'all', label: '全部' }, { value: 'custom', label: '自定义' },
+      { value: 'all', label: '全部' },
     ],
     spaces: [{ id: '', name: '全部空间' }], spaceIndex: 0,
     filters: [{ value: 'unchecked', label: '未核对' }, { value: 'checked', label: '已核对' }],
@@ -176,10 +177,8 @@ Page({
     this.load()
   },
   /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
-  onTimePreset(event) {
-    const options = this.data.timeOptions
-    const index = Number(event.detail.value)
-    const key = (options[index] || {}).value || 'all'
+  onTimePresetTap(event) {
+    const key = event.currentTarget.dataset.key || 'all'
     const pad = v => String(v).padStart(2, '0')
     const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     const now = new Date()
@@ -190,9 +189,7 @@ Page({
     else if (key === 'month') { from = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); to = fmt(now) }
     // 本年 / 全部：按核对起算日算（7月1日到今天），避免把不能核对的历史也算进来
     else if (key === 'year' || key === 'all') { from = this.data.lockStart; to = fmt(now) }
-    // 「自定义」只切状态，日期由下面的日期框决定
-    if (key === 'custom') { this.setData({ timePreset: 'custom', timePresetIndex: index }); return }
-    this.setData({ timePreset: key, timePresetIndex: index, dateFrom: from, dateTo: to })
+    this.setData({ timePreset: key, dateFrom: from, dateTo: to })
     this.load()
   },
   onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load() },

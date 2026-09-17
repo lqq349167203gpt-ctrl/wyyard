@@ -7,9 +7,9 @@
   <view class="filter-card">
     <view class="filter-row">
       <text class="filter-label">时间</text>
-      <picker class="filter-control" range="{{timeOptions}}" range-key="label" value="{{timePresetIndex}}" bindchange="onTimePreset">
-        <view class="filter-value">{{timeOptions[timePresetIndex].label}}</view>
-      </picker>
+      <view class="presets">
+        <view class="preset {{timePreset === item.value ? 'active' : ''}}" wx:for="{{timePresets}}" wx:key="value" data-key="{{item.value}}" bindtap="onTimePresetTap">{{item.label}}</view>
+      </view>
     </view>
     <view class="filter-row">
       <text class="filter-label">自定义</text>
