@@ -1,0 +1,53 @@
+.page { min-height: 100vh; background: #f7f8fa; padding: 24rpx; box-sizing: border-box; color: #1f2329; font-size: 26rpx; overflow-x: hidden; }
+
+/* 模式切换（课表 / 邀约）：和课程记录的页签同一套 */
+.mode-tabs { display: flex; background: #fff; border-radius: 12rpx; padding: 6rpx; margin-bottom: 12rpx; }
+.mode-tab { flex: 1; height: 64rpx; line-height: 64rpx; text-align: center; font-size: 26rpx; color: #4e535a; border-radius: 8rpx; }
+.mode-tab.active { background: #fff; color: #1f2329; font-weight: 500; box-shadow: 0 1rpx 3rpx rgba(31,35,41,.10); background-color: #f2f3f5; }
+
+/* 筛选 */
+.filter-card { background: #fff; border-radius: 12rpx; padding: 6rpx 24rpx 12rpx; margin-bottom: 12rpx; box-sizing: border-box; }
+.filter-row { display: flex; align-items: center; gap: 12rpx; padding: 12rpx 0; }
+.filter-label { flex-shrink: 0; width: 88rpx; font-size: 24rpx; color: #8f959e; }
+.filter-control { flex: 1; min-width: 0; }
+.filter-value { height: 60rpx; line-height: 58rpx; padding: 0 16rpx; box-sizing: border-box; border: 1rpx solid #e8eaed; border-radius: 8rpx; font-size: 23rpx; color: #2b2f36; }
+.filter-sep { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
+.seg { display: flex; gap: 4rpx; padding: 4rpx; border-radius: 10rpx; background: #f2f3f5; flex: 1; }
+.seg-item { flex: 1; height: 56rpx; line-height: 56rpx; text-align: center; font-size: 23rpx; color: #4e535a; border-radius: 8rpx; }
+.seg-item.active { background: #fff; color: #1f2329; font-weight: 500; box-shadow: 0 1rpx 3rpx rgba(31,35,41,.10); }
+
+.summary { padding: 4rpx 8rpx 12rpx; font-size: 22rpx; color: #8f959e; }
+.error { padding: 12rpx 8rpx; color: #c4506a; font-size: 24rpx; }
+
+/* 按天分组 */
+.day-card { margin-bottom: 16rpx; border: 1rpx solid #eceef0; border-radius: 12rpx; overflow: hidden; background: #fff; }
+.day-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 14rpx 18rpx; background: #fafbfc; border-bottom: 1rpx solid #f2f3f5; }
+.day-date { font-size: 24rpx; font-weight: 500; color: #2b2f36; }
+.day-state { font-size: 21rpx; color: #c98a2e; }
+.day-state.done { color: #4b9e75; }
+.row { display: flex; align-items: center; gap: 12rpx; padding: 18rpx; border-bottom: 1rpx solid #f5f6f7; }
+.row:last-child { border-bottom: none; }
+.row-main { flex: 1; min-width: 0; }
+.row-line1 { display: flex; align-items: center; gap: 10rpx; }
+.row-title { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 26rpx; font-weight: 500; color: #1f2329; }
+.row-badge { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; background: #fff4e8; font-size: 20rpx; color: #c98a2e; }
+.row-sub { display: block; margin-top: 6rpx; font-size: 22rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
+.row-arrow { flex-shrink: 0; color: #c9cdd4; font-size: 28rpx; }
+
+.loading, .empty { padding: 80rpx 24rpx; text-align: center; color: #8f959e; font-size: 24rpx; }
+
+/* 详情弹层 */
+.mask { position: fixed; inset: 0; z-index: 200; background: rgba(31,35,41,.34); }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 201; display: flex; flex-direction: column; height: 78vh; border-radius: 16rpx 16rpx 0 0; background: #fff; padding-bottom: env(safe-area-inset-bottom); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 24rpx 28rpx; border-bottom: 1rpx solid #f0f0f0; }
+.sheet-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 28rpx; font-weight: 500; }
+.sheet-close { flex-shrink: 0; font-size: 25rpx; color: #3370ff; }
+.sheet-body { flex: 1 1 0; min-height: 0; max-height: 64vh; padding: 20rpx 28rpx; box-sizing: border-box; }
+.sheet-sub { display: block; margin-bottom: 12rpx; font-size: 22rpx; color: #8f959e; }
+.field { display: flex; align-items: flex-start; gap: 12rpx; padding: 12rpx 0; border-bottom: 1rpx solid #f5f6f7; }
+.field-label { flex-shrink: 0; width: 150rpx; font-size: 23rpx; color: #9aa1a9; }
+.field-value { flex: 1; min-width: 0; font-size: 25rpx; line-height: 1.6; color: #2b2f36; word-break: break-all; }
+.sheet-actions { display: flex; gap: 20rpx; padding: 20rpx 28rpx 26rpx; border-top: 1rpx solid #f0f0f0; }
+.sheet-button { display: flex; align-items: center; justify-content: center; flex: 1 1 0; width: 0; height: 72rpx; border-radius: 8rpx; border: 1rpx solid #dfe2e6; font-size: 25rpx; font-weight: 500; color: #646a73; background: #fff; }
+.sheet-button.primary { border-color: #3370ff; background: #3370ff; color: #fff; }
+.sheet-button.disabled { opacity: .6; }

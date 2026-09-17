@@ -42,6 +42,7 @@ Page({
       canServiceTeacher: app.checkPagePermission('service-teacher'),
       canCourseRecords: app.checkPagePermission('course-statistics'),
       canCustomerFollowUps: app.checkPagePermission('customer-follow-ups'),
+      canAuditCheck: app.checkPagePermission('audit-check'),
       canPrincipal: app.checkPagePermission('principal'),
       canOrganizations: app.checkPagePermission('organizations'),
     })
@@ -72,6 +73,9 @@ Page({
   },
   onCourseRecordsTap() {
     wx.navigateTo({ url: '/pages/course-records/index' })
+  },
+  onAuditCheckTap() {
+    wx.navigateTo({ url: '/pages/audit-check/index' })
   },
   onCustomerFollowUpsTap() {
     wx.navigateTo({ url: '/pages/customer-follow-ups/index' })

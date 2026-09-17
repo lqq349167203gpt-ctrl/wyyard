@@ -1,0 +1,74 @@
+<page-meta page-style="{{detail ? 'overflow:hidden;height:100vh;' : ''}}" />
+<view class="page">
+  <view class="mode-tabs">
+    <view class="mode-tab {{mode === 'course' ? 'active' : ''}}" data-mode="course" bindtap="onMode">课表</view>
+    <view class="mode-tab {{mode === 'visit' ? 'active' : ''}}" data-mode="visit" bindtap="onMode">邀约</view>
+  </view>
+
+  <view class="filter-card">
+    <view class="filter-row">
+      <text class="filter-label">时间</text>
+      <picker class="filter-control" mode="date" value="{{dateFrom}}" end="{{dateTo}}" bindchange="onDateFrom">
+        <view class="filter-value">{{dateFrom}}</view>
+      </picker>
+      <text class="filter-sep">~</text>
+      <picker class="filter-control" mode="date" value="{{dateTo}}" start="{{dateFrom}}" bindchange="onDateTo">
+        <view class="filter-value">{{dateTo}}</view>
+      </picker>
+    </view>
+    <view class="filter-row" wx:if="{{mode === 'course'}}">
+      <text class="filter-label">空间</text>
+      <picker class="filter-control" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpace">
+        <view class="filter-value">{{spaces[spaceIndex].name}}</view>
+      </picker>
+    </view>
+    <view class="filter-row">
+      <text class="filter-label">状态</text>
+      <view class="seg">
+        <view class="seg-item {{filterIndex === index ? 'active' : ''}}" wx:for="{{filters}}" wx:key="value" data-index="{{index}}" bindtap="onFilter">{{item.label}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="summary" wx:if="{{summary}}">共 {{summary.day_count}} 天 · 待核对 {{summary.missing_count}} 条</view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+
+  <view class="day-card" wx:for="{{days}}" wx:key="date" wx:for-item="day" wx:for-index="di">
+    <view class="day-head">
+      <text class="day-date">{{day.dateText}}</text>
+      <text class="day-state {{day.checked ? 'done' : ''}}">{{day.checked ? '已核对' : '未核对'}}{{day.checked && day.operator ? ' · ' + day.operator : ''}}</text>
+    </view>
+    <view class="row" wx:for="{{day.rows}}" wx:key="id" wx:for-item="row" wx:for-index="ri" data-day="{{di}}" data-row="{{ri}}" bindtap="openDetail">
+      <view class="row-main">
+        <view class="row-line1">
+          <text class="row-title">{{row.title}}</text>
+          <text class="row-badge" wx:if="{{row.badge}}">{{row.badge}}</text>
+        </view>
+        <text class="row-sub">{{row.timeText}}{{row.subText ? ' · ' + row.subText : ''}}</text>
+      </view>
+      <text class="row-arrow">›</text>
+    </view>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">加载中…</view>
+  <view class="empty" wx:if="{{!loading && !days.length && !error}}">所选条件下没有要核对的记录</view>
+
+  <view class="mask" wx:if="{{detail}}" bindtap="closeDetail"></view>
+  <view class="sheet" wx:if="{{detail}}">
+    <view class="sheet-head">
+      <text class="sheet-title">{{detail.title}}</text>
+      <text class="sheet-close" bindtap="closeDetail">关闭</text>
+    </view>
+    <scroll-view class="sheet-body" scroll-y>
+      <text class="sheet-sub">{{detail.dateText}} · {{detail.checked ? '已核对' : '未核对'}}{{detail.checked && detail.operator ? ' · ' + detail.operator : ''}}</text>
+      <view class="field" wx:for="{{detail.fields}}" wx:key="label">
+        <text class="field-label">{{item.label}}</text>
+        <text class="field-value">{{item.value}}</text>
+      </view>
+    </scroll-view>
+    <view class="sheet-actions">
+      <text class="sheet-button" bindtap="goEdit">去编辑</text>
+      <text class="sheet-button primary {{busy ? 'disabled' : ''}}" bindtap="toggleCheck">{{detail.checked ? '取消核对' : '确认核对'}}</text>
+    </view>
+  </view>
+</view>

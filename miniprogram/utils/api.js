@@ -907,6 +907,24 @@ module.exports = {
   isOperationCancelled: (error) => Boolean(error && error.cancelled === true),
   visitApi,
   visitNoteApi,
+  // 信息核对（课表 / 邀约）
+  auditCheckApi: {
+    catalog: (scope = '') => request(`/api/audit-check/catalog${scope ? '?scope=' + scope : ''}`),
+    list: (params = {}) => {
+      const query = [`start_date=${params.startDate}`, `end_date=${params.endDate}`, `scope=${params.scope || 'all'}`]
+      if (params.spaceId) query.push(`space_id=${encodeURIComponent(params.spaceId)}`)
+      if (params.kinds !== undefined) query.push(`kinds=${encodeURIComponent(params.kinds || '')}`)
+      return request(`/api/audit-check?${query.join('&')}`)
+    },
+  },
+  activityThemeApi: {
+    lock: (date, spaceId = '') => request('/api/activity-themes/lock', { method: 'POST', data: { date, space_id: spaceId } }),
+    unlock: (date, spaceId = '') => request('/api/activity-themes/unlock', { method: 'POST', data: { date, space_id: spaceId } }),
+  },
+  visitVerificationApi: {
+    verify: (date, spaceId = '') => request('/api/visit-verifications/verify', { method: 'POST', data: { date, space_id: spaceId } }),
+    unverify: (date, spaceId = '') => request('/api/visit-verifications/unverify', { method: 'POST', data: { date, space_id: spaceId } }),
+  },
   activityParticipantNoteApi,
   // 客户跟进：自己填过的客户信息 / 跟进点
   customerFollowUpApi: {
