@@ -47,8 +47,8 @@ Page({
     // 默认「全部」：核对起算日 ~ 今天（起算日先用 2026-07-01，接口回来后再以实际为准）
     const today = fmt(new Date())
     this.setData({ dateFrom: this.data.lockStart, dateTo: today, timePreset: 'all', timePresetIndex: 4 })
-    this.loadSpaces()
-    this.load()
+    // 先拿到空间列表，默认选第一个真实空间，再用它查数据
+    this.loadSpaces().then(() => this.load())
   },
 
   onShow() {
@@ -58,7 +58,9 @@ Page({
   async loadSpaces() {
     try {
       const spaces = await spaceApi.list()
-      this.setData({ spaces: [{ id: '', name: '全部空间' }].concat((spaces || []).map(item => ({ id: item.id, name: item.name }))) })
+      const list = [{ id: '', name: '全部空间' }].concat((spaces || []).map(item => ({ id: item.id, name: item.name })))
+      // 默认落到第一个真实空间（没有空间时才用「全部空间」）
+      this.setData({ spaces: list, spaceIndex: list.length > 1 ? 1 : 0 })
     } catch (e) { /* 没空间权限就只看全部空间 */ }
   },
 
