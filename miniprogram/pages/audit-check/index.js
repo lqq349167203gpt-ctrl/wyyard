@@ -32,7 +32,8 @@ Page({
     filters: [{ value: 'unchecked', label: '未核对' }, { value: 'checked', label: '已核对' }],
     filterIndex: 0,
     kinds: null,
-    days: [], daysAll: [], batchSize: 6,
+    // 按天分页：客户端只持有当前页，数据量始终有界
+    days: [], page: 1, pageSize: 10, hasMore: false, totalDays: 0,
     summary: null,
     loading: false, error: '',
     busy: false,
@@ -146,9 +147,10 @@ Page({
     }
   },
 
-  async load() {
-    // 快速切换模式/筛选时，只认最后一次请求的结果（之前用 loading 守卫会把新请求丢掉）
+  async load(reset = true) {
+    // 重新查询（切模式/筛选）时从第 1 页开始；滚动到底再取下一页
     const seq = this._seq = (this._seq || 0) + 1
+    const nextPage = reset ? 1 : this.data.page + 1
     this.setData({ loading: true, error: '' })
     try {
       const result = await auditCheckApi.list({
@@ -157,6 +159,8 @@ Page({
         scope: this.data.mode,
         spaceId: (this.data.spaces[this.data.spaceIndex] || {}).id || '',
         kinds: this.data.kinds === null ? undefined : this.data.kinds,
+        page: nextPage,
+        pageSize: this.data.pageSize,
       })
       if (seq !== this._seq) return
       const lockStart = result.lock_start_date || this.data.lockStart
@@ -164,8 +168,15 @@ Page({
       const days = (result.days || []).map(day => this.decorateDay(day)).filter(Boolean)
       const checked = this.data.filters[this.data.filterIndex].value === 'checked'
       const matched = days.filter(day => (checked ? day.checked : !day.checked))
-      // 一次渲染的天数有限，否则几十天几百条卡片会把界面卡住（下拉到底自动补）
-      this.setData({ daysAll: matched, days: matched.slice(0, this.data.batchSize), summary: result.summary || null })
+      const merged = reset ? matched : this.data.days.concat(matched)
+      this.setData({
+        days: merged,
+        page: result.page || nextPage,
+        totalDays: result.total_days || merged.length,
+        // 状态筛选是在本页内过滤的，只要服务端还有下一页就继续可加载
+        hasMore: (result.page || nextPage) < (result.total_pages || 1),
+        summary: result.summary || null,
+      })
     } catch (e) {
       if (seq === this._seq) this.setData({ error: e.message || '加载失败', days: [] })
     } finally {
@@ -173,18 +184,16 @@ Page({
     }
   },
 
-  /** 滚到底再放出下一批天，避免一次性渲染太多 */
+  /** 滚到底取下一页（分页在服务端，客户端数据量始终只有一页多一点） */
   onReachBottom() {
-    const { days, daysAll, batchSize } = this.data
-    if (days.length >= daysAll.length) return
-    this.setData({ days: daysAll.slice(0, days.length + batchSize) })
+    if (this.data.hasMore && !this.data.loading) this.load(false)
   },
 
   onMode(event) {
     const mode = event.currentTarget.dataset.mode
     if (mode === this.data.mode) return
     this.setData({ mode })
-    this.load()
+    this.load(true)
   },
   /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
   onTimePresetTap(event) {
@@ -200,14 +209,14 @@ Page({
     // 本年 / 全部：按核对起算日算（7月1日到今天），避免把不能核对的历史也算进来
     else if (key === 'year' || key === 'all') { from = this.data.lockStart; to = fmt(now) }
     this.setData({ timePreset: key, dateFrom: from, dateTo: to })
-    this.load()
+    this.load(true)
   },
-  onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load() },
-  onDateTo(event) { this.setData({ timePreset: 'custom', dateTo: event.detail.value }); this.load() },
-  onSpace(event) { this.setData({ spaceIndex: Number(event.detail.value) }); this.load() },
+  onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load(true) },
+  onDateTo(event) { this.setData({ timePreset: 'custom', dateTo: event.detail.value }); this.load(true) },
+  onSpace(event) { this.setData({ spaceIndex: Number(event.detail.value) }); this.load(true) },
   onFilter(event) {
     this.setData({ filterIndex: Number(event.currentTarget.dataset.index) })
-    this.load()
+    this.load(true)
   },
 
 

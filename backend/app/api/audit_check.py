@@ -36,6 +36,9 @@ def check_missing(
     scope: str = Query("all"),
     # 不传 = 用默认口径；显式传空字符串 = 一项都不检查（只看核对状态）
     kinds: str | None = Query(None),
+    # 按「天」分页：page_size <= 0 表示不分页（PC 一次性渲染，保持不变）
+    page: int = Query(1, ge=1),
+    page_size: int = Query(0),
     request: Request = None,
 ):
     """返回选中范围内的缺失清单、按天分组，并带上课表/邀约各自的核对状态。"""
@@ -53,7 +56,7 @@ def check_missing(
     # 来访需求按邀约页同一口径：没有「跟进点」查看权限的账号只核对是否填写，不看内容
     roles = get_request_roles(request) if request is not None else []
     can_view_visit_need = "超级管理员" in roles or customer_access_service.can_view_detail_tab(roles, "follow_up")
-    return missing_check_service.check(
+    result = missing_check_service.check(
         start_date=start_date,
         end_date=end_date,
         space_id=space_id,
@@ -62,3 +65,13 @@ def check_missing(
         visible_customer_ids=visible_customer_ids,
         can_view_visit_need=can_view_visit_need,
     )
+    all_days = result.get("days") or []
+    result["total_days"] = len(all_days)
+    if page_size and page_size > 0:
+        total_pages = max(1, (len(all_days) + page_size - 1) // page_size)
+        current = min(page, total_pages)
+        result["days"] = all_days[(current - 1) * page_size: current * page_size]
+        result["page"] = current
+        result["page_size"] = page_size
+        result["total_pages"] = total_pages
+    return result
