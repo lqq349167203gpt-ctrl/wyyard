@@ -35,7 +35,7 @@
     </view>
   </view>
 
-  <view class="summary" wx:if="{{summary}}">共 {{summary.day_count}} 天 · 待核对 {{summary.missing_count}} 条</view>
+  <view class="summary" wx:if="{{summary}}">共 {{summary.day_count}} 天 · {{summary.unchecked_day_count}} 天未核对 · 缺信息 {{summary.missing_count}} 条</view>
   <view wx:if="{{error}}" class="error">{{error}}</view>
 
   <view class="day-card" wx:for="{{days}}" wx:key="date" wx:for-item="day" wx:for-index="di">
