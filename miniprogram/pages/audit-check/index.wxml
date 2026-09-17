@@ -60,7 +60,7 @@
       <view class="rec-people" wx:if="{{row.peopleText || row.peopleMissing}}">
         <view class="rec-people-line">
           <view class="rec-people-icon"></view>
-          <text class="rec-people-text {{row.peopleMissing ? 'missing' : ''}}">{{row.peopleMissing ? '未填写参与人' : row.peopleText}}</text>
+          <text class="rec-people-text {{row.peopleMissing ? 'missing' : ''}}">{{row.peopleMissing ? '无参与人' : row.peopleText}}</text>
         </view>
       </view>
     </view>
