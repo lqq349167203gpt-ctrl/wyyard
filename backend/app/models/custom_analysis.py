@@ -90,6 +90,9 @@ AnalysisMetric = Literal[
     "created_customers",
     "referred_customers",
     "invited_customers",
+    "invitation_visits",
+    "cancelled_customers",
+    "cancelled_visits",
     "arrived_customers",
     "arrival_visits",
     "activity_customers",
@@ -176,7 +179,7 @@ class AnalysisPlan(StrictBaseModel):
     condition_logic: Literal["all", "any"] = "all"
     date_from: str = ""
     date_to: str = ""
-    metrics: list[AnalysisMetric] = Field(default_factory=lambda: ["total_customers"], min_length=1, max_length=11)
+    metrics: list[AnalysisMetric] = Field(default_factory=lambda: ["total_customers"], min_length=1, max_length=14)
     card_metric: AnalysisMetric = "total_customers"
     card_dimension: CardDimension = "follow_up_status"
     columns: list[AnalysisField] = Field(
