@@ -62,13 +62,13 @@
 .rec:last-child { border-bottom: none; }
 .rec-head { display: flex; align-items: center; gap: 10rpx; }
 .rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 25rpx; font-weight: 500; color: #1f2329; }
-.rec-tag { flex-shrink: 0; padding: 2rpx 12rpx; border-radius: 6rpx; background: #fff1ec; font-size: 22rpx; line-height: 1.5; color: #d4380d; }
+.rec-tag { flex-shrink: 0; padding: 0 12rpx; border-radius: 6rpx; background: #fff1ec; font-size: 22rpx; line-height: 1.5; color: #d4380d; }
 .rec-edit { flex-shrink: 0; padding: 4rpx 12rpx; border: 1rpx solid #e8eaed; border-radius: 6rpx; font-size: 21rpx; color: #4e535a; }
 .rec-headline { display: block; margin-top: 6rpx; font-size: 23rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
 .rec-fields { margin-top: 10rpx; }
-.rec-field { display: flex; align-items: baseline; gap: 12rpx; padding: 5rpx 0; }
-.rec-field-label { flex-shrink: 0; width: 110rpx; font-size: 24rpx; line-height: 1.6; color: #9aa1a9; }
-.rec-field-value { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.6; color: #2b2f36; word-break: break-all; }
+.rec-field { display: flex; align-items: flex-start; gap: 12rpx; padding: 4rpx 0; }
+.rec-field-label { flex-shrink: 0; width: 110rpx; font-size: 24rpx; line-height: 1.5; color: #9aa1a9; }
+.rec-field-value { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.5; color: #2b2f36; word-break: break-all; }
 /* 参与人：浅灰底块，不再加分隔横线（和方案 C 一致） */
 .rec-people { margin-top: 12rpx; }
 .rec-people-line { display: flex; align-items: flex-start; gap: 10rpx; padding: 14rpx 16rpx; border-radius: 8rpx; background: #f7f8fa; }
