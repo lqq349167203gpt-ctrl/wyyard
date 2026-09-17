@@ -75,7 +75,7 @@ Page({
             // 扣卡 0 次也要显示，否则会以为这条信息缺了
             `扣卡 ${row.deduction_count || 0} 次`,
           ].filter(Boolean).join(" · ")
-        : [row.time, row.is_leader ? "组长" : ""].filter(Boolean).join(" · ")
+        : [row.time, row.is_leader ? "组长" : "", row.inviter ? `邀约人 ${row.inviter}` : ""].filter(Boolean).join(" · ")
       // 方案 B：到场 / 取消状态做成胶囊，放在名字左边
       const statusText = isCourse ? "" : (row.cancelled ? "已取消" : (row.arrived ? "已到店" : "未到店"))
       const statusClass = isCourse ? "" : (row.cancelled ? "cancel" : (row.arrived ? "ok" : "wait"))
@@ -86,7 +86,6 @@ Page({
         { label: "简介", value: row.intro },
       ] : [
         { label: "到场时间", value: row.arrived && !row.cancelled ? (row.arrival_time || "已到店") : "" },
-        { label: "邀约人", kind: "visit_inviter", value: row.inviter },
         { label: "接待人", kind: "visit_receptionist", value: row.receptionist },
         { label: "目标", kind: "visit_goal", value: row.goal },
         { label: "所属组长", kind: "visit_leader", value: row.has_leader ? (row.leader_name || "") : "" },
