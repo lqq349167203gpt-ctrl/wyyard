@@ -390,6 +390,14 @@
   background: #fff;
 }
 
+/* 选中样式与「信息核对」页的时间快捷项一致 */
+.preset.active {
+  border-color: #d5d9de;
+  background: #f5f6f7;
+  color: #1f2329;
+  font-weight: 500;
+}
+
 .preset-group {
   flex-wrap: wrap;
   margin-top: 14rpx;

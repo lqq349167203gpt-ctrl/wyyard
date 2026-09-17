@@ -38,6 +38,19 @@ function yearRange(year) {
   return { date_from: `${year}-01-01`, date_to: `${year}-12-31` }
 }
 
+/** 由当前日期区间反推选中的快捷项（当天/本周/本月/本年/全部/自定义），不额外维护状态 */
+function datePresetOf(plan) {
+  const from = plan.date_from || ''
+  const to = plan.date_to || ''
+  if (!from && !to) return 'all'
+  const same = range => range && range.date_from === from && range.date_to === to
+  if (same(todayRange())) return 'today'
+  if (same(weekRange())) return 'week'
+  if (same(monthRange())) return 'month'
+  if (same(yearRange(currentYear))) return 'year'
+  return 'custom'
+}
+
 const currentYear = new Date().getFullYear()
 const periodYears = Array.from({ length: 10 }, (_, index) => currentYear + 1 - index)
 const periodParts = ['全年'].concat(Array.from({ length: 12 }, (_, index) => `${index + 1}月`))
@@ -373,6 +386,7 @@ Page({
     const selectedPeriod = periodSelection(plan)
     this.setData({
       plan,
+      datePreset: datePresetOf(plan),
       conditionRows,
       comparisonGroupRows,
       metricOptions,
