@@ -290,17 +290,7 @@
 .save-rule-button.confirm { border-color: #3370ff; background: #3370ff; color: #fff; }
 .save-rule-button.disabled { opacity: .6; }
 
-/* B：连续条件表。仅转化分析启用，不修改顶部 Tab 和经营概况。 */
-.conversion-compact .filter-card { padding: 12rpx 20rpx; margin-bottom: 8rpx; }
-.conversion-compact .filter-row { padding: 6rpx 0; gap: 12rpx; }
-.conversion-compact .filter-label { width: 72rpx; font-size: 24rpx; }
-.conversion-compact .filter-date { flex: 1; min-width: 0; }
-.conversion-compact .control { min-height: 56rpx; padding: 0 12rpx; font-size: 24rpx; }
-.conversion-compact .date-control { min-width: 0; font-size: 22rpx; }
-.conversion-compact .preset-row { gap: 6rpx; }
-.conversion-compact .preset { padding: 6rpx 10rpx; font-size: 22rpx; }
-.conversion-compact .filter-foot { padding-top: 6rpx; margin-top: 6rpx; }
-.conversion-compact .filter-foot .muted { font-size: 20rpx; }
+/* B：连续条件表。转化分析只压缩下面的规则区，顶部「范围 / 周期 / 自定义」筛选区与经营概况共用同一套样式。 */
 .conversion-compact .section-card { padding: 14rpx 20rpx; border-radius: 6rpx; margin-bottom: 8rpx; }
 .conversion-compact .conv-head { gap: 10rpx; flex-wrap: wrap; }
 .conversion-compact .conv-title { font-size: 24rpx; color: #8f959e; font-weight: 400; flex-shrink: 0; }
