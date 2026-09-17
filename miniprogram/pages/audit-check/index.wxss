@@ -91,4 +91,4 @@
 /* 时间快捷项：点选式小胶囊（选中=深绿描边+浅绿底，不用蓝色） */
 .presets { display: flex; flex-wrap: wrap; gap: 10rpx; flex: 1; min-width: 0; }
 .preset { padding: 0 18rpx; height: 52rpx; line-height: 50rpx; box-sizing: border-box; border: 1rpx solid #e8eaed; border-radius: 8rpx; background: #fff; font-size: 22rpx; color: #4e535a; }
-.preset.active { border-color: #2f8f63; background: #eef7f2; color: #2f8f63; font-weight: 500; }
+.preset.active { border-color: #8a6a4b; background: #f7f3ee; color: #7a5c40; font-weight: 500; }
