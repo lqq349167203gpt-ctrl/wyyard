@@ -65,7 +65,8 @@ Page({
             row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : "",
             row.type_label || row.activity_type_label,
             row.activity_mode,
-            row.deduction_count ? `扣卡 ${row.deduction_count} 次` : "",
+            // 扣卡 0 次也要显示，否则会以为这条信息缺了
+            `扣卡 ${row.deduction_count || 0} 次`,
           ].filter(Boolean).join(" · ")
         : [row.time, row.is_leader ? "组长" : "", row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ' ' + row.arrival_time : ''}` : "未到店")].filter(Boolean).join(" · ")
       const fields = isCourse ? [
