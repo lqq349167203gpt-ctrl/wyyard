@@ -32,7 +32,7 @@ Page({
     filters: [{ value: 'unchecked', label: '未核对' }, { value: 'checked', label: '已核对' }],
     filterIndex: 0,
     kinds: null,
-    days: [],
+    days: [], daysAll: [], batchSize: 6,
     summary: null,
     loading: false, error: '',
     busy: false,
@@ -163,10 +163,9 @@ Page({
       if (lockStart !== this.data.lockStart) this.setData({ lockStart })
       const days = (result.days || []).map(day => this.decorateDay(day)).filter(Boolean)
       const checked = this.data.filters[this.data.filterIndex].value === 'checked'
-      this.setData({
-        days: days.filter(day => (checked ? day.checked : !day.checked)),
-        summary: result.summary || null,
-      })
+      const matched = days.filter(day => (checked ? day.checked : !day.checked))
+      // 一次渲染的天数有限，否则几十天几百条卡片会把界面卡住（下拉到底自动补）
+      this.setData({ daysAll: matched, days: matched.slice(0, this.data.batchSize), summary: result.summary || null })
     } catch (e) {
       if (seq === this._seq) this.setData({ error: e.message || '加载失败', days: [] })
     } finally {
@@ -174,12 +173,17 @@ Page({
     }
   },
 
+  /** 滚到底再放出下一批天，避免一次性渲染太多 */
+  onReachBottom() {
+    const { days, daysAll, batchSize } = this.data
+    if (days.length >= daysAll.length) return
+    this.setData({ days: daysAll.slice(0, days.length + batchSize) })
+  },
+
   onMode(event) {
-    // 模式值做兜底，避免 dataset 丢失时把 mode 设成 undefined 导致两个页签都不高亮
-    const mode = event.currentTarget.dataset.mode === 'visit' ? 'visit' : 'course'
-    if (mode === this.data.mode) { this.load(); return }
-    // 立刻切数据状态并清空列表，保证视觉上一定跟着变
-    this.setData({ mode, days: [], summary: null, detail: null })
+    const mode = event.currentTarget.dataset.mode
+    if (mode === this.data.mode) return
+    this.setData({ mode })
     this.load()
   },
   /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
