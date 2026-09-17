@@ -64,7 +64,10 @@ Page({
         course_owner: "缺案主", course_body_parts: "缺部位", course_intro: "缺简介", course_no_participant: "无参与人",
         visit_time: "缺时间", visit_nickname: "缺昵称", visit_inviter: "缺邀约人", visit_receptionist: "缺接待人",
       }
-      const missingTags = (row.kinds || []).map(key => MISSING_LABELS[key] || key)
+      // 「无参与人」只在下面的参与人那一行显示，标题后不再重复
+      const missingTags = (row.kinds || [])
+        .filter(key => key !== "course_no_participant")
+        .map(key => MISSING_LABELS[key] || key)
       // 时间 / 类型 / 方式（线上线下）一看就懂，放在同一行、不用标题
       const headline = isCourse
         ? [
