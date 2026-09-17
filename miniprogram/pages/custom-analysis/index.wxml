@@ -43,11 +43,11 @@
           </picker>
         </view>
         <view class="preset-group">
-          <view class="preset {datePreset === 'today' ? 'active' : ''}" data-value="today" bindtap="onDatePreset">当天</view>
-          <view class="preset {datePreset === 'week' ? 'active' : ''}" data-value="week" bindtap="onDatePreset">本周</view>
-          <view class="preset {datePreset === 'month' ? 'active' : ''}" data-value="month" bindtap="onDatePreset">本月</view>
-          <view class="preset {datePreset === 'year' ? 'active' : ''}" data-value="year" bindtap="onDatePreset">本年</view>
-          <view class="preset {datePreset === 'all' ? 'active' : ''}" data-value="all" bindtap="onDatePreset">全部</view>
+          <view class="preset {{datePreset === 'today' ? 'active' : ''}}" data-value="today" bindtap="onDatePreset">当天</view>
+          <view class="preset {{datePreset === 'week' ? 'active' : ''}}" data-value="week" bindtap="onDatePreset">本周</view>
+          <view class="preset {{datePreset === 'month' ? 'active' : ''}}" data-value="month" bindtap="onDatePreset">本月</view>
+          <view class="preset {{datePreset === 'year' ? 'active' : ''}}" data-value="year" bindtap="onDatePreset">本年</view>
+          <view class="preset {{datePreset === 'all' ? 'active' : ''}}" data-value="all" bindtap="onDatePreset">全部</view>
         </view>
         <view class="date-range">
           <picker class="date-picker" mode="date" value="{{plan.date_from}}" bindchange="onDateFromChange">
