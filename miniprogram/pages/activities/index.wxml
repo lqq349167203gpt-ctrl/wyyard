@@ -121,7 +121,6 @@
             <view class="card-right">
               <view class="card-status-row" wx:if="{{!item.canEdit || item.isPublished}}">
                 <text class="readonly-status" wx:if="{{isDayLocked || !item.canEdit}}">{{isDayLocked ? ((lockInfo.locked_by || '未记录') + '锁定') : ((item.createdBy || '未记录') + '锁定')}}</text>
-                <text class="status" wx:if="{{item.isPublished}}">已发布</text>
               </view>
             </view>
           </view>

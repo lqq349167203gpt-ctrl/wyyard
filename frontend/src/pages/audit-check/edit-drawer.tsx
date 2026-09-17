@@ -518,12 +518,7 @@ export function AuditEditDrawer({
                   className="w-full resize-none rounded-[4px] border-[0.5px] border-[#e1e4e7] px-2 py-1.5 text-[12px] leading-5 text-[#2b2f36] outline-none focus:border-[#b9cdf8]"
                 />
               </Field>
-              <Field label="发布" hint="发布后客户端能看到这场活动" disabledReason={disabledReason("is_published")}>
-                <label className="inline-flex h-8 items-center gap-2 text-[12px] text-[#4e535a]">
-                  <input type="checkbox" checked={Boolean(draft.published)} disabled={!canEdit("is_published")} onChange={e => set("published", e.target.checked)} className="h-4 w-4 accent-[#3370ff]" />
-                  已发布
-                </label>
-              </Field>
+              {/* 发布功能已隐藏 */}
             </>
           ) : null}
         </div>

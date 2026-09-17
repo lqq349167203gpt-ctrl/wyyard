@@ -337,7 +337,6 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
     { key: "deduction", label: "扣卡", width: "5.5%" },
     { key: "intro", label: "简介", width: "14%" },
     { key: "participants", label: "参与人", width: "16.5%" },
-    { key: "publish", label: "发布", width: "5%" },
     { key: "action", label: "操作", width: "5%" },
   ]
 
@@ -393,11 +392,7 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
           label="无参与人"
           onEdit={canEditRow ? openDrawer : undefined}
         />
-        <td className="px-2 py-2 align-top" style={{ width: "6%" }}>
-          <span className={`text-[12px] ${row.published ? "text-[#4e535a]" : has("course_publish") ? "text-[#d4380d]" : "text-[#8f959e]"}`}>
-            {row.published ? "已发布" : "未发布"}
-          </span>
-        </td>
+        {/* 发布列已隐藏 */}
         <td className="px-2 py-2 align-top" style={{ width: "5%" }}>
           {canEditRow && (
             <button type="button" onClick={openDrawer} className="whitespace-nowrap text-[12px] text-[#3370ff] hover:underline">编辑</button>

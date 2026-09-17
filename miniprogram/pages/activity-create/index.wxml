@@ -112,8 +112,8 @@
     </view>
   </view>
 
-  <!-- 发布到客户端 -->
-  <view class="form-card">
+  <!-- 发布到客户端：已隐藏 -->
+  <view class="form-card" wx:if="{{false}}">
     <view class="form-item last switch-row">
       <text class="form-label">发布</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">

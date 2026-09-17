@@ -84,7 +84,7 @@ Page({
       return {
         id: row.id,
         // 发布不是重点：只在「未发布」时用一个小标签提示，已发布不占地方
-        statusTag: isCourse && !row.published ? "未发布" : "",
+        statusTag: "",
         headline,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
         fields: fields.filter(item => item.value),

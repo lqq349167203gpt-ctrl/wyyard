@@ -1558,7 +1558,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal">新人</th>
               <th className="px-1 py-2 text-left font-normal">创建人</th>
               <th className="sticky right-[52px] z-20 w-[40px] bg-[#f7f8fa] py-2 pl-1 pr-0 font-normal">
-                  <span className="flex w-full items-center justify-center whitespace-nowrap">发布</span>
+                  {/* 发布功能已隐藏 */}
               </th>
               <th className="sticky right-0 z-20 w-[52px] bg-[#f7f8fa] px-0 py-2 text-center font-normal">操作</th>
             </tr>
@@ -2028,18 +2028,8 @@ export function ActivityBatchTable({
                     </span>
                   </td>
 
-                  {/* 发布到客户端 */}
-                  <td className={`sticky right-[52px] z-20 py-0.5 pl-1 pr-0 text-center align-top ${isCellChanged(row.key, "is_published") ? "bg-[#f5eeff] rounded" : "bg-white"}`}>
-                    <div className="flex h-7 w-full items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={row.is_published}
-                        onChange={(e) => updateRow(row.key, "is_published", e.target.checked)}
-                        aria-label={`发布${row.name || "活动"}`}
-                        className="h-3.5 w-3.5 appearance-none border border-[#e8eaed] rounded-[2px] bg-white checked:bg-white checked:border-[#6b9dff] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b9dff%22%20stroke-width%3D%221.5%22%20d%3D%22M3%206l2%202%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-center bg-no-repeat cursor-pointer"
-                      />
-                    </div>
-                  </td>
+                  {/* 发布到客户端：已隐藏 */}
+                  <td className="sticky right-[52px] z-20 w-[40px] bg-white py-0.5" />
 
                   {/* 操作 */}
                   <td className="sticky right-0 z-20 w-[52px] bg-white px-0 py-0.5 text-center">
