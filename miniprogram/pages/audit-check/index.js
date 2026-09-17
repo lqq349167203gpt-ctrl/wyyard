@@ -153,6 +153,23 @@ Page({
     if (!day || this.data.busy) return
     const date = day.date
     const willCheck = !day.checked
+    const pageName = this.data.mode === 'course' ? '课表' : '邀约'
+    // 弹窗文案与 PC 完全一致
+    const confirmed = await new Promise(resolve => {
+      wx.showModal({
+        title: willCheck ? `确认核对 ${date} 的${pageName}？` : `解锁 ${date} 的${pageName}？`,
+        content: willCheck
+          ? (this.data.mode === 'course'
+              ? '锁定后当天该空间的活动将不能修改（课程复盘除外）'
+              : '锁定后当天该空间的邀约资料将不能修改（来访需求、客户信息、跟进点除外）')
+          : `解锁后当天该空间的${pageName}可以继续修改。`,
+        confirmText: willCheck ? '确认核对' : '解锁',
+        cancelText: '取消',
+        success: res => resolve(res.confirm === true),
+        fail: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
     this.setData({ busy: true })
     wx.showLoading({ title: willCheck ? '核对中' : '取消中' })
     try {
