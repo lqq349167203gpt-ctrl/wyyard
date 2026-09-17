@@ -147,16 +147,18 @@ Page({
   },
 
   async load() {
-    if (this.data.loading) return
+    // 快速切换模式/筛选时，只认最后一次请求的结果（之前用 loading 守卫会把新请求丢掉）
+    const seq = this._seq = (this._seq || 0) + 1
     this.setData({ loading: true, error: '' })
     try {
       const result = await auditCheckApi.list({
         startDate: this.data.dateFrom,
         endDate: this.data.dateTo,
         scope: this.data.mode,
-        spaceId: this.data.mode === 'course' ? (this.data.spaces[this.data.spaceIndex] || {}).id || '' : '',
+        spaceId: (this.data.spaces[this.data.spaceIndex] || {}).id || '',
         kinds: this.data.kinds === null ? undefined : this.data.kinds,
       })
+      if (seq !== this._seq) return
       const lockStart = result.lock_start_date || this.data.lockStart
       if (lockStart !== this.data.lockStart) this.setData({ lockStart })
       const days = (result.days || []).map(day => this.decorateDay(day)).filter(Boolean)
@@ -166,9 +168,9 @@ Page({
         summary: result.summary || null,
       })
     } catch (e) {
-      this.setData({ error: e.message || '加载失败', days: [] })
+      if (seq === this._seq) this.setData({ error: e.message || '加载失败', days: [] })
     } finally {
-      this.setData({ loading: false })
+      if (seq === this._seq) this.setData({ loading: false })
     }
   },
 

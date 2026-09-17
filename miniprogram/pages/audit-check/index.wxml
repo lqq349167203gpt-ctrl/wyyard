@@ -21,7 +21,7 @@
         <view class="filter-value">{{dateTo}}</view>
       </picker>
     </view>
-    <view class="filter-row" wx:if="{{mode === 'course'}}">
+    <view class="filter-row">
       <text class="filter-label">空间</text>
       <picker class="filter-control" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpace">
         <view class="filter-value">{{spaces[spaceIndex].name}}</view>
