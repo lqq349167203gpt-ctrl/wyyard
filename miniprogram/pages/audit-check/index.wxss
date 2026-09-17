@@ -79,3 +79,6 @@
 .rec-people-text.missing { color: #c98a2e; }
 
 .loading, .empty { padding: 80rpx 24rpx; text-align: center; color: #8f959e; font-size: 24rpx; }
+
+/* 未发布：标题行上的小标签（已发布不显示，不占地方） */
+.rec-statustag { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; border: 1rpx solid #e8eaed; font-size: 20rpx; color: #8f959e; }

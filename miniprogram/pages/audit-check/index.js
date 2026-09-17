@@ -74,7 +74,6 @@ Page({
         { label: "案主", value: row.owner_name, missing: has("course_owner") },
         { label: "部位", value: row.body_parts ? `${row.body_parts}` : "" },
         { label: "简介", value: row.intro },
-        { label: "发布", value: row.published ? "已发布" : "未发布" },
       ] : [
         { label: "邀约人", value: row.inviter },
         { label: "接待人", value: row.receptionist },
@@ -84,6 +83,8 @@ Page({
       ]
       return {
         id: row.id,
+        // 发布不是重点：只在「未发布」时用一个小标签提示，已发布不占地方
+        statusTag: isCourse && !row.published ? "未发布" : "",
         headline,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
         fields: fields.filter(item => item.value),
