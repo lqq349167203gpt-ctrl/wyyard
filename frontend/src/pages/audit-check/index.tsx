@@ -426,7 +426,7 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
         <Cell width="5%" value={row.is_leader ? "组长" : ""} onEdit={cellEdit} />
         <Cell
           width="10%"
-          value={row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ` ${row.arrival_time}` : ""}` : "未到店")}
+          value={row.cancelled ? "已取消" : (row.arrived ? "已到店" : "未到店")}
           missing={has("visit_not_arrived")}
           label="未确认到店"
           onEdit={cellEdit}
