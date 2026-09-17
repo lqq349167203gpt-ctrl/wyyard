@@ -59,20 +59,22 @@ Page({
     if (!block) return null
     const rows = (block.rows || []).map(row => {
       const has = key => (row.kinds || []).indexOf(key) >= 0
+      // 时间 / 类型 / 方式（线上线下）一看就懂，放在同一行、不用标题
+      const headline = isCourse
+        ? [
+            row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : "",
+            row.type_label || row.activity_type_label,
+            row.activity_mode,
+          ].filter(Boolean).join(" · ")
+        : [row.time, row.is_leader ? "组长" : "", row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ' ' + row.arrival_time : ''}` : "未到店")].filter(Boolean).join(" · ")
       const fields = isCourse ? [
-        { label: "时间", value: row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : "", missing: has("course_time") },
-        { label: "类型", value: row.type_label || row.activity_type_label },
         { label: "老师", value: (row.teacher_names || []).join("、"), missing: has("course_teacher") },
         { label: "案主", value: row.owner_name, missing: has("course_owner") },
         { label: "部位", value: row.body_parts ? `${row.body_parts}` : "" },
-        { label: "方式", value: row.activity_mode },
         { label: "扣卡", value: row.deduction_count ? `${row.deduction_count} 次` : "" },
         { label: "简介", value: row.intro },
         { label: "发布", value: row.published ? "已发布" : "未发布" },
       ] : [
-        { label: "时间", value: row.time },
-        { label: "组长", value: row.is_leader ? "是" : "" },
-        { label: "到店", value: row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ' ' + row.arrival_time : ''}` : "未到店") },
         { label: "邀约人", value: row.inviter },
         { label: "接待人", value: row.receptionist },
         { label: "目标", value: row.goal },
@@ -81,6 +83,7 @@ Page({
       ]
       return {
         id: row.id,
+        headline,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
         fields: fields.filter(item => item.value),
         missingCount: (row.kinds || []).length,

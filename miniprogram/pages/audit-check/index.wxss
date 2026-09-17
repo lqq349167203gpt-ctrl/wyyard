@@ -75,3 +75,7 @@
 .rec-people-icon { flex-shrink: 0; width: 26rpx; height: 26rpx; margin: 3rpx 0 0 42rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWFhMWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
 .rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.55; color: #2b2f36; word-break: break-all; }
 .rec-people-text.missing { color: #c98a2e; }
+
+/* 一行自解释信息（时间 · 类型 · 线上/线下），不需要标题 */
+.rec-headline { flex-shrink: 0; font-size: 23rpx; color: #8f959e; }
+.rec-title { margin-left: 4rpx; }

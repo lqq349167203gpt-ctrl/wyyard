@@ -43,6 +43,7 @@
 
     <view class="rec" wx:for="{{day.rows}}" wx:key="id" wx:for-item="row" wx:for-index="ri">
       <view class="rec-head">
+        <text class="rec-headline" wx:if="{{row.headline}}">{{row.headline}}</text>
         <text class="rec-title">{{row.title}}</text>
         <text class="rec-badge" wx:if="{{row.missingCount}}">缺 {{row.missingCount}}</text>
         <text class="rec-edit" data-id="{{row.id}}" bindtap="goEdit">编辑</text>
