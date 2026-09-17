@@ -85,3 +85,5 @@
 .rec-status.ok { background: #e8f6ef; color: #2f8f63; }
 .rec-status.wait { background: #f2f3f5; color: #8f959e; }
 .rec-status.cancel { background: #fdeeee; color: #c94b55; }
+
+.rec-field-value.empty { color: #c9cdd4; }

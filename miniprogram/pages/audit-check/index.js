@@ -75,7 +75,7 @@ Page({
             // 扣卡 0 次也要显示，否则会以为这条信息缺了
             `扣卡 ${row.deduction_count || 0} 次`,
           ].filter(Boolean).join(" · ")
-        : [row.time, row.is_leader ? "组长" : "", row.inviter ? `邀约人 ${row.inviter}` : ""].filter(Boolean).join(" · ")
+        : [row.time, row.is_leader ? "组长" : "", row.creator ? `创建人 ${row.creator}` : ""].filter(Boolean).join(" · ")
       // 方案 B：到场 / 取消状态做成胶囊，放在名字左边
       const statusText = isCourse ? "" : (row.cancelled ? "已取消" : (row.arrived ? "已到店" : "未到店"))
       const statusClass = isCourse ? "" : (row.cancelled ? "cancel" : (row.arrived ? "ok" : "wait"))
@@ -86,10 +86,11 @@ Page({
         { label: "简介", value: row.intro },
       ] : [
         { label: "到场时间", value: row.arrived && !row.cancelled ? (row.arrival_time || "已到店") : "" },
-        { label: "接待人", kind: "visit_receptionist", value: row.receptionist },
-        { label: "目标", kind: "visit_goal", value: row.goal },
+        { label: "邀约人", kind: "visit_inviter", value: row.inviter },
+        // 接待人 / 目标：不管有没有内容都保留标题
+        { label: "接待人", kind: "visit_receptionist", alwaysShow: true, value: row.receptionist },
+        { label: "目标", kind: "visit_goal", alwaysShow: true, value: row.goal },
         { label: "所属组长", kind: "visit_leader", value: row.has_leader ? (row.leader_name || "") : "" },
-        { label: "创建人", value: row.creator },
       ]
       return {
         id: row.id,
@@ -104,8 +105,12 @@ Page({
         // 只有 PC 判定为「缺」的项才显示成未填（比如能量结才检查部位、沙龙没有案主就不提示）；
         // 简介等没有检查项的字段，空着就整行不显示
         fields: fields
-          .filter(item => item.value || (item.kind && has(item.kind)))
-          .map(item => item.value ? item : { ...item, missing: true, missingLabel: MISSING_LABELS[item.kind] || "未填" }),
+          .filter(item => item.value || (item.kind && has(item.kind)) || item.alwaysShow)
+          .map(item => {
+            if (item.value) return item
+            if (item.kind && has(item.kind)) return { ...item, missing: true, missingLabel: MISSING_LABELS[item.kind] || "未填" }
+            return { ...item, empty: true }
+          }),
 
         // 参与人全部显示，不做缩略
         peopleText: isCourse && (row.participant_names || []).length
