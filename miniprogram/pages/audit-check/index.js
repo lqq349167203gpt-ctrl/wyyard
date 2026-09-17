@@ -24,7 +24,12 @@ Page({
       { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
       { value: 'all', label: '全部' },
     ],
-    timePreset: 'all',
+    timePreset: 'all', timePresetIndex: 4,
+    timeOptions: [
+      { value: 'today', label: '当天' }, { value: 'week', label: '本周' },
+      { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
+      { value: 'all', label: '全部' }, { value: 'custom', label: '自定义' },
+    ],
     spaces: [{ id: '', name: '全部空间' }], spaceIndex: 0,
     filters: [{ value: 'unchecked', label: '未核对' }, { value: 'checked', label: '已核对' }],
     filterIndex: 0,
@@ -42,7 +47,7 @@ Page({
       return
     }
     // 默认「全部」：起止留空，后端从核对起算日（2026-07-01）开始算，和 PC 一致
-    this.setData({ dateFrom: '', dateTo: '', timePreset: 'all' })
+    this.setData({ dateFrom: '', dateTo: '', timePreset: 'all', timePresetIndex: 4 })
     this.loadSpaces()
     this.load()
   },
@@ -172,7 +177,9 @@ Page({
   },
   /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
   onTimePreset(event) {
-    const key = event.currentTarget.dataset.key
+    const options = this.data.timeOptions
+    const index = Number(event.detail.value)
+    const key = (options[index] || {}).value || 'all'
     const pad = v => String(v).padStart(2, '0')
     const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     const now = new Date()
@@ -182,7 +189,9 @@ Page({
     else if (key === 'week') { const start = new Date(now); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); from = fmt(start); to = fmt(now) }
     else if (key === 'month') { from = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); to = fmt(now) }
     else if (key === 'year') { from = fmt(new Date(now.getFullYear(), 0, 1)); to = fmt(now) }
-    this.setData({ timePreset: key, dateFrom: from, dateTo: to })
+    // 「自定义」只切状态，日期由下面的日期框决定
+    if (key === 'custom') { this.setData({ timePreset: 'custom', timePresetIndex: index }); return }
+    this.setData({ timePreset: key, timePresetIndex: index, dateFrom: from, dateTo: to })
     this.load()
   },
   onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load() },
