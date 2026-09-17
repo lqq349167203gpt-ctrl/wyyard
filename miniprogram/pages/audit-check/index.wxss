@@ -26,8 +26,8 @@
 .day-action { flex-shrink: 0; padding: 0 16rpx; height: 48rpx; line-height: 46rpx; font-size: 22rpx; border: 1rpx solid #dfe2e6; border-radius: 8rpx; background: #fff; color: #4e535a; }
 .day-action.primary { border-color: #3370ff; background: #3370ff; color: #fff; }
 .day-date { font-size: 24rpx; font-weight: 500; color: #2b2f36; }
-.day-state { font-size: 21rpx; color: #c98a2e; }
-.day-state.done { color: #4b9e75; }
+.day-state { font-size: 19rpx; line-height: 1.4; color: #c98a2e; }
+.day-state.done { color: #6bb392; }
 .row { display: flex; align-items: center; gap: 12rpx; padding: 18rpx; border-bottom: 1rpx solid #f5f6f7; }
 .row:last-child { border-bottom: none; }
 .row-main { flex: 1; min-width: 0; }
