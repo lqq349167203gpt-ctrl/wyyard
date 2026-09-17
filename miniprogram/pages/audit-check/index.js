@@ -25,6 +25,8 @@ Page({
       { value: 'all', label: '全部' },
     ],
     timePreset: 'all', timePresetIndex: 4,
+    // 核对起算日：接口会返回（默认 2026-07-01），本年/全部都从这个日期算到今天
+    lockStart: '2026-07-01',
     timeOptions: [
       { value: 'today', label: '当天' }, { value: 'week', label: '本周' },
       { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
@@ -46,8 +48,9 @@ Page({
       this.setData({ error: '暂无「信息核对」页面权限' })
       return
     }
-    // 默认「全部」：起止留空，后端从核对起算日（2026-07-01）开始算，和 PC 一致
-    this.setData({ dateFrom: '', dateTo: '', timePreset: 'all', timePresetIndex: 4 })
+    // 默认「全部」：核对起算日 ~ 今天（起算日先用 2026-07-01，接口回来后再以实际为准）
+    const today = fmt(new Date())
+    this.setData({ dateFrom: this.data.lockStart, dateTo: today, timePreset: 'all', timePresetIndex: 4 })
     this.loadSpaces()
     this.load()
   },
@@ -156,6 +159,8 @@ Page({
         spaceId: this.data.mode === 'course' ? (this.data.spaces[this.data.spaceIndex] || {}).id || '' : '',
         kinds: this.data.kinds === null ? undefined : this.data.kinds,
       })
+      const lockStart = result.lock_start_date || this.data.lockStart
+      if (lockStart !== this.data.lockStart) this.setData({ lockStart })
       const days = (result.days || []).map(day => this.decorateDay(day)).filter(Boolean)
       const checked = this.data.filters[this.data.filterIndex].value === 'checked'
       this.setData({
@@ -188,7 +193,8 @@ Page({
     if (key === 'today') { from = fmt(now); to = fmt(now) }
     else if (key === 'week') { const start = new Date(now); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); from = fmt(start); to = fmt(now) }
     else if (key === 'month') { from = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); to = fmt(now) }
-    else if (key === 'year') { from = fmt(new Date(now.getFullYear(), 0, 1)); to = fmt(now) }
+    // 本年 / 全部：按核对起算日算（7月1日到今天），避免把不能核对的历史也算进来
+    else if (key === 'year' || key === 'all') { from = this.data.lockStart; to = fmt(now) }
     // 「自定义」只切状态，日期由下面的日期框决定
     if (key === 'custom') { this.setData({ timePreset: 'custom', timePresetIndex: index }); return }
     this.setData({ timePreset: key, timePresetIndex: index, dateFrom: from, dateTo: to })
