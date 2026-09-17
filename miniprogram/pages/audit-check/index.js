@@ -26,7 +26,7 @@ Page({
     days: [],
     summary: null,
     loading: false, error: '',
-    detail: null, busy: false,
+    busy: false,
   },
 
   onLoad() {
@@ -57,26 +57,41 @@ Page({
     const isCourse = this.data.mode === 'course'
     const block = isCourse ? day.course : day.visit
     if (!block) return null
-    const rows = (block.rows || []).map(row => (isCourse ? {
-      id: row.id,
-      title: row.title || row.type_label || '未命名课程',
-      timeText: row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : '',
-      subText: [row.activity_type_label, row.teacher_names && row.teacher_names.length ? row.teacher_names.join('、') : '', row.owner_name ? `案主 ${row.owner_name}` : ''].filter(Boolean).join(' · '),
-      // 参与人直接显示在列表上，不用点开
-      peopleText: (row.participant_names || []).length
-        ? `参与人 ${row.participant_names.slice(0, 8).join('、')}${row.participant_names.length > 8 ? ' 等' : ''}（${row.participant_names.length} 人）`
-        : '',
-      badge: row.kinds && row.kinds.length ? `待补 ${row.kinds.length}` : '',
-      raw: row,
-    } : {
-      id: row.id,
-      title: row.nickname || '未命名客户',
-      timeText: row.time || '',
-      subText: [row.member_type, row.inviter ? `引流 ${row.inviter}` : '', row.cancelled ? '已取消' : (row.arrived ? '已到店' : '')].filter(Boolean).join(' · '),
-      peopleText: (row.needs_hidden ? '' : (row.needs || '')) || row.customer_info || row.follow_up || '',
-      badge: row.kinds && row.kinds.length ? `待补 ${row.kinds.length}` : '',
-      raw: row,
-    }))
+    const rows = (block.rows || []).map(row => {
+      const has = key => (row.kinds || []).indexOf(key) >= 0
+      const fields = isCourse ? [
+        { label: "时间", value: row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : "", missing: has("course_time") },
+        { label: "类型", value: row.type_label || row.activity_type_label },
+        { label: "老师", value: (row.teacher_names || []).join("、"), missing: has("course_teacher") },
+        { label: "案主", value: row.owner_name, missing: has("course_owner") },
+        { label: "部位", value: row.body_parts ? `${row.body_parts}` : "" },
+        { label: "方式", value: row.activity_mode },
+        { label: "扣卡", value: row.deduction_count ? `${row.deduction_count} 次` : "" },
+        { label: "简介", value: row.intro },
+        { label: "发布", value: row.published ? "已发布" : "未发布" },
+      ] : [
+        { label: "时间", value: row.time },
+        { label: "组长", value: row.is_leader ? "是" : "" },
+        { label: "到店", value: row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ' ' + row.arrival_time : ''}` : "未到店") },
+        { label: "邀约人", value: row.inviter },
+        { label: "接待人", value: row.receptionist },
+        { label: "目标", value: row.goal },
+        { label: "所属组长", value: row.has_leader ? (row.leader_name || "") : "" },
+        { label: "创建人", value: row.creator },
+      ]
+      return {
+        id: row.id,
+        title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
+        fields: fields.filter(item => item.value),
+        missingCount: (row.kinds || []).length,
+        peopleText: isCourse
+          ? ((row.participant_names || []).length
+              ? `${row.participant_names.join("、")}（${row.participant_names.length} 人）`
+              : "")
+          : "",
+        peopleMissing: isCourse && (!row.participant_names || !row.participant_names.length),
+      }
+    })
     return {
       date: day.date,
       dateText: dateText(day.date),
@@ -115,7 +130,7 @@ Page({
   onMode(event) {
     const mode = event.currentTarget.dataset.mode
     if (mode === this.data.mode) return
-    this.setData({ mode, detail: null })
+    this.setData({ mode })
     this.load()
   },
   onDateFrom(event) { this.setData({ dateFrom: event.detail.value }); this.load() },
@@ -126,55 +141,6 @@ Page({
     this.load()
   },
 
-  /** 详情：把这一条的所有字段平铺出来，空的不显示 */
-  openDetail(event) {
-    const dayIndex = Number(event.currentTarget.dataset.day)
-    const rowIndex = Number(event.currentTarget.dataset.row)
-    const day = this.data.days[dayIndex]
-    const row = day && day.rows[rowIndex]
-    if (!row) return
-    const isCourse = this.data.mode === 'course'
-    const raw = row.raw || {}
-    const fields = isCourse ? [
-      ['时间', raw.time && `${raw.time}${raw.end_time ? '~' + raw.end_time : ''}`],
-      ['课程', raw.title],
-      ['类型', raw.activity_type_label || raw.type_label],
-      ['老师', (raw.teacher_names || []).join('、')],
-      ['案主', raw.owner_name],
-      ['部位数', raw.body_parts ? String(raw.body_parts) : ''],
-      ['参与人', (raw.participant_names || []).join('、')],
-      ['活动方式', raw.activity_mode],
-      ['活动简介', raw.intro],
-      ['创建人', raw.creator],
-      ['缺口', (raw.kinds || []).join('、')],
-    ] : [
-      ['时间', raw.time],
-      ['客户', raw.nickname],
-      ['会员身份', raw.member_type],
-      ['组长', raw.is_leader ? '是' : (raw.leader_name ? raw.leader_name : '')],
-      ['到店', raw.cancelled ? '已取消' : (raw.arrived ? `已到店${raw.arrival_time ? ' · ' + raw.arrival_time : ''}` : '未到店')],
-      ['来访需求', raw.needs_hidden ? '（无查看权限）' : raw.needs],
-      ['客户信息', raw.customer_info],
-      ['跟进点', raw.follow_up],
-      ['引流人', raw.inviter],
-      ['承接人', raw.receptionist],
-      ['邀约目标', raw.goal],
-      ['创建人', raw.creator],
-      ['缺口', (raw.kinds || []).join('、')],
-    ]
-    this.setData({
-      detail: {
-        dayIndex,
-        date: day.date,
-        dateText: day.dateText,
-        checked: day.checked,
-        operator: day.operator,
-        title: row.title,
-        fields: fields.filter(item => item[1]).map(item => ({ label: item[0], value: item[1] })),
-      },
-    })
-  },
-  closeDetail() { if (!this.data.busy) this.setData({ detail: null }) },
 
   /** 核对 / 取消核对：核对的是「当天」的全部信息，所以放在日期分组头上 */
   async toggleCheckDay(event) {
@@ -207,13 +173,8 @@ Page({
   },
 
   /** 去编辑：课表跳活动详情、邀约跳邀约详情 */
-  goEdit() {
-    const detail = this.data.detail
-    if (!detail) return
-    const day = this.data.days[detail.dayIndex]
-    const row = day && day.rows.find(item => item.title === detail.title)
-    const id = row && row.id
-    this.setData({ detail: null })
+  goEdit(event) {
+    const id = event.currentTarget.dataset.id
     if (!id) return
     if (this.data.mode === 'course') {
       wx.navigateTo({ url: `/pages/activity-detail/index?id=${encodeURIComponent(id)}` })

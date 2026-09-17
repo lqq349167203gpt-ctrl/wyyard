@@ -56,3 +56,22 @@
 .sheet-button { display: flex; align-items: center; justify-content: center; flex: 1 1 0; width: 0; height: 72rpx; border-radius: 8rpx; border: 1rpx solid #dfe2e6; font-size: 25rpx; font-weight: 500; color: #646a73; background: #fff; }
 .sheet-button.primary { border-color: #3370ff; background: #3370ff; color: #fff; }
 .sheet-button.disabled { opacity: .6; }
+
+/* 行内直接展示全部字段：一行一个，左侧短标签、右侧内容 */
+.rec { padding: 20rpx 22rpx; border-bottom: 1rpx solid #f2f3f5; }
+.rec:last-child { border-bottom: none; }
+.rec-head { display: flex; align-items: center; gap: 10rpx; }
+.rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 27rpx; font-weight: 500; color: #1f2329; }
+.rec-badge { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; background: #fff4e8; font-size: 20rpx; color: #c98a2e; }
+.rec-edit { flex-shrink: 0; padding: 4rpx 12rpx; border: 1rpx solid #e8eaed; border-radius: 6rpx; font-size: 21rpx; color: #4e535a; }
+.rec-fields { margin-top: 8rpx; }
+.rec-field { display: flex; align-items: flex-start; gap: 12rpx; padding: 5rpx 0; }
+.rec-field-label { flex-shrink: 0; width: 110rpx; font-size: 22rpx; color: #9aa1a9; }
+.rec-field-value { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.55; color: #2b2f36; word-break: break-all; }
+.rec-field-value.missing { color: #c98a2e; }
+/* 参与人：上面一条短横线分隔，标签用图标 */
+.rec-divider { width: 40rpx; height: 2rpx; border-radius: 2rpx; background: #e5e8eb; margin: 14rpx 0 12rpx 110rpx; }
+.rec-people-line { display: flex; align-items: flex-start; gap: 12rpx; }
+.rec-people-icon { flex-shrink: 0; width: 26rpx; height: 26rpx; margin: 3rpx 0 0 42rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWFhMWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
+.rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.55; color: #2b2f36; word-break: break-all; }
+.rec-people-text.missing { color: #c98a2e; }
