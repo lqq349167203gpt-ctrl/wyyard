@@ -47,20 +47,21 @@
         <text class="rec-status {{row.statusClass}}" wx:if="{{row.statusText}}">{{row.statusText}}</text>
         <text class="rec-title">{{row.title}}</text>
         <text class="rec-statustag" wx:if="{{row.statusTag}}">{{row.statusTag}}</text>
-        <text class="rec-miss" wx:for="{{row.missingTags}}" wx:key="*this" wx:for-item="mtag">{{mtag}}</text>
         <text class="rec-edit" data-id="{{row.id}}" data-date="{{day.date}}" bindtap="goEdit">编辑</text>
       </view>
       <text class="rec-headline" wx:if="{{row.headline}}">{{row.headline}}</text>
       <view class="rec-fields">
         <view class="rec-field" wx:for="{{row.fields}}" wx:key="label" wx:for-item="cell">
           <text class="rec-field-label">{{cell.label}}</text>
-          <text class="rec-field-value {{cell.missing ? 'missing' : ''}}">{{cell.value}}</text>
+          <text class="rec-tag" wx:if="{{cell.missing}}">{{cell.missingLabel}}</text>
+          <text class="rec-field-value" wx:else>{{cell.value}}</text>
         </view>
       </view>
       <view class="rec-people" wx:if="{{row.peopleText || row.peopleMissing}}">
         <view class="rec-people-line">
           <view class="rec-people-icon"></view>
-          <text class="rec-people-text {{row.peopleMissing ? 'missing' : ''}}">{{row.peopleMissing ? '无参与人' : row.peopleText}}</text>
+          <text class="rec-tag" wx:if="{{row.peopleMissing}}">无参与人</text>
+          <text class="rec-people-text" wx:else>{{row.peopleText}}</text>
         </view>
       </view>
     </view>

@@ -64,10 +64,8 @@ Page({
         course_owner: "缺案主", course_body_parts: "缺部位", course_intro: "缺简介", course_no_participant: "无参与人",
         visit_time: "缺时间", visit_nickname: "缺昵称", visit_inviter: "缺邀约人", visit_receptionist: "缺接待人",
       }
-      // 「无参与人」只在下面的参与人那一行显示，标题后不再重复
-      const missingTags = (row.kinds || [])
-        .filter(key => key !== "course_no_participant")
-        .map(key => MISSING_LABELS[key] || key)
+      // 缺失只在「字段自己那一行」用带底框的标签显示一次（标题行不再重复）
+      const missingTags = []
       // 时间 / 类型 / 方式（线上线下）一看就懂，放在同一行、不用标题
       const headline = isCourse
         ? [
@@ -107,7 +105,7 @@ Page({
         // 简介等没有检查项的字段，空着就整行不显示
         fields: fields
           .filter(item => item.value || (item.kind && has(item.kind)))
-          .map(item => item.value ? item : { ...item, value: "未填", missing: true }),
+          .map(item => item.value ? item : { ...item, missing: true, missingLabel: MISSING_LABELS[item.kind] || "未填" }),
 
         // 参与人全部显示，不做缩略
         peopleText: isCourse && (row.participant_names || []).length
