@@ -62,6 +62,10 @@ Page({
       title: row.title || row.type_label || '未命名课程',
       timeText: row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : '',
       subText: [row.activity_type_label, row.teacher_names && row.teacher_names.length ? row.teacher_names.join('、') : '', row.owner_name ? `案主 ${row.owner_name}` : ''].filter(Boolean).join(' · '),
+      // 参与人直接显示在列表上，不用点开
+      peopleText: (row.participant_names || []).length
+        ? `参与人 ${row.participant_names.slice(0, 8).join('、')}${row.participant_names.length > 8 ? ' 等' : ''}（${row.participant_names.length} 人）`
+        : '',
       badge: row.kinds && row.kinds.length ? `待补 ${row.kinds.length}` : '',
       raw: row,
     } : {
@@ -69,6 +73,7 @@ Page({
       title: row.nickname || '未命名客户',
       timeText: row.time || '',
       subText: [row.member_type, row.inviter ? `引流 ${row.inviter}` : '', row.cancelled ? '已取消' : (row.arrived ? '已到店' : '')].filter(Boolean).join(' · '),
+      peopleText: (row.needs_hidden ? '' : (row.needs || '')) || row.customer_info || row.follow_up || '',
       badge: row.kinds && row.kinds.length ? `待补 ${row.kinds.length}` : '',
       raw: row,
     }))
@@ -171,12 +176,13 @@ Page({
   },
   closeDetail() { if (!this.data.busy) this.setData({ detail: null }) },
 
-  /** 核对 / 取消核对（按天，和 PC 一致） */
-  async toggleCheck() {
-    const detail = this.data.detail
-    if (!detail || this.data.busy) return
-    const date = detail.date
-    const willCheck = !detail.checked
+  /** 核对 / 取消核对：核对的是「当天」的全部信息，所以放在日期分组头上 */
+  async toggleCheckDay(event) {
+    const dayIndex = Number(event.currentTarget.dataset.day)
+    const day = this.data.days[dayIndex]
+    if (!day || this.data.busy) return
+    const date = day.date
+    const willCheck = !day.checked
     this.setData({ busy: true })
     wx.showLoading({ title: willCheck ? '核对中' : '取消中' })
     try {
@@ -186,14 +192,11 @@ Page({
         ? (willCheck ? await activityThemeApi.lock(date, spaceId) : await activityThemeApi.unlock(date, spaceId))
         : (willCheck ? await visitVerificationApi.verify(date, spaceId) : await visitVerificationApi.unverify(date, spaceId))
       const operator = response.locked_by || response.verified_by || ''
-      const days = this.data.days.map((day, index) => index === detail.dayIndex
-        ? { ...day, checked: willCheck, operator }
-        : day)
+      const days = this.data.days.map((item, index) => index === dayIndex
+        ? { ...item, checked: willCheck, operator }
+        : item)
       const checkedFilter = this.data.filters[this.data.filterIndex].value === 'checked'
-      this.setData({
-        days: days.filter(day => (checkedFilter ? day.checked : !day.checked)),
-        detail: null,
-      })
+      this.setData({ days: days.filter(item => (checkedFilter ? item.checked : !item.checked)) })
       wx.showToast({ title: willCheck ? '已核对' : '已取消核对', icon: 'none' })
     } catch (e) {
       wx.showToast({ title: e.message || '操作失败', icon: 'none' })

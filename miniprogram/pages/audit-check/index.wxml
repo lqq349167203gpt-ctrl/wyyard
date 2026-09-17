@@ -35,8 +35,11 @@
 
   <view class="day-card" wx:for="{{days}}" wx:key="date" wx:for-item="day" wx:for-index="di">
     <view class="day-head">
-      <text class="day-date">{{day.dateText}}</text>
-      <text class="day-state {{day.checked ? 'done' : ''}}">{{day.checked ? '已核对' : '未核对'}}{{day.checked && day.operator ? ' · ' + day.operator : ''}}</text>
+      <view class="day-info">
+        <text class="day-date">{{day.dateText}}</text>
+        <text class="day-state {{day.checked ? 'done' : ''}}">{{day.checked ? '已核对' : '未核对'}}{{day.checked && day.operator ? ' · ' + day.operator : ''}}</text>
+      </view>
+      <text class="day-action {{day.checked ? '' : 'primary'}}" data-day="{{di}}" bindtap="toggleCheckDay">{{day.checked ? '取消核对' : '核对当天'}}</text>
     </view>
     <view class="row" wx:for="{{day.rows}}" wx:key="id" wx:for-item="row" wx:for-index="ri" data-day="{{di}}" data-row="{{ri}}" bindtap="openDetail">
       <view class="row-main">
@@ -45,6 +48,7 @@
           <text class="row-badge" wx:if="{{row.badge}}">{{row.badge}}</text>
         </view>
         <text class="row-sub">{{row.timeText}}{{row.subText ? ' · ' + row.subText : ''}}</text>
+        <text class="row-people" wx:if="{{row.peopleText}}">{{row.peopleText}}</text>
       </view>
       <text class="row-arrow">›</text>
     </view>
@@ -61,14 +65,14 @@
     </view>
     <scroll-view class="sheet-body" scroll-y>
       <text class="sheet-sub">{{detail.dateText}} · {{detail.checked ? '已核对' : '未核对'}}{{detail.checked && detail.operator ? ' · ' + detail.operator : ''}}</text>
+      <text class="sheet-tip">核对是按「当天」整体核对的，在列表的日期那一行点「核对当天」。</text>
       <view class="field" wx:for="{{detail.fields}}" wx:key="label">
         <text class="field-label">{{item.label}}</text>
         <text class="field-value">{{item.value}}</text>
       </view>
     </scroll-view>
     <view class="sheet-actions">
-      <text class="sheet-button" bindtap="goEdit">去编辑</text>
-      <text class="sheet-button primary {{busy ? 'disabled' : ''}}" bindtap="toggleCheck">{{detail.checked ? '取消核对' : '确认核对'}}</text>
+      <text class="sheet-button primary" bindtap="goEdit">去编辑</text>
     </view>
   </view>
 </view>
