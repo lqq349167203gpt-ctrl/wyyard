@@ -42,12 +42,13 @@
     </view>
 
     <view class="rec" wx:for="{{day.rows}}" wx:key="id" wx:for-item="row" wx:for-index="ri">
+      <!-- 方案 C：课程名/客户名在最上面，下面才是 时间·类型·方式·扣卡 -->
       <view class="rec-head">
-        <text class="rec-headline" wx:if="{{row.headline}}">{{row.headline}}</text>
         <text class="rec-title">{{row.title}}</text>
         <text class="rec-badge" wx:if="{{row.missingCount}}">缺 {{row.missingCount}}</text>
         <text class="rec-edit" data-id="{{row.id}}" bindtap="goEdit">编辑</text>
       </view>
+      <text class="rec-headline" wx:if="{{row.headline}}">{{row.headline}}</text>
       <view class="rec-fields">
         <view class="rec-field" wx:for="{{row.fields}}" wx:key="label" wx:for-item="cell">
           <text class="rec-field-label">{{cell.label}}</text>

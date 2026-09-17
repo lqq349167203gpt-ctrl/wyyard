@@ -87,3 +87,7 @@
 .rec-people-icon { flex-shrink: 0; width: 30rpx; height: 30rpx; margin-top: 2rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGE5MWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
 .rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.65; color: #2b2f36; word-break: break-all; }
 .rec-people-text.missing { color: #c98a2e; }
+
+/* 课程名在最上，自解释行跟在下面 */
+.rec-title { font-size: 29rpx; font-weight: 600; }
+.rec-headline { display: block; margin-top: 6rpx; font-size: 23rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
