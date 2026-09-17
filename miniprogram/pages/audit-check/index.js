@@ -175,9 +175,11 @@ Page({
   },
 
   onMode(event) {
-    const mode = event.currentTarget.dataset.mode
-    if (mode === this.data.mode) return
-    this.setData({ mode })
+    // 模式值做兜底，避免 dataset 丢失时把 mode 设成 undefined 导致两个页签都不高亮
+    const mode = event.currentTarget.dataset.mode === 'visit' ? 'visit' : 'course'
+    if (mode === this.data.mode) { this.load(); return }
+    // 立刻切数据状态并清空列表，保证视觉上一定跟着变
+    this.setData({ mode, days: [], summary: null, detail: null })
     this.load()
   },
   /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
