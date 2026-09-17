@@ -1,4 +1,4 @@
-const { auditCheckApi, activityThemeApi, visitVerificationApi, spaceApi } = require('../../utils/api')
+const { auditCheckApi, activityThemeApi, visitVerificationApi, spaceApi, classRecordApi } = require('../../utils/api')
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
@@ -200,13 +200,35 @@ Page({
   },
 
   /** 去编辑：课表跳活动详情、邀约跳邀约详情 */
-  goEdit(event) {
+  async goEdit(event) {
     const id = event.currentTarget.dataset.id
+    const date = event.currentTarget.dataset.date
     if (!id) return
-    if (this.data.mode === 'course') {
-      wx.navigateTo({ url: `/pages/activity-detail/index?id=${encodeURIComponent(id)}` })
-    } else {
+    if (this.data.mode !== 'course') {
       wx.navigateTo({ url: `/pages/visit-detail/index?id=${encodeURIComponent(id)}` })
+      return
+    }
+    // 活动详情页是从 globalData 取原始记录，所以先查当天课表、拿到这条记录再跳
+    const [activityType, recordId] = String(id).split(':')
+    const sourceMap = { class: 'class_record', gcs: 'group_case', ers: 'emotional_release', eks: 'energy_knot', ics: 'internal_course' }
+    const keyMap = { class_record: 'class_records', group_case: 'gcs_sessions', emotional_release: 'ers_sessions', energy_knot: 'eks_sessions', internal_course: 'ics_sessions' }
+    const source = sourceMap[activityType] || 'class_record'
+    wx.showLoading({ title: '打开中' })
+    try {
+      const spaceId = (this.data.spaces[this.data.spaceIndex] || {}).id || ''
+      const dashboard = await classRecordApi.dashboard(date, spaceId || undefined)
+      const raw = ((dashboard && dashboard[keyMap[source]]) || []).find(item => item.id === recordId)
+      if (!raw) throw new Error('找不到这条活动记录')
+      const app = getApp()
+      app.globalData._selectedActivity = raw
+      app.globalData._selectedActivitySource = source
+      app.globalData._selectedActivityDayLocked = false
+      app.globalData._selectedActivityLockedBy = ''
+      wx.navigateTo({ url: '/pages/activity-detail/index' })
+    } catch (e) {
+      wx.showToast({ title: e.message || '打开失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
     }
   },
 })
