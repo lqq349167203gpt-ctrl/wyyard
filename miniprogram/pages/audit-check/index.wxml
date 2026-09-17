@@ -41,7 +41,7 @@
           <text class="day-state-text">{{day.checked ? '已核对' : '未核对'}}{{day.checked && day.operator ? ' · ' + day.operator : ''}}</text>
         </view>
       </view>
-      <text class="day-action" data-day="{{di}}" bindtap="toggleCheckDay">{{day.checked ? '解锁' : '确认核对'}}</text>
+      <text class="day-action" data-day="{{di}}" bindtap="toggleCheckDay">{{day.checked ? '解锁' : '核对'}}</text>
     </view>
 
     <view class="rec" wx:for="{{day.rows}}" wx:key="id" wx:for-item="row" wx:for-index="ri">
