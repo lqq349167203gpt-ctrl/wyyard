@@ -7,6 +7,12 @@
   <view class="filter-card">
     <view class="filter-row">
       <text class="filter-label">时间</text>
+      <view class="seg">
+        <view class="seg-item {{timePreset === item.value ? 'active' : ''}}" wx:for="{{timePresets}}" wx:key="value" data-key="{{item.value}}" bindtap="onTimePreset">{{item.label}}</view>
+      </view>
+    </view>
+    <view class="filter-row">
+      <text class="filter-label">自定义</text>
       <picker class="filter-control" mode="date" value="{{dateFrom}}" end="{{dateTo}}" bindchange="onDateFrom">
         <view class="filter-value">{{dateFrom}}</view>
       </picker>

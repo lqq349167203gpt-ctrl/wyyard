@@ -19,6 +19,12 @@ Page({
   data: {
     mode: 'course',
     dateFrom: '', dateTo: '',
+    timePresets: [
+      { value: 'today', label: '当天' }, { value: 'week', label: '本周' },
+      { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
+      { value: 'all', label: '全部' },
+    ],
+    timePreset: 'all',
     spaces: [{ id: '', name: '全部空间' }], spaceIndex: 0,
     filters: [{ value: 'unchecked', label: '未核对' }, { value: 'checked', label: '已核对' }],
     filterIndex: 0,
@@ -35,8 +41,8 @@ Page({
       this.setData({ error: '暂无「信息核对」页面权限' })
       return
     }
-    const range = monthRange()
-    this.setData({ dateFrom: range.from, dateTo: range.to })
+    // 默认「全部」：起止留空，后端从核对起算日（2026-07-01）开始算，和 PC 一致
+    this.setData({ dateFrom: '', dateTo: '', timePreset: 'all' })
     this.loadSpaces()
     this.load()
   },
@@ -164,8 +170,23 @@ Page({
     this.setData({ mode })
     this.load()
   },
-  onDateFrom(event) { this.setData({ dateFrom: event.detail.value }); this.load() },
-  onDateTo(event) { this.setData({ dateTo: event.detail.value }); this.load() },
+  /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
+  onTimePreset(event) {
+    const key = event.currentTarget.dataset.key
+    const pad = v => String(v).padStart(2, '0')
+    const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const now = new Date()
+    let from = ''
+    let to = ''
+    if (key === 'today') { from = fmt(now); to = fmt(now) }
+    else if (key === 'week') { const start = new Date(now); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); from = fmt(start); to = fmt(now) }
+    else if (key === 'month') { from = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); to = fmt(now) }
+    else if (key === 'year') { from = fmt(new Date(now.getFullYear(), 0, 1)); to = fmt(now) }
+    this.setData({ timePreset: key, dateFrom: from, dateTo: to })
+    this.load()
+  },
+  onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load() },
+  onDateTo(event) { this.setData({ timePreset: 'custom', dateTo: event.detail.value }); this.load() },
   onSpace(event) { this.setData({ spaceIndex: Number(event.detail.value) }); this.load() },
   onFilter(event) {
     this.setData({ filterIndex: Number(event.currentTarget.dataset.index) })
