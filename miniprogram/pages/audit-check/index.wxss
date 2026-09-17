@@ -75,7 +75,6 @@
 .rec-people-icon { flex-shrink: 0; width: 30rpx; height: 30rpx; margin-top: 2rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGE5MWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
 .rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.65; color: #2b2f36; word-break: break-all; }
 
-.loading, .empty { padding: 80rpx 24rpx; text-align: center; color: #8f959e; font-size: 24rpx; }
 
 /* 未发布：标题行上的小标签（已发布不显示，不占地方） */
 .rec-statustag { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; border: 1rpx solid #e8eaed; font-size: 20rpx; color: #8f959e; }
@@ -86,4 +85,4 @@
 .rec-status.wait { background: #f2f3f5; color: #8f959e; }
 .rec-status.cancel { background: #fdeeee; color: #c94b55; }
 
-.rec-field-value.empty { color: #c9cdd4; }
+.rec-field-empty { color: #c9cdd4; }
