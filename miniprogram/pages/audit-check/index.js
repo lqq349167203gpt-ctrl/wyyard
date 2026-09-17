@@ -226,7 +226,9 @@ Page({
     const date = event.currentTarget.dataset.date
     if (!id) return
     if (this.data.mode !== 'course') {
-      wx.navigateTo({ url: `/pages/visit-detail/index?id=${encodeURIComponent(id)}` })
+      // 和「邀约」页一致：直接进编辑表单；当天已核对时带上 verified，表单按锁定处理
+      const verified = event.currentTarget.dataset.checked === true || event.currentTarget.dataset.checked === 'true'
+      wx.navigateTo({ url: `/pages/visit-edit/index?id=${encodeURIComponent(id)}&verified=${verified ? '1' : '0'}` })
       return
     }
     // 活动详情页是从 globalData 取原始记录，所以先查当天课表、拿到这条记录再跳
