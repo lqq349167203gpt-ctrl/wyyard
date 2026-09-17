@@ -44,6 +44,7 @@
     <view class="rec" wx:for="{{day.rows}}" wx:key="id" wx:for-item="row" wx:for-index="ri">
       <!-- 方案 C：课程名/客户名在最上面，下面才是 时间·类型·方式·扣卡 -->
       <view class="rec-head">
+        <text class="rec-status {{row.statusClass}}" wx:if="{{row.statusText}}">{{row.statusText}}</text>
         <text class="rec-title">{{row.title}}</text>
         <text class="rec-statustag" wx:if="{{row.statusTag}}">{{row.statusTag}}</text>
         <text class="rec-badge" wx:if="{{row.missingCount}}">缺 {{row.missingCount}}</text>

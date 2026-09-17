@@ -68,13 +68,17 @@ Page({
             // 扣卡 0 次也要显示，否则会以为这条信息缺了
             `扣卡 ${row.deduction_count || 0} 次`,
           ].filter(Boolean).join(" · ")
-        : [row.time, row.is_leader ? "组长" : "", row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ' ' + row.arrival_time : ''}` : "未到店")].filter(Boolean).join(" · ")
+        : [row.time, row.is_leader ? "组长" : ""].filter(Boolean).join(" · ")
+      // 方案 B：到场 / 取消状态做成胶囊，放在名字左边
+      const statusText = isCourse ? "" : (row.cancelled ? "已取消" : (row.arrived ? "已到店" : "未到店"))
+      const statusClass = isCourse ? "" : (row.cancelled ? "cancel" : (row.arrived ? "ok" : "wait"))
       const fields = isCourse ? [
         { label: "老师", value: (row.teacher_names || []).join("、"), missing: has("course_teacher") },
         { label: "案主", value: row.owner_name, missing: has("course_owner") },
         { label: "部位", value: row.body_parts ? `${row.body_parts}` : "" },
         { label: "简介", value: row.intro },
       ] : [
+        { label: "到场时间", value: row.arrived && !row.cancelled ? (row.arrival_time || "已到店") : "" },
         { label: "邀约人", value: row.inviter },
         { label: "接待人", value: row.receptionist },
         { label: "目标", value: row.goal },
@@ -86,6 +90,8 @@ Page({
         // 发布不是重点：只在「未发布」时用一个小标签提示，已发布不占地方
         statusTag: "",
         headline,
+        statusText,
+        statusClass,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
         fields: fields.filter(item => item.value),
         missingCount: (row.kinds || []).length,
