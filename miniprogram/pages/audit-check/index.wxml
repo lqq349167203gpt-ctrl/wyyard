@@ -55,7 +55,7 @@
         <view class="rec-field" wx:for="{{row.fields}}" wx:key="label" wx:for-item="cell">
           <text class="rec-field-label">{{cell.label}}</text>
           <text class="rec-tag" wx:if="{{cell.missing}}">{{cell.missingLabel}}</text>
-          <text class="rec-field-value rec-field-empty" wx:elif="{{cell.empty}}">—</text>
+          <view class="rec-empty-line" wx:elif="{{cell.empty}}"></view>
           <text class="rec-field-value" wx:else>{{cell.value}}</text>
         </view>
       </view>

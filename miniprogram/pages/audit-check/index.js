@@ -75,7 +75,12 @@ Page({
             // 扣卡 0 次也要显示，否则会以为这条信息缺了
             `扣卡 ${row.deduction_count || 0} 次`,
           ].filter(Boolean).join(" · ")
-        : [row.time, row.is_leader ? "组长" : "", row.creator ? `创建人 ${row.creator}` : ""].filter(Boolean).join(" · ")
+        : [
+            row.time,
+            row.creator ? `创建人 ${row.creator}` : "",
+            // 组长情况：是组长 → 组长；有分组 → 所属 xxx；都没有 → 未分组
+            row.is_leader ? "组长" : (row.has_leader && row.leader_name ? `所属 ${row.leader_name}` : "未分组"),
+          ].filter(Boolean).join(" · ")
       // 方案 B：到场 / 取消状态做成胶囊，放在名字左边
       const statusText = isCourse ? "" : (row.cancelled ? "已取消" : (row.arrived ? "已到店" : "未到店"))
       const statusClass = isCourse ? "" : (row.cancelled ? "cancel" : (row.arrived ? "ok" : "wait"))
@@ -90,7 +95,6 @@ Page({
         // 接待人 / 目标：不管有没有内容都保留标题
         { label: "接待人", kind: "visit_receptionist", alwaysShow: true, value: row.receptionist },
         { label: "目标", kind: "visit_goal", alwaysShow: true, value: row.goal },
-        { label: "所属组长", kind: "visit_leader", value: row.has_leader ? (row.leader_name || "") : "" },
       ]
       return {
         id: row.id,

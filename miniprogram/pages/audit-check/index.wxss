@@ -85,4 +85,4 @@
 .rec-status.wait { background: #f2f3f5; color: #8f959e; }
 .rec-status.cancel { background: #fdeeee; color: #c94b55; }
 
-.rec-field-empty { color: #c9cdd4; }
+.rec-empty-line { flex-shrink: 0; width: 20rpx; height: 2rpx; margin-top: 17rpx; border-radius: 2rpx; background: #e5e8eb; }
