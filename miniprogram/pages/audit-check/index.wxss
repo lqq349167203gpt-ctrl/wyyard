@@ -61,7 +61,7 @@
 .rec { padding: 20rpx 22rpx; border-bottom: 1rpx solid #f2f3f5; }
 .rec:last-child { border-bottom: none; }
 .rec-head { display: flex; align-items: center; gap: 10rpx; }
-.rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 29rpx; font-weight: 600; color: #1f2329; }
+.rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 25rpx; font-weight: 500; color: #1f2329; }
 .rec-badge { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; background: #fff4e8; font-size: 20rpx; color: #c98a2e; }
 .rec-edit { flex-shrink: 0; padding: 4rpx 12rpx; border: 1rpx solid #e8eaed; border-radius: 6rpx; font-size: 21rpx; color: #4e535a; }
 .rec-headline { display: block; margin-top: 6rpx; font-size: 23rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
@@ -70,9 +70,8 @@
 .rec-field-label { flex-shrink: 0; width: 110rpx; font-size: 22rpx; color: #9aa1a9; }
 .rec-field-value { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.6; color: #2b2f36; word-break: break-all; }
 .rec-field-value.missing { color: #c98a2e; }
-/* 参与人：只有这一条短横线做分隔，名单全部显示 */
-.rec-people { margin-top: 14rpx; }
-.rec-divider { width: 40rpx; height: 2rpx; border-radius: 2rpx; background: #e5e8eb; margin-bottom: 12rpx; }
+/* 参与人：浅灰底块，不再加分隔横线（和方案 C 一致） */
+.rec-people { margin-top: 12rpx; }
 .rec-people-line { display: flex; align-items: flex-start; gap: 10rpx; padding: 14rpx 16rpx; border-radius: 8rpx; background: #f7f8fa; }
 .rec-people-icon { flex-shrink: 0; width: 30rpx; height: 30rpx; margin-top: 2rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGE5MWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
 .rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.65; color: #2b2f36; word-break: break-all; }
