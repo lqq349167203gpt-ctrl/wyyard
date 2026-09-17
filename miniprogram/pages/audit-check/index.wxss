@@ -57,37 +57,25 @@
 .sheet-button.primary { border-color: #3370ff; background: #3370ff; color: #fff; }
 .sheet-button.disabled { opacity: .6; }
 
-/* 行内直接展示全部字段：一行一个，左侧短标签、右侧内容 */
+/* 记录卡片（方案 C）：课程名在最上 → 自解释行 → 字段 → 参与人 */
 .rec { padding: 20rpx 22rpx; border-bottom: 1rpx solid #f2f3f5; }
 .rec:last-child { border-bottom: none; }
 .rec-head { display: flex; align-items: center; gap: 10rpx; }
-.rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 27rpx; font-weight: 500; color: #1f2329; }
+.rec-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 29rpx; font-weight: 600; color: #1f2329; }
 .rec-badge { flex-shrink: 0; padding: 2rpx 10rpx; border-radius: 6rpx; background: #fff4e8; font-size: 20rpx; color: #c98a2e; }
 .rec-edit { flex-shrink: 0; padding: 4rpx 12rpx; border: 1rpx solid #e8eaed; border-radius: 6rpx; font-size: 21rpx; color: #4e535a; }
-.rec-fields { margin-top: 8rpx; }
+.rec-headline { display: block; margin-top: 6rpx; font-size: 23rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
+.rec-fields { margin-top: 10rpx; }
 .rec-field { display: flex; align-items: flex-start; gap: 12rpx; padding: 5rpx 0; }
 .rec-field-label { flex-shrink: 0; width: 110rpx; font-size: 22rpx; color: #9aa1a9; }
-.rec-field-value { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.55; color: #2b2f36; word-break: break-all; }
+.rec-field-value { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.6; color: #2b2f36; word-break: break-all; }
 .rec-field-value.missing { color: #c98a2e; }
-/* 参与人：上面一条短横线分隔，标签用图标 */
-.rec-divider { width: 40rpx; height: 2rpx; border-radius: 2rpx; background: #e5e8eb; margin: 14rpx 0 12rpx 110rpx; }
-.rec-people-line { display: flex; align-items: flex-start; gap: 12rpx; }
-.rec-people-icon { flex-shrink: 0; width: 26rpx; height: 26rpx; margin: 3rpx 0 0 42rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOWFhMWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
-.rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.55; color: #2b2f36; word-break: break-all; }
-.rec-people-text.missing { color: #c98a2e; }
-
-/* 一行自解释信息（时间 · 类型 · 线上/线下），不需要标题 */
-.rec-headline { flex-shrink: 0; font-size: 23rpx; color: #8f959e; }
-.rec-title { margin-left: 4rpx; }
-
-/* 参与人：浅灰底块 + 图标，名单全部显示、自动换行 */
-.rec-people { margin-top: 12rpx; }
-.rec-divider { width: 40rpx; height: 2rpx; border-radius: 2rpx; background: #e5e8eb; margin: 0 0 12rpx 12rpx; }
+/* 参与人：只有这一条短横线做分隔，名单全部显示 */
+.rec-people { margin-top: 14rpx; }
+.rec-divider { width: 40rpx; height: 2rpx; border-radius: 2rpx; background: #e5e8eb; margin-bottom: 12rpx; }
 .rec-people-line { display: flex; align-items: flex-start; gap: 10rpx; padding: 14rpx 16rpx; border-radius: 8rpx; background: #f7f8fa; }
 .rec-people-icon { flex-shrink: 0; width: 30rpx; height: 30rpx; margin-top: 2rpx; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGE5MWE5IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTkgMTFhNCA0IDAgMSAwIDAgLTggNCA0IDAgMCAwIDAgOCIvPjxwYXRoIGQ9Ik0zIDIxdi0yYTYgNiAwIDAgMSA2IC02aDRhNiA2IDAgMCAxIDYgNnYyIi8+PHBhdGggZD0iTTE2IDNhNCA0IDAgMCAxIDAgOG0yIDEwdi0yYTYgNiAwIDAgMCAtNCAtNS42Ii8+PC9zdmc+"); }
 .rec-people-text { flex: 1; min-width: 0; font-size: 24rpx; line-height: 1.65; color: #2b2f36; word-break: break-all; }
 .rec-people-text.missing { color: #c98a2e; }
 
-/* 课程名在最上，自解释行跟在下面 */
-.rec-title { font-size: 29rpx; font-weight: 600; }
-.rec-headline { display: block; margin-top: 6rpx; font-size: 23rpx; line-height: 1.5; color: #8f959e; word-break: break-all; }
+.loading, .empty { padding: 80rpx 24rpx; text-align: center; color: #8f959e; font-size: 24rpx; }
