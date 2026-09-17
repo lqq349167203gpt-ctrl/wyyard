@@ -65,13 +65,13 @@ Page({
             row.time ? `${row.time}${row.end_time ? '~' + row.end_time : ''}` : "",
             row.type_label || row.activity_type_label,
             row.activity_mode,
+            row.deduction_count ? `扣卡 ${row.deduction_count} 次` : "",
           ].filter(Boolean).join(" · ")
         : [row.time, row.is_leader ? "组长" : "", row.cancelled ? "已取消" : (row.arrived ? `已到店${row.arrival_time ? ' ' + row.arrival_time : ''}` : "未到店")].filter(Boolean).join(" · ")
       const fields = isCourse ? [
         { label: "老师", value: (row.teacher_names || []).join("、"), missing: has("course_teacher") },
         { label: "案主", value: row.owner_name, missing: has("course_owner") },
         { label: "部位", value: row.body_parts ? `${row.body_parts}` : "" },
-        { label: "扣卡", value: row.deduction_count ? `${row.deduction_count} 次` : "" },
         { label: "简介", value: row.intro },
         { label: "发布", value: row.published ? "已发布" : "未发布" },
       ] : [
@@ -87,10 +87,9 @@ Page({
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
         fields: fields.filter(item => item.value),
         missingCount: (row.kinds || []).length,
-        peopleText: isCourse
-          ? ((row.participant_names || []).length
-              ? `${row.participant_names.join("、")}（${row.participant_names.length} 人）`
-              : "")
+        // 参与人全部显示，不做缩略
+        peopleText: isCourse && (row.participant_names || []).length
+          ? `${row.participant_names.join("、")}（${row.participant_names.length} 人）`
           : "",
         peopleMissing: isCourse && (!row.participant_names || !row.participant_names.length),
       }
