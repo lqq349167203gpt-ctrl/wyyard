@@ -27,3 +27,6 @@ backend/uploads/materials/
 
 # 微信开发者工具本机私有配置
 **/project.private.config.json
+
+# 工具/设计产物（不进小程序包，也不入版本管理）
+miniprogram/.workbuddy/
