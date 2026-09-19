@@ -590,7 +590,11 @@ def build_customer_dataset(
             "inviter_names": sorted(period_inviter_names.get(customer.id, set())),
             "invitation_creators": sorted(period_invitation_creators.get(customer.id, set())),
             "schedule_creators": sorted(period_schedule_creators.get(customer.id, set())),
-            "invitation_count_period": period_invitation_counts.get(customer.id, 0),
+            # 期间邀约次数按总次数算：已取消的也算在内（取消次数另有 cancelled_count_period）
+            "invitation_count_period": (
+                period_invitation_counts.get(customer.id, 0)
+                + period_cancelled_counts.get(customer.id, 0)
+            ),
             "visit_count_period": len(period_visit_dates.get(customer.id, set())),
             "arrival_count_period": len(period_visit_dates.get(customer.id, set())),
             "cancelled_count_period": period_cancelled_counts.get(customer.id, 0),
@@ -853,7 +857,8 @@ def _scope_invitation_metrics(rows: list[dict[str, Any]], plan: AnalysisPlan) ->
                 for created_date in event.get("invitation_created_dates", [])
                 if created_date
             }),
-            "invitation_count_period": len(valid_events),
+            # 期间邀约次数是总次数：已取消的邀约也算（到店相关指标仍只看有效邀约）
+            "invitation_count_period": len(events),
             "cancelled_count_period": sum(1 for event in events if event.get("cancelled")),
             "visit_count_period": len({
                 event.get("visit_date")

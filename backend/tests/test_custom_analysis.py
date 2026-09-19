@@ -479,6 +479,38 @@ def test_inviter_condition_scopes_invitation_metrics(monkeypatch):
     assert result["items"][0]["arrival_count_period"] == 1
 
 
+def test_period_invitation_count_includes_cancelled(monkeypatch):
+    """期间邀约次数是总次数：已取消的邀约也算在内；到店相关仍只看有效邀约。"""
+    rows = [
+        _row(
+            "c1",
+            inviter_names=["奥雅"],
+            invitation_count_period=2,
+            cancelled_count_period=1,
+            visit_count_period=1,
+            arrival_count_period=1,
+            _invitation_events_period=[
+                {"inviter_names": ["奥雅"], "visit_date": "2026-01-05", "arrived": True, "cancelled": False},
+                {"inviter_names": ["奥雅"], "visit_date": "2026-01-08", "arrived": False, "cancelled": True},
+            ],
+        ),
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(
+        conditions=[AnalysisCondition(field="inviter_names", operator="eq", value="奥雅")],
+        metrics=["invited_customers"],
+        columns=["nickname", "invitation_count_period", "cancelled_count_period", "visit_count_period"],
+        card_dimension="none",
+    )
+
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+
+    item = result["items"][0]
+    assert item["invitation_count_period"] == 2  # 含已取消的那一条
+    assert item["cancelled_count_period"] == 1
+    assert item["visit_count_period"] == 1
+
+
 def test_invitation_creator_condition_scopes_invitation_metrics(monkeypatch):
     """「邀约创建人」按单条邀约判断，命中的那一条才计入邀约/到场口径。"""
     rows = [
