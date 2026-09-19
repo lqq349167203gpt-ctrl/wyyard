@@ -3437,6 +3437,8 @@ export interface CourseStatistics {
     course_count: number
     class_hours: number
     participant_count: number
+    /** 案主人次（与参与人次相加 = 服务总人次） */
+    owner_count?: number
   }>
   salon_subtype_statistics: Array<{
     type: string

@@ -1840,7 +1840,7 @@ def _course_activity_hours(activity_type: str, activity) -> int:
 def _course_owner_details(activity_type, activity, customer_map, visible_customer_ids):
     """案主沿用客户可见范围；能量结兼容多案主及历史部位记录。"""
     if activity_type not in {"gcs", "ers", "eks"}:
-        return {"owner_name": "", "body_part_count": None}
+        return {"owner_name": "", "body_part_count": None, "owner_count": 0}
     owners = []
     if activity_type == "eks":
         try:
@@ -1864,7 +1864,12 @@ def _course_owner_details(activity_type, activity, customer_map, visible_custome
             count += max(1, int(owner.get("count", 1) or 1))
         except (ValueError, TypeError):
             count += 1
-    return {"owner_name": "、".join(names), "body_part_count": count if activity_type == "eks" else None}
+    return {
+        "owner_name": "、".join(names),
+        "body_part_count": count if activity_type == "eks" else None,
+        # 案主人次：按可见的案主去重计数（能量结支持多案主）
+        "owner_count": len(names),
+    }
 
 
 def _course_teacher_hours(activities_by_type: dict[str, list]) -> dict[str, int]:
@@ -2101,6 +2106,7 @@ def get_course_statistics(
         course_count = 0
         class_hours = 0
         participant_count = 0
+        owner_count = 0
         for activity in selected_activities_by_type[type_key]:
             teacher_ids = _course_activity_teacher_ids(activity)
             course_count += 1
@@ -2116,6 +2122,13 @@ def get_course_statistics(
             activity_participants = len(participant_ids)
             class_hours += activity_hours
             participant_count += activity_participants
+            owner_count += len([
+                name for name in (
+                    _course_owner_details(type_key, activity, customer_map, visible_customer_ids)
+                    .get("owner_name", "")
+                    .split("、")
+                ) if name
+            ])
             filtered_participants_by_date[activity.date].update(participant_ids)
             period_key = _course_period_key(activity.date, granularity)
             trend_grouped[period_key]["course_count"] += 1
@@ -2215,6 +2228,8 @@ def get_course_statistics(
             "course_count": course_count,
             "class_hours": class_hours,
             "participant_count": participant_count,
+            # 案主人次（与参与人次相加就是服务总人次）
+            "owner_count": owner_count,
         })
 
     for activity_date, participant_ids in filtered_participants_by_date.items():

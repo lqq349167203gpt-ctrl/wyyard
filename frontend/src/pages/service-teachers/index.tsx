@@ -458,9 +458,13 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       courseCount: result.courseCount + item.course_count,
       classHours: result.classHours + item.class_hours,
       participantCount: result.participantCount + item.participant_count,
+      ownerCount: result.ownerCount + (item.owner_count || 0),
     }),
-    { courseCount: 0, classHours: 0, participantCount: 0 },
+    { courseCount: 0, classHours: 0, participantCount: 0, ownerCount: 0 },
   ), [courseData?.statistics])
+
+  // 服务总人次 = 案主人次 + 参与人次
+  const serviceVisitCount = courseSummary.ownerCount + courseSummary.participantCount
 
   const applyCourseRangePreset = (preset: Exclude<CourseRangePreset, "custom">) => {
     const range = coursePresetRange(preset)
@@ -628,11 +632,20 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     }
   }
 
-  const summaryItems = activeTab === "courses"
+  type SummarySub = { label: string; value: number; unit: string }
+  const summaryItems: Array<{ label: string; value: number; unit: string; hint?: string; subs?: SummarySub[] }> = activeTab === "courses"
     ? [
         { label: "课程数", value: courseSummary.courseCount, unit: "场", hint: "所选时间范围" },
         { label: "课时数", value: courseSummary.classHours, unit: "课时", hint: "按课程扣卡规则统计" },
-        { label: "参与人次", value: courseSummary.participantCount, unit: "人次", hint: "同一客户多次参与会重复计算" },
+        {
+          label: "服务总人次",
+          value: serviceVisitCount,
+          unit: "人次",
+          subs: [
+            { label: "案主人次", value: courseSummary.ownerCount, unit: "人次" },
+            { label: "参与人次", value: courseSummary.participantCount, unit: "人次" },
+          ],
+        },
       ]
     : [
         { label: "负责客户", value: summary.total, unit: "人", hint: "当前服务老师" },
@@ -840,7 +853,18 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                     {item.value.toLocaleString()}
                     <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{item.unit}</span>
                   </span>
-                  <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>
+                  {item.subs && (
+                    <div className="mt-1 flex flex-wrap gap-x-3 text-[12px] text-[#8f959e]">
+                      {item.subs.map(sub => (
+                        <span key={sub.label}>
+                          {sub.label}
+                          <span className="ml-1 tabular-nums text-[#1f2329]">{sub.value.toLocaleString()}</span>
+                          <span className="ml-0.5">{sub.unit}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {item.hint && <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>}
                 </div>
               ))}
             </div>
@@ -1181,7 +1205,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                   {item.value.toLocaleString()}
                   <span className="ml-1 text-[12px] font-normal text-[#8f959e]">{item.unit}</span>
                 </span>
-                <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>
+                {item.hint && <div className="mt-1 text-[12px] text-[#8f959e]">{item.hint}</div>}
               </div>
             ))}
           </div>

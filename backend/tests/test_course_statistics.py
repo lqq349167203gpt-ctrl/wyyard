@@ -153,6 +153,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         "course_count": 1,
         "class_hours": 2,
         "participant_count": 2,
+        "owner_count": 0,
     }
     assert by_type["gcs"] == {
         "type": "gcs",
@@ -160,6 +161,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         "course_count": 1,
         "class_hours": 1,
         "participant_count": 1,
+        "owner_count": 0,
     }
     assert result["organizations"] == [{"id": "org-1", "name": "无忧茶苑"}]
     assert result["teachers"] == [{"id": "teacher-1", "name": "老师甲"}]
@@ -301,6 +303,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         "course_count": 1,
         "class_hours": 0,
         "participant_count": 1,
+        "owner_count": 0,
     }]
     assert [item["id"] for item in internal_result["courses"]] == ["ics:ics-2"]
     assert internal_result["trend"][0]["course_count"] == 1
@@ -334,6 +337,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         "course_count": 1,
         "class_hours": 0,
         "participant_count": 1,
+        "owner_count": 0,
     }]
     assert energy_result["trend"][0]["class_hours"] == 0
     assert energy_result["teacher_statistics"][0]["class_hours"] == 0
@@ -362,10 +366,10 @@ def test_course_owners_include_emotional_release_and_multiple_energy_owners():
     customers = {"a": SimpleNamespace(nickname="小安"), "b": SimpleNamespace(nickname="小白")}
     for activity_type in ("gcs", "ers"):
         result = _course_owner_details(activity_type, _activity(owner_id="a"), customers, {"a"})
-        assert result == {"owner_name": "小安", "body_part_count": None}
+        assert result == {"owner_name": "小安", "body_part_count": None, "owner_count": 1}
     activity = _activity(owner_id="a", description='[{"id":"a","count":2},{"id":"b","count":3}]')
     assert _course_owner_details("eks", activity, customers, {"a", "b"}) == {
-        "owner_name": "小安、小白", "body_part_count": 5,
+        "owner_name": "小安、小白", "body_part_count": 5, "owner_count": 2,
     }
     assert _course_owner_details("eks", activity, customers, {"a"})["owner_name"] == "小安"
 
