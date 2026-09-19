@@ -674,18 +674,18 @@ Page({
     if (!this.data.canManageVisitVerification || this.data.verificationSubmitting || !this.data.spaceId) return
     const willUnlock = this.data.isDayVerified
     wx.showModal({
-      title: willUnlock ? '解锁当天邀约？' : '核对无误并锁定？',
+      title: willUnlock ? '解锁当天邀约？' : '确认核对当天的邀约？',
       content: willUnlock
         ? '解锁后，拥有相应权限的员工可以继续修改当天全部邀约资料。'
-        : '锁定后，仅来访需求、客户信息和跟进点可继续填写；其他资料及操作需先解锁。',
-      confirmText: willUnlock ? '确认解锁' : '确认锁定',
+        : '锁定后当天该空间的邀约资料将不能修改（来访需求、客户信息、跟进点除外）',
+      confirmText: willUnlock ? '确认解锁' : '确认核对',
       success: async (result) => {
         if (!result.confirm) return
         this.setData({ verificationSubmitting: true })
         try {
           if (willUnlock) await visitVerificationApi.unverify(this.data.currentDate, this.data.spaceId)
           else await visitVerificationApi.verify(this.data.currentDate, this.data.spaceId)
-          wx.showToast({ title: willUnlock ? '已解锁' : '已核对并锁定', icon: 'success' })
+          wx.showToast({ title: willUnlock ? '已解锁' : '已核对', icon: 'success' })
           await this.loadData()
         } finally {
           this.setData({ verificationSubmitting: false })

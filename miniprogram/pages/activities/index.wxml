@@ -26,7 +26,7 @@
         <text class="lock-operator" wx:if="{{isDayLocked && lockInfo.locked_by}}">· {{lockInfo.locked_by}}</text>
       </view>
       <view class="lock-action {{lockSubmitting || !spaceId ? 'disabled' : ''}}" wx:if="{{canManageActivityLock}}" bindtap="onLockToggle">
-        {{lockSubmitting ? '处理中…' : (isDayLocked ? '解锁' : '核对并锁定')}}
+        {{lockSubmitting ? '处理中…' : (isDayLocked ? '解锁' : '确认核对')}}
       </view>
     </view>
     <!-- 三槽位周轮播：滑动完成后无感回中，可稳定连续切换前后周 -->

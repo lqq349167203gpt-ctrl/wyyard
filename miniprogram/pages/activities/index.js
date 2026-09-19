@@ -983,18 +983,18 @@ Page({
     if (!this.data.canManageActivityLock || this.data.lockSubmitting || !this.data.spaceId) return
     const willUnlock = this.data.isDayLocked
     wx.showModal({
-      title: willUnlock ? '解锁当天课表？' : '核对无误并锁定？',
+      title: willUnlock ? '解锁当天课表？' : '确认核对当天的课表？',
       content: willUnlock
         ? '解锁后，拥有相应权限的员工可以继续修改当天课程和参与人。'
-        : '锁定后所有账号都不能修改当天课程、参与人、发布状态和退课记录，需要调整时须先解锁。',
-      confirmText: willUnlock ? '确认解锁' : '确认锁定',
+        : '锁定后当天该空间的活动将不能修改（课程复盘除外）',
+      confirmText: willUnlock ? '确认解锁' : '确认核对',
       success: async (result) => {
         if (!result.confirm) return
         this.setData({ lockSubmitting: true })
         try {
           if (willUnlock) await activityThemeApi.unlock(this.data.currentDate, this.data.spaceId)
           else await activityThemeApi.lock(this.data.currentDate, this.data.spaceId)
-          wx.showToast({ title: willUnlock ? '已解锁' : '已核对并锁定', icon: 'success' })
+          wx.showToast({ title: willUnlock ? '已解锁' : '已核对', icon: 'success' })
           await this.loadData()
         } finally {
           this.setData({ lockSubmitting: false })

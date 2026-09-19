@@ -25,7 +25,7 @@
         <text class="lock-operator" wx:if="{{isDayVerified && verificationInfo.verified_by}}">· {{verificationInfo.verified_by}}</text>
       </view>
       <view class="lock-action {{verificationSubmitting || !spaceId ? 'disabled' : ''}}" wx:if="{{canManageVisitVerification}}" bindtap="onVerificationToggle">
-        {{verificationSubmitting ? '处理中…' : (isDayVerified ? '解锁' : '核对并锁定')}}
+        {{verificationSubmitting ? '处理中…' : (isDayVerified ? '解锁' : '确认核对')}}
       </view>
     </view>
     <!-- 三槽位周轮播：滑动完成后无感回中，避免循环克隆长期滑动后出现空白 -->

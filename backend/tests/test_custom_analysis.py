@@ -658,7 +658,7 @@ def test_invitation_created_date_filters_and_splits_by_inviter(monkeypatch):
 
     assert result["total"] == 2
     assert {card["title"]: card["count"] for card in result["cards"]} == {
-        "邀约成功人数": 2,
+        "邀约总人数": 2,
         "潘潘": 2,
     }
     assert all(item["inviter_names"] == ["潘潘"] for item in result["items"])
