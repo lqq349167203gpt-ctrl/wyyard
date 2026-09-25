@@ -426,6 +426,50 @@ def test_audit_check_endpoint_returns_rows_and_defaults(client, monkeypatch):
     assert row["title"] == "读书会"
 
 
+def test_audit_check_filters_status_before_pagination(client, monkeypatch):
+    from app.services import customer_access_service
+
+    monkeypatch.setattr(customer_access_service, "visible_customer_ids", lambda request, customers: None)
+    monkeypatch.setattr(
+        missing_check_service,
+        "check",
+        lambda **kwargs: {
+            "days": [
+                {"date": "2026-09-20", "course": {"locked": True}, "visit": {"verified": False}},
+                {"date": "2026-09-19", "course": {"locked": False}, "visit": {"verified": True}},
+                {"date": "2026-09-18", "course": {"locked": True}, "visit": {"verified": False}},
+                {"date": "2026-09-17", "course": {"locked": False}, "visit": {"verified": True}},
+            ],
+            "summary": {"day_count": 4, "unchecked_day_count": 2},
+        },
+    )
+
+    response = client.get(
+        "/api/audit-check",
+        params={
+            "start_date": "2026-09-17", "end_date": "2026-09-20",
+            "scope": "course", "status": "unchecked", "page_size": 1, "page": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_days"] == 2
+    assert payload["total_pages"] == 2
+    assert [day["date"] for day in payload["days"]] == ["2026-09-17"]
+    assert payload["summary"]["day_count"] == 4
+
+    visit_response = client.get(
+        "/api/audit-check",
+        params={
+            "start_date": "2026-09-17", "end_date": "2026-09-20",
+            "scope": "visit", "status": "checked", "page_size": 1, "page": 1,
+        },
+    )
+    assert visit_response.status_code == 200
+    assert visit_response.json()["days"][0]["date"] == "2026-09-19"
+
+
 def test_audit_catalog_marks_defaults(client):
     response = client.get("/api/audit-check/catalog")
 

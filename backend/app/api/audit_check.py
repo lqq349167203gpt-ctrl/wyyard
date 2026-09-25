@@ -1,5 +1,7 @@
 """信息核对页面：把课表 / 邀约里缺失的信息集中列出来，并带出核对（锁定）状态。"""
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.middleware.jwt_auth import require_page_permission
@@ -34,6 +36,7 @@ def check_missing(
     end_date: str = Query(...),
     space_id: str = Query(""),
     scope: str = Query("all"),
+    status: Literal["checked", "unchecked"] | None = Query(None),
     # 不传 = 用默认口径；显式传空字符串 = 一项都不检查（只看核对状态）
     kinds: str | None = Query(None),
     # 按「天」分页：page_size <= 0 表示不分页（PC 一次性渲染，保持不变）
@@ -66,7 +69,12 @@ def check_missing(
         can_view_visit_need=can_view_visit_need,
     )
     all_days = result.get("days") or []
+    if status and scope in {"course", "visit"}:
+        field = "locked" if scope == "course" else "verified"
+        expected = status == "checked"
+        all_days = [day for day in all_days if bool(day.get(scope, {}).get(field)) == expected]
     result["total_days"] = len(all_days)
+    result["days"] = all_days
     if page_size and page_size > 0:
         total_pages = max(1, (len(all_days) + page_size - 1) // page_size)
         current = min(page, total_pages)

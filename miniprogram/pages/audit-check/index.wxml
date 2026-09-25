@@ -6,32 +6,28 @@
 
   <view class="filter-card">
     <view class="filter-row">
-      <text class="filter-label">时间</text>
+      <text class="filter-label">周期</text>
       <view class="presets">
         <view class="preset {{timePreset === item.value ? 'active' : ''}}" wx:for="{{timePresets}}" wx:key="value" data-key="{{item.value}}" bindtap="onTimePresetTap">{{item.label}}</view>
       </view>
     </view>
     <view class="filter-row">
       <text class="filter-label">自定义</text>
-      <picker class="filter-control" mode="date" value="{{dateFrom}}" end="{{dateTo}}" bindchange="onDateFrom">
-        <view class="filter-value">{{dateFrom}}</view>
-      </picker>
-      <text class="filter-sep">~</text>
-      <picker class="filter-control" mode="date" value="{{dateTo}}" start="{{dateFrom}}" bindchange="onDateTo">
-        <view class="filter-value">{{dateTo}}</view>
-      </picker>
-    </view>
-    <view class="filter-row">
-      <text class="filter-label">空间</text>
-      <picker class="filter-control" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpace">
-        <view class="filter-value">{{spaces[spaceIndex].name}}</view>
-      </picker>
+      <view class="date-range">
+        <picker class="filter-control date-control" mode="date" value="{{dateFrom}}" end="{{dateTo}}" bindchange="onDateFrom">
+          <view class="filter-value date-value"><text>{{dateFrom}}</text><view class="date-arrow"></view></view>
+        </picker>
+        <text class="filter-sep">至</text>
+        <picker class="filter-control date-control" mode="date" value="{{dateTo}}" start="{{dateFrom}}" bindchange="onDateTo">
+          <view class="filter-value date-value"><text>{{dateTo}}</text><view class="date-arrow"></view></view>
+        </picker>
+      </view>
     </view>
     <view class="filter-row">
       <text class="filter-label">状态</text>
-      <view class="seg">
-        <view class="seg-item {{filterIndex === index ? 'active' : ''}}" wx:for="{{filters}}" wx:key="value" data-index="{{index}}" bindtap="onFilter">{{item.label}}</view>
-      </view>
+      <picker class="status-picker" mode="selector" range="{{filters}}" range-key="label" value="{{filterIndex}}" bindchange="onFilter">
+        <view class="status-value"><text>{{filters[filterIndex].label}}</text><view class="date-arrow"></view></view>
+      </picker>
     </view>
   </view>
 

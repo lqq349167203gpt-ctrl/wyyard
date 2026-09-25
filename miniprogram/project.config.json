@@ -4,6 +4,7 @@
     "ignore": [
       { "type": "folder", "value": "previews" },
       { "type": "folder", "value": "outputs" },
+      { "type": "folder", "value": "style-samples" },
       { "type": "suffix", "value": ".html" },
       { "type": "suffix", "value": ".md" }
     ],

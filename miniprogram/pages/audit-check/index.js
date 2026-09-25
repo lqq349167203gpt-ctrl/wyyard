@@ -28,12 +28,11 @@ Page({
       { value: 'month', label: '本月' }, { value: 'year', label: '本年' },
       { value: 'all', label: '全部' },
     ],
-    spaces: [{ id: '', name: '全部空间' }], spaceIndex: 0,
+    spaces: [], spaceIndex: 0,
     filters: [{ value: 'unchecked', label: '未核对' }, { value: 'checked', label: '已核对' }],
     filterIndex: 0,
     kinds: null,
-    // 按天分页：客户端只持有当前页，数据量始终有界
-    days: [], page: 1, pageSize: 10, hasMore: false, totalDays: 0,
+    days: [],
     summary: null,
     loading: false, error: '',
     busy: false,
@@ -48,21 +47,29 @@ Page({
     // 默认「全部」：核对起算日 ~ 今天（起算日先用 2026-07-01，接口回来后再以实际为准）
     const today = fmt(new Date())
     this.setData({ dateFrom: this.data.lockStart, dateTo: today, timePreset: 'all', timePresetIndex: 4 })
-    // 先拿到空间列表，默认选第一个真实空间，再用它查数据
-    this.loadSpaces().then(() => this.load())
+    // 使用课表/邀约页当前选择的空间，核对页不再单独切换空间
+    this.loadSpaces().then(loaded => { if (loaded) this.load() })
   },
 
   onShow() {
     if (getApp().trackUsagePage) getApp().trackUsagePage('/pages/audit-check/index')
   },
 
+  onUnload() {
+    if (this._renderTimer) clearTimeout(this._renderTimer)
+  },
+
   async loadSpaces() {
     try {
       const spaces = await spaceApi.list()
-      const list = [{ id: '', name: '全部空间' }].concat((spaces || []).map(item => ({ id: item.id, name: item.name })))
-      // 默认落到第一个真实空间（没有空间时才用「全部空间」）
-      this.setData({ spaces: list, spaceIndex: list.length > 1 ? 1 : 0 })
-    } catch (e) { /* 没空间权限就只看全部空间 */ }
+      if (!spaces || !spaces.length) throw new Error('暂无可核对的空间')
+      const savedIndex = Number(wx.getStorageSync(this.data.mode === 'course' ? 'activity_space_index' : 'visit_space_index')) || 0
+      this.setData({ spaces, spaceIndex: Math.min(Math.max(savedIndex, 0), spaces.length - 1) })
+      return true
+    } catch (e) {
+      this.setData({ error: e.message || '空间加载失败，请重试' })
+      return false
+    }
   },
 
   /** 列表只保留关键信息，其余放进详情弹层（小屏才不会乱） */
@@ -103,7 +110,7 @@ Page({
         { label: "部位", kind: "course_body_parts", value: row.body_parts ? `${row.body_parts}` : "" },
         { label: "简介", value: row.intro },
       ] : [
-        { label: "到场时间", value: row.arrived && !row.cancelled ? (row.arrival_time || "已到店") : "" },
+        { label: "到场时间", value: row.arrived && !row.cancelled ? row.arrival_time : "" },
         { label: "邀约人", kind: "visit_inviter", value: row.inviter },
         // 接待人 / 目标：不管有没有内容都保留标题
         { label: "接待人", kind: "visit_receptionist", alwaysShow: true, value: row.receptionist },
@@ -147,10 +154,10 @@ Page({
     }
   },
 
-  async load(reset = true) {
-    // 重新查询（切模式/筛选）时从第 1 页开始；滚动到底再取下一页
+  async load() {
+    // 与 PC 端一致：当前状态的日期一次查全，不截在最近 10 天
     const seq = this._seq = (this._seq || 0) + 1
-    const nextPage = reset ? 1 : this.data.page + 1
+    if (this._renderTimer) clearTimeout(this._renderTimer)
     this.setData({ loading: true, error: '' })
     try {
       const result = await auditCheckApi.list({
@@ -158,24 +165,27 @@ Page({
         endDate: this.data.dateTo,
         scope: this.data.mode,
         spaceId: (this.data.spaces[this.data.spaceIndex] || {}).id || '',
+        status: this.data.filters[this.data.filterIndex].value,
         kinds: this.data.kinds === null ? undefined : this.data.kinds,
-        page: nextPage,
-        pageSize: this.data.pageSize,
+        pageSize: 0,
       })
       if (seq !== this._seq) return
       const lockStart = result.lock_start_date || this.data.lockStart
       if (lockStart !== this.data.lockStart) this.setData({ lockStart })
       const days = (result.days || []).map(day => this.decorateDay(day)).filter(Boolean)
-      const checked = this.data.filters[this.data.filterIndex].value === 'checked'
-      const matched = days.filter(day => (checked ? day.checked : !day.checked))
-      const merged = reset ? matched : this.data.days.concat(matched)
       this.setData({
-        days: merged,
-        page: result.page || nextPage,
-        totalDays: result.total_days || merged.length,
-        // 状态筛选是在本页内过滤的，只要服务端还有下一页就继续可加载
-        hasMore: (result.page || nextPage) < (result.total_pages || 1),
+        days: days.slice(0, 20),
         summary: result.summary || null,
+      }, () => {
+        let shown = 20
+        const append = () => {
+          if (seq !== this._seq || shown >= days.length) return
+          shown = Math.min(shown + 20, days.length)
+          this.setData({ days: days.slice(0, shown) }, () => {
+            if (seq === this._seq && shown < days.length) this._renderTimer = setTimeout(append, 16)
+          })
+        }
+        if (seq === this._seq && shown < days.length) this._renderTimer = setTimeout(append, 16)
       })
     } catch (e) {
       if (seq === this._seq) this.setData({ error: e.message || '加载失败', days: [] })
@@ -184,16 +194,13 @@ Page({
     }
   },
 
-  /** 滚到底取下一页（分页在服务端，客户端数据量始终只有一页多一点） */
-  onReachBottom() {
-    if (this.data.hasMore && !this.data.loading) this.load(false)
-  },
-
   onMode(event) {
     const mode = event.currentTarget.dataset.mode
     if (mode === this.data.mode) return
-    this.setData({ mode })
-    this.load(true)
+    if (!this.data.spaces.length) return
+    const savedIndex = Number(wx.getStorageSync(mode === 'course' ? 'activity_space_index' : 'visit_space_index')) || 0
+    this.setData({ mode, spaceIndex: Math.min(Math.max(savedIndex, 0), this.data.spaces.length - 1) })
+    this.load()
   },
   /** 时间预设：当天/本周/本月/本年/全部，口径与 PC 一致（全部=不限定日期） */
   onTimePresetTap(event) {
@@ -209,14 +216,13 @@ Page({
     // 本年 / 全部：按核对起算日算（7月1日到今天），避免把不能核对的历史也算进来
     else if (key === 'year' || key === 'all') { from = this.data.lockStart; to = fmt(now) }
     this.setData({ timePreset: key, dateFrom: from, dateTo: to })
-    this.load(true)
+    this.load()
   },
-  onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load(true) },
-  onDateTo(event) { this.setData({ timePreset: 'custom', dateTo: event.detail.value }); this.load(true) },
-  onSpace(event) { this.setData({ spaceIndex: Number(event.detail.value) }); this.load(true) },
+  onDateFrom(event) { this.setData({ timePreset: 'custom', dateFrom: event.detail.value }); this.load() },
+  onDateTo(event) { this.setData({ timePreset: 'custom', dateTo: event.detail.value }); this.load() },
   onFilter(event) {
-    this.setData({ filterIndex: Number(event.currentTarget.dataset.index) })
-    this.load(true)
+    this.setData({ filterIndex: Number(event.detail.value) })
+    this.load()
   },
 
 
@@ -248,16 +254,13 @@ Page({
     wx.showLoading({ title: willCheck ? '核对中' : '取消中' })
     try {
       const isCourse = this.data.mode === 'course'
-      const spaceId = isCourse ? (this.data.spaces[this.data.spaceIndex] || {}).id || '' : ''
-      const response = isCourse
-        ? (willCheck ? await activityThemeApi.lock(date, spaceId) : await activityThemeApi.unlock(date, spaceId))
-        : (willCheck ? await visitVerificationApi.verify(date, spaceId) : await visitVerificationApi.unverify(date, spaceId))
-      const operator = response.locked_by || response.verified_by || ''
-      const days = this.data.days.map((item, index) => index === dayIndex
-        ? { ...item, checked: willCheck, operator }
-        : item)
-      const checkedFilter = this.data.filters[this.data.filterIndex].value === 'checked'
-      this.setData({ days: days.filter(item => (checkedFilter ? item.checked : !item.checked)) })
+      const spaceId = (this.data.spaces[this.data.spaceIndex] || {}).id || ''
+      if (isCourse) {
+        if (willCheck) await activityThemeApi.lock(date, spaceId)
+        else await activityThemeApi.unlock(date, spaceId)
+      } else if (willCheck) await visitVerificationApi.verify(date, spaceId)
+      else await visitVerificationApi.unverify(date, spaceId)
+      await this.load()
       wx.showToast({ title: willCheck ? '已核对' : '已取消核对', icon: 'none' })
     } catch (e) {
       wx.showToast({ title: e.message || '操作失败', icon: 'none' })

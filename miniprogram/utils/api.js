@@ -913,9 +913,10 @@ module.exports = {
     list: (params = {}) => {
       const query = [`start_date=${params.startDate}`, `end_date=${params.endDate}`, `scope=${params.scope || 'all'}`]
       if (params.spaceId) query.push(`space_id=${encodeURIComponent(params.spaceId)}`)
+      if (params.status) query.push(`status=${encodeURIComponent(params.status)}`)
       if (params.kinds !== undefined) query.push(`kinds=${encodeURIComponent(params.kinds || '')}`)
       query.push(`page=${params.page || 1}`)
-      query.push(`page_size=${params.pageSize || 10}`)
+      query.push(`page_size=${params.pageSize === undefined ? 10 : params.pageSize}`)
       return request(`/api/audit-check?${query.join('&')}`)
     },
   },
