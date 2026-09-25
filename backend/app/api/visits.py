@@ -61,8 +61,9 @@ def _private_need_map(request: Request | None, visit_ids: list[str]) -> dict[str
     for note in notes:
         if note.category != "visit_need":
             continue
-        creator = note.created_by or "历史记录"
-        result.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
+        result.setdefault(note.visit_id, []).append(
+            f"{visit_note_service.display_author(note)}：{note.content}"
+        )
     return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
 
 
@@ -96,8 +97,9 @@ def _visit_note_maps(request: Request | None, visit_ids: list[str]) -> tuple[dic
         item["can_delete"] = can_manage
         note_map.setdefault(note.visit_id, []).append(item)
         if note.category == "visit_need":
-            creator = note.created_by or "历史记录"
-            need_lines.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
+            need_lines.setdefault(note.visit_id, []).append(
+                f"{visit_note_service.display_author(note)}：{note.content}"
+            )
     return (
         {visit_id: "\n".join(lines) for visit_id, lines in need_lines.items()},
         note_map,

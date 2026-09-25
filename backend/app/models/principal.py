@@ -90,8 +90,10 @@ class PrincipalQuery(StrictBaseModel):
     # 课程记录：活动类型与沙龙具体课程（仅课程列表生效）
     activity_type: str = ""
     course_subtype: str = ""
-    course_view: Literal["course", "participant"] = "course"
+    course_view: Literal["course", "participant", "teacher_follow_up"] = "course"
     participant_scope: Literal["", "internal", "external"] = ""
+    # 邀约二级列表：arrive＝邀约到店口径；initiated＝发起口径（列内容后续再定）
+    invite_view: Literal["arrive", "initiated"] = "arrive"
     order_filter: Literal["", "first", "repeat", "cross"] = ""
     # 课程列表：只看当日有成交 / 有关联成交的课程（经营概况里点数字筛选）
     course_deal: Literal["", "same_day", "related"] = ""
@@ -102,8 +104,10 @@ class PrincipalQuery(StrictBaseModel):
     # 只看某个客户的记录（列表里点「成交笔数」时用来取这个客户的全部成交）
     customer_id: str = Field(default="", max_length=64)
     # 引流客户导出：ID 仅用于收窄已授权结果及保持页面顺序，不作为数据来源。
-    export_view: Literal["", "traffic"] = ""
+    export_view: Literal["", "traffic", "invite_initiated", "invite_arrivals"] = ""
     export_customer_ids: list[str] | None = Field(default=None, max_length=50000)
+    export_columns: list[str] | None = Field(default=None, max_length=32)
+    arrival_view: Literal["customer", "date"] = "customer"
     # 只有使用者主动点「查询」时才记分析日志；切 tab、翻页这类自动请求不记，避免刷屏
     log_analysis: bool = False
     # 交易列表的展示口径：order＝每笔交易一行；customer＝同一人只显示一行（合并）
@@ -114,6 +118,10 @@ class PrincipalQuery(StrictBaseModel):
     rule: ConversionRule = Field(default_factory=ConversionRule)
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=1000)
+    # 管理端小程序按当前经营板块分批取列表；PC 仍沿用完整 breakdown。
+    mobile_group: Literal["", "traffic", "invite_arrive", "invite_initiated", "courses", "deals"] = ""
+    mobile_quick_filter: str = Field(default="", max_length=80)
+    mobile_detail_key: str = Field(default="", max_length=120)
 
     @model_validator(mode="after")
     def validate_range(self):

@@ -10,7 +10,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
 import { LogOut } from "lucide-react"
 import { useUsageTracking } from "@/hooks/use-usage-tracking"
-import { SystemSwitcher } from "./system-switcher"
 
 const PAGE_TITLES: Record<string, string> = {
 
@@ -107,7 +106,6 @@ export function AppLayout() {
         <header className="flex h-[38px] items-center justify-between bg-white px-5 border-b-2 border-[#f0f1f2]">
           <div className="flex items-center gap-2">
             <SidebarTrigger />
-            <SystemSwitcher currentSystem="main" />
           </div>
           <div className="flex items-center gap-2">
             {ownerName && (

@@ -8,6 +8,8 @@ interface Option {
   value: string
   label: string
   rightLabel?: string  // 右侧标签，用于左对齐名称右对齐价格
+  rightNote?: string   // 右侧辅助说明，使用更小字号
+  rightLabelClassName?: string
   groupLabel?: string  // 子菜单分组标题，仅在该组第一项上设置
   children?: Option[]  // 子选项，用于级联菜单
   /** 弱化显示（如「未配置」） */
@@ -266,7 +268,9 @@ export function SelectDropdown({
   // 查找当前值的标签（可能在子选项中）
   const findLabel = (opts: Option[], val: string): string | undefined => {
     for (const opt of opts) {
-      if (opt.value === val) return !opt.rightLabel || hideRightLabelInTrigger ? opt.label : `${opt.label} ${opt.rightLabel}`
+      if (opt.value === val) return !opt.rightLabel || hideRightLabelInTrigger
+        ? opt.label
+        : [opt.label, opt.rightLabel, opt.rightNote].filter(Boolean).join(" ")
       if (opt.children) {
         const found = findLabel(opt.children, val)
         if (found) return found
@@ -351,7 +355,10 @@ export function SelectDropdown({
                     <>
                       {/* flex-1 + text-left：多选带勾选框时名字也要贴在左边，不能被 justify-between 挤到中间 */}
                       <span className={`min-w-0 flex-1 truncate text-left ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>
-                      <span className="text-[#8f959e] ml-2 shrink-0">{opt.rightLabel}</span>
+                      <span className="ml-2 flex shrink-0 items-baseline gap-1.5 text-[#8f959e]">
+                        <span className={opt.rightLabelClassName}>{opt.rightLabel}</span>
+                        {opt.rightNote && <span className="text-[11px] text-[#a8adb5]">{opt.rightNote}</span>}
+                      </span>
                     </>
                   ) : (
                     <span className={`min-w-0 flex-1 truncate text-left ${opt.muted ? "text-[#a8b1bd]" : ""}`}>{opt.label}</span>

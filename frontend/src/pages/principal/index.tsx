@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { Download, GripVertical, Plus, Save, SlidersHorizontal, Trash2, X } from "lucide-react"
-import { principalApi, customerDetailApi, type AnalysisCondition, type AnalysisOperator, type ConversionAction, type ConversionRule, type PrincipalBreakdownCustomer, type PrincipalMetadata, type PrincipalQuery, type PrincipalResult, type PrincipalRow, type PrincipalRuleFields, type SavedConversionRule } from "@/lib/api"
+import { principalApi, customerDetailApi, type AnalysisCondition, type AnalysisOperator, type ConversionAction, type ConversionRule, type PrincipalBreakdown, type PrincipalBreakdownCustomer, type PrincipalMetadata, type PrincipalQuery, type PrincipalResult, type PrincipalRow, type PrincipalRuleFields, type SavedConversionRule } from "@/lib/api"
 import { AnalysisConditionRow } from "@/components/analysis-condition-row"
 import { AnalysisPeriodFilter } from "@/components/analysis-period-filter"
 import DetailView from "@/pages/healing-records/components/detail-view"
@@ -15,6 +15,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { EmptyValue } from "@/components/empty-value"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useServerPagination } from "@/hooks/use-server-pagination"
+import { TeacherFollowUpDialog, TeacherFollowUpList } from "./teacher-follow-up-list"
 
 const INITIAL_RULE: ConversionRule = {
   name: "粗门初次到场 → 会员卡首购",
@@ -25,6 +26,7 @@ const INITIAL_RULE: ConversionRule = {
   target_mode: "any", window_days: 30, same_organization: true,
   organization_id: "", date_from: "", date_to: "",
 }
+type InviteInitiatedRecord = NonNullable<NonNullable<PrincipalBreakdown["invite_inviters"]>[number]["records"]>[number]
 const TABS = [{ key: "overview", label: "经营概况" }, { key: "conversion", label: "转化分析" }] as const
 // 转化分析上次用过的条件：换页面/刷新后还能接着用
 const CONVERSION_DRAFT_KEY = "principal:conversion-draft"
@@ -37,7 +39,7 @@ function loadConversionDraft(): { rule?: ConversionRule; rule_id?: string; organ
   }
 }
 /** 点下面的数字筛引流客户列表 */
-type TrafficQuickFilter = { kind: "invite" | "cancel" | "arrive" | "deals" | "product" | "subtype"; value?: string; label: string }
+type TrafficQuickFilter = { kind: "initiated" | "invite" | "cancel" | "no_show" | "arrive" | "deals" | "product" | "subtype"; value?: string; label: string }
 const KIND_OPTIONS = [
   { value: "coarse_usage", label: "参加粗门活动" },
   { value: "attendance", label: "参加课程" },
@@ -99,7 +101,6 @@ const PARTICIPANT_COLUMN_WIDTH: Record<string, number> = {
   hours: 66,
   org_participation_count: 94,
   org_participation_hours: 94,
-  participant_category: 96,
 }
 
 const COLUMN_CELL: Record<string, string> = {
@@ -114,7 +115,7 @@ const COLUMN_CELL: Record<string, string> = {
 const NUMBER_COLUMNS = new Set(["hours", "parts", "participants", "order_count", "target_count", "deal_count", "same_day_deals",
   "org_participation_count", "org_participation_hours"])
 // 表头带问号的列：算最小宽度时要多留一个问号的位置
-const HELP_TIP_COLUMNS = new Set(["classification", "participant_category", "org_participation_count", "org_participation_hours"])
+const HELP_TIP_COLUMNS = new Set(["classification", "org_participation_count", "org_participation_hours"])
 /**
  * 表头最小宽度：标题字数 × 11px + 内边距 + 排序箭头（+ 问号）。
  * 表格用百分比分配宽度，窗口变窄时会被压到标题显示不全；把这个值作为每列下限，
@@ -127,7 +128,7 @@ const PAGE_SIZE = 20
 const PARENT_OF: Record<string, string> = { subtype: "deals", course: "type" }
 // 这些维度是「附加条件」，可以和别的维度一起用：
 // 成交量那边是购买类型，课程数那边是课程类型 / 具体课程 / 课程老师，引流人数那边是引流人 + 阶段 / 来源 / 标签
-const COMBINABLE_PREFIXES = new Set(["buy", "type", "course", "teacher", "traffic", "identity", "stage", "source", "tag"])
+const COMBINABLE_PREFIXES = new Set(["buy", "type", "course", "teacher", "traffic", "identity", "stage", "source", "tag", "upsell", "inviter"])
 
 // 引流客户列表的列：可在「列表设置」里勾选显示、上下调整顺序
 type TrafficColumnDef = {
@@ -179,9 +180,9 @@ const defaultTrafficColumns = (): TrafficColumnConfig[] => clampTrafficColumns(
   TRAFFIC_COLUMN_DEFS.map(def => ({ key: def.key, label: def.label, visible: def.defaultVisible !== false })),
 )
 // 隐私列要按当前角色的权限收敛：没权限的列既不出现在设置里，也不显示在表上
-const permittedTrafficColumns = (config: TrafficColumnConfig[], allowed: string[] | null): TrafficColumnConfig[] =>
+const permittedColumns = (config: TrafficColumnConfig[], allowed: string[] | null, definitions = TRAFFIC_COLUMN_DEFS): TrafficColumnConfig[] =>
   config.filter(item => {
-    const def = TRAFFIC_COLUMN_DEFS.find(entry => entry.key === item.key)
+    const def = definitions.find(entry => entry.key === item.key)
     return !def?.permission || (allowed ?? []).includes(def.permission)
   })
 
@@ -209,19 +210,113 @@ function loadTrafficColumns(): TrafficColumnConfig[] {
   }
 }
 
+// 邀约到店列表的列：与引流列表设置独立
+const INVITE_COLUMN_DEFS: TrafficColumnDef[] = [
+  { key: "arrive_date", label: "到店日期", width: "w-[100px]", sortField: "arrive_date" },
+  { key: "name", label: "昵称", width: "w-[100px]", sortField: "name" },
+  { key: "identity", label: "会员身份", width: "w-[90px]", sortField: "identity" },
+  { key: "referrer", label: "引流人", width: "w-[76px]", sortField: "referrer", defaultVisible: false },
+  { key: "referrer_handler", label: "承接人", width: "w-[76px]", sortField: "referrer_handler", defaultVisible: false },
+  { key: "follow_up_status", label: "跟进阶段", width: "w-[84px]", sortField: "follow_up_status", defaultVisible: false },
+  { key: "traffic_source", label: "流量来源", width: "w-[84px]", sortField: "traffic_source", defaultVisible: false },
+  { key: "tags", label: "客户标签", width: "w-[110px]", sortField: "tags", defaultVisible: false },
+  { key: "deals", label: "交易笔数", width: "w-[84px]", sortField: "deals", align: "right" as const, defaultVisible: false },
+  { key: "invite_count", label: "邀约次数", width: "w-[70px]", sortField: "invite_count", align: "right" as const },
+  { key: "cancel_count", label: "取消", width: "w-[60px]", sortField: "cancel_count", align: "right" as const },
+  { key: "no_show_count", label: "未到场", width: "w-[60px]", sortField: "no_show_count", align: "right" as const },
+  { key: "arrive_count", label: "已到场", width: "w-[60px]", sortField: "arrive_count", align: "right" as const },
+  { key: "activity_count", label: "参与活动数", width: "w-[90px]", sortField: "activity_count", align: "right" as const },
+  { key: "visit_interval", label: "平均到店间隔", width: "w-[104px]", sortField: "visit_interval", align: "right" as const, defaultVisible: false },
+  { key: "same_day_deals", label: "当日成交", width: "w-[80px]", sortField: "same_day_deals", align: "right" as const },
+  { key: "arrive_inviter", label: "邀约人", width: "w-[90px]", sortField: "arrive_inviter" },
+  { key: "visit_purpose", label: "到访目的", width: "w-[120px]", sortField: "visit_purpose", permission: "visit_purpose", defaultVisible: false },
+  { key: "trauma_history", label: "创伤经历", width: "w-[120px]", sortField: "trauma_history", permission: "trauma_history", defaultVisible: false },
+  { key: "current_block", label: "当下卡点", width: "w-[120px]", sortField: "current_block", permission: "current_block", defaultVisible: false },
+  { key: "work_info", label: "工作情况", width: "w-[110px]", sortField: "work_info", permission: "work_info", defaultVisible: false },
+  { key: "other_info", label: "其他信息", width: "w-[120px]", sortField: "other_info", permission: "other_info", defaultVisible: false },
+]
+const INVITE_COLUMNS_STORAGE = "principal:invite-arrive-columns"
+const defaultInviteColumns = (): TrafficColumnConfig[] =>
+  clampTrafficColumns(INVITE_COLUMN_DEFS.map(def => ({ key: def.key, label: def.label, visible: def.defaultVisible !== false })))
+function loadInviteColumns(): TrafficColumnConfig[] {
+  const fallback = defaultInviteColumns()
+  try {
+    const raw = JSON.parse(localStorage.getItem(INVITE_COLUMNS_STORAGE) || "[]")
+    if (!Array.isArray(raw) || !raw.length) return fallback
+    const merged: TrafficColumnConfig[] = []
+    for (const item of raw) {
+      const def = INVITE_COLUMN_DEFS.find(entry => entry.key === item?.key)
+      if (def) merged.push({ key: def.key, label: def.label, visible: typeof item.visible === "boolean" ? item.visible : true })
+    }
+    for (const def of INVITE_COLUMN_DEFS) {
+      if (!merged.some(item => item.key === def.key)) merged.push({ key: def.key, label: def.label, visible: def.defaultVisible !== false })
+    }
+    return merged.length ? clampTrafficColumns(merged) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+// 发起邀约明细：日期和状态固定显示，中间字段与邀约到店共用同一套定义，但保存自己的列设置。
+const INITIATED_COLUMN_DEFS = INVITE_COLUMN_DEFS.filter(def => def.key !== "arrive_date")
+const INITIATED_COLUMNS_STORAGE = "principal:invite-initiated-columns"
+const defaultInitiatedColumns = (): TrafficColumnConfig[] =>
+  clampTrafficColumns(INITIATED_COLUMN_DEFS.map(def => ({ key: def.key, label: def.label, visible: def.defaultVisible !== false })))
+function loadInitiatedColumns(): TrafficColumnConfig[] {
+  const fallback = defaultInitiatedColumns()
+  try {
+    const raw = JSON.parse(localStorage.getItem(INITIATED_COLUMNS_STORAGE) || "[]")
+    if (!Array.isArray(raw) || !raw.length) return fallback
+    const merged = raw.flatMap((item: TrafficColumnConfig) => {
+      const def = INITIATED_COLUMN_DEFS.find(entry => entry.key === item?.key)
+      return def ? [{ key: def.key, label: def.label, visible: typeof item.visible === "boolean" ? item.visible : true }] : []
+    })
+    for (const def of INITIATED_COLUMN_DEFS) {
+      if (!merged.some((item: TrafficColumnConfig) => item.key === def.key)) {
+        merged.push({ key: def.key, label: def.label, visible: def.defaultVisible !== false })
+      }
+    }
+    return clampTrafficColumns(merged)
+  } catch {
+    return fallback
+  }
+}
+
 // 列表设置：勾选要显示哪些列，按住每一行拖动调整顺序（和自定义筛选的「显示列」一致）
-function ColumnSettings({ config, onChange }: { config: TrafficColumnConfig[]; onChange: (next: TrafficColumnConfig[]) => void }) {
+function ColumnSettings({ config, onChange, onReset = defaultTrafficColumns, resetLabel = "恢复默认", maxColumns = MAX_TRAFFIC_COLUMNS }: {
+  config: TrafficColumnConfig[]
+  onChange: (next: TrafficColumnConfig[]) => void
+  onReset?: () => TrafficColumnConfig[]
+  resetLabel?: string
+  maxColumns?: number
+}) {
   const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const syncAnchor = () => {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    const panel = panelRef.current
+    if (!rect || !panel) return
+    panel.style.left = `${Math.min(rect.right, window.innerWidth - 256) - 248}px`
+    panel.style.top = `${rect.bottom + 6}px`
+  }
   useEffect(() => {
     if (!open) return
     const handler = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
     }
     document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
+    window.addEventListener("scroll", syncAnchor, true)
+    window.addEventListener("resize", syncAnchor)
+    return () => {
+      document.removeEventListener("mousedown", handler)
+      window.removeEventListener("scroll", syncAnchor, true)
+      window.removeEventListener("resize", syncAnchor)
+    }
   }, [open])
   const reorder = (from: number, to: number) => {
     if (from === to || to < 0 || to >= config.length) return
@@ -234,19 +329,28 @@ function ColumnSettings({ config, onChange }: { config: TrafficColumnConfig[]; o
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen(current => !current)}
+        onClick={event => {
+          const rect = event.currentTarget.getBoundingClientRect()
+          setAnchor({ left: Math.min(rect.right, window.innerWidth - 256), top: rect.bottom + 6 })
+          setOpen(current => !current)
+        }}
         aria-expanded={open}
         className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7]"
       >
         <SlidersHorizontal className="h-3.5 w-3.5" />列表设置
       </button>
-      {open && (
-        <div className="absolute right-0 top-[34px] z-30 w-[248px] rounded-[6px] border border-[#e8eaed] bg-white p-2 shadow-[0_8px_24px_rgba(31,35,41,.12)]">
+      {open && anchor && (
+        <div
+          ref={panelRef}
+          className="fixed z-50 w-[248px] rounded-[6px] border border-[#e8eaed] bg-white p-2 shadow-[0_8px_24px_rgba(31,35,41,.12)]"
+          style={{ left: anchor.left - 248, top: anchor.top }}
+        >
           <div className="px-1.5 pb-1.5 text-[11px] text-[#8f959e]">
             勾选要显示的列，拖动调整顺序
-            <span className={`ml-1 ${visibleCount >= MAX_TRAFFIC_COLUMNS ? "text-[#c4506a]" : ""}`}>
-              （最多 {MAX_TRAFFIC_COLUMNS} 列，已选 {visibleCount}）
+            <span className={`ml-1 ${visibleCount >= maxColumns ? "text-[#c4506a]" : ""}`}>
+              （最多 {maxColumns} 列，已选 {visibleCount}）
             </span>
           </div>
           <div className="max-h-[320px] overflow-y-auto overscroll-contain">
@@ -265,17 +369,17 @@ function ColumnSettings({ config, onChange }: { config: TrafficColumnConfig[]; o
                 <input
                   type="checkbox"
                   checked={item.visible}
-                  disabled={(item.visible && visibleCount <= 1) || (!item.visible && visibleCount >= MAX_TRAFFIC_COLUMNS)}
-                  onChange={event => onChange(clampTrafficColumns(
+                  disabled={(item.visible && visibleCount <= 1) || (!item.visible && visibleCount >= maxColumns)}
+                  onChange={event => onChange(
                     config.map((entry, i) => i === index ? { ...entry, visible: event.target.checked } : entry),
-                  ))}
+                  )}
                 />
                 <span className={`min-w-0 flex-1 truncate text-[12px] ${item.visible ? "text-[#2b2f36]" : "text-[#a8aeb6]"}`}>{item.label}</span>
               </div>
             ))}
           </div>
           <div className="mt-1 flex items-center justify-between border-t border-[#f0f1f3] px-1.5 pt-1.5">
-            <button type="button" onClick={() => onChange(defaultTrafficColumns())} className="text-[11px] text-[#8f959e] hover:text-[#4e535a]">恢复默认</button>
+            <button type="button" onClick={() => onChange(onReset())} className="text-[11px] text-[#8f959e] hover:text-[#4e535a]">{resetLabel}</button>
             <span className="text-[11px] text-[#b0b5bb]">显示 {visibleCount} / {config.length} 列</span>
           </div>
         </div>
@@ -347,15 +451,6 @@ function HelpTip({ children, width = 240, trigger = "hover" }: { children: React
     </>
   )
 }
-
-// 购买类型（交易列表里那一列）的口径说明
-// 人员类型（课程参与者列表里那一列）的口径说明
-const PARTICIPANT_CATEGORY_TIP = (
-  <>
-    <b className="font-medium text-white">内部人员</b>：选择的组织/俱乐部中被引流的人员<br />
-    <b className="font-medium text-white">外部人员</b>：选择的组织/俱乐部外的人员
-  </>
-)
 
 // 参与者列表里的累计口径：跟着当前筛选范围（组织/俱乐部、统计周期、课程类型等）走
 const PARTICIPATION_COUNT_TIP = <>统计周期内，累计参与当前组织/俱乐部次数</>
@@ -530,6 +625,7 @@ export default function PrincipalPage() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [detail, setDetail] = useState<PrincipalRow | null>(null)
+  const [teacherFollowUpDetail, setTeacherFollowUpDetail] = useState<PrincipalRow | null>(null)
   // 点课程列表里的数字时，只看这一类明细（当日成交 / 关联成交），空串表示全部
   const [detailTag, setDetailTag] = useState("")
   const [saveOpen, setSaveOpen] = useState(false)
@@ -550,9 +646,11 @@ export default function PrincipalPage() {
   const [dealDetail, setDealDetail] = useState<{ customer: string; rows: PrincipalRow[]; loading: boolean } | null>(null)
   // 交易列表口径：每笔交易一行 / 同一人只显示一行
   const [listView, setListView] = useState<"order" | "customer">("order")
+  const [inviteArriveView, setInviteArriveView] = useState<"customer" | "date">("customer")
+  const [inviteArrivePage, setInviteArrivePage] = useState(1)
   // 经营概况：三张卡一次展开一组；二级项目勾选后筛选下面的列表
   // 默认选中第一张卡（成交量），点它可以收起
-  const [overviewGroup, setOverviewGroup] = useState<"deals" | "courses" | "traffic" | "">("traffic")
+  const [overviewGroup, setOverviewGroup] = useState<"deals" | "courses" | "traffic" | "invite" | "">("traffic")
   const [breakdownPicks, setBreakdownPicks] = useState<string[]>([])
   const [trafficPage, setTrafficPage] = useState(1)
   // 引流客户列表：除昵称外都支持点击表头排序（本地排序，不影响分页口径）
@@ -562,6 +660,8 @@ export default function PrincipalPage() {
   const [trafficQuickFilter, setTrafficQuickFilter] = useState<TrafficQuickFilter | null>(null)
   // 引流客户列表的列配置（勾选显示 + 顺序），存在浏览器里
   const [trafficColumns, setTrafficColumns] = useState<TrafficColumnConfig[]>(() => loadTrafficColumns())
+  const [inviteColumns, setInviteColumns] = useState<TrafficColumnConfig[]>(() => loadInviteColumns())
+  const [initiatedColumns, setInitiatedColumns] = useState<TrafficColumnConfig[]>(() => loadInitiatedColumns())
   const updateTrafficColumns = (next: TrafficColumnConfig[]) => {
     setTrafficColumns(next)
     try { localStorage.setItem(TRAFFIC_COLUMNS_STORAGE, JSON.stringify(next)) } catch { /* 存不上也无所谓 */ }
@@ -569,14 +669,41 @@ export default function PrincipalPage() {
   // 隐私列（到访目的 / 创伤经历 / 当下卡点 / 工作情况 / 其他信息）按当前角色的权限自动出现或隐藏
   const trafficProfileFields = result?.breakdown?.traffic_profile_fields ?? null
   const listTrafficColumns = useMemo(
-    () => permittedTrafficColumns(trafficColumns, trafficProfileFields),
+    () => permittedColumns(trafficColumns, trafficProfileFields),
     [trafficColumns, trafficProfileFields],
+  )
+  const listInviteColumns = useMemo(
+    () => permittedColumns(inviteColumns, trafficProfileFields, INVITE_COLUMN_DEFS),
+    [inviteColumns, trafficProfileFields],
   )
   // 设置面板里只改「当前角色可见」的这几列，其余配置原样保留
   const changeTrafficColumns = (next: TrafficColumnConfig[]) => {
     const keys = new Set(next.map(item => item.key))
     updateTrafficColumns([...next, ...trafficColumns.filter(item => !keys.has(item.key))])
   }
+  const changeInviteColumns = (next: TrafficColumnConfig[]) => {
+    const keys = new Set(next.map(item => item.key))
+    const merged = [...next, ...inviteColumns.filter(item => !keys.has(item.key))]
+    setInviteColumns(merged)
+    try { localStorage.setItem(INVITE_COLUMNS_STORAGE, JSON.stringify(merged)) } catch { /* 存不上也无所谓 */ }
+  }
+  const changeInitiatedColumns = (next: TrafficColumnConfig[]) => {
+    const keys = new Set(next.map(item => item.key))
+    const merged = [...next, ...initiatedColumns.filter(item => !keys.has(item.key))]
+    setInitiatedColumns(merged)
+    try { localStorage.setItem(INITIATED_COLUMNS_STORAGE, JSON.stringify(merged)) } catch { /* 存不上也不影响使用 */ }
+  }
+  const visibleInviteColumns = listInviteColumns
+    .filter(item => item.visible)
+    .map(item => ({ ...INVITE_COLUMN_DEFS.find(def => def.key === item.key)!, visible: true }))
+  // 发起邀约日期与状态固定显示，中间字段与“邀约到店”使用同一套字段定义。
+  const listInitiatedColumns = useMemo(
+    () => permittedColumns(initiatedColumns, trafficProfileFields, INITIATED_COLUMN_DEFS),
+    [initiatedColumns, trafficProfileFields],
+  )
+  const visibleInviteDetailColumns = listInitiatedColumns
+    .filter(item => item.visible)
+    .map(item => ({ ...INITIATED_COLUMN_DEFS.find(def => def.key === item.key)!, visible: true }))
   const visibleTrafficColumns = listTrafficColumns
     .filter(item => item.visible)
     .map(item => ({ ...TRAFFIC_COLUMN_DEFS.find(def => def.key === item.key)!, visible: true }))
@@ -589,8 +716,13 @@ export default function PrincipalPage() {
   const listCardRef = useRef<HTMLDivElement>(null)
   // 名单（新人/老人）默认单行缩略，展开后整列换行显示全部名字
   const [expandNames, setExpandNames] = useState(false)
+  const [expandTeacherFollowUp, setExpandTeacherFollowUp] = useState(false)
   // 引流客户列表：默认单行截断，展开后整列换行显示全文
   const [expandTrafficCells, setExpandTrafficCells] = useState(false)
+  // 发起邀约按邀约人汇总，明细用弹窗打开，避免行内展开撑满页面。
+  const [inviteDetail, setInviteDetail] = useState<{ key: string; label: string; records: InviteInitiatedRecord[] } | null>(null)
+  const [inviteDetailSort, setInviteDetailSort] = useState<{ field: string; order: "asc" | "desc" }>({ field: "date", order: "desc" })
+  const [expandInviteDetail, setExpandInviteDetail] = useState(false)
   // 引流人数：会员身份默认只显示前 3 类，展开后铺成两列小表
   // 与「自定义筛选」表头一致：点击列头切换升/降序（当前页内排序）
   const [sortBy, setSortBy] = useState("")
@@ -626,7 +758,11 @@ export default function PrincipalPage() {
       for (const item of data.breakdown?.traffic_filters?.stage ?? []) values.add(`stage:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.source ?? []) values.add(`source:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.tag ?? []) values.add(`tag:${item.key}`)
+      for (const item of data.breakdown?.traffic_filters?.upsell ?? []) values.add(`upsell:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.identity ?? []) values.add(`identity:${item.key}`)
+    } else if (overviewGroup === "invite") {
+      for (const item of data.breakdown?.invite_inviters ?? []) values.add(`inviter:${item.key}`)
+      for (const item of data.breakdown?.traffic ?? []) values.add(`traffic:${item.key}`)
     }
     return values
   }
@@ -775,7 +911,7 @@ export default function PrincipalPage() {
     }
     setDealDetail({ customer: customerName, rows: fallback ? [fallback] : [], loading: true })
     try {
-      // 弹窗里始终逐笔列出，不受列表的「同一人显示一次」影响
+      // 弹窗里始终逐笔列出，不受列表的「同一人仅显示一次」影响
       const response = await principalApi.query({ ...query, tab: "orders", breakdown: serverPicks, list_view: "order", customer_id: customerId }, 1, 100)
       setDealDetail({ customer: customerName, rows: response.items, loading: false })
     } catch {
@@ -835,6 +971,13 @@ export default function PrincipalPage() {
       return value ? [...kept, value] : kept
     })
   }
+  const chooseBreakdownMulti = (prefix: string, values: string[]) => {
+    setTrafficPage(1)
+    setBreakdownPicks(current => [
+      ...current.filter(item => pickPrefix(item) !== prefix),
+      ...values,
+    ])
+  }
   /** 已选中的二级项还原成看得懂的名字（卡种带上所属付费项目、具体课程带上活动类型） */
   const pickLabel = (pick: string): string => {
     const prefix = pickPrefix(pick)
@@ -853,6 +996,8 @@ export default function PrincipalPage() {
       return parent ? `${parent.label} · ${sub}` : sub
     }
     if (prefix === "teacher") return breakdown?.courses?.by_teacher.find(item => item.key === value)?.label ?? value
+    if (prefix === "inviter") return breakdown?.invite_inviters?.find(item => item.key === value)?.label ?? value
+    if (prefix === "traffic") return breakdown?.traffic?.find(item => item.key === value)?.label ?? value
     return value
   }
   /** 取消某一项筛选：清掉它自己，带上它下面的子项 */
@@ -863,8 +1008,8 @@ export default function PrincipalPage() {
       return !childPrefixes(prefix).includes(pickPrefix(item))
     }))
   }
-  const selectOverviewGroup = (key: "deals" | "courses" | "traffic") => {
-    setQuery(current => ({ ...current, course_view: "course", participant_scope: "" }))
+  const selectOverviewGroup = (key: "deals" | "courses" | "traffic" | "invite") => {
+    setQuery(current => ({ ...current, course_view: "course", participant_scope: "", invite_view: "arrive" }))
     setOverviewGroup(overviewGroup === key ? "" : key)
     resetPanel()
   }
@@ -908,8 +1053,38 @@ export default function PrincipalPage() {
     setBusy(true); setError("")
     try { const blob = await principalApi.download({ ...query, tab: listTab, list_view: listView, breakdown: serverPicks,
       ...(showTrafficList ? { export_view: "traffic" as const, export_customer_ids: sortedTrafficCustomers.map(customer => customer.id).filter((id): id is string => !!id) } : {}),
-    }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = showTrafficList ? "引流客户.xlsx" : "组织俱乐部.xlsx"; link.click(); URL.revokeObjectURL(url) }
+      ...(showInviteArriveList ? { export_view: "invite_arrivals" as const, arrival_view: inviteArriveView,
+        export_customer_ids: [...new Set(inviteArriveRows.map(customer => customer.id).filter((id): id is string => !!id))],
+        export_columns: visibleInviteColumns.map(column => column.key) } : {}),
+    }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = showTrafficList ? "引流客户.xlsx" : showInviteArriveList ? "邀约到店.xlsx" : "组织俱乐部.xlsx"; link.click(); URL.revokeObjectURL(url) }
     catch (e) { setError(e instanceof Error ? e.message : "导出失败") } finally { setBusy(false) }
+  }
+  async function downloadInviteDetail() {
+    if (!inviteDetail) return
+    setBusy(true); setError("")
+    try {
+      const blob = await principalApi.download({
+        ...query,
+        tab: "overview",
+        invite_view: "initiated",
+        export_view: "invite_initiated",
+        export_columns: ["date", "visit_date", ...visibleInviteDetailColumns.map(column => column.key), "status_label"],
+        breakdown: [
+          ...serverPicks.filter(value => !value.startsWith("inviter:")),
+          `inviter:${inviteDetail.key}`,
+        ],
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${inviteDetail.label}发起邀约.xlsx`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "导出失败")
+    } finally {
+      setBusy(false)
+    }
   }
   // 列表标题与「自定义筛选」结果区一致：日期区间 · 说明
   const dateSummary = query.date_from && query.date_to
@@ -918,19 +1093,25 @@ export default function PrincipalPage() {
       : query.date_to ? `截至 ${query.date_to.replaceAll("-", ".")}` : "全部时间"
   const listUnitLabel = query.tab === "conversion" ? "符合条件客户"
     : query.tab === "orders" || (query.tab === "overview" && overviewGroup === "deals") ? "交易记录"
-      : query.course_view === "participant" ? "参与者" : "课程记录"
+      : query.tab === "overview" && overviewGroup === "invite"
+        ? (query.invite_view === "initiated" ? "发起邀约" : "邀约到店")
+        : query.course_view === "participant" ? "参与者" : query.course_view === "teacher_follow_up" ? "老师跟进" : "课程记录"
 
-  // 经营概况：三张卡 + 二级项（勾选后筛选下面的列表）
-  const overviewCards = [
-    { key: "traffic" as const, title: "引流人数", value: `${result?.summary["引流人数"] ?? "—"}`, unit: "人",
-      sub: `${(breakdown?.traffic ?? []).filter(item => item.key !== "未配置").length} 位引流人 · 成交 ${(breakdown?.traffic ?? []).reduce((sum, item) => sum + (item.deal_count ?? 0), 0)} 笔`, help: "按照引流日期进行统计" },
-    { key: "courses" as const, title: "课程数", value: `${result?.summary["课程数"] ?? "—"}`, unit: "场",
-      sub: `${result?.summary["课时数"] ?? "—"} 课时 · 到场 ${result?.summary["到场人数"] ?? "—"} 人`, help: "" },
-    { key: "deals" as const, title: "成交量", value: `${result?.summary["交易笔数"] ?? "—"}`, unit: "笔",
-      sub: `成交 ${result?.summary["成交人数"] ?? "—"} 人${(breakdown?.deals ?? []).length ? ` · ${(breakdown?.deals ?? []).slice(0, 2).map(item => `${item.label} ${item.count}`).join(" / ")}` : ""}`, help: "" },
-  ]
   // 展开面板：每个维度一个下拉，选项在菜单里（带数量），一行单选
-  const panelSelects: { label: string; prefix: string; placeholder: string; items: { value: string; label: string; text: string; muted?: boolean }[] }[] = []
+  const referralConversionText = (customers: PrincipalBreakdownCustomer[]) => {
+    const consumers = customers.filter(customer => customer.deals > 0)
+    const firstLevelKey = breakdown?.traffic_upsell_levels?.[0]?.key
+    const trialOnlyCount = firstLevelKey
+      ? customers.filter(customer => {
+        const levelKeys = (customer.upsell_levels ?? []).map(level => level.key)
+        return levelKeys.length === 1 && levelKeys[0] === firstLevelKey
+      }).length
+      : 0
+    const upsellCount = consumers.filter(customer => customer.is_upsell).length
+    const rate = (count: number, total: number) => total > 0 ? `${Math.round(count * 1000 / total) / 10}%` : "0%"
+    return `（体验卡 ${rate(trialOnlyCount, customers.length)} · 升单 ${rate(upsellCount, consumers.length)}）`
+  }
+  const panelSelects: { label: string; prefix: string; placeholder: string; multi?: boolean; items: { value: string; label: string; text: string; note?: string; compactText?: boolean; muted?: boolean }[] }[] = []
   if (overviewGroup === "deals") {
     panelSelects.push({
       label: "付费项目", prefix: "deals", placeholder: "全部",
@@ -963,16 +1144,38 @@ export default function PrincipalPage() {
       items: (breakdown?.courses?.by_teacher ?? []).map(item => ({ value: `teacher:${item.key}`, label: item.label, text: `${item.count} 场 · ${item.hours ?? 0} 课时` })),
     })
   }
+  /** 「未配置」固定排在下拉第一位 */
+  const unassignedFirst = <T extends { key?: string; label: string; muted?: boolean }>(items: T[]): T[] =>
+    [...items].sort((a, b) => Number((b.key ?? b.label) === "未配置") - Number((a.key ?? a.label) === "未配置"))
+  if (overviewGroup === "invite") {
+    panelSelects.push({
+      label: "邀约人", prefix: "inviter", placeholder: "全部",
+      items: (breakdown?.invite_inviters ?? []).map(item => ({
+        value: `inviter:${item.key}`,
+        label: item.label,
+        text: `发起邀约 ${item.initiated_count} 次`,
+        muted: item.key === "未配置",
+      })),
+    })
+    panelSelects.push({
+      label: "引流人", prefix: "traffic", placeholder: "全部",
+      items: (breakdown?.traffic ?? []).map(item => ({
+        value: `traffic:${item.key}`,
+        label: item.label,
+        text: `邀约到店 ${item.invite_count ?? 0} 次`,
+        muted: item.key === "未配置",
+      })),
+    })
+  }
   if (overviewGroup === "traffic") {
-    /** 「未配置」固定排在下拉第一位 */
-    const unassignedFirst = <T extends { key?: string; label: string; muted?: boolean }>(items: T[]): T[] =>
-      [...items].sort((a, b) => Number((b.key ?? b.label) === "未配置") - Number((a.key ?? a.label) === "未配置"))
     panelSelects.push({
       label: "引流人", prefix: "traffic", placeholder: "全部",
       items: unassignedFirst((breakdown?.traffic ?? []).map(item => ({
         value: `traffic:${item.key}`,
         label: item.label,
-        text: `${item.count} 人 · 成交 ${item.deal_count ?? 0} 笔`,
+        text: `引流 ${item.count} 人`,
+        note: referralConversionText(item.customers ?? []),
+        compactText: true,
         muted: item.key === "未配置",
       }))),
     })
@@ -987,10 +1190,18 @@ export default function PrincipalPage() {
     })
     panelSelects.push(
       {
+        label: "升单情况", prefix: "upsell", placeholder: "全部", multi: true,
+        items: (breakdown?.traffic_filters?.upsell ?? []).map(item => ({
+          value: `upsell:${item.key}`,
+          label: item.label,
+          text: `${item.count} 人`,
+        })),
+      },
+      {
         label: "跟进阶段", prefix: "stage", placeholder: "全部",
         items: unassignedFirst((breakdown?.traffic_filters?.stage ?? []).map(item => ({
           value: `stage:${item.key}`,
-          label: item.key === "未配置" ? "—" : item.label,
+          label: item.label,
           text: `${item.count} 人`,
           muted: item.key === "未配置",
         }))),
@@ -1024,6 +1235,14 @@ export default function PrincipalPage() {
       if (source.length && !source.includes(customer.traffic_source ?? "")) return false
       const tags = picksOf("tag:")
       if (tags.length && !tags.some(tag => (customer.tags ?? []).includes(tag))) return false
+      const upsellSituations = picksOf("upsell:")
+      if (upsellSituations.length) {
+        const levelKeys = (customer.upsell_levels ?? []).map(level => level.key)
+        const currentLevelKey = levelKeys.at(-1)
+        if (!currentLevelKey || !upsellSituations.includes(currentLevelKey)) return false
+      }
+      const inviters = picksOf("inviter:")
+      if (inviters.length && !inviters.some(name => (customer.inviters ?? []).includes(name))) return false
       return pickedTraffic.length === 0 || pickedTraffic.includes(customer.referrer)
     })
   const trafficProductCounts = new Map<string, { key: string; label: string; count: number }>()
@@ -1037,55 +1256,64 @@ export default function PrincipalPage() {
   const listScope = result?.list_summary
   // 引流人数：成交构成（客户成交按付费项目拆）+ 会员卡子类；会员身份人数在筛选下拉里看
   const trafficDealTotal = trafficCustomers.reduce((sum, customer) => sum + (customer.deals ?? 0), 0)
-  // 邀约 / 取消邀约 / 到店：人数按去重客户算，人次按记录数累加
+  // 邀约 / 取消邀约 / 到店：次按记录累加；人数按同一人去重
   const trafficVisitStats = trafficCustomers.reduce((totals, customer) => {
+    const initiated = customer.initiated_count ?? 0
     const invite = customer.invite_count ?? 0
     const cancel = customer.cancel_count ?? 0
+    const noShow = customer.no_show_count ?? Math.max(0, invite - (customer.arrive_count ?? 0))
     const arrive = customer.arrive_count ?? 0
+    const invited = cancel + noShow + arrive
     return {
-      invitedPeople: totals.invitedPeople + (invite > 0 ? 1 : 0),
-      invitedCount: totals.invitedCount + invite,
-      cancelledPeople: totals.cancelledPeople + (cancel > 0 ? 1 : 0),
+      initiatedCount: totals.initiatedCount + initiated,
+      invitedCount: totals.invitedCount + invited,
       cancelledCount: totals.cancelledCount + cancel,
-      arrivedPeople: totals.arrivedPeople + (arrive > 0 ? 1 : 0),
+      noShowCount: totals.noShowCount + noShow,
       arrivedCount: totals.arrivedCount + arrive,
+      initiatedPeople: totals.initiatedPeople + (initiated > 0 ? 1 : 0),
+      invitedPeople: totals.invitedPeople + (invited > 0 ? 1 : 0),
+      cancelledPeople: totals.cancelledPeople + (cancel > 0 ? 1 : 0),
+      noShowPeople: totals.noShowPeople + (noShow > 0 ? 1 : 0),
+      arrivedPeople: totals.arrivedPeople + (arrive > 0 ? 1 : 0),
     }
-  }, { invitedPeople: 0, invitedCount: 0, cancelledPeople: 0, cancelledCount: 0, arrivedPeople: 0, arrivedCount: 0 })
+  }, {
+    initiatedCount: 0, invitedCount: 0, cancelledCount: 0, noShowCount: 0, arrivedCount: 0,
+    initiatedPeople: 0, invitedPeople: 0, cancelledPeople: 0, noShowPeople: 0, arrivedPeople: 0,
+  })
+  // 发起邀约按邀约记录的创建日期统计，与按预计到访日期统计的“邀约到店”分开。
+  const inviteInitiatorRows = useMemo(() => {
+    const selected = new Set(picksOf("inviter:"))
+    return (breakdown?.invite_inviters ?? []).filter(item => !selected.size || selected.has(item.key))
+  }, [breakdown?.invite_inviters, breakdownPicks])
+  const inviteInitiatedTotal = inviteInitiatorRows.reduce((sum, item) => sum + item.initiated_count, 0)
+  const inviteInitiatedPeople = new Set(
+    inviteInitiatorRows.flatMap(item => (item.records ?? []).map(record => record.customer_id).filter(Boolean)),
+  ).size
+  // 开发热更新或旧页面缓存可能保留新增 visit_date 之前的结果；刷新后同步替换已打开弹窗的数据。
+  useEffect(() => {
+    if (!inviteDetail) return
+    const latest = (breakdown?.invite_inviters ?? []).find(item => item.key === inviteDetail.key)
+    if (latest?.records && latest.records !== inviteDetail.records) {
+      setInviteDetail(current => current ? { ...current, records: latest.records ?? [] } : current)
+    }
+  }, [breakdown?.invite_inviters, inviteDetail?.key])
+  // 邀约到店按所选日期内的次统计，三种状态互斥且合计等于总次。
+  const overviewCards = [
+    { id: "traffic", group: "traffic" as const, title: "引流人数（效果）", value: `${result?.summary["引流人数"] ?? "—"}`, unit: "人",
+      sub: `${(breakdown?.traffic ?? []).filter(item => item.key !== "未配置").length} 位引流人 · 成交 ${(breakdown?.traffic ?? []).reduce((sum, item) => sum + (item.deal_count ?? 0), 0)} 笔`, help: <>按照引流日期进行统计</> },
+    { id: "invite", group: "invite" as const, title: "邀约到店", value: `${trafficVisitStats.invitedCount}`, unit: "次",
+      sub: `取消 ${trafficVisitStats.cancelledCount} · 未到场 ${trafficVisitStats.noShowCount} · 已到场 ${trafficVisitStats.arrivedCount}`,
+      help: <>统计周期内邀约页面里的客户总数</> },
+    { id: "courses", group: "courses" as const, title: "课程数据", value: `${result?.summary["课程数"] ?? "—"}`, unit: "场",
+      sub: `总 ${result?.summary["课时数"] ?? "—"} 课时`, help: null },
+    { id: "deals", group: "deals" as const, title: "成交量", value: `${result?.summary["交易笔数"] ?? "—"}`, unit: "笔",
+      sub: `会员卡 ${(breakdown?.deals ?? []).filter(item => item.key === "membership").reduce((sum, item) => sum + item.count, 0)} 笔 · 其他 ${(breakdown?.deals ?? []).filter(item => item.key !== "membership").reduce((sum, item) => sum + item.count, 0)} 笔`, help: null },
+  ]
   const productTotals = [...trafficProductCounts.values()].sort((a, b) => b.count - a.count)
-  const membershipSubtypes = (() => {
-    const counter = new Map<string, { key: string; label: string; count: number }>()
-    for (const customer of trafficCustomers) {
-      for (const subtype of customer.subtypes ?? []) {
-        const current = counter.get(subtype.key)
-        counter.set(subtype.key, { key: subtype.key, label: subtype.label, count: (current?.count ?? 0) + subtype.count })
-      }
-    }
-    return [...counter.values()].sort((a, b) => b.count - a.count)
-  })()
   const scopeNumber = (key: string, fallback: string | number | undefined) => listScope?.[key] ?? fallback ?? "—"
-  // 上课人数/上课人次后面的「内 / 外」：点了切到参与者列表并按内部/外部筛，再点一次取消
-  const participantScopeLink = (text: string, scope: "internal" | "external", value: string | number | undefined) => {
-    const scopeActive = query.participant_scope === scope && (query.course_view || "course") === "participant"
-    return (
-      <button
-        type="button"
-        title={`点击筛选参与者的${text}部人员`}
-        onClick={() => {
-          setSortBy("")
-          setQuery(current => {
-            const already = (current.course_view || "course") === "participant" && current.participant_scope === scope
-            return { ...current, course_view: "participant", participant_scope: already ? "" : scope }
-          })
-        }}
-        className={`cursor-pointer hover:underline ${scopeActive ? "text-[#3370ff]" : "hover:text-[#3370ff]"}`}
-      >
-        {text} {value ?? "—"}
-      </button>
-    )
-  }
   const panelMetrics: {
     label: string; text: string; hint?: string; help?: ReactNode
-    /** 数字下面的补充说明（比如内部/外部人员的人数） */
+    /** 数字下面的补充说明 */
     sub?: ReactNode
     /** 引流客户列表：按有无对应记录筛（本地筛） */
     filter?: TrafficQuickFilter
@@ -1093,43 +1321,142 @@ export default function PrincipalPage() {
     pick?: string
     /** 课程列表筛：当日成交 / 关联成交 */
     courseDeal?: "" | "same_day" | "related"
+    /** 与主指标合并展示的第二项课程成交数据 */
+    secondaryCourseDeal?: { label: string; text: string; value: "same_day" | "related" }
   }[] = overviewGroup === "deals"
     ? [
       { label: "成交量", text: `${scopeNumber("成交量", result?.summary["交易笔数"])} 笔` },
-      { label: "成交人数", text: `${scopeNumber("成交人数", result?.summary["成交人数"])} 人` },
+      { label: "总成交人数", text: `${scopeNumber("成交人数", result?.summary["成交人数"])} 人` },
       { label: "升单人数", text: `${scopeNumber("升单人", 0)} 人`, help: <>「升单配置」页面配置，同一人多次升单，仅记作一次</>, pick: "buy:升单" },
       { label: "升单量", text: `${scopeNumber("升单量", 0)} 次`, help: <>同一人多次升单，按升单次数重复统计</>, pick: "buy:升单" },
-      { label: "付费项目类型", text: `${scopeNumber("付费项目", breakdown?.deals?.length ?? 0)} 种` },
     ]
     : overviewGroup === "courses"
       ? [
-        { label: "课程数", text: `${scopeNumber("课程数", result?.summary["课程数"])} 场` },
-        { label: "课时数", text: `${scopeNumber("课时数", result?.summary["课时数"])} 课时` },
-        { label: "上课人数", text: `${scopeNumber("上课人数", result?.summary["到场人数"])} 人`,
-          sub: <>{participantScopeLink("内", "internal", result?.summary["上课人数（内部）"])} · {participantScopeLink("外", "external", result?.summary["上课人数（外部）"])}</> },
+        { label: "课程数", text: `${scopeNumber("课程数", result?.summary["课程数"])} 场`,
+          sub: <>总 {scopeNumber("课时数", result?.summary["课时数"])} 课时</> },
         { label: "上课人次", text: `${scopeNumber("上课人次", result?.summary["到场人次"])} 次`,
-          sub: <>{participantScopeLink("内", "internal", result?.summary["上课人次（内部）"])} · {participantScopeLink("外", "external", result?.summary["上课人次（外部）"])}</> },
-        { label: "课程当日成交", text: `${scopeNumber("课程当日成交", result?.summary["课程当日成交数"])} 笔`, help: <>仅包含当日相关课程参与者</>, courseDeal: "same_day" },
-        { label: "课程关联成交", text: `${scopeNumber("课程关联成交", result?.summary["课程关联成交数"])} 笔`, help: <>只算明确挂在这门课上的成交（比如这门课的粗门次卡扣卡记录），全部课程合计</>, courseDeal: "related" },
+          sub: <>上课人数 {scopeNumber("上课人数", result?.summary["到场人数"])} 人</> },
+        { label: "服务人次", text: `${scopeNumber("服务人次", result?.summary["服务人次"])} 人次`,
+          sub: <>案主 {scopeNumber("服务案主人次", result?.summary["服务案主人次"])} · 参与者 {scopeNumber("服务参与人次", result?.summary["服务参与人次"])}</>,
+          help: <>与课程记录的服务总人次一致：案主人次＋参与人次，同一人参与多堂课程分别累计。</> },
       ]
-      : overviewGroup === "traffic"
+      : overviewGroup === "invite"
         ? [
-          { label: "邀约人数", text: `${trafficVisitStats.invitedPeople} 人`, filter: { kind: "invite", label: "有邀约" } },
-          { label: "邀约人次", text: `${trafficVisitStats.invitedCount} 人次`, filter: { kind: "invite", label: "有邀约" } },
-          { label: "取消邀约人数", text: `${trafficVisitStats.cancelledPeople} 人`, filter: { kind: "cancel", label: "有取消邀约" } },
-          { label: "取消邀约人次", text: `${trafficVisitStats.cancelledCount} 人次`, filter: { kind: "cancel", label: "有取消邀约" } },
-          { label: "到店人数", text: `${trafficVisitStats.arrivedPeople} 人`, filter: { kind: "arrive", label: "有到店" } },
-          { label: "到店人次", text: `${trafficVisitStats.arrivedCount} 人次`, filter: { kind: "arrive", label: "有到店" } },
+          { label: "邀约到店总次", text: `${trafficVisitStats.invitedCount} 次`,
+            sub: <>{trafficVisitStats.invitedPeople} 人</>,
+            help: <>已取消 + 未到店 + 已到店；次按记录累加，人数同一人只算一次</> },
+          { label: "取消", text: `${trafficVisitStats.cancelledCount} 次`,
+            sub: <>{trafficVisitStats.cancelledPeople} 人</> },
+          { label: "未到店", text: `${trafficVisitStats.noShowCount} 次`,
+            sub: <>{trafficVisitStats.noShowPeople} 人</>,
+            help: <>既未取消也未到店</> },
+          { label: "已到店", text: `${trafficVisitStats.arrivedCount} 次`,
+            sub: <>{trafficVisitStats.arrivedPeople} 人</> },
+          { label: "发起邀约次", text: `${inviteInitiatedTotal} 次`,
+            sub: <>{inviteInitiatedPeople} 人</>,
+            help: <>按邀约记录的创建日期统计，所选时间段内每创建一条邀约记 1 次</> },
+        ]
+        : overviewGroup === "traffic"
+        ? [
+          { label: "邀约到店", text: `${trafficVisitStats.invitedCount} 次`,
+            sub: <>{trafficVisitStats.invitedPeople} 人</>,
+            filter: { kind: "initiated", label: "有邀约（含取消）" },
+            help: <>按所选日期内的邀约记录统计，含已取消记录，同一人多次分别计数；下方三种状态合计等于总次</> },
+          { label: "已取消", text: `${trafficVisitStats.cancelledCount} 次`,
+            sub: <>{trafficVisitStats.cancelledPeople} 人</>,
+            filter: { kind: "cancel", label: "有取消邀约" } },
+          { label: "未到场", text: `${trafficVisitStats.noShowCount} 次`,
+            sub: <>{trafficVisitStats.noShowPeople} 人</>,
+            help: <>既未取消也未到店</> },
+          { label: "已到场", text: `${trafficVisitStats.arrivedCount} 次`,
+            sub: <>{trafficVisitStats.arrivedPeople} 人</>,
+            filter: { kind: "arrive", label: "有到店" } },
         ]
         : []
   const showTrafficList = query.tab === "overview" && overviewGroup === "traffic"
+  const showCourseDealOverviewList = query.tab === "overview" && (overviewGroup === "courses" || overviewGroup === "deals")
+  const showTeacherFollowUpList = (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses")) && query.course_view === "teacher_follow_up"
+  const showInviteListTabs = query.tab === "overview" && overviewGroup === "invite"
+  const showInviteArriveList = showInviteListTabs && (query.invite_view || "arrive") === "arrive"
+  const showInviteInitiatedList = showInviteListTabs && query.invite_view === "initiated"
+  const sortedInviteDetailRecords = useMemo(() => {
+    const rows = [...(inviteDetail?.records ?? [])]
+    const statusOrder: Record<string, number> = { cancelled: 0, no_show: 1, arrived: 2 }
+    const valueOf = (record: (typeof rows)[number]) => {
+      if (inviteDetailSort.field === "status_label") return statusOrder[record.status] ?? 99
+      if (inviteDetailSort.field === "date") return record.date
+      if (inviteDetailSort.field === "name") return record.name
+      const value = record[inviteDetailSort.field as keyof InviteInitiatedRecord]
+      return Array.isArray(value) ? value.join("、") : value ?? ""
+    }
+    const direction = inviteDetailSort.order === "asc" ? 1 : -1
+    return rows.sort((left, right) => {
+      const leftValue = valueOf(left)
+      const rightValue = valueOf(right)
+      const compared = typeof leftValue === "number" && typeof rightValue === "number"
+        ? leftValue - rightValue
+        : String(leftValue).localeCompare(String(rightValue), "zh-CN")
+      return compared * direction || right.date.localeCompare(left.date)
+    })
+  }, [inviteDetail, inviteDetailSort])
+  const toggleInviteDetailSort = (field: string) => {
+    setInviteDetailSort(current => current.field === field
+      ? { field, order: current.order === "asc" ? "desc" : "asc" }
+      : { field, order: field === "date" ? "desc" : "asc" })
+  }
+  // 邀约到店列表：按首次到店日期排序，每人一行；支持表头点击排序
+  const inviteArriveRows = useMemo(() => {
+    const customers = trafficCustomers.filter(customer => (customer.arrive_count ?? 0) > 0 || customer.arrive_date)
+    const rows = inviteArriveView === "date"
+      ? customers.flatMap(customer => (customer.arrival_records ?? []).map(arrival => ({ ...customer, ...arrival, arrival_id: arrival.id })))
+      : customers
+    const dir = trafficSortOrder === "asc" ? 1 : -1
+    if (!trafficSortBy) {
+      return rows.slice().sort((a, b) => (b.arrive_date || "").localeCompare(a.arrive_date || "") || a.name.localeCompare(b.name, "zh-CN"))
+    }
+    const valueOf = (customer: (typeof trafficCustomers)[number]): string | number => {
+      switch (trafficSortBy) {
+        case "name": return customer.name
+        case "identity": return customer.identity ?? ""
+        case "referrer": return customer.referrer ?? ""
+        case "referrer_handler": return customer.referrer_handler ?? ""
+        case "follow_up_status": return customer.follow_up_status ?? ""
+        case "traffic_source": return customer.traffic_source ?? ""
+        case "tags": return (customer.tags ?? []).join("、")
+        case "deals": return customer.deals ?? 0
+        case "invite_count": return customer.invite_count ?? 0
+        case "cancel_count": return customer.cancel_count ?? 0
+        case "no_show_count": return customer.no_show_count ?? 0
+        case "arrive_count": return customer.arrive_count ?? 0
+        case "activity_count": return customer.activity_count ?? 0
+        case "visit_interval": return customer.visit_interval ?? ""
+        case "same_day_deals": return customer.same_day_deals ?? 0
+        case "arrive_inviter": return customer.arrive_inviter ?? ""
+        case "visit_purpose": return customer.visit_purpose ?? ""
+        case "trauma_history": return customer.trauma_history ?? ""
+        case "current_block": return customer.current_block ?? ""
+        case "work_info": return customer.work_info ?? ""
+        case "other_info": return customer.other_info ?? ""
+        default: return customer.arrive_date ?? ""
+      }
+    }
+    return rows.slice().sort((a, b) => {
+      const av = valueOf(a)
+      const bv = valueOf(b)
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir
+      return String(av).localeCompare(String(bv), "zh-CN") * dir
+    })
+  }, [trafficCustomers, inviteArriveView, trafficSortBy, trafficSortOrder])
+  const inviteArrivePageCount = Math.max(1, Math.ceil(inviteArriveRows.length / PAGE_SIZE))
+  const inviteArriveCurrentPage = Math.min(inviteArrivePage, inviteArrivePageCount)
+  const inviteArrivePageRows = inviteArriveRows.slice((inviteArriveCurrentPage - 1) * PAGE_SIZE, inviteArriveCurrentPage * PAGE_SIZE)
   // 当前生效的筛选（课程数 / 成交量）：显示在列表标题右边，逐个可取消
   const activeFilterChips = useMemo(() => {
     if (showTrafficList) return []
     const chips: { key: string; label: string; clear: () => void }[] = []
     for (const pick of breakdownPicks) {
       const prefix = pickPrefix(pick)
-      if (!["deals", "subtype", "buy", "type", "course", "teacher"].includes(prefix)) continue
+      if (!["deals", "subtype", "buy", "type", "course", "teacher", "inviter", "traffic"].includes(prefix)) continue
       chips.push({ key: pick, label: pickLabel(pick), clear: () => clearPick(prefix, pick.slice(prefix.length + 1)) })
     }
     if (overviewGroup === "courses" && query.course_deal) {
@@ -1139,16 +1466,9 @@ export default function PrincipalPage() {
         clear: () => update({ course_deal: "" }),
       })
     }
-    if (overviewGroup === "courses" && query.participant_scope) {
-      chips.push({
-        key: `participant_scope:${query.participant_scope}`,
-        label: query.participant_scope === "internal" ? "参与者：内部人员" : "参与者：外部人员",
-        clear: () => update({ participant_scope: "" }),
-      })
-    }
     return chips
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breakdownPicks, breakdown, overviewGroup, query.course_deal, query.participant_scope, showTrafficList])
+  }, [breakdownPicks, breakdown, overviewGroup, query.course_deal, showTrafficList])
   // 参与者视图单独一套列宽（课程名 +40px、人员类型 -60px）
   const participantTableView = (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses"))
     && query.course_view === "participant"
@@ -1163,15 +1483,19 @@ export default function PrincipalPage() {
   const listTableMinWidth = (result?.columns ?? []).reduce((total, column) => total + headerMinWidth(column.key, column.label), 0)
   const toggleTrafficSort = (field: string) => {
     setTrafficPage(1)
+    setInviteArrivePage(1)
     if (trafficSortBy === field) setTrafficSortOrder(order => (order === "asc" ? "desc" : "asc"))
     else { setTrafficSortBy(field); setTrafficSortOrder("asc") }
   }
   const trafficQuickFiltered = useMemo(() => {
     if (!trafficQuickFilter) return trafficCustomers
     return trafficCustomers.filter(customer => {
+      if (["initiated", "invite", "cancel", "no_show", "arrive"].includes(trafficQuickFilter.kind) && customer.referrer === "未配置") return false
       switch (trafficQuickFilter.kind) {
+        case "initiated": return (customer.initiated_count ?? (customer.invite_count ?? 0) + (customer.cancel_count ?? 0)) > 0
         case "invite": return (customer.invite_count ?? 0) > 0
         case "cancel": return (customer.cancel_count ?? 0) > 0
+        case "no_show": return (customer.no_show_count ?? Math.max(0, (customer.invite_count ?? 0) - (customer.arrive_count ?? 0))) > 0
         case "arrive": return (customer.arrive_count ?? 0) > 0
         case "deals": return (customer.deals ?? 0) > 0
         case "product": return (customer.products ?? []).some(item => item.key === trafficQuickFilter.value)
@@ -1191,28 +1515,6 @@ export default function PrincipalPage() {
   const splitMetricText = (text: string): [string, string] => {
     const matched = text.match(/^(\S+)\s*(.*)$/)
     return matched ? [matched[1], matched[2]] : [text, ""]
-  }
-  // 引流面板的指标组（方案 E）：小组内「标签 + 人数 + 人次」，人数与人次都可点筛选
-  const trafficMetricGroup = (label: string, kind: "invite" | "cancel" | "arrive", people: number, times: number) => {
-    const active = isQuickFilterActive(kind)
-    const filterLabel = kind === "invite" ? "有邀约" : kind === "cancel" ? "有取消邀约" : "有到店"
-    return (
-      <span className="inline-flex items-baseline gap-2">
-        <span className="text-[12px] text-[#8f959e]">{label}</span>
-        {[{ value: people, unit: "人" }, { value: times, unit: "人次" }].map(item => (
-          <button
-            key={item.unit}
-            type="button"
-            onClick={() => toggleTrafficQuickFilter({ kind, label: filterLabel })}
-            title="点击筛选下面的列表"
-            className={`cursor-pointer hover:underline ${active ? "text-[#3370ff]" : "hover:text-[#3370ff]"}`}
-          >
-            <span className={`text-[12px] font-medium tabular-nums ${active ? "text-[#3370ff]" : "text-[#1f2329]"}`}>{item.value}</span>
-            <span className="ml-1 text-[11px] text-[#8f959e]">{item.unit}</span>
-          </button>
-        ))}
-      </span>
-    )
   }
   // 换了筛选条件后列表会变短，浏览器会把滚动位置往上顶；这里始终把列表顶到可视区，
   // 避免视口停在半截的卡片/面板上。列表本来就可见时不会滚动。
@@ -1404,15 +1706,15 @@ export default function PrincipalPage() {
     <div className="min-h-full bg-[#f4f5f6] p-4 pb-6">
       {/* 与「付费项目」一致的顶部 tab 栏：白条 + 3px 蓝色下划线贴底 */}
       <div className="mb-3 flex h-[52px] items-center rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
-        <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex h-full min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {visibleTabs.map(tab => (
             <button
               key={tab.key}
-              className={`relative whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${query.tab === tab.key ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
+              className={`relative flex h-full shrink-0 items-center whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${query.tab === tab.key ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
               onClick={() => update({ tab: tab.key, course_view: "course", participant_scope: "" })}
             >
               {tab.label}
-              {query.tab === tab.key && <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
+              {query.tab === tab.key && <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
             </button>
           ))}
         </div>
@@ -1695,17 +1997,22 @@ export default function PrincipalPage() {
       )}
 
       {!pagination.error && result && query.tab === "overview" && (
-        /* 经营概况：三张一级卡点开就在下面展开那一组（二级指标可勾选筛选列表） */
+        /* 经营概况：引流人数、邀约到店人次、课程与成交。 */
         <div className="mt-4 border-t border-[#f0f0f0] pt-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {overviewCards.map(card => {
-              const active = overviewGroup === card.key
+              const isPrimaryCard = card.id === card.group
+              const active = isPrimaryCard && overviewGroup === card.group
               return (
                 <button
-                  key={card.key}
+                  key={card.id}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => selectOverviewGroup(card.key)}
+                  onClick={() => {
+                    if (isPrimaryCard) selectOverviewGroup(card.group)
+                    else if (card.group === "invite") selectOverviewGroup("invite")
+                    else if (overviewGroup !== "traffic") selectOverviewGroup("traffic")
+                  }}
                   className={`group min-w-0 rounded-[8px] border px-4 py-3.5 text-left transition-all ${active
                     ? "border-[#c7d7f7] bg-white shadow-[0_1px_6px_rgba(51,112,255,.07)]"
                     : "border-[#e8eaed] bg-white hover:border-[#d5dbe6] hover:shadow-[0_2px_10px_rgba(31,35,41,.05)]"}`}
@@ -1721,10 +2028,16 @@ export default function PrincipalPage() {
                   </div>
                   {isEmptyMetric(card.value)
                     ? <span className="mt-3 block h-[2px] w-[14px] rounded-full bg-[#e5e8eb]" aria-label="无数据" />
-                    : <div className="mt-2.5 flex items-baseline gap-1">
-                      <span className="text-[26px] font-semibold leading-none text-[#1f2329] tabular-nums">{card.value}</span>
-                      <span className="text-[12px] text-[#8f959e]">{card.unit}</span>
-                    </div>}
+                    : (
+                      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                        {!isEmptyMetric(card.value) && (
+                          <span className="flex items-baseline gap-1">
+                            <span className="text-[26px] font-semibold leading-none text-[#1f2329] tabular-nums">{card.value}</span>
+                            <span className="text-[12px] text-[#8f959e]">{card.unit}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   <div className="mt-2 truncate text-[11.5px] text-[#9aa1a9]" title={card.sub}>{card.sub}</div>
                 </button>
               )
@@ -1734,52 +2047,87 @@ export default function PrincipalPage() {
           {overviewGroup && (
             <div className="mt-3 overflow-hidden rounded-[8px] border border-[#e8eaed] bg-white">
               <div className="flex min-w-0 items-center gap-2 border-b border-[#f2f3f5] bg-[#fafbfc] px-4 py-2">
-                <span className="shrink-0 text-[12px] text-[#646a73]">{overviewCards.find(item => item.key === overviewGroup)?.title}明细</span>
+                <span className="shrink-0 text-[12px] text-[#646a73]">{overviewCards.find(item => item.id === overviewGroup)?.title ?? overviewCards.find(item => item.group === overviewGroup)?.title}明细</span>
                 <span className="shrink-0 text-[11px] text-[#b0b5bb]">按下面的维度筛选列表</span>
                 {(breakdownPicks.length > 0 || trafficQuickFilter || query.course_deal) && (
                   <button type="button" onClick={resetPanel} className="ml-auto shrink-0 text-[11px] text-[#8f959e] hover:text-[#3370ff]">清除全部</button>
                 )}
               </div>
-              <div className="flex items-center gap-x-3 px-4 py-3.5">
+              <div className="flex flex-wrap items-center gap-2 px-4 py-3.5">
                 {panelSelects.map(group => {
                   const chosen = breakdownPicks.find(item => pickPrefix(item) === group.prefix) ?? ""
+                  const chosenValues = breakdownPicks.filter(item => pickPrefix(item) === group.prefix)
+                  const options = group.items.map(item => ({
+                    value: item.value,
+                    label: item.label,
+                    rightLabel: item.text,
+                    rightNote: item.note,
+                    rightLabelClassName: item.compactText ? "text-[11px]" : undefined,
+                    muted: item.muted,
+                  }))
+                  const active = !!(group.multi ? chosenValues.length : chosen)
                   return (
-                    <label key={group.prefix} className="flex min-w-0 items-center gap-1.5">
-                      <span className="shrink-0 text-[12px] text-[#8f959e]">{group.label}</span>
-                      <SelectDropdown
-                        size="sm"
-                        className="w-[136px] min-w-[104px] shrink"
-                        value={chosen}
-                        options={[
-                          { value: "", label: group.placeholder },
-                          ...group.items.map(item => ({ value: item.value, label: item.label, rightLabel: item.text, muted: item.muted })),
-                        ]}
-                        onChange={value => chooseBreakdown(group.prefix, value)}
-                        buttonClassName={`!h-8 !rounded-[4px] !border !px-2.5 !text-[12px] !shadow-none ${chosen ? "!border-[#c7d7f7] !text-[#3370ff]" : "!border-[#e1e4e7] !text-[#4e535a]"}`}
-                        placeholderColor="text-[#8f959e]"
-                        dropdownWidth={260}
-                        menuMaxHeight={280}
-                        hideRightLabelInTrigger
-                      />
-                    </label>
+                    <div
+                      key={group.prefix}
+                      className={`inline-flex h-8 min-w-0 max-w-full items-center gap-1 rounded-full border pl-3 pr-1 transition-colors ${
+                        active
+                          ? "border-[#c7d7f7] bg-[#f0f5ff]"
+                          : "border-[#e8eaed] bg-[#fafbfc] hover:border-[#d5dbe6]"
+                      }`}
+                    >
+                      <span className={`shrink-0 text-[12px] ${active ? "text-[#3370ff]" : "text-[#4e535a]"}`}>
+                        {group.label}
+                      </span>
+                      <span className={`shrink-0 text-[12px] ${active ? "text-[#245be8]" : "text-[#8f959e]"}`}>
+                        ·
+                      </span>
+                      {group.multi ? (
+                        <SelectDropdown
+                          multi
+                          size="sm"
+                          className="min-w-0 max-w-[160px] shrink"
+                          value={chosenValues}
+                          options={options}
+                          placeholder={group.placeholder}
+                          triggerLabel={chosenValues.length ? `已选 ${chosenValues.length} 项` : undefined}
+                          onChange={values => chooseBreakdownMulti(group.prefix, values)}
+                          buttonClassName={`!h-7 !rounded-full !border-0 !bg-transparent !px-1.5 !text-[12px] !shadow-none ${
+                            active ? "!text-[#3370ff]" : "!text-[#8f959e]"
+                          }`}
+                          placeholderColor="text-[#8f959e]"
+                          dropdownWidth={260}
+                          menuMaxHeight={280}
+                          hideRightLabelInTrigger
+                        />
+                      ) : (
+                        <SelectDropdown
+                          size="sm"
+                          className="min-w-0 max-w-[160px] shrink"
+                          value={chosen}
+                          options={[{ value: "", label: group.placeholder }, ...options]}
+                          onChange={value => chooseBreakdown(group.prefix, value)}
+                          buttonClassName={`!h-7 !rounded-full !border-0 !bg-transparent !px-1.5 !text-[12px] !shadow-none ${
+                            active ? "!text-[#3370ff]" : "!text-[#8f959e]"
+                          }`}
+                          placeholderColor="text-[#8f959e]"
+                          dropdownWidth={overviewGroup === "traffic" && group.prefix === "traffic" ? 320 : 260}
+                          menuMaxHeight={280}
+                          hideRightLabelInTrigger
+                        />
+                      )}
+                    </div>
                   )
                 })}
                 {!panelSelects.length && (
                   <p className="text-[12px] text-[#8f959e]">
-                    {overviewGroup === "deals" ? "这个范围里没有成交记录。" : overviewGroup === "courses" ? "这个范围里没有课程记录。" : "这个范围里没有引流客户。"}
+                    {overviewGroup === "deals" ? "这个范围里没有成交记录。" : overviewGroup === "courses" ? "这个范围里没有课程记录。" : overviewGroup === "invite" ? "这个范围里没有邀约记录。" : "这个范围里没有引流客户。"}
                   </p>
                 )}
               </div>
               {overviewGroup === "traffic" && trafficCustomers.length > 0 && (
-                <div className="border-t border-[#f5f6f7] px-4 pb-3 pt-2">
-                  {/* 方案 E：邀约/到店/取消邀约同一行，成交单独一行；每个数字都可点筛选 */}
-                  <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-dashed border-[#f4f5f6] py-1.5">
-                    {trafficMetricGroup("邀约", "invite", trafficVisitStats.invitedPeople, trafficVisitStats.invitedCount)}
-                    {trafficMetricGroup("到店", "arrive", trafficVisitStats.arrivedPeople, trafficVisitStats.arrivedCount)}
-                    {trafficMetricGroup("取消邀约", "cancel", trafficVisitStats.cancelledPeople, trafficVisitStats.cancelledCount)}
-                  </div>
-                  <div className="flex items-baseline gap-2 py-1.5">
-                    <span className="shrink-0 text-[12px] text-[#8f959e]">成交</span>
+                <div className="border-t border-[#f5f6f7]">
+                  <div className="flex items-baseline gap-1 px-4 py-2.5">
+                    <span className="shrink-0 text-[12px] text-[#8f959e]">成交总计</span>
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[12px] text-[#646a73]">
                     <button
                       type="button"
@@ -1801,26 +2149,6 @@ export default function PrincipalPage() {
                           <span className="text-[11px]">{item.label}</span>{' '}
                           <b className={`text-[11px] font-normal tabular-nums ${isQuickFilterActive("product", item.key) ? "text-[#3370ff]" : ""}`}>{item.count}</b>
                         </button>
-                        {item.key === "membership" && membershipSubtypes.length > 0 && (
-                          <span
-                            className="ml-1 text-[11px] text-[#8f959e]"
-                            title={membershipSubtypes.map(sub => `${sub.label} ${sub.count}`).join("、")}
-                          >
-                            （{membershipSubtypes.map((sub, index) => (
-                              <span key={sub.key}>
-                                {index > 0 ? "、" : ""}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleTrafficQuickFilter({ kind: "subtype", value: sub.key, label: `买了${sub.label}` })}
-                                  title="点击筛选下面的列表"
-                                  className={`cursor-pointer hover:underline ${isQuickFilterActive("subtype", sub.key) ? "text-[#3370ff]" : ""}`}
-                                >
-                                  {sub.label}{sub.count}
-                                </button>
-                              </span>
-                            ))}）
-                          </span>
-                        )}
                       </span>
                     ))}
                     </div>
@@ -1830,11 +2158,12 @@ export default function PrincipalPage() {
               {overviewGroup !== "traffic" && panelMetrics.length > 0 && (
                 <div className="flex flex-wrap border-t border-[#f2f3f5] bg-[#fcfcfd]">
                   {panelMetrics.map(item => {
+                    const secondaryActive = !!item.secondaryCourseDeal && query.course_deal === item.secondaryCourseDeal.value
                     const active = item.filter
                       ? isQuickFilterActive(item.filter.kind, item.filter.value ?? "")
                       : item.pick
                         ? breakdownPicks.includes(item.pick)
-                        : !!item.courseDeal && query.course_deal === item.courseDeal
+                        : (!!item.courseDeal && query.course_deal === item.courseDeal) || secondaryActive
                     // 显示 0 的指标点了也只会筛出空列表，就不做成可点
                     const metricIsZero = Number(String(item.text).trim().split(/\s+/)[0]) === 0
                     const clickable = (!!item.filter || !!item.pick || !!item.courseDeal) && !metricIsZero
@@ -1854,15 +2183,39 @@ export default function PrincipalPage() {
                           <span className="truncate" title={item.hint ?? item.label}>{item.label}</span>
                           {item.help && <HelpTip width={196}>{item.help}</HelpTip>}
                         </div>
-                        <div className={`mt-1 whitespace-normal text-[14px] font-medium leading-[1.35] tabular-nums ${active ? "text-[#3370ff]" : "text-[#2b2f36]"}`}>
-                          {item.text}
-                          {/* 内部/外部这类补充数字跟主数字同一行，小一号、更浅，不额外占一行 */}
-                          {item.sub && <span className="ml-2 whitespace-nowrap text-[11px] font-normal text-[#646a73]">{item.sub}</span>}
-                        </div>
+                        {item.secondaryCourseDeal ? (
+                          <button
+                            type="button"
+                            disabled={metricIsZero}
+                            className={`mt-1 block whitespace-normal text-[14px] font-medium leading-[1.35] tabular-nums hover:text-[#3370ff] hover:underline ${active && !secondaryActive ? "text-[#3370ff]" : "text-[#2b2f36]"}`}
+                            onClick={handleClick}
+                          >
+                            {item.text}
+                          </button>
+                        ) : (
+                          <div className={`mt-1 whitespace-normal text-[14px] font-medium leading-[1.35] tabular-nums ${active ? "text-[#3370ff]" : "text-[#2b2f36]"}`}>
+                            {item.text}
+                          </div>
+                        )}
+                        {item.sub && <div className="mt-1 whitespace-normal break-words text-[11px] font-normal leading-[1.35] text-[#8f959e]">{item.sub}</div>}
+                        {item.secondaryCourseDeal && (
+                          <button
+                            type="button"
+                            className={`mt-1 whitespace-nowrap text-[11px] font-normal leading-[1.35] hover:text-[#3370ff] hover:underline ${secondaryActive ? "text-[#3370ff]" : "text-[#8f959e]"}`}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              update({ course_deal: secondaryActive ? "" : item.secondaryCourseDeal!.value })
+                            }}
+                          >
+                            {item.secondaryCourseDeal.label} {item.secondaryCourseDeal.text}
+                          </button>
+                        )}
                       </>
                     )
-                    // 整块不可点时用 div 承载，里面的「内 / 外」本身还能点
-                    return clickable ? (
+                    // 整块不可点时用 div 承载，关联成交仍可单独点击
+                    return item.secondaryCourseDeal ? (
+                      <div key={item.label} className={chipClass}>{chipBody}</div>
+                    ) : clickable ? (
                       <button key={item.label} type="button" onClick={handleClick} title="点击筛选下面的列表" className={chipClass}>
                         {chipBody}
                       </button>
@@ -1894,24 +2247,43 @@ export default function PrincipalPage() {
 
       {/* 与「自定义筛选」的结果区一致：带 0.5px 边框的容器 + 表头栏 */}
       <div ref={listCardRef} className="mt-4 min-h-[640px] overflow-hidden border-[0.5px] border-[#eceef0] bg-white">
-        {(query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses")) && (
+        {(query.tab === "courses" || showInviteListTabs || (query.tab === "overview" && overviewGroup === "courses")) && (
           <div className="flex flex-wrap items-center gap-4 border-b border-[#eceef0] px-3.5 py-2">
             {/* 分段控件：浅灰底槽 + 白底选中（细阴影），比下划线明显，又不像蓝底那样抢视觉 */}
-            <div className="flex items-center gap-[3px] rounded-[6px] bg-[#f2f3f5] p-[3px]" role="tablist" aria-label="课程列表类型">
-              {([{ value: "course", label: "课程记录" }, { value: "participant", label: "参与者" }] as const).map(item => (
-                <button key={item.value} type="button" role="tab" aria-selected={(query.course_view || "course") === item.value}
-                  className={`h-7 rounded-[4px] px-3.5 text-[12px] transition-colors ${(query.course_view || "course") === item.value
-                    ? "bg-white text-[#1f2329] shadow-[0_1px_3px_rgba(31,35,41,.12)]"
-                    : "text-[#4e535a] hover:text-[#1f2329]"}`}
-                  onClick={() => { setSortBy(""); setQuery(current => ({ ...current, course_view: item.value })) }}>{item.label}</button>
-              ))}
+            <div className="flex items-center gap-[3px] rounded-[6px] bg-[#f2f3f5] p-[3px]" role="tablist" aria-label={showInviteListTabs ? "邀约列表类型" : "课程列表类型"}>
+              {(showInviteListTabs
+                ? ([{ value: "arrive", label: "邀约到店" }, { value: "initiated", label: "发起邀约" }] as const)
+                : ([{ value: "course", label: "课程记录" }, { value: "participant", label: "参与者" }, ...(metadata?.can_view_follow_up ? [{ value: "teacher_follow_up" as const, label: "老师跟进" }] : [])] as const)
+              ).map(item => {
+                const selected = showInviteListTabs
+                  ? (query.invite_view || "arrive") === item.value
+                  : (query.course_view || "course") === item.value
+                return (
+                  <button key={item.value} type="button" role="tab" aria-selected={selected}
+                    className={`h-7 rounded-[4px] px-3.5 text-[12px] transition-colors ${selected
+                      ? "bg-white text-[#1f2329] shadow-[0_1px_3px_rgba(31,35,41,.12)]"
+                      : "text-[#4e535a] hover:text-[#1f2329]"}`}
+                    onClick={() => {
+                      setSortBy("")
+                      setQuery(current => showInviteListTabs
+                        ? { ...current, invite_view: item.value as "arrive" | "initiated" }
+                        : { ...current, course_view: item.value as "course" | "participant" | "teacher_follow_up", participant_scope: "" })
+                    }}>{item.label}</button>
+                )
+              })}
             </div>
           </div>
         )}
         <div className="flex items-center justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5">
           <div className="flex min-w-0 items-baseline gap-2">
             <div className="truncate text-[13px] font-medium text-[#2b2f36]">{dateSummary} · {showTrafficList ? "引流客户" : listUnitLabel}</div>
-            {result && <span className="shrink-0 text-[12px] text-[#8f959e]">共 {showTrafficList ? trafficQuickFiltered.length : pagination.totalItems} 条</span>}
+            {result && (
+              <span className="shrink-0 text-[12px] text-[#8f959e]">
+                {showInviteInitiatedList
+                  ? `共 ${inviteInitiatorRows.length} 位邀约人 · ${inviteInitiatedTotal} 人次`
+                  : `共 ${showInviteArriveList ? inviteArriveRows.length : showTrafficList ? trafficQuickFiltered.length : pagination.totalItems} 条`}
+              </span>
+            )}
             {pagination.loading && <span className="shrink-0 text-[11px] text-[#b0b5bb]">查询中…</span>}
             {showTrafficList && trafficQuickFilter && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-[3px] bg-[#f0f5ff] px-2 py-0.5 text-[11px] text-[#3370ff]">
@@ -1927,7 +2299,41 @@ export default function PrincipalPage() {
               </span>
             ))}
           </div>
-          {showTrafficList ? (
+          {showInviteInitiatedList ? null : showInviteArriveList ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <ColumnSettings
+                config={listInviteColumns}
+                onChange={changeInviteColumns}
+                onReset={defaultInviteColumns}
+                resetLabel="恢复默认"
+                maxColumns={10}
+              />
+              <SelectDropdown
+                size="sm"
+                className="w-[196px]"
+                value={inviteArriveView}
+                options={[{ value: "customer", label: "单个客户仅显示一次" }, { value: "date", label: "按日期显示每条邀约记录" }]}
+                onChange={value => { setInviteArriveView(value as "customer" | "date"); setInviteArrivePage(1) }}
+                buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2.5 !text-[12px] !text-[#4e535a] !shadow-none"
+                dropdownWidth={196}
+              />
+              <button
+                type="button"
+                onClick={download}
+                disabled={busy || pagination.loading || !!pagination.error}
+                className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50">
+                <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpandTrafficCells(current => !current)}
+                aria-pressed={expandTrafficCells}
+                className="flex h-7 shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7]"
+              >
+                {expandTrafficCells ? "缩略" : "展开"}
+              </button>
+            </div>
+          ) : showTrafficList ? (
             <div className="flex shrink-0 items-center gap-2">
             {trafficQuickFilter && (
               <button
@@ -1961,7 +2367,7 @@ export default function PrincipalPage() {
                   size="sm"
                   className="w-[150px]"
                   value={listView}
-                  options={[{ value: "order", label: "每笔交易显示一次" }, { value: "customer", label: "同一人显示一次" }]}
+                  options={[{ value: "order", label: "每笔交易显示一次" }, { value: "customer", label: "同一人仅显示一次" }]}
                   onChange={value => setListView(value as "order" | "customer")}
                   buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2.5 !text-[12px] !text-[#4e535a] !shadow-none"
                   dropdownWidth={168}
@@ -1978,14 +2384,11 @@ export default function PrincipalPage() {
                   {expandNames ? "缩略" : "展开"}
                 </button>
               )}
-              {/* 参与者列表：内部/外部人员的筛选，放在导出左边 */}
-              {participantTableView && (
-                <SelectDropdown size="sm" className="w-[140px]" value={query.participant_scope || ""}
-                  options={[{ value: "", label: "全部人员" }, { value: "internal", label: "内部人员" }, { value: "external", label: "外部人员" }]}
-                  onChange={value => setQuery(current => ({ ...current, participant_scope: value as PrincipalQuery["participant_scope"] }))}
-                  buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2.5 !text-[12px] !text-[#4e535a] !shadow-none"
-                  dropdownWidth={140}
-                />
+              {showTeacherFollowUpList && (
+                <button type="button" onClick={() => setExpandTeacherFollowUp(value => !value)} aria-pressed={expandTeacherFollowUp}
+                  className="flex h-7 shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7]">
+                  {expandTeacherFollowUp ? "缩略" : "展开"}
+                </button>
               )}
               <button
                 type="button"
@@ -2002,6 +2405,170 @@ export default function PrincipalPage() {
 
         {query.tab === "conversion" && resultTab !== "conversion" ? (
           <div className="py-24 text-center text-[13px] text-[#8f959e]">点「查询」按当前范围与规则出结果</div>
+        ) : showInviteInitiatedList ? (
+          <>
+            <div className="overflow-x-auto">
+              <Table className="w-full table-fixed" style={{ minWidth: 720 }}>
+                <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
+                  <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
+                    <TableHead className="w-[24%] pl-4 text-[11px] font-normal text-[#646a73]">邀约人</TableHead>
+                    <TableHead className="w-[15%] text-right text-[11px] font-normal text-[#646a73]">邀约人次</TableHead>
+                    <TableHead className="w-[15%] text-right text-[11px] font-normal text-[#646a73]">取消人次</TableHead>
+                    <TableHead className="w-[15%] text-right text-[11px] font-normal text-[#646a73]">未到场人次</TableHead>
+                    <TableHead className="w-[15%] text-right text-[11px] font-normal text-[#646a73]">已到场人次</TableHead>
+                    <TableHead className="w-[16%] pr-4 text-right text-[11px] font-normal text-[#646a73]">邀约明细</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inviteInitiatorRows.map(item => (
+                    <TableRow key={item.key} className="h-11 border-[#f0f0f0] text-[12px] hover:bg-[#f7f8fa]">
+                      <TableCell className={`pl-4 font-medium ${item.label === "未配置" ? "text-[#a8adb5]" : "text-[#2b2f36]"}`}>{item.label}</TableCell>
+                      <TableCell className="text-right tabular-nums text-[#2b2f36]">{item.initiated_count}</TableCell>
+                      <TableCell className="text-right tabular-nums text-[#4e535a]">{item.cancel_count ?? 0}</TableCell>
+                      <TableCell className="text-right tabular-nums text-[#4e535a]">{item.no_show_count ?? 0}</TableCell>
+                      <TableCell className="text-right tabular-nums text-[#4e535a]">{item.arrive_count ?? 0}</TableCell>
+                      <TableCell className="pr-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInviteDetailSort({ field: "date", order: "desc" })
+                            setExpandInviteDetail(false)
+                            const records = item.records ?? []
+                            setInviteDetail({ key: item.key, label: item.label, records })
+                            if (records.some(record => !Object.prototype.hasOwnProperty.call(record, "visit_date"))) {
+                              pagination.refresh()
+                            }
+                          }}
+                          className="text-[12px] text-[#3370ff] hover:text-[#245be8]"
+                        >
+                          查看
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {!inviteInitiatorRows.length && (
+              <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无发起邀约记录</div>
+            )}
+          </>
+        ) : showInviteArriveList ? (
+          <>
+            <div className="overflow-x-auto">
+              <Table className="w-full table-fixed" style={{ minWidth: Math.max(720, visibleInviteColumns.length * 88) }}>
+                <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
+                  <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
+                    {visibleInviteColumns.map((column, index) => (
+                      <TrafficSortHead
+                        key={column.key}
+                        label={column.label}
+                        field={column.sortField}
+                        width={column.width}
+                        align={column.align}
+                        className={`${index === 0 ? "!pl-4 !pr-1" : ""} ${index === visibleInviteColumns.length - 1 ? "!pr-4" : ""}`}
+                      />
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inviteArrivePageRows.map(customer => (
+                    <TableRow key={`${customer.id ?? customer.name}:${"arrival_id" in customer ? customer.arrival_id : "once"}`} className="h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
+                      {visibleInviteColumns.map((column, index) => {
+                        const isLast = index === visibleInviteColumns.length - 1
+                        const base = `${expandTrafficCells ? "whitespace-normal break-words py-2 align-top" : "h-11 overflow-hidden py-0"} text-[12px] ${column.align === "right" ? "text-right tabular-nums" : ""} ${index === 0 ? "pl-4 pr-1" : "px-3"} ${isLast ? "pr-4" : ""}`
+                        if (column.key === "arrive_date") {
+                          return (
+                            <TableCell key={column.key} className={`${base} py-1`}>
+                              <div className="truncate tabular-nums text-[12px] text-[#8f959e]" title={customer.arrive_date || undefined}>
+                                {customer.arrive_date || <EmptyValue />}
+                              </div>
+                              {!expandTrafficCells && (
+                                <div className="truncate text-[11px] tabular-nums text-[#a1a6ad]" title={customer.arrive_time || undefined}>
+                                  {customer.arrive_time || <EmptyValue />}
+                                </div>
+                              )}
+                            </TableCell>
+                          )
+                        }
+                        if (column.key === "name") {
+                          return (
+                            <TableCell key={column.key} className={`${base} text-[12px] font-medium text-[#2b2f36]`}>
+                              {customer.name || <EmptyValue />}
+                            </TableCell>
+                          )
+                        }
+                        if (column.key === "identity") {
+                          return (
+                            <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.identity || <EmptyValue />}</TableCell>
+                          )
+                        }
+                        if (["referrer", "referrer_handler", "follow_up_status", "traffic_source", "tags",
+                          "visit_purpose", "trauma_history", "current_block", "work_info", "other_info"].includes(column.key)) {
+                          const value = column.key === "referrer" ? customer.referrer
+                            : column.key === "referrer_handler" ? customer.referrer_handler
+                              : column.key === "follow_up_status" ? customer.follow_up_status
+                                : column.key === "traffic_source" ? customer.traffic_source
+                                  : column.key === "tags" ? (customer.tags ?? []).join("、")
+                                    : column.key === "visit_purpose" ? customer.visit_purpose
+                                      : column.key === "trauma_history" ? customer.trauma_history
+                                        : column.key === "current_block" ? customer.current_block
+                                          : column.key === "work_info" ? customer.work_info
+                                            : customer.other_info
+                          return (
+                            <TableCell key={column.key} className={`${base} text-[#4e535a]`}>
+                              <div className={expandTrafficCells ? "whitespace-normal break-words" : "truncate"} title={value || undefined}>{value || <EmptyValue />}</div>
+                            </TableCell>
+                          )
+                        }
+                        if (column.key === "arrive_inviter") {
+                          return (
+                            <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.arrive_inviter || <EmptyValue />}</TableCell>
+                          )
+                        }
+                        if (column.key === "invite_count") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.invite_count ?? 0}</TableCell>
+                        }
+                        if (column.key === "deals") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.deals ?? 0}</TableCell>
+                        }
+                        if (column.key === "cancel_count") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.cancel_count ?? 0}</TableCell>
+                        }
+                        if (column.key === "no_show_count") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.no_show_count ?? 0}</TableCell>
+                        }
+                        if (column.key === "arrive_count") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.arrive_count ?? 0}</TableCell>
+                        }
+                        if (column.key === "activity_count") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.activity_count ?? 0}</TableCell>
+                        }
+                        if (column.key === "visit_interval") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.visit_interval || <EmptyValue />}</TableCell>
+                        }
+                        if (column.key === "same_day_deals") {
+                          return <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.same_day_deals ?? 0}</TableCell>
+                        }
+                        return <TableCell key={column.key} className={base}><EmptyValue /></TableCell>
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {!inviteArriveRows.length && (
+              <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无到店记录</div>
+            )}
+            <PaginationBar
+              currentPage={inviteArriveCurrentPage}
+              totalPages={inviteArrivePageCount}
+              totalItems={inviteArriveRows.length}
+              startIndex={inviteArriveRows.length ? (inviteArriveCurrentPage - 1) * PAGE_SIZE + 1 : 0}
+              endIndex={Math.min(inviteArriveCurrentPage * PAGE_SIZE, inviteArriveRows.length)}
+              onPageChange={setInviteArrivePage}
+            />
+          </>
         ) : showTrafficList ? (
           <>
             <div className="overflow-x-auto">
@@ -2046,6 +2613,17 @@ export default function PrincipalPage() {
               onPageChange={setTrafficPage}
             />
           </>
+        ) : showTeacherFollowUpList && !pagination.error ? (
+          <>
+            <TeacherFollowUpList
+              rows={sortedItems}
+              loading={pagination.loading}
+              expanded={expandTeacherFollowUp}
+              onOpenCustomer={row => { setDetailCourseId(String(row.course_id || "")); setDetailCustomerId(String(row.customer_id)) }}
+              onOpenDetail={setTeacherFollowUpDetail}
+            />
+            <PaginationBar currentPage={pagination.currentPage} totalPages={pagination.totalPages} totalItems={pagination.totalItems} startIndex={pagination.startIndex} endIndex={pagination.endIndex} onPageChange={pagination.goToPage} />
+          </>
         ) : pagination.loading && !pagination.paginatedItems.length ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中…</div>
         ) : !pagination.error ? (
@@ -2058,7 +2636,7 @@ export default function PrincipalPage() {
                     const isNum = NUMBER_COLUMNS.has(c.key)
                     const sortable = !UNSORTABLE_COLUMNS.has(c.key)
                     return (
-                    <TableHead key={c.key} style={columnWidthStyle(c.key, c.label)} className={`h-9 !px-2 text-[11px] font-normal ${i === 0 ? "!pl-3" : ""} ${columnWidthClass(c.key)} ${isNum ? "text-right" : ""}`}>
+                    <TableHead key={c.key} style={columnWidthStyle(c.key, c.label)} className={`h-9 ${showCourseDealOverviewList ? "!px-3" : "!px-2"} text-[11px] font-normal ${i === 0 ? (showCourseDealOverviewList ? "!pl-4 !pr-1" : "!pl-3") : ""} ${columnWidthClass(c.key)} ${isNum ? "text-right" : ""}`}>
                       {sortable ? (
                       <button
                         type="button"
@@ -2067,7 +2645,6 @@ export default function PrincipalPage() {
                         title={`按${c.label}排序`}
                       >
                         <span className="truncate">{c.label}</span>
-                        {c.key === "participant_category" && <HelpTip trigger="click" width={268}>{PARTICIPANT_CATEGORY_TIP}</HelpTip>}
                         {c.key === "org_participation_count" && <HelpTip trigger="click" width={220}>{PARTICIPATION_COUNT_TIP}</HelpTip>}
                         {c.key === "org_participation_hours" && <HelpTip trigger="click" width={220}>{PARTICIPATION_HOURS_TIP}</HelpTip>}
                         {c.key === "classification" && <HelpTip width={299}>{PURCHASE_TYPE_TIP}</HelpTip>}
@@ -2079,7 +2656,6 @@ export default function PrincipalPage() {
                       ) : (
                         <span className="inline-flex items-center gap-1">
                           <span className="truncate">{c.label}</span>
-                          {c.key === "participant_category" && <HelpTip trigger="click" width={268}>{PARTICIPANT_CATEGORY_TIP}</HelpTip>}
                           {c.key === "org_participation_count" && <HelpTip trigger="click" width={220}>{PARTICIPATION_COUNT_TIP}</HelpTip>}
                           {c.key === "org_participation_hours" && <HelpTip trigger="click" width={220}>{PARTICIPATION_HOURS_TIP}</HelpTip>}
                           {c.key === "classification" && <HelpTip width={299}>{PURCHASE_TYPE_TIP}</HelpTip>}
@@ -2097,6 +2673,7 @@ export default function PrincipalPage() {
                   <TableRow key={row.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
                     {result?.columns.map((c, i) => {
                       const isNumber = NUMBER_COLUMNS.has(c.key) || typeof row[c.key] === "number"
+                      const isFollowUpText = query.course_view === "teacher_follow_up" && ["visit_need", "customer_info", "follow_up"].includes(c.key)
                       // 只有「有数」的数字才可点：0 或空值点了也看不到东西
                       const cellNumber = Number(row[c.key])
                       const clickable = hasDetails && isNumber && Number.isFinite(cellNumber) && cellNumber > 0
@@ -2114,7 +2691,7 @@ export default function PrincipalPage() {
                           : c.key === "classification" && Number(row.repeat_times) > 1
                             ? `第 ${row.repeat_times} 次购买同一个卡种/具体项目，已经复购 ${Number(row.repeat_times) - 1} 次`
                           : COLUMN_CELL[c.key] && String(row[c.key] ?? "") ? String(row[c.key]) : undefined}
-                        className={`${expandNames && (c.key === "new_names" || c.key === "old_names") ? "whitespace-normal break-words py-2 align-top" : "h-11 overflow-hidden text-ellipsis py-0"} !px-2 text-[12px] ${i === 0 ? "!pl-3" : ""} ${COLUMN_WIDTH[c.key] || ""} ${COLUMN_CELL[c.key] || ""} ${isNumber ? "text-right tabular-nums" : ""} ${clickable ? "cursor-pointer hover:underline" : ""} ${accentClickable ? "text-[#3370ff]" : ""}`}
+                        className={`${isFollowUpText ? "whitespace-pre-wrap break-words py-2 align-top" : expandNames && (c.key === "new_names" || c.key === "old_names") ? "whitespace-normal break-words py-2 align-top" : "h-11 overflow-hidden text-ellipsis py-0"} ${showCourseDealOverviewList ? "!px-3" : "!px-2"} text-[12px] ${i === 0 ? (showCourseDealOverviewList ? "!pl-4 !pr-1" : "!pl-3") : ""} ${COLUMN_WIDTH[c.key] || ""} ${COLUMN_CELL[c.key] || ""} ${isNumber ? "text-right tabular-nums" : ""} ${clickable ? "cursor-pointer hover:underline" : ""} ${accentClickable ? "text-[#3370ff]" : ""}`}
                       >
                         {c.key === "customer" && row.customer_id ? (
                           <button
@@ -2160,11 +2737,103 @@ export default function PrincipalPage() {
             </div>
             {!pagination.paginatedItems.length && <div className="py-16 text-center text-sm text-muted-foreground">暂无符合条件的数据</div>}
             <PaginationBar currentPage={pagination.currentPage} totalPages={pagination.totalPages} totalItems={pagination.totalItems} startIndex={pagination.startIndex} endIndex={pagination.endIndex} onPageChange={pagination.goToPage} />
-            {result?.notice && <p className="px-3.5 pb-3 text-[11.5px] leading-relaxed text-[#a0a6ad]">{result.notice}</p>}
           </>
         ) : null}
       </div>
       </section>
+
+    <Dialog open={!!inviteDetail} onOpenChange={open => { if (!open) setInviteDetail(null) }}>
+      <DialogContent initialFocus={false} className="flex h-[86vh] max-h-[86vh] w-[1180px] max-w-[98vw] flex-col gap-0 overflow-hidden rounded-[10px] border border-[#e6e8eb] bg-white p-0 shadow-[0_16px_48px_rgba(31,35,41,.14)]">
+        <DialogHeader className="border-b border-[#eceef1] bg-white px-4 py-4">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <DialogTitle className="text-[16px] font-medium leading-5 text-[#1f2329]">邀约明细 · <span className={inviteDetail?.label === "未配置" ? "text-[#a8adb5]" : ""}>{inviteDetail?.label || ""}</span></DialogTitle>
+              <p className="mt-1 text-[12.5px] leading-5 text-[#858b94]">共 {(inviteDetail?.records ?? []).length} 条记录 · 按邀约创建日期统计</p>
+            </div>
+            <div className="flex shrink-0 items-end gap-2">
+              <ColumnSettings
+                config={listInitiatedColumns}
+                onChange={changeInitiatedColumns}
+                onReset={defaultInitiatedColumns}
+                resetLabel="恢复默认"
+                maxColumns={10}
+              />
+              <button
+                type="button"
+                onClick={downloadInviteDetail}
+                disabled={busy || !(inviteDetail?.records ?? []).length}
+                className="flex h-7 shrink-0 items-center gap-1 rounded-[5px] border border-[#dfe2e6] bg-white px-3 text-[12.5px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpandInviteDetail(current => !current)}
+                className="flex h-7 shrink-0 items-center rounded-[5px] border border-[#dfe2e6] bg-white px-3 text-[12.5px] font-normal text-[#4e535a] hover:bg-[#f5f6f7]"
+              >
+                {expandInviteDetail ? "缩略" : "展开"}
+              </button>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-hidden bg-white p-4">
+          <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[7px] border border-[#e5e8ec] bg-white">
+          <Table className="w-full table-fixed">
+            <TableHeader className="sticky top-0 z-10 bg-[#f7f8fa] [&_tr]:border-[#e8eaed]">
+              <TableRow className="h-10 bg-[#f7f8fa] hover:bg-[#f7f8fa]">
+                {[{ key: "date", label: "发起邀约", width: "w-[96px]" }, { key: "visit_date", label: "邀约到店", width: "w-[96px]" }, ...visibleInviteDetailColumns, { key: "status_label", label: "邀约状态", width: "w-[90px]" }].map((column, index) => (
+                  <TableHead key={column.key} className={`h-auto min-h-10 ${column.width} px-2 py-2 text-[11px] font-medium leading-4 text-[#5f6670] ${index === 0 ? "pl-4" : ""}`}>
+                    <button type="button" onClick={() => toggleInviteDetailSort(column.key)} className="inline-flex max-w-full items-center gap-1 hover:text-[#2b2f36]" title={`按${column.label}排序`}>
+                      <span className="whitespace-normal break-keep text-left">{column.label}</span>
+                      <span className="inline-flex shrink-0 flex-col leading-none">
+                        <span className={`text-[8px] leading-[7px] ${inviteDetailSort.field === column.key && inviteDetailSort.order === "asc" ? "text-[#2b2f36]" : "text-[#d0d3d6]"}`}>▲</span>
+                        <span className={`text-[8px] leading-[7px] ${inviteDetailSort.field === column.key && inviteDetailSort.order === "desc" ? "text-[#2b2f36]" : "text-[#d0d3d6]"}`}>▼</span>
+                      </span>
+                    </button>
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedInviteDetailRecords.map(record => (
+                <TableRow key={record.id || `${record.date}-${record.customer_id}`} className="min-h-11 border-[#eef0f2] hover:bg-[#fafbfc]">
+                  <TableCell className="pl-4 text-[12px] tabular-nums text-[#5f6670]">{record.date}</TableCell>
+                  <TableCell className="px-2 text-[12px] tabular-nums text-[#5f6670]">{record.visit_date || <EmptyValue />}</TableCell>
+                  {visibleInviteDetailColumns.map(column => {
+                    const raw = record[column.key as keyof InviteInitiatedRecord]
+                    const text = Array.isArray(raw) ? raw.join("、") : String(raw ?? "")
+                    const isNumber = column.align === "right"
+                    return (
+                      <TableCell key={column.key} className={`${expandInviteDetail ? "whitespace-normal break-words py-2.5 align-top" : "h-11 overflow-hidden py-0"} px-2 text-[12px] ${isNumber ? "text-right tabular-nums" : ""} ${text === "未配置" ? "text-[#a8adb5]" : "text-[#454b54]"}`}>
+                        {column.key === "name" && record.customer_id ? (
+                          <button
+                            type="button"
+                            onClick={() => { setInviteDetail(null); setDetailCustomerId(record.customer_id) }}
+                            className={`${expandInviteDetail ? "whitespace-normal break-words" : "block max-w-full truncate"} text-left text-[#2b2f36] hover:underline`}
+                            title={`查看${record.name}的客户详情`}
+                          >
+                            {record.name}
+                          </button>
+                        ) : text ? (
+                          <span className={expandInviteDetail ? "whitespace-normal break-words" : "block max-w-full truncate"} title={text}>{text}</span>
+                        ) : <EmptyValue />}
+                      </TableCell>
+                    )
+                  })}
+                  <TableCell className={`px-2 text-[12px] ${record.status === "arrived" ? "text-[#2f8f57]" : record.status === "cancelled" ? "text-[#8f959e]" : "text-[#b26b24]"}`}>
+                    {record.status_label}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {!(inviteDetail?.records ?? []).length && (
+            <div className="py-14 text-center text-[13px] text-muted-foreground">暂无明细</div>
+          )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
 
     <Dialog open={!!detailCustomerId} onOpenChange={open => { if (!open) setDetailCustomerId("") }}>
       <DialogContent initialFocus={false} className="flex max-h-[90vh] max-w-[1180px] flex-col overflow-hidden p-0">
@@ -2273,6 +2942,8 @@ export default function PrincipalPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <TeacherFollowUpDialog row={teacherFollowUpDetail} onClose={() => setTeacherFollowUpDetail(null)} />
 
     <Dialog open={!!detail} onOpenChange={open => { if (!open) { setDetail(null); setDetailTag("") } }}>
       <DialogContent initialFocus={false} className="flex max-h-[80vh] w-[660px] max-w-[92vw] flex-col gap-0 overflow-hidden rounded-[8px] border-[0.5px] border-[#e8eaed] p-0">

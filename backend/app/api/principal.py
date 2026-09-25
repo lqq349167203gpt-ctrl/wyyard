@@ -7,7 +7,7 @@ from app.api.service_teacher_customers import _xlsx_response
 from app.middleware.jwt_auth import require_page_permission
 from app.models.operation_log import OperationLogCreate
 from app.models.principal import CONDITION_FIELD_ORDER, CONDITION_FIELDS, ConversionRule, PrincipalQuery
-from app.services import operation_log_service, principal_service
+from app.services import operation_log_service, principal_mobile_service, principal_service
 from app.services.storage import load_data, load_item, save_item
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
@@ -120,7 +120,13 @@ def conversion_log_snapshot(request: Request, data: PrincipalQuery, result: dict
 
 
 @router.get("/metadata")
-def metadata(request: Request):
+def metadata(request: Request, lite: bool = False):
+    if lite:
+        organizations, _, permissions = principal_service.scope(request)
+        return {"organizations": [{"id": o.id, "name": o.name} for o in organizations],
+                "scope": permissions["principal_scope"], "products": [], "activity_types": [],
+                "transaction_access": permissions["customer_access"]["transaction_access"],
+                "can_view_follow_up": permissions["customer_access"].get("detail_tabs", {}).get("follow_up") is True}
     organizations, permissions, events, _ = principal_service.collect_data(request, metadata_only=True)
     options = []
     for key, label, _, _field in principal_service.PRODUCTS:
@@ -128,6 +134,7 @@ def metadata(request: Request):
     return {"organizations": [{"id": o.id, "name": o.name} for o in organizations],
             "scope": permissions["principal_scope"], "products": options,
             "transaction_access": permissions["customer_access"]["transaction_access"],
+            "can_view_follow_up": permissions["customer_access"].get("detail_tabs", {}).get("follow_up") is True,
             "activity_types": [{"key": k, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "attendance" and e["product"] == k and e["subtype"]})} for k, label in [("class", "沙龙活动"), ("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "能量结"), ("ics", "内部课程")]]}
 
 
@@ -154,6 +161,8 @@ def rule_fields(request: Request):
 @router.post("/query")
 def query(data: PrincipalQuery, request: Request):
     result = principal_service.analyze(request, data)
+    if data.mobile_group:
+        result = principal_mobile_service.mobile_result(result, data)
     if data.tab == "conversion" and data.log_analysis:
         # 转化分析：只有主动点「查询」这次才写进「分析日志」（切 tab、翻页不记）
         snapshot = conversion_log_snapshot(request, data, result)
@@ -172,7 +181,7 @@ def query(data: PrincipalQuery, request: Request):
 
 @router.post("/export")
 def export(data: PrincipalQuery, request: Request):
-    if data.export_view == "traffic":
+    if data.export_view in ("traffic", "invite_initiated", "invite_arrivals"):
         data = data.model_copy(update={"tab": "overview"})
     result = principal_service.analyze(request, data, export=True)
     if data.export_view == "traffic":
@@ -180,16 +189,16 @@ def export(data: PrincipalQuery, request: Request):
             ("name", "昵称"), ("referral_date", "引流日期"), ("referrer", "引流人"),
             ("referrer_handler", "承接人"), ("identity", "会员身份"),
             ("follow_up_status", "跟进阶段"), ("traffic_source", "流量来源"),
-            ("tags", "客户标签"), ("deals", "交易笔数"), ("invite_count", "邀约次数"),
-            ("cancel_count", "取消次数"), ("arrive_count", "到店次数"),
+            ("tags", "客户标签"), ("deals", "交易笔数"), ("initiated_count", "发起邀约次"),
+            ("cancel_count", "取消次"), ("no_show_count", "未到场次"), ("arrive_count", "实际到场次"),
             ("visit_interval", "平均到店间隔"), ("activity_count", "参与活动"),
         ]
         # 从同一权限过滤后的引流列表取数据，忽略客户端传入的无权访问或已失效 ID。
-        customers = {
-            customer["id"]: {**customer, "referrer": group["label"]}
-            for group in result.get("breakdown", {}).get("traffic", [])
-            for customer in group.get("customers", [])
-        }
+        selected = principal_mobile_service.selected_customers(result.get("breakdown", {}), data.breakdown)
+        selected = principal_mobile_service.traffic_quick_filter(selected, data.mobile_quick_filter)
+        if data.sort_by:
+            selected.sort(key=lambda item: str(item.get(data.sort_by) or ""), reverse=data.sort_order == "desc")
+        customers = {customer["id"]: customer for customer in selected}
         ids = data.export_customer_ids if data.export_customer_ids is not None else list(customers)
         items = []
         for customer_id in dict.fromkeys(ids):
@@ -199,15 +208,84 @@ def export(data: PrincipalQuery, request: Request):
             items.append({**customer, "tags": "、".join(customer.get("tags") or []), "details": []})
         result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
                   "items": items, "total": len(items)}
+    elif data.export_view == "invite_arrivals":
+        field_labels = {
+            "arrive_date": "到店日期", "name": "昵称", "identity": "会员身份", "referrer": "引流人",
+            "referrer_handler": "承接人", "follow_up_status": "跟进阶段", "traffic_source": "流量来源",
+            "tags": "客户标签", "deals": "交易笔数", "invite_count": "邀约次数", "cancel_count": "取消",
+            "no_show_count": "未到场", "arrive_count": "已到场", "activity_count": "参与活动数",
+            "visit_interval": "平均到店间隔", "same_day_deals": "当日成交", "arrive_inviter": "邀约人",
+            "visit_purpose": "到访目的", "trauma_history": "创伤经历", "current_block": "当下卡点",
+            "work_info": "工作情况", "other_info": "其他信息",
+        }
+        profile_fields = {"visit_purpose", "trauma_history", "current_block", "work_info", "other_info"}
+        allowed_profile = set(result.get("breakdown", {}).get("traffic_profile_fields", []))
+        requested = data.export_columns or list(field_labels)
+        fields = [(key, field_labels[key]) for key in requested
+                  if key in field_labels and (key not in profile_fields or key in allowed_profile)]
+        customers = {customer["id"]: customer for customer in principal_mobile_service.selected_customers(
+            result.get("breakdown", {}), data.breakdown) if customer.get("id")}
+        ids = data.export_customer_ids if data.export_customer_ids is not None else list(customers)
+        items = []
+        for customer_id in dict.fromkeys(ids):
+            customer = customers.get(customer_id)
+            if not customer or not customer.get("arrive_count"):
+                continue
+            base = {**customer, "tags": "、".join(customer.get("tags") or []), "details": []}
+            if data.arrival_view == "date":
+                items.extend({**base, **arrival} for arrival in customer.get("arrival_records", []))
+            else:
+                items.append(base)
+        if data.arrival_view == "date":
+            items.sort(key=lambda item: (item.get("arrive_date", ""), item.get("name", "")), reverse=True)
+        elif data.export_customer_ids is None:
+            items.sort(key=lambda item: str(item.get("arrive_date") or ""), reverse=True)
+        if data.sort_by:
+            items.sort(key=lambda item: str(item.get(data.sort_by) or ""), reverse=data.sort_order == "desc")
+        result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
+                  "items": items, "total": len(items)}
+    elif data.export_view == "invite_initiated":
+        field_labels = {
+            "date": "发起邀约", "visit_date": "邀约到店", "name": "昵称", "identity": "会员身份",
+            "referrer": "引流人", "referrer_handler": "承接人", "follow_up_status": "跟进阶段",
+            "traffic_source": "流量来源", "tags": "客户标签", "deals": "交易笔数",
+            "invite_count": "邀约次数", "cancel_count": "取消", "no_show_count": "未到场",
+            "arrive_count": "已到场", "activity_count": "参与活动数", "visit_interval": "平均到店间隔",
+            "same_day_deals": "当日成交", "arrive_inviter": "邀约人", "status_label": "邀约状态",
+            "visit_purpose": "到访目的", "trauma_history": "创伤经历", "current_block": "当下卡点",
+            "work_info": "工作情况", "other_info": "其他信息",
+        }
+        allowed_profile = set(result.get("breakdown", {}).get("traffic_profile_fields", []))
+        allowed_fields = {
+            key for key in field_labels
+            if key not in {"visit_purpose", "trauma_history", "current_block", "work_info", "other_info"}
+            or key in allowed_profile
+        }
+        requested = data.export_columns or ["date", "visit_date", "name", "identity", "invite_count", "cancel_count", "no_show_count", "arrive_count", "arrive_inviter", "status_label"]
+        fields = [(key, field_labels[key]) for key in requested if key in allowed_fields]
+        selected_inviters = {value.partition(":")[2] for value in data.breakdown if value.startswith("inviter:")}
+        items = []
+        for group in result.get("breakdown", {}).get("invite_inviters", []):
+            if selected_inviters and group.get("key") not in selected_inviters:
+                continue
+            for record in group.get("records", []):
+                items.append({**record, "tags": "、".join(record.get("tags") or []), "details": []})
+        if data.sort_by:
+            items.sort(key=lambda item: str(item.get(data.sort_by) or ""), reverse=data.sort_order == "desc")
+        result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
+                  "items": items, "total": len(items)}
     columns = result["columns"]
-    rows = [[item.get(c["key"], "") for c in columns] + ["\n".join(item["details"])] for item in result["items"]]
+    include_details = data.export_view != "invite_arrivals" and not (data.tab in {"courses", "overview"} and data.course_view == "teacher_follow_up")
+    rows = [[item.get(c["key"], "") for c in columns] + (["\n".join(item["details"])] if include_details else [])
+            for item in result["items"]]
     # 阻止用户文本在 Excel 中成为公式。
     rows = [["'" + value if isinstance(value, str) and value.startswith(("=", "+", "-", "@")) else value for value in row] for row in rows]
-    label = "导出引流客户" if data.export_view == "traffic" else "导出转化分析" if data.tab == "conversion" else "导出组织/俱乐部"
+    label = "导出引流客户" if data.export_view == "traffic" else "导出邀约到店" if data.export_view == "invite_arrivals" else "导出发起邀约" if data.export_view == "invite_initiated" else "导出转化分析" if data.tab == "conversion" else "导出组织/俱乐部"
     suffix = f"，规则：{data.rule.name}" if data.tab == "conversion" else f"，{data.tab}"
     audit(request, f"{label}：{result['total']}条{suffix}", "EXPORT")
     # Excel 工作表名不允许包含 “/”，用去掉斜杠的名称
-    return _xlsx_response("组织俱乐部", [c["label"] for c in columns] + ["关联明细"], rows, "组织俱乐部.xlsx")
+    headers = [c["label"] for c in columns] + (["关联明细"] if include_details else [])
+    return _xlsx_response("组织俱乐部", headers, rows, "组织俱乐部.xlsx")
 
 
 @router.get("/rules")

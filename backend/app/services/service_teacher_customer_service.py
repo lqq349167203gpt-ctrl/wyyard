@@ -20,6 +20,11 @@ def _aware_datetime(value: datetime) -> datetime:
 
 
 def _note_author(note: Any) -> str:
+    person = str(getattr(note, "feedback_person", "") or getattr(note, "created_by", "") or "").strip()
+    return person if person and person != "历史记录" else "未知"
+
+
+def _note_creator(note: Any) -> str:
     creator = str(getattr(note, "created_by", "") or "").strip()
     return creator if creator and creator != "历史记录" else "未知"
 
@@ -86,8 +91,9 @@ def _latest_teacher_notes(customer_ids: set[str], teacher: str) -> dict[str, dic
     account_ids, teacher_names = _teacher_accounts(teacher)
     latest: dict[str, dict[str, Any]] = {}
     for note in visit_note_service.list_notes(customer_by_visit):
-        matches_account = bool(note.created_by_id and note.created_by_id in account_ids)
-        matches_name = bool(note.created_by and note.created_by.strip() in teacher_names)
+        feedback_name = str(getattr(note, "feedback_person", "") or "").strip()
+        matches_account = bool(not feedback_name and note.created_by_id and note.created_by_id in account_ids)
+        matches_name = (feedback_name or str(note.created_by or "").strip()) in teacher_names
         if not matches_account and not matches_name:
             continue
         customer_id = customer_by_visit.get(note.visit_id, "")
@@ -168,12 +174,14 @@ def list_teacher_customers(
             "last_follow_up_by": _note_author(note) if note else "",
             "latest_customer_info_content": customer_info_note.content if customer_info_note else "",
             "latest_customer_info_by": _note_author(customer_info_note) if customer_info_note else "",
+            "latest_customer_info_created_by": _note_creator(customer_info_note) if customer_info_note else "",
             "latest_customer_info_at": (
                 _aware_datetime(customer_info_note.updated_at).isoformat()
                 if customer_info_note else ""
             ),
             "latest_follow_up_content": follow_up_note.content if follow_up_note else "",
             "latest_follow_up_by": _note_author(follow_up_note) if follow_up_note else "",
+            "latest_follow_up_created_by": _note_creator(follow_up_note) if follow_up_note else "",
             "latest_follow_up_at": (
                 _aware_datetime(follow_up_note.updated_at).isoformat()
                 if follow_up_note else ""

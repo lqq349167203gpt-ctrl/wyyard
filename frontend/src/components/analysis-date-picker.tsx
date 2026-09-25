@@ -6,7 +6,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { onOtherPopoverOpen } from "@/lib/popover"
 
 
-export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = false }: { value: string; onChange: (value: string) => void; ariaLabel: string; fullWidth?: boolean }) {
+export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = false, widthClassName = "w-[132px]" }: { value: string; onChange: (value: string) => void; ariaLabel: string; fullWidth?: boolean; widthClassName?: string }) {
   const today = new Date()
   const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
   const [open, setOpen] = useState(false)
@@ -80,7 +80,7 @@ export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = fal
         type="button"
         aria-label={ariaLabel}
         onClick={() => setOpen(current => !current)}
-        className={`flex h-7 ${fullWidth ? "w-full" : "w-[132px] shrink-0"} items-center gap-1 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-left text-[11px] ${value ? "text-[#2b2f36]" : "text-[#8f959e]"}`}
+        className={`flex h-7 ${fullWidth ? "w-full" : `${widthClassName} shrink-0`} items-center gap-1 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-left text-[11px] ${value ? "text-[#2b2f36]" : "text-[#8f959e]"}`}
       >
         <CalendarDays className="h-3.5 w-3.5 shrink-0 text-[#8f959e]" />
         <span className="min-w-0 flex-1 truncate">{displayValue}</span>

@@ -134,6 +134,42 @@ def test_teacher_follow_up_only_counts_notes_written_by_selected_teacher(monkeyp
     assert result["items"][0]["latest_customer_info_content"] == ""
 
 
+def test_teacher_follow_up_uses_feedback_person_and_preserves_creator(monkeypatch):
+    now = datetime.now(timezone.utc)
+    customer = _customer("c1", "婷婷")
+    note = SimpleNamespace(
+        visit_id="v1",
+        created_by_id="account-pan",
+        created_by="潘潘",
+        feedback_person="婷婷",
+        category="follow_up",
+        content="潘潘代婷婷记录的跟进点",
+        updated_at=now,
+    )
+    monkeypatch.setattr(
+        service_teacher_customer_service.account_service,
+        "list_accounts",
+        lambda: [SimpleNamespace(id="account-ting", owner="婷婷", username="tingting")],
+    )
+    monkeypatch.setattr(
+        service_teacher_customer_service.visit_service,
+        "list_basic_visits",
+        lambda _customer_ids: [SimpleNamespace(id="v1", customer_id="c1")],
+    )
+    monkeypatch.setattr(
+        service_teacher_customer_service.visit_note_service,
+        "list_notes",
+        lambda _visit_ids: [note],
+    )
+
+    result = service_teacher_customer_service.list_teacher_customers(
+        [customer], "婷婷", follow_up_filter="active",
+    )
+    assert result["total"] == 1
+    assert result["items"][0]["latest_follow_up_by"] == "婷婷"
+    assert result["items"][0]["latest_follow_up_created_by"] == "潘潘"
+
+
 def test_follow_up_definition_filters_each_note_category_independently(monkeypatch):
     now = datetime.now(timezone.utc)
     customers = [_customer("c1", "婷婷"), _customer("c2", "婷婷")]
@@ -234,7 +270,7 @@ def test_course_participants_split_notes_by_author(monkeypatch):
 
     from app.api import service_teacher_customers, statistics
     from app.models.visit_note import VisitNote
-    from app.services import visit_note_service
+    from app.services import visit_note_service, visit_service
 
     now = datetime.now(timezone.utc)
     courses = [{
@@ -255,6 +291,7 @@ def test_course_participants_split_notes_by_author(monkeypatch):
         }],
     }]
     monkeypatch.setattr(statistics, "get_course_statistics", lambda **_: {"courses": courses})
+    monkeypatch.setattr(visit_service, "list_visits", lambda: [])
     monkeypatch.setattr(visit_note_service, "list_notes", lambda _ids, ensure_legacy=True: [
         VisitNote(id="n2", visit_id="v1", category="visit_need", content="想改善睡眠", created_by="沁桐", created_at=now, updated_at=now),
         VisitNote(id="n1", visit_id="v1", category="visit_need", content="想了解课程", created_by="潘潘", created_at=now, updated_at=now),
@@ -279,6 +316,46 @@ def test_course_participants_split_notes_by_author(monkeypatch):
     # 没有独立填写记录时回退到原来的整段内容，保证历史数据仍可见
     assert row["customer_info_entries"] == [{"author": "", "content": "潘潘：第一次到店", "at": ""}]
     assert row["follow_up_entries"] == []
+
+
+def test_course_participants_only_loads_notes_for_requested_page(monkeypatch):
+    from starlette.requests import Request
+
+    from app.api import service_teacher_customers, statistics
+    from app.services import visit_note_service, visit_service
+
+    courses = [
+        {
+            "id": f"class:{index}", "date": f"2026-09-0{index}", "name": "沙龙活动",
+            "activity_type": "class", "activity_type_label": "沙龙活动",
+            "participants": [{
+                "id": f"customer-{index}", "nickname": f"客户{index}",
+                "member_type": "", "identity_group": "老人",
+                "daily_visit_id": f"visit-{index}",
+            }],
+        }
+        for index in (3, 2, 1)
+    ]
+    seen_visits = []
+    monkeypatch.setattr(statistics, "get_course_statistics", lambda **_: {"courses": courses})
+    monkeypatch.setattr(visit_service, "list_visits", lambda: [SimpleNamespace(
+        id=f"visit-{index}", visit_date=f"2026-09-0{index}",
+        customer_id=f"customer-{index}", needs=f"需求{index}",
+        feedback=f"资料{index}", healing_notes=f"跟进{index}",
+    ) for index in (3, 2, 1)])
+    monkeypatch.setattr(visit_note_service, "group_notes_by_visit", lambda visits: seen_visits.extend(visits) or {})
+
+    result = service_teacher_customers.list_course_participants(
+        request=Request({"type": "http", "path": "/api/service-teacher-customers/course-participants", "headers": []}),
+        teacher_id="", date_from=None, date_to=None, all_dates=True,
+        activity_type="all", keyword="", member_type="", identity_group="",
+        page=2, page_size=1,
+    )
+    assert result["total"] == 3
+    assert result["total_participants"] == 3
+    assert [group["course_id"] for group in result["items"]] == ["class:2"]
+    assert seen_visits == ["visit-2"]
+    assert result["items"][0]["participants"][0]["visit_need"] == "需求2"
 
 
 def test_available_teachers_includes_current_account_owner():

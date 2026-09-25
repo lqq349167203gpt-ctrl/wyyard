@@ -33,6 +33,7 @@ const PAGE_LABELS: Record<string, string> = {
   "course-statistics": "课程记录",
   "customer-follow-ups": "客户跟进",
   "audit-check": "信息核对",
+  "agreement-signings": "协议签订",
   "principal": "组织/俱乐部",
   "product-sales": "产品销售",
   "statistics": "服务数据",
@@ -121,7 +122,7 @@ const FIELD_CN: Record<string, string> = {
   cancelled_at: "恢复退课时间", cancelled_by: "恢复操作人", cancelled_by_id: "恢复操作账号编号",
   achiever_name: "成就君", achiever_id: "成就君",
   leader_id: "组长", deputy_id: "副组长", member_ids: "成员",
-  closer_name: "成交人", closer_id: "成交人", closers: "成交人",
+  closer_name: "成交人", closer_id: "成交人", closers: "成交人", agreement_status: "协议签订",
   price: "价格", amount: "金额", count: "次数", total: "总计", class_count: "课时数",
   sort_order: "排序", is_public_welfare: "公益", category: "分类",
   arrived: "到店", cancelled: "邀约状态", arrival_time: "到店时间", experience: "客户反馈", feedback: "客户信息",
@@ -147,6 +148,7 @@ const FIELD_CN: Record<string, string> = {
   operator: "匹配方式", conditions: "匹配条件",
   customers: "客户资料可见范围", class_records: "人员安排可见身份", payment: "付费项目可见身份",
   referrer_handler: "引流处理人", traffic_source_detail: "流量来源详情",
+  feedback_person_id: "反馈人编号", feedback_person: "反馈人",
   total_payment: "累计付费",
   activity_mode: "活动模式", course_id: "课程",
   effective_date: "生效日期", deal_date: "成交日期", themes: "主题",
@@ -727,6 +729,7 @@ export default function OperationLogsPage() {
   }
 
   const formatCellValue = (val: unknown, key?: string): string => {
+    if (key === "agreement_status") return val === "signed" ? "已签" : val === "unsigned" ? "未签" : "未填写"
     if (val === null || val === undefined) return ""
     if (key === "diagnosis_duration") {
       const halfHours = Number(val)

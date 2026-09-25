@@ -73,13 +73,13 @@ export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统�
           <span className="text-[11px] text-[#8f959e]">至</span>
           <AnalysisDatePicker value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} />
         </div>
-        <div className="flex items-center rounded-[4px] border border-[#e1e4e7] bg-white p-0.5">
+        <div className="flex h-7 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
           {PRESETS.map(item => (
             <button
               key={item.value}
               type="button"
               onClick={() => applyPreset(item.value)}
-              className={`h-6 rounded-[3px] px-2.5 text-[11px] ${preset === item.value ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:text-[#2b2f36]"}`}
+              className={`h-[22px] min-w-[40px] rounded-[3px] px-2 text-[11px] transition-colors ${preset === item.value ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:bg-[#f5f6f7] hover:text-[#2b2f36]"}`}
             >
               {item.label}
             </button>
@@ -114,20 +114,22 @@ export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统�
       />
       <span className="text-[10px] text-[#b0b5bb]">或自定义</span>
       <div className="flex flex-wrap items-center gap-1.5">
-        <AnalysisDatePicker value={dateFrom} onChange={value => onChange({ date_from: value, date_to: dateTo })} ariaLabel={`${label}开始日期`} />
+        <AnalysisDatePicker value={dateFrom} onChange={value => onChange({ date_from: value, date_to: dateTo })} ariaLabel={`${label}开始日期`} widthClassName="w-[142px]" />
         <span className="text-[11px] text-[#8f959e]">至</span>
-        <AnalysisDatePicker value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} />
+        <AnalysisDatePicker value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} widthClassName="w-[142px]" />
       </div>
-      {PRESETS.map(item => (
-        <button
-          key={item.value}
-          type="button"
-          onClick={() => applyPreset(item.value)}
-          className={`h-6 rounded-[3px] px-2 text-[11px] ${preset === item.value ? "bg-[#1f2329] text-white" : "border border-[#e1e4e7] bg-white text-[#646a73]"}`}
-        >
-          {item.label}
-        </button>
-      ))}
+      <div className="flex h-7 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+        {PRESETS.map(item => (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => applyPreset(item.value)}
+            className={`h-[22px] min-w-[40px] rounded-[3px] px-2 text-[11px] transition-colors ${preset === item.value ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:bg-[#f5f6f7] hover:text-[#2b2f36]"}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

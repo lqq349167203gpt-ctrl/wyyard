@@ -11,7 +11,7 @@ type Draft = { id: string; name: string; products: string[] }
 
 /**
  * 升单配置：先把若干付费项目归成一个「大类」并取名，再给这些大类排序；
- * 数组顺序就是升单方向（客户先买靠前的大类、再进靠后的大类，那笔就记成升单）。
+ * 页面从高档到低档展示；接口仍按低档到高档存储，以保持现有升单统计口径。
  */
 export default function UpsellConfigPage() {
   const [levels, setLevels] = useState<UpsellLevel[]>([])
@@ -40,7 +40,7 @@ export default function UpsellConfigPage() {
     setLoading(true)
     try {
       const data = await upsellConfigApi.get()
-      setLevels(data.levels)
+      setLevels([...data.levels].reverse())
       setOptions(data.products)
     } catch (e) {
       setError(e instanceof Error ? e.message : "加载失败")
@@ -53,8 +53,8 @@ export default function UpsellConfigPage() {
   const persist = async (nextLevels: UpsellLevel[]) => {
     setSaving(true); setError("")
     try {
-      const data = await upsellConfigApi.save(nextLevels)
-      setLevels(data.levels); setOptions(data.products)
+      const data = await upsellConfigApi.save([...nextLevels].reverse())
+      setLevels([...data.levels].reverse()); setOptions(data.products)
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败")
@@ -107,7 +107,7 @@ export default function UpsellConfigPage() {
       <section className="rounded-xl bg-white px-[22px] py-4 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-2 text-[13px] font-medium text-[#1f2329]"><span className="h-3 w-[3px] rounded-[1px] bg-[#3370ff]"></span>升单顺序</span>
-          <span className="text-[11px] text-[#8f959e]">先把付费项目归成大类取名，再用 ↑↓ 调整大类的先后；客户先买靠前的大类、第一次进靠后的大类，那笔成交在主理人里就记成「升单」</span>
+          <span className="text-[11px] text-[#8f959e]">升单规则，从靠后的大类往前升</span>
         </div>
 
         {error && <div className="mb-3 rounded-[4px] border border-[#f1d9dc] bg-[#fff8f8] px-3 py-2"><p role="alert" className="text-[12px] text-[#b94a58]">{error}</p></div>}

@@ -34,8 +34,8 @@ const DvEmpty = ({ className = "" }: { className?: string }) => (
 )
 
 function visitNoteAuthorName(note: VisitNoteSummary): string {
-  const creator = (note.created_by || "").trim()
-  return creator && creator !== "历史记录" ? creator : "未知"
+  const creator = (note.created_by || "").trim() || "未知"
+  return (note.feedback_person || "").trim() || creator
 }
 
 function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
@@ -52,12 +52,13 @@ function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
       {uniqueNotes.map((note) => (
         <div key={note.id} className="flex min-w-0 items-baseline gap-2 leading-[1.6]">
           <span
-            className="max-w-[88px] shrink-0 truncate text-[12px] text-[#8f959e]"
+            className="max-w-[150px] shrink-0 truncate text-[12px] text-[#8f959e]"
             title={visitNoteAuthorName(note)}
           >
             {visitNoteAuthorName(note)}
           </span>
-          <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{note.content}</span>
+          <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{note.content}</span>
+          <span className="ml-auto shrink-0 text-right text-[11px] text-[#8f959e]">创建人：{note.created_by || "未知"}</span>
         </div>
       ))}
     </div>
@@ -174,7 +175,6 @@ export default function DetailView({
         access?.detail_tabs.follow_up !== false && "healing",
         communicationAllowed && "communication",
         access?.detail_tabs.activities !== false && "activities",
-        access?.detail_tabs.customer_followups !== false && "followups",
         access?.detail_tabs.card_statistics !== false && "purchase",
         access?.detail_tabs.offline_courses !== false && "offline_course",
         access?.transaction_access === "detail" && "payment",
@@ -636,7 +636,6 @@ export default function DetailView({
                 { key: "healing" as const, label: "跟进点", cnt: (detail?.visit_records || []).length },
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
                 { key: "activities" as const, label: "活动记录", cnt: (detail?.activities || []).length },
-                { key: "followups" as const, label: "客户回访", cnt: (detail?.activity_followups || []).length },
                 { key: "purchase" as const, label: "卡次统计", cnt: null as number | null },
                 { key: "offline_course" as const, label: "线下落地课程", cnt: (detail?.offline_course_records || []).length },
                 { key: "payment" as const, label: "交易记录", cnt: (detail?.payment_records || []).length },
@@ -645,7 +644,6 @@ export default function DetailView({
                 if (tab.key === "healing") return access.detail_tabs.follow_up
                 if (tab.key === "communication") return access.detail_tabs.communication
                 if (tab.key === "activities") return access.detail_tabs.activities
-                if (tab.key === "followups") return access.detail_tabs.customer_followups
                 if (tab.key === "purchase") return access.detail_tabs.card_statistics
                 if (tab.key === "offline_course") return access.detail_tabs.offline_courses
                 return access.transaction_access === "detail"

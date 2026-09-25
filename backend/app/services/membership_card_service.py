@@ -4,12 +4,52 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException
 
 from app.models.membership_card import MembershipCard, MembershipCardCreate
 from app.services import customer_service
 from app.services.storage import delete_item, load_data, save_data, save_item
 
 FILENAME = "membership_cards.json"
+
+
+def requires_agreement(card_type: str) -> bool:
+    return bool(card_type) and card_type not in {"次卡", "体验会员", "粗门次卡"}
+
+
+def validate_agreement_status(card_type: str, status, *, required: bool = False):
+    if status is not None and status not in ("unsigned", "signed"):
+        raise HTTPException(status_code=400, detail="协议签订请选择未签或已签")
+    if required and requires_agreement(card_type) and status is None:
+        raise HTTPException(status_code=400, detail="请选择协议签订状态：未签或已签")
+
+
+def agreement_period(card: MembershipCard, today: str) -> str:
+    if card.effective_date and card.effective_date > today:
+        return "未生效"
+    if card.expiry_date and card.expiry_date < today:
+        return "已过期"
+    return "有效期内"
+
+
+def mark_agreement_signed(card_id: str) -> Optional[MembershipCard]:
+    """兼容旧调用；新调用使用 update_agreement_status 指定目标状态。"""
+    return update_agreement_status(card_id, "signed")
+
+
+def update_agreement_status(card_id: str, status: str) -> Optional[MembershipCard]:
+    if status not in ("unsigned", "signed"):
+        raise HTTPException(status_code=400, detail="协议签订请选择未签或已签")
+    # 仅改变协议，不重算有效期、扣卡或会员身份。
+    with _card_lock:
+        card = get_card(card_id)
+        if not card or card.voided or not requires_agreement(card.card_type):
+            return None
+        if (card.agreement_status or "unsigned") != status:
+            card.agreement_status = status
+            card.updated_at = datetime.now(timezone.utc)
+            _save(card_id)
+        return card
 
 # 会员卡卡种的先后顺序，与付款页「会员卡」下拉里的顺序一致（列表里没提到的排在后面）
 MEMBERSHIP_CARD_TYPE_ORDER = ("次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "45次卡", "半年卡", "年卡")
@@ -674,6 +714,7 @@ def get_card(card_id: str) -> Optional[MembershipCard]:
 
 
 def create_card(data: MembershipCardCreate) -> MembershipCard:
+    validate_agreement_status(data.card_type, data.agreement_status, required=True)
     with _card_lock:
         now = datetime.now(timezone.utc)
         card_data = data.model_dump()
@@ -706,6 +747,10 @@ def update_card(card_id: str, data: dict) -> Optional[MembershipCard]:
         card = _cards.get(card_id)
         if not card or card.voided:
             return None
+        validate_agreement_status(
+            data.get("card_type", card.card_type), data.get("agreement_status", card.agreement_status),
+            required="agreement_status" in data or data.get("card_type", card.card_type) != card.card_type,
+        )
         for key, value in data.items():
             if hasattr(card, key) and key not in ("id", "created_at", "created_by"):
                 setattr(card, key, value)
@@ -1340,6 +1385,7 @@ def get_debt_record(customer_id: str) -> dict:
             "label": label,
             "date": activity_date,
             "count": count,
+            "source_key": activity_key,
         })
     debt = sum(item["count"] for item in activities)
     customer = customer_service.get_customer(customer_id)

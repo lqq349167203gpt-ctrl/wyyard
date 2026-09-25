@@ -292,7 +292,7 @@ def get_debt_record(customer_id: str) -> dict:
     debt = max(0, -remaining)
     debt_sessions = sessions[-debt:] if debt and debt <= len(sessions) else (sessions if debt else [])
     activities = [
-        {"label": s.name or "情绪释放", "date": s.date, "count": 1}
+        {"label": s.name or "情绪释放", "date": s.date, "count": 1, "source_key": s.id}
         for s in debt_sessions
     ]
     return {

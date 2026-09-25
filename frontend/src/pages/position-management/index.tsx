@@ -29,16 +29,16 @@ const ALL_PAGES = [
   { key: "custom-analysis", label: "自定义筛选" },
   { key: "service-teacher", label: "服务老师" },
   { key: "course-statistics", label: "课程记录" },
-  { key: "customer-follow-ups", label: "客户跟进" },
   { key: "principal", label: "组织/俱乐部" },
-  // 报表
   { key: "daily-report", label: "每日报表" },
   // 业务
   { key: "healing-records", label: "客户资料" },
   { key: "class-records", label: "邀约" },
   { key: "daily-activities", label: "课表" },
   { key: "audit-check", label: "信息核对" },
+  { key: "agreement-signings", label: "协议签订" },
   { key: "offline-course-records", label: "落地课程" },
+  { key: "offline-course-types", label: "落地课程类型设置" },
   // 沟通
   { key: "communication-records", label: "沟通记录" },
   { key: "followup-records", label: "回访记录" },
@@ -65,21 +65,16 @@ const ALL_PAGES = [
   { key: "operation-logs", label: "操作日志" },
   { key: "login-records", label: "使用统计" },
   { key: "analysis-logs", label: "分析日志" },
-  // 茶客业务
-  { key: "tea-guest-consumption-records", label: "消费记录" },
-  { key: "tea-guest-expenses", label: "支出" },
 ]
 
 const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "customer-follow-ups", "principal"] },
-  { label: "报表", keys: ["daily-report"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "audit-check", "offline-course-records"] },
+  { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "principal", "daily-report"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records", "offline-course-types", "audit-check", "debt-records", "agreement-signings"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },
-  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds", "debt-records"] },
+  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },
   { label: "信息配置", keys: ["member-identities", "customer-tags", "upsell-config", "healing-identities", "organizations", "spaces"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
   { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs", "login-records", "analysis-logs"] },
-  { label: "茶客业务", keys: ["tea-guest-consumption-records", "tea-guest-expenses"] },
 ]
 
 const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
@@ -895,7 +890,7 @@ export default function PositionManagementPage() {
                       </div>
                       {([
                         { key: "sensitive_fields", title: "隐私信息查看", fields: { visit_purpose: "到访目的", trauma_history: "创伤经历", current_block: "当下卡点", work_info: "工作情况", other_info: "其他信息" } },
-                        { key: "detail_tabs", title: "详情内容查看", fields: { follow_up: "跟进点", communication: "沟通记录", activities: "活动记录", customer_followups: "客户回访", card_statistics: "卡次统计", offline_courses: "线下落地课程" } },
+                        { key: "detail_tabs", title: "详情内容查看", fields: { follow_up: "跟进点", communication: "沟通记录", activities: "活动记录", card_statistics: "卡次统计", offline_courses: "线下落地课程" } },
                       ] as const).map(group => (
                         <div key={group.key} className="mb-4">
                           <div className="mb-2 text-[13px] font-medium">{group.title}</div>
@@ -1211,7 +1206,6 @@ export default function PositionManagementPage() {
                           { key: "follow_up" as const, label: "跟进点" },
                           { key: "communication" as const, label: "沟通记录" },
                           { key: "activities" as const, label: "活动记录" },
-                          { key: "customer_followups" as const, label: "客户回访" },
                           { key: "card_statistics" as const, label: "卡次统计" },
                           { key: "offline_courses" as const, label: "线下落地课程" },
                         ]).map(item => (

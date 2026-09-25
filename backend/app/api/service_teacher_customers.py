@@ -1,7 +1,7 @@
 import io
 import re
 import uuid
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from urllib.parse import quote
 
@@ -20,9 +20,9 @@ from app.services import (
     position_edit_permission_service,
     service_teacher_customer_service,
     visit_note_service,
+    visit_service,
 )
 from app.utils.record_ownership import request_actor_customer_ids
-from app.utils.pagination import paginate
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
 
@@ -174,9 +174,11 @@ def export_follow_ups(
             item["follow_up_status"] or "-",
             item["latest_customer_info_content"] or "-",
             item["latest_customer_info_by"] or "-",
+            item["latest_customer_info_created_by"] or "-",
             item["latest_customer_info_at"] or "-",
             item["latest_follow_up_content"] or "-",
             item["latest_follow_up_by"] or "-",
+            item["latest_follow_up_created_by"] or "-",
             item["latest_follow_up_at"] or "-",
             f"近{follow_up_days}天已录入" if item["is_active"] else f"近{follow_up_days}天未录入",
         ]
@@ -193,7 +195,7 @@ def export_follow_ups(
     record_service_teacher_action(request, f"导出跟进记录：服务老师 {teacher}；{definition_label}；{filter_label}；共{len(rows)}人", export=True)
     return _xlsx_response(
         "跟进记录",
-        ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近客户信息", "客户信息录入人", "客户信息录入时间", "最近跟进点", "跟进点录入人", "跟进点录入时间", "当前状态"],
+        ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近客户信息", "客户信息反馈人", "客户信息创建人", "客户信息录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"],
         rows,
         f"服务老师跟进记录_{teacher or '未选择'}.xlsx",
     )
@@ -225,18 +227,21 @@ def list_course_participants(
         activity_type=activity_type,
         course_subtype=None,
         teacher_id=teacher_id or None,
+        mobile_view="participants_source",
         request=request,
     )
     rows = []
     for course in result["courses"]:
+        course_rows = {}
         for participant in course["participants"]:
-            rows.append({
+            course_rows[participant["id"]] = {
                 "id": f"{course['id']}:{participant['id']}",
                 "course_id": course["id"],
                 "activity_type": course["activity_type"],
                 "course_date": course["date"],
                 "course_name": course["name"],
                 "activity_type_label": course["activity_type_label"],
+                "course_subtype": course.get("course_subtype", ""),
                 "customer_id": participant["id"],
                 "nickname": participant["nickname"],
                 "member_type": participant.get("member_type", ""),
@@ -245,14 +250,40 @@ def list_course_participants(
                 "customer_info": participant.get("daily_customer_info", ""),
                 "follow_up": participant.get("daily_follow_up", ""),
                 "visit_id": participant.get("daily_visit_id", ""),
-            })
+                "participant_role": participant.get("participation_role", "参与者"),
+            }
+        # 案主也要出现在本堂课名单里；若案主同时在参与者名单中，只保留一行并标记其主要身份。
+        for owner in course.get("owner_participants", []):
+            owner_id = owner["id"]
+            if owner_id in course_rows:
+                course_rows[owner_id]["participant_role"] = "案主"
+                continue
+            course_rows[owner_id] = {
+                "id": f"{course['id']}:{owner_id}",
+                "course_id": course["id"],
+                "activity_type": course["activity_type"],
+                "course_date": course["date"],
+                "course_name": course["name"],
+                "activity_type_label": course["activity_type_label"],
+                "course_subtype": course.get("course_subtype", ""),
+                "customer_id": owner_id,
+                "nickname": owner["nickname"],
+                "member_type": owner.get("member_type", ""),
+                "identity_group": owner.get("identity_group", ""),
+                "visit_need": owner.get("daily_need", ""),
+                "customer_info": owner.get("daily_customer_info", ""),
+                "follow_up": owner.get("daily_follow_up", ""),
+                "visit_id": owner.get("daily_visit_id", ""),
+                "participant_role": "案主",
+            }
+        rows.extend(course_rows.values())
     rows.sort(key=lambda item: (item["course_date"], item["nickname"]), reverse=True)
 
     def same_course_key(row: dict) -> str:
         """同类活动的口径：沙龙活动/内部课程有二级分类（按具体课程算），
         觉醒游戏、情绪释放、能量结没有二级（按整个活动类型算）。"""
         if row.get("activity_type") in ("class", "ics"):
-            name = str(row.get("course_name") or "")
+            name = str(row.get("course_subtype") or row.get("course_name") or "")
             # 课程名写法不统一（空格、《》书名号、连接符号），归一化后再比
             return re.sub(r"[\s《》〈〉()（）\[\]【】·・\-—_/、,，.。：:]+", "", name).casefold()
         return str(row.get("activity_type") or "")
@@ -271,11 +302,41 @@ def list_course_participants(
         rows = [row for row in rows if row["member_type"] == member_type]
     if identity_group:
         rows = [row for row in rows if row["identity_group"] == identity_group]
+    # 先按课程分页，再取当前页的填写记录，避免“全部日期”扫描每页的所有历史备注。
+    rows_by_course = defaultdict(list)
+    for row in rows:
+        rows_by_course[row["course_id"]].append(row)
+    selected_courses = [course for course in result["courses"] if rows_by_course[course["id"]]]
+    total_participants = sum(len(members) for members in rows_by_course.values())
+    total_pages = max(1, (len(selected_courses) + page_size - 1) // page_size)
+    current = min(page, total_pages)
+    page_courses = selected_courses[(current - 1) * page_size: current * page_size]
+    page_rows = [row for course in page_courses for row in rows_by_course[course["id"]]]
+    # 只给当前页补当天邀约信息；课程统计不必为全部历史课程生成逐人备注。
+    page_keys = {(row["course_date"], row["customer_id"]) for row in page_rows}
+    daily_visits = {}
+    daily_needs = defaultdict(list)
+    for visit in visit_service.list_visits():
+        key = (getattr(visit, "visit_date", ""), getattr(visit, "customer_id", ""))
+        if key not in page_keys:
+            continue
+        daily_visits[key] = visit
+        need = (getattr(visit, "needs", None) or "").strip()
+        if need and need not in daily_needs[key]:
+            daily_needs[key].append(need)
+    for row in page_rows:
+        key = (row["course_date"], row["customer_id"])
+        visit = daily_visits.get(key)
+        if visit:
+            row["visit_id"] = getattr(visit, "id", "") or ""
+            row["visit_need"] = "；".join(daily_needs[key])
+            row["customer_info"] = (getattr(visit, "feedback", None) or "").strip()
+            row["follow_up"] = (getattr(visit, "healing_notes", None) or "").strip()
     # 同一个字段可能是不同人分别填写的：按填写人拆成多条，前端逐人换行展示
     notes_by_visit = visit_note_service.group_notes_by_visit(
-        [row["visit_id"] for row in rows if row["visit_id"]]
+        [row["visit_id"] for row in page_rows if row["visit_id"]]
     )
-    for row in rows:
+    for row in page_rows:
         for field in ("visit_need", "customer_info", "follow_up"):
             entries = (notes_by_visit.get(row["visit_id"]) or {}).get(field, [])
             if not entries and row[field]:
@@ -284,23 +345,21 @@ def list_course_participants(
             row[f"{field}_entries"] = entries
     # 按课程分组：一组 = 一堂课，下面是这堂课的所有参与者（分页按课程分）
     groups = []
-    for course in result["courses"]:
-        members = [row for row in rows if row["course_id"] == course["id"]]
-        if not members:
-            continue
+    for course in page_courses:
+        members = rows_by_course[course["id"]]
+        members.sort(key=lambda row: (row["participant_role"] != "案主", row["nickname"].casefold()))
         groups.append({
             "course_id": course["id"],
             "course_date": course["date"],
             "course_name": course["name"],
+            "activity_type": course["activity_type"],
             "activity_type_label": course["activity_type_label"],
+            "course_subtype": course.get("course_subtype", ""),
             "participants": members,
         })
-    total_participants = sum(len(group["participants"]) for group in groups)
-    total_pages = max(1, (len(groups) + page_size - 1) // page_size)
-    current = min(page, total_pages)
     return {
-        "items": groups[(current - 1) * page_size: current * page_size],
-        "total": len(groups),
+        "items": groups,
+        "total": len(selected_courses),
         "total_participants": total_participants,
         "page": current,
         "page_size": page_size,

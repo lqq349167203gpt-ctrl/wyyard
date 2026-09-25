@@ -7,6 +7,12 @@ import { Input } from "@/components/ui/input"
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import {
+  currentFeedbackPersonName,
+  FeedbackPersonSelect,
+  feedbackPersonValue,
+  type FeedbackPersonOption,
+} from "@/components/visits/feedback-person-select"
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { useServerPagination } from "@/hooks/use-server-pagination"
@@ -138,7 +144,7 @@ function NoteContent({ author, content, expanded }: { author: string; content: s
   if (!content) return <EmptyDash />
   return (
     <div className={`flex min-w-0 items-baseline gap-2 ${expanded ? "leading-5" : "overflow-hidden"}`}>
-      <span className="max-w-[88px] shrink-0 truncate text-[12px] text-[#8f959e]" title={author || "未知"}>{author || "未知"}</span>
+      <span className="max-w-[145px] shrink-0 truncate text-[12px] text-[#8f959e]" title={author}>{author}</span>
       <span
         className={expanded
           ? "min-w-0 whitespace-pre-wrap break-words text-[#4e535a]"
@@ -170,11 +176,15 @@ function ParticipantNoteLines({
     return (
       <div className="space-y-1.5">
         {list.map((entry, index) => (
-          <div key={`${entry.author}-${index}`} className="flex min-w-0 items-baseline gap-2">
-            {entry.author && (
-              <span className="max-w-[88px] shrink-0 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>
-            )}
-            <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{entry.content}</span>
+          <div key={`${entry.author}-${index}`} className="border-b border-[#eceef0] pb-1.5 last:border-b-0 last:pb-0">
+            <div className="flex min-w-0 items-baseline gap-2">
+              {entry.author && <span className="min-w-0 flex-1 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>}
+              <span className="ml-auto flex shrink-0 items-center gap-2 text-right text-[11px] text-[#8f959e]">
+                {entry.at && <span className="tabular-nums">{formatDateTime(entry.at)}</span>}
+                {entry.created_by && <span className="max-w-[145px] truncate" title={`创建人：${entry.created_by}`}>创建人：{entry.created_by}</span>}
+              </span>
+            </div>
+            <div className="mt-0.5 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{entry.content}</div>
           </div>
         ))}
       </div>
@@ -187,7 +197,7 @@ function ParticipantNoteLines({
       {visible.map((entry, index) => (
         <div key={`${entry.author}-${index}`} className="flex min-w-0 items-baseline gap-2">
           {entry.author && (
-            <span className="max-w-[72px] shrink-0 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>
+            <span className="max-w-[120px] shrink-0 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>
           )}
           <span
             className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a] group-hover:text-[#3370ff]"
@@ -262,6 +272,11 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   } | null>(null)
   const [participantDraft, setParticipantDraft] = useState("")
   const [participantMyNoteId, setParticipantMyNoteId] = useState("")
+  const [participantFeedbackPeople, setParticipantFeedbackPeople] = useState<FeedbackPersonOption[]>([])
+  const [participantFeedbackPerson, setParticipantFeedbackPerson] = useState("")
+  const [participantEditorLoading, setParticipantEditorLoading] = useState(false)
+  const [participantEditorError, setParticipantEditorError] = useState("")
+  const [participantEditorReadFailed, setParticipantEditorReadFailed] = useState(false)
   const [participantSaving, setParticipantSaving] = useState(false)
 
   const followUpDefinition: ServiceTeacherFollowUpDefinition = includeCustomerInfo && includeFollowUp
@@ -424,25 +439,62 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     setParticipantEditing({ row, field })
     setParticipantMyNoteId("")
     setParticipantDraft("")
-    if (!row.visit_id) return
+    setParticipantEditorError("")
+    setParticipantEditorReadFailed(false)
+    setParticipantEditorLoading(true)
+    const currentName = currentFeedbackPersonName()
+    setParticipantFeedbackPeople(currentName ? [{ customer_id: "", name: currentName }] : [])
+    setParticipantFeedbackPerson(currentName ? `name:${currentName}` : "")
+    if (!row.visit_id) {
+      setParticipantEditorError("该参与者没有关联邀约，无法填写")
+      setParticipantEditorReadFailed(true)
+      setParticipantEditorLoading(false)
+      return
+    }
     try {
-      const mine = await customerFollowUpApi.myNote(row.visit_id, field)
+      const [mineResult, peopleResult] = await Promise.allSettled([
+        customerFollowUpApi.myNote(row.visit_id, field),
+        customerFollowUpApi.feedbackPeople(),
+      ])
+      if (mineResult.status !== "fulfilled") {
+        setParticipantEditorError("读取已有记录失败，请关闭后重试")
+        setParticipantEditorReadFailed(true)
+        return
+      }
+      const mine = mineResult.value
+      const people = peopleResult.status === "fulfilled"
+        ? peopleResult.value
+        : { current_person: { customer_id: "", name: currentName }, options: currentName ? [{ customer_id: "", name: currentName }] : [] }
+      const selected: FeedbackPersonOption = mine
+        ? { customer_id: mine.feedback_person_id || "", name: mine.feedback_person || mine.created_by || currentName }
+        : people.current_person
+      const options = [...people.options]
+      if (selected.name && !options.some(option => feedbackPersonValue(option) === feedbackPersonValue(selected))) options.unshift(selected)
       setParticipantMyNoteId(mine?.id || "")
       setParticipantDraft(mine?.content || "")
-    } catch { /* 拿不到就按新填写处理 */ }
+      setParticipantFeedbackPeople(options)
+      setParticipantFeedbackPerson(selected.name ? feedbackPersonValue(selected) : "")
+    } finally {
+      setParticipantEditorLoading(false)
+    }
   }
 
   const saveParticipantNote = async () => {
-    if (!participantEditing) return
+    if (!participantEditing || participantEditorLoading || participantEditorReadFailed) return
     const content = participantDraft.trim()
     if (!content) return
+    const person = participantFeedbackPeople.find(option => feedbackPersonValue(option) === participantFeedbackPerson)
+    const attribution = person ? { id: person.customer_id, name: person.name } : undefined
     setParticipantSaving(true)
+    setParticipantEditorError("")
     try {
       const { row, field } = participantEditing
-      if (participantMyNoteId) await customerFollowUpApi.update(participantMyNoteId, content)
-      else await customerFollowUpApi.create(row.visit_id, field, content)
+      if (participantMyNoteId) await customerFollowUpApi.update(participantMyNoteId, content, attribution)
+      else await customerFollowUpApi.create(row.visit_id, field, content, attribution)
       setParticipantEditing(null)
       loadParticipants(participantPage)
+    } catch (error) {
+      setParticipantEditorError(error instanceof Error ? error.message : "保存失败，请重试")
     } finally {
       setParticipantSaving(false)
     }
@@ -581,10 +633,12 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         { header: "会员身份", key: "memberType", width: 16 },
         { header: "跟进阶段", key: "followUpStatus", width: 16 },
         { header: "最近客户信息", key: "customerInfo", width: 42 },
-        { header: "客户信息录入人", key: "customerInfoBy", width: 16 },
+        { header: "客户信息反馈人", key: "customerInfoBy", width: 16 },
+        { header: "客户信息创建人", key: "customerInfoCreatedBy", width: 16 },
         { header: "客户信息录入时间", key: "customerInfoAt", width: 22 },
         { header: "最近跟进点", key: "followUp", width: 42 },
-        { header: "跟进点录入人", key: "followUpBy", width: 16 },
+        { header: "跟进点反馈人", key: "followUpBy", width: 16 },
+        { header: "跟进点创建人", key: "followUpCreatedBy", width: 16 },
         { header: "跟进点录入时间", key: "followUpAt", width: 22 },
         { header: "包含内容", key: "definition", width: 22 },
         { header: "当前状态", key: "status", width: 18 },
@@ -596,9 +650,11 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         followUpStatus: item.follow_up_status || "-",
         customerInfo: item.latest_customer_info_content || "-",
         customerInfoBy: item.latest_customer_info_by || "-",
+        customerInfoCreatedBy: item.latest_customer_info_created_by || "-",
         customerInfoAt: item.latest_customer_info_at ? formatDateTime(item.latest_customer_info_at) : "-",
         followUp: item.latest_follow_up_content || "-",
         followUpBy: item.latest_follow_up_by || "-",
+        followUpCreatedBy: item.latest_follow_up_created_by || "-",
         followUpAt: item.latest_follow_up_at ? formatDateTime(item.latest_follow_up_at) : "-",
         definition: followUpDefinitionLabel,
         status: item.is_active ? `近${followUpDays}天已录入` : `近${followUpDays}天未录入`,
@@ -667,16 +723,16 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     <div className="flex min-h-full min-w-0 max-w-full flex-col gap-3 overflow-x-hidden bg-[#f4f5f6] p-4">
       {activeTab === "courses" ? (
         <div className="flex h-[52px] items-center rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
-          <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex h-full min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {COURSE_VIEW_TABS.map(tab => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => setCourseViewTab(tab.key)}
-                className={`relative whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${courseViewTab === tab.key ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
+                className={`relative flex h-full shrink-0 items-center whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${courseViewTab === tab.key ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
               >
                 {tab.label}
-                {courseViewTab === tab.key && <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
+                {courseViewTab === tab.key && <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
               </button>
             ))}
           </div>
@@ -724,13 +780,13 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 buttonClassName="border-[#dee0e3] bg-white"
               />
               <span className="ml-1 text-[12px] text-[#8f959e]">时间</span>
-              <div className="flex h-8 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
+              <div className="flex h-7 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
                 {COURSE_RANGE_PRESETS.map(option => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => applyCourseRangePreset(option.value)}
-                    className={`h-[26px] rounded-[2px] px-2 text-[12px] transition-colors ${
+                    className={`h-[22px] min-w-[40px] rounded-[3px] px-2 text-[11px] transition-colors ${
                       courseRangePreset === option.value ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#646a73] hover:bg-[#f5f6f7]"
                     }`}
                   >
@@ -945,9 +1001,12 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                           {group.participants.map(row => (
                             <tr key={row.id} className="border-t border-[#f5f6f7] align-top">
                               <td className="break-words px-3 py-2.5 pl-3 text-[12px] text-[#2b2f36]">
-                                <button type="button" onClick={() => setSelectedCustomerId(row.customer_id)} className="text-left hover:underline">
-                                  {row.nickname || <EmptyDash />}
-                                </button>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <button type="button" onClick={() => setSelectedCustomerId(row.customer_id)} className="text-left hover:underline">
+                                    {row.nickname || <EmptyDash />}
+                                  </button>
+                                  {row.participant_role === "案主" && <span className="rounded-[3px] border border-[#f1e2d2] bg-[#fffaf5] px-1.5 py-0.5 text-[10px] leading-none text-[#a8794f]">案主</span>}
+                                </div>
                               </td>
                               <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</td>
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
@@ -968,7 +1027,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                                       <button
                                         type="button"
                                         onClick={() => openParticipantEditor(row, field)}
-                                        className="flex h-8 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[12px] text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
+                                        className="flex h-7 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[11px] leading-none text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
                                       >点击填写</button>
                                     )}
                                   </td>
@@ -1317,7 +1376,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             </p>
             {participantEditing && (participantEditing.row[participantEditing.field] || (participantEditing.row[`${participantEditing.field}_entries`] || []).length > 0) && (
               <div className="max-h-[220px] overflow-y-auto rounded-[4px] bg-[#f7f8fa] px-3 py-2">
-                <div className="mb-1 text-[11px] text-[#8f959e]">这一条已经填写的内容（含其他人填写的）</div>
+                <div className="mb-1 text-[11px] text-[#8f959e]">别人填写的</div>
                 <ParticipantNoteLines
                   entries={participantEditing.row[`${participantEditing.field}_entries`] || []}
                   fallback={participantEditing.row[participantEditing.field]}
@@ -1327,19 +1386,25 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             )}
             <div>
               <div className="mb-1 text-[11px] text-[#8f959e]">我填写的内容</div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[12px] text-[#646a73]">反馈人</span>
+                <FeedbackPersonSelect options={participantFeedbackPeople} value={participantFeedbackPerson} onChange={setParticipantFeedbackPerson} />
+              </div>
               <textarea
                 value={participantDraft}
                 onChange={event => setParticipantDraft(event.target.value)}
+                disabled={participantEditorLoading || participantEditorReadFailed}
                 rows={5}
                 maxLength={5000}
-                placeholder="写清楚这次来的情况和下一步跟进安排"
+                placeholder={participantEditing?.field === "customer_info" ? "填写客户信息..." : participantEditing?.field === "follow_up" ? "填写跟进点..." : "填写来访需求..."}
                 className="w-full rounded-[4px] border-[0.5px] border-[#e1e4e7] px-3 py-2 text-[12.5px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#b0b5bb] focus:border-[#b9cdf8]"
               />
+              {participantEditorError && <p className="mt-1 text-[11px] text-[#c4506a]">{participantEditorError}</p>}
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t-[0.5px] border-[#f0f0f0] px-5 py-2.5">
             <Button variant="outline" size="sm" onClick={() => setParticipantEditing(null)} disabled={participantSaving} className="h-8 w-[88px] rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">取消</Button>
-            <Button size="sm" onClick={saveParticipantNote} disabled={participantSaving || !participantDraft.trim()} className="h-8 w-[104px] rounded-[4px] border border-[#3370ff] bg-[#3370ff] text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{participantSaving ? "保存中" : "保存"}</Button>
+            <Button size="sm" onClick={saveParticipantNote} disabled={participantSaving || participantEditorLoading || participantEditorReadFailed || !participantDraft.trim()} className="h-8 w-[104px] rounded-[4px] border border-[#3370ff] bg-[#3370ff] text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{participantSaving ? "保存中" : "保存"}</Button>
           </div>
         </DialogContent>
       </Dialog>

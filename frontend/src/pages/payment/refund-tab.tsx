@@ -283,8 +283,6 @@ export function RefundTab() {
                 <TableHead className="pl-4" style={{ width: "140px" }}>昵称</TableHead>
                 <TableHead style={{ width: "100px" }}>项目类型</TableHead>
                 <TableHead style={{ width: "140px" }}>项目名称</TableHead>
-                <TableHead style={{ width: "90px" }}>已付金额</TableHead>
-                <TableHead style={{ width: "90px" }}>退费金额</TableHead>
                 <TableHead style={{ width: "100px" }}>退费日期</TableHead>
                 <TableHead style={{ width: "80px" }}>创建人</TableHead>
                 <TableHead className="text-right pr-4" style={{ width: "88px" }}>操作</TableHead>
@@ -316,8 +314,6 @@ export function RefundTab() {
                   <TableCell>
                     <span className="text-[12px] text-[#2b2f36] truncate block" title={r.project_name}>{r.project_name}</span>
                   </TableCell>
-                  <TableCell className="tabular-nums text-[12px] text-[#2b2f36]">¥{r.paid_amount.toLocaleString()}</TableCell>
-                  <TableCell className="tabular-nums text-[12px] text-[#c4506a]">¥{r.refund_amount.toLocaleString()}</TableCell>
                   <TableCell className="text-[12px] text-[#2b2f36] tabular-nums">{r.refund_date}</TableCell>
                   <TableCell className="text-[12px] text-[#a8b1bd]">{r.created_by || <EmptyValue />}</TableCell>
                   <TableCell className="text-right pr-4">
@@ -389,7 +385,7 @@ export function RefundTab() {
                   value={selectedItemKey}
                   options={availableItems.map((item) => ({
                     value: item.selection_key,
-                    label: `${item.project_type_label} · ${item.name} · ¥${item.paid_amount}`,
+                    label: `${item.project_type_label} · ${item.name}`,
                   }))}
                   placeholder="请选择可退项目"
                   onChange={(key) => {
@@ -406,7 +402,6 @@ export function RefundTab() {
               <div className="bg-[#f7f8fa] rounded-md p-3 text-[12px] space-y-1">
                 <div className="flex justify-between"><span className="text-[#8f959e]">项目类型</span><span>{selectedItem.project_type_label}</span></div>
                 <div className="flex justify-between"><span className="text-[#8f959e]">项目名称</span><span>{selectedItem.name}</span></div>
-                <div className="flex justify-between"><span className="text-[#8f959e]">已付金额</span><span>¥{selectedItem.paid_amount.toLocaleString()}</span></div>
               </div>
             )}
 

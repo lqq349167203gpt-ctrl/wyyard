@@ -216,6 +216,23 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
     assert participants["leader-1"]["identity_group"] == "老人"
     assert participants["leader-1"]["participation_role"] == "组长"
 
+    salon.course_review = "课程复盘"
+    mobile_page = statistics.get_course_statistics(
+        date_from="2026-08-01", date_to="2026-08-31", granularity="day",
+        organization_id="org-1", activity_type=None, teacher_id="teacher-1",
+        mobile_view="courses", page=1, page_size=1,
+    )
+    assert mobile_page["total"] == 2
+    assert len(mobile_page["courses"]) == 1
+    assert "daily_need" not in mobile_page["courses"][0]["participants"][0]
+    review_page = statistics.get_course_statistics(
+        date_from="2026-08-01", date_to="2026-08-31", granularity="day",
+        organization_id="org-1", activity_type=None, teacher_id="teacher-1",
+        mobile_view="reviews", page=1, page_size=20,
+    )
+    assert review_page["total"] == 1
+    assert review_page["courses"][0]["id"] == "class:salon-1"
+
     sound_salon = _activity(
         id="salon-2",
         membership_deduction_count=3,

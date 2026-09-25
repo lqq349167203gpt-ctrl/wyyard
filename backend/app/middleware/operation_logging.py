@@ -38,6 +38,8 @@ SECTION_MAP = {
     "/api/activity-withdrawals": "课表",
     "/api/activity-orders": "课表",
     "/api/membership-cards": "付费项目",
+    "/api/agreement-signings": "协议签订",
+    "/api/debt-records": "欠卡记录",
     "/api/group-cases": "课表",
     "/api/group-case-sessions": "课表",
     "/api/emotional-releases": "课表",
@@ -80,9 +82,6 @@ SECTION_MAP = {
 
 # 路径前缀 → (section, service_module, get_function_name)
 GETTER_MAP = {
-    "/api/tea-guest/consumption-records": ("茶客业务 · 消费记录", "tea_guest_consumption_service", "get_record"),
-    "/api/tea-guest/expenses/types": ("茶客业务 · 支出", "tea_guest_expense_service", "get_expense_type"),
-    "/api/tea-guest/expenses": ("茶客业务 · 支出", "tea_guest_expense_service", "get_expense"),
     "/api/financial/commissions": ("分成", "financial_record_service", "get_commission"),
     "/api/financial/staff-benefits": ("人员福利", "financial_record_service", "get_benefit"),
     "/api/customers": ("客户资料", "customer_service", "get_customer"),
@@ -92,6 +91,7 @@ GETTER_MAP = {
     "/api/member-identities": ("会员身份", "member_identity_service", "get_identity"),
     "/api/customer-tags": ("客户标签", "customer_tag_service", "get_tag"),
     "/api/membership-cards": ("付费项目", "membership_card_service", "get_card"),
+    "/api/agreement-signings": ("协议签订", "membership_card_service", "get_card"),
     "/api/group-cases": ("课表", "group_case_service", "get_case"),
     "/api/group-case-sessions": ("课表", "group_case_session_service", "get_session"),
     "/api/emotional-releases": ("课表", "emotional_release_service", "get_release"),
@@ -137,7 +137,9 @@ PAGE_LABELS: dict[str, str] = {
     "class-records-arrival": "邀约",
     "daily-activities": "课表",
     "audit-check": "信息核对",
+    "agreement-signings": "协议签订",
     "offline-course-records": "落地课程",
+    "offline-course-types": "落地课程类型设置",
     "communication-records": "沟通记录",
     "followup-records": "回访记录",
     "referral-statistics": "引流统计",
@@ -348,15 +350,6 @@ def get_entity_id(path: str) -> str:
     # 批量操作路径不提取 entity_id
     if "/batch/" in path:
         return ""
-    tea_guest_match = re.search(r"/api/tea-guest/consumption-records/([^/]+)(?:/|$)", path)
-    if tea_guest_match:
-        return tea_guest_match.group(1)
-    tea_guest_expense_type_match = re.search(r"/api/tea-guest/expenses/types/([^/]+)(?:/|$)", path)
-    if tea_guest_expense_type_match:
-        return tea_guest_expense_type_match.group(1)
-    tea_guest_expense_match = re.search(r"/api/tea-guest/expenses/([^/]+)(?:/|$)", path)
-    if tea_guest_expense_match:
-        return tea_guest_expense_match.group(1)
     expense_type_match = re.search(r"/api/expenses/types/([^/]+)(?:/|$)", path)
     if expense_type_match:
         return expense_type_match.group(1)

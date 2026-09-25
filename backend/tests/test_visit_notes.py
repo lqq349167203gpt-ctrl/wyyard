@@ -155,6 +155,75 @@ def test_visit_notes_are_collaborative_but_only_creator_can_manage(
         client.delete(f"/api/accounts/{account['id']}")
 
 
+def test_same_feedback_person_keeps_each_creators_record_separate(client, created_customer):
+    from app.services import visit_note_service
+
+    teacher = client.patch(
+        f"/api/customers/{created_customer['id']}",
+        json={"positions": ["课程老师"]},
+    )
+    assert teacher.status_code == 200, teacher.text
+    visit = _create_visit(client, created_customer["id"])
+    account, other_headers = _create_other_headers(client)
+    note_ids = []
+    person = {
+        "feedback_person_id": created_customer["id"],
+        "feedback_person": created_customer["nickname"],
+    }
+    try:
+        people = client.get("/api/visit-notes/feedback-people")
+        assert people.status_code == 200
+        assert any(item["customer_id"] == created_customer["id"] for item in people.json()["options"])
+
+        first = client.post(
+            "/api/visit-notes",
+            json={"visit_id": visit["id"], "category": "follow_up", "content": "首次反馈", **person},
+        )
+        assert first.status_code == 200, first.text
+        note_ids.append(first.json()["id"])
+
+        second = client.post(
+            "/api/customer-follow-ups",
+            headers=other_headers,
+            json={"visit_id": visit["id"], "category": "follow_up", "content": "同事补充", **person},
+        )
+        assert second.status_code == 200, second.text
+        note_ids.append(second.json()["id"])
+        assert second.json()["id"] != first.json()["id"]
+
+        notes = client.get(f"/api/visit-notes?visit_id={visit['id']}").json()
+        matching = [note for note in notes if note["id"] in note_ids]
+        assert len(matching) == 2
+        assert {note["feedback_person"] for note in matching} == {created_customer["nickname"]}
+        assert {note["created_by"] for note in matching} == {"不闹", account["owner"]}
+        entries = visit_note_service.group_notes_by_visit([visit["id"]])[visit["id"]]["follow_up"]
+        assert {entry["created_by"] for entry in entries} == {"不闹", account["owner"]}
+        assert {entry["author"] for entry in entries} == {created_customer["nickname"]}
+        aggregate = client.get(f"/api/visits/{visit['id']}").json()["healing_notes"]
+        assert f"{created_customer['nickname']}（不闹创建）：首次反馈" in aggregate
+        assert f"{created_customer['nickname']}（{account['owner']}创建）：同事补充" in aggregate
+
+        forbidden = client.patch(
+            f"/api/visit-notes/{first.json()['id']}",
+            json={"content": "不能改别人的记录"},
+            headers=other_headers,
+        )
+        assert forbidden.status_code == 403
+
+        invalid = client.post(
+            "/api/visit-notes",
+            json={"visit_id": visit["id"], "category": "customer_info", "content": "测试", "feedback_person": "不存在的老师"},
+        )
+        assert invalid.status_code == 400
+    finally:
+        if note_ids:
+            client.delete(f"/api/visit-notes/{note_ids[0]}")
+        if len(note_ids) > 1:
+            client.delete(f"/api/visit-notes/{note_ids[1]}", headers=other_headers)
+        client.delete(f"/api/visits/{visit['id']}")
+        client.delete(f"/api/accounts/{account['id']}")
+
+
 def test_visit_note_list_migrates_legacy_fields(client, created_customer):
     visit = _create_visit(
         client,

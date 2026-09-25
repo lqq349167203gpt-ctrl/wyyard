@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from types import SimpleNamespace as NS
 
 import pytest
@@ -19,6 +19,102 @@ def event(eid, day, customer="c1", org="a", kind="purchase", product="membership
 
 def source(eid="s", day="2026-01-01", **kwargs):
     return event(eid, day, kind="coarse_usage", product="coarse", subtype="", **kwargs)
+
+
+def test_teacher_follow_up_matches_feedback_person_and_course_day(monkeypatch):
+    when = datetime(2026, 1, 2, 12, 30, tzinfo=timezone.utc)
+    course = {"id": "class:1", "date": "2026-01-02", "name": "读书会", "type": "沙龙活动",
+              "course_subtype": "读书交流", "organization": "小院",
+              "teacher_ids": ["teacher-1", "teacher-2"], "participant_ids": ["customer-1"],
+              "participant_names": [("customer-1", "小明")]}
+    visits = [NS(id="visit-1", customer_id="customer-1", visit_date="2026-01-02", cancelled=False),
+              NS(id="visit-2", customer_id="customer-1", visit_date="2026-01-03", cancelled=False)]
+    notes = [NS(visit_id="visit-1", category="customer_info", content="睡眠不稳", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="潘潘", updated_at=when),
+             NS(visit_id="visit-1", category="customer_info", content="工作压力", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="娟娟"),
+             NS(visit_id="visit-1", category="follow_up", content="下周回访", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="娟娟"),
+             NS(visit_id="visit-1", category="visit_need", content="改善睡眠", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="潘潘"),
+             NS(visit_id="visit-1", category="customer_info", content="别人的记录", feedback_person_id="teacher-2", feedback_person="老师乙", created_by="婷婷")]
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda ids: visits)
+    monkeypatch.setattr(service.visit_note_service, "list_notes", lambda ids, ensure_legacy=False: notes)
+    rows = service.teacher_follow_up_rows([course], {
+        "teacher-1": NS(nickname="老师甲", name="甲"),
+        "teacher-2": NS(nickname="老师乙", name="乙"),
+    })
+    assert len(rows) == 2
+    first = next(row for row in rows if row["teachers"] == "老师甲")
+    assert first["follow_up_status"] == "已填写"
+    assert first["visit_need"] == "改善睡眠"
+    assert first["customer_info"] == "睡眠不稳\n工作压力"
+    assert first["customer_info_creators"] == "潘潘、娟娟"
+    assert first["customer_info_entries"] == [
+        {"content": "睡眠不稳", "author": "老师甲", "at": when.isoformat(), "created_by": "潘潘"},
+        {"content": "工作压力", "author": "老师甲", "at": "", "created_by": "娟娟"},
+    ]
+    assert first["follow_up_creators"] == "娟娟"
+    assert first["course_subtype"] == "读书交流"
+    public_row = service._public_rows([first], [("customer_info", "客户信息")], teacher_feedback=True)[0]
+    assert public_row["customer_info_entries"] == first["customer_info_entries"]
+    assert public_row["type"] == "沙龙活动"
+    assert public_row["course_subtype"] == "读书交流"
+    second = next(row for row in rows if row["teachers"] == "老师乙")
+    assert second["follow_up_status"] == "待补充"
+    assert second["customer_info"] == "别人的记录"
+    assert second["customer_info_creators"] == "婷婷"
+    assert second["follow_up"] == ""
+
+
+def test_teacher_follow_up_includes_owner_before_participants(monkeypatch):
+    course = {"id": "gcs:1", "date": "2026-01-02", "name": "觉醒游戏", "organization": "小院",
+              "teacher_ids": ["teacher-1"], "owner_ids": ["owner-1"],
+              "participant_ids": ["customer-1"], "participant_names": [("customer-1", "参与者甲")]}
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda ids: [
+        NS(id="visit-owner", customer_id="owner-1", visit_date="2026-01-02", cancelled=False),
+    ])
+    monkeypatch.setattr(service.visit_note_service, "list_notes", lambda ids, ensure_legacy=False: [
+        NS(visit_id="visit-owner", category="customer_info", content="案主反馈", feedback_person_id="teacher-1",
+           feedback_person="老师甲", created_by="潘潘"),
+    ])
+    rows = service.teacher_follow_up_rows([course], {
+        "teacher-1": NS(nickname="老师甲", name="甲"),
+        "owner-1": NS(nickname="案主甲", name="甲"),
+    })
+    assert [(row["customer"], row["participant_role"]) for row in rows] == [
+        ("案主甲", "案主"), ("参与者甲", "参与者"),
+    ]
+    assert rows[0]["customer_info"] == "案主反馈"
+    assert service._public_rows(rows, [("customer", "人员")], teacher_feedback=True)[0]["participant_role"] == "案主"
+
+
+def test_teacher_follow_up_totals_count_all_rows_before_paging():
+    rows = [
+        {"date": "2026-09-10", "teacher_id": "teacher-1", "course_id": "class:1", "customer_info": "已填", "follow_up": ""},
+        {"date": "2026-09-10", "teacher_id": "teacher-1", "course_id": "class:1", "customer_info": "", "follow_up": "已填"},
+        {"date": "2026-09-10", "teacher_id": "teacher-1", "course_id": "class:2", "customer_info": "已填", "follow_up": "已填"},
+        {"date": "2026-09-10", "teacher_id": "teacher-2", "course_id": "class:2", "customer_info": "", "follow_up": ""},
+    ]
+    totals = service._teacher_follow_up_totals(rows)
+    assert totals[0]["teacher_count"] == 2
+    assert totals[0]["course_count"] == 2
+    assert totals[0]["teachers"][0] == {
+        "id": "teacher-1", "total": 3, "info": 2, "point": 2, "course_count": 2,
+    }
+    assert totals[0]["teachers"][1]["total"] == 1
+
+
+def test_course_owner_can_open_own_course_profile_without_broad_customer_scope(monkeypatch):
+    from app.middleware import jwt_auth
+
+    monkeypatch.setattr(jwt_auth, "require_page_permission", lambda _: lambda request: None)
+    monkeypatch.setattr(service, "get_request_roles", lambda _: ["课程老师"])
+    monkeypatch.setattr(service.customer_access_service, "get_customer_permissions", lambda _: {"scope": "own"})
+    monkeypatch.setattr(service, "collect_data", lambda _: ([], {}, [], [
+        {"id": "gcs:1", "owner_ids": ["owner-1"], "participant_ids": []},
+    ]))
+    monkeypatch.setattr(service, "scope", lambda _: ([], {}, {}))
+    assert service.require_participant_profile_access(NS(), "owner-1", "gcs:1") is True
+    with pytest.raises(HTTPException) as error:
+        service.require_participant_profile_access(NS(), "other-1", "gcs:1")
+    assert error.value.status_code == 403
 
 
 def calculate(events, rule=None, start="2026-01-01", end="2026-01-31", today=date(2026, 3, 1)):
@@ -253,6 +349,105 @@ def test_overview_referrals_use_all_customers_for_all_referral_organization(monk
     )
     # 俱乐部：婷婷带来的 1 人 + 空引流人 2 人（未配置）
     assert club["summary"]["引流人数"] == 3
+
+
+def test_overview_initiated_invites_group_by_inviter_with_record_details(monkeypatch):
+    """发起邀约按邀约人汇总，人次由取消、未到场、已到场三种互斥状态组成。"""
+    def customer(cid, nickname, referrer=""):
+        return NS(id=cid, nickname=nickname, name="", referrer=referrer, referral_date="2026-01-01",
+                  member_type="", follow_up_status="", traffic_source="")
+
+    request = NS(state=NS(user_id="acc", user_role="超级管理员"))
+    org = NS(id="all", name="无忧茶院", member_ids=[], referrer_mode="all", referrer_ids=[])
+    customers = {
+        item.id: item for item in (
+            customer("staff", "婷婷"), customer("c1", "客户一", "婷婷"), customer("c2", "客户二", "婷婷"),
+        )
+    }
+    visits = [
+        NS(id="v1", customer_id="c1", visit_date="2026-02-03", created_at="2026-01-03T10:00:00+08:00", referrer_handler="潘潘", cancelled=True, arrived=False),
+        NS(id="v2", customer_id="c1", visit_date="2026-02-04", created_at="2026-01-04T10:00:00+08:00", referrer_handler="潘潘", cancelled=False, arrived=False),
+        NS(id="v3", customer_id="c2", visit_date="2026-02-05", created_at="2026-01-05T10:00:00+08:00", referrer_handler="潘潘", cancelled=False, arrived=True),
+    ]
+    permissions = {"customer_access": {"transaction_access": "detail"}}
+    monkeypatch.setattr(service, "collect_data", lambda _: ([org], permissions, [], []))
+    monkeypatch.setattr(service, "scope", lambda _: ([org], customers, permissions))
+    monkeypatch.setattr(service.customer_service, "list_customers", lambda: list(customers.values()))
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda _: visits)
+
+    result = service.analyze(
+        request,
+        PrincipalQuery(tab="overview", organization_id="all", date_from=date(2026, 1, 1), date_to=date(2026, 1, 31)),
+    )
+    inviter = result["breakdown"]["invite_inviters"][0]
+    assert inviter["label"] == "潘潘"
+    assert (inviter["initiated_count"], inviter["cancel_count"], inviter["no_show_count"], inviter["arrive_count"]) == (3, 1, 1, 1)
+    assert [(item["date"], item["customer"], item["status_label"]) for item in inviter["records"]] == [
+        ("2026-01-05", "客户二", "已到场"),
+        ("2026-01-04", "客户一", "未到场"),
+        ("2026-01-03", "客户一", "已取消"),
+    ]
+    assert [item["visit_date"] for item in inviter["records"]] == ["2026-02-05", "2026-02-04", "2026-02-03"]
+
+
+def test_overview_referrals_group_buyers_by_upsell_configuration(monkeypatch):
+    """引流成交按升单配置统计人数，同一客户在同一档多次成交仍只标记一次。"""
+    def customer(cid, nickname, referrer=""):
+        return NS(id=cid, nickname=nickname, name="", referrer=referrer, referral_date="2026-01-05",
+                  member_type="", follow_up_status="", traffic_source="")
+
+    request = NS(state=NS(user_id="acc", user_role="超级管理员"))
+    org = NS(id="all", name="无忧茶院", member_ids=[], referrer_mode="all", referrer_ids=[])
+    customers = {
+        item.id: item for item in (
+            customer("staff", "婷婷"), customer("c1", "客户一", "婷婷"), customer("c2", "客户二", "婷婷"),
+            customer("c3", "客户三", "婷婷"),
+        )
+    }
+    events = [
+        event("p1", "2026-01-06", customer="c1", org="all", subtype="398会员"),
+        event("p2", "2026-01-07", customer="c1", org="all", subtype="398会员"),
+        event("p3", "2026-01-08", customer="c2", org="all", subtype="45次卡"),
+        event("p4", "2026-01-06", customer="c3", org="all", subtype="398会员"),
+        event("p5", "2026-01-09", customer="c3", org="all", subtype="45次卡"),
+    ]
+    permissions = {"customer_access": {"transaction_access": "detail"}}
+    levels = [
+        {"id": "trial", "name": "体验档", "products": ["membership:398会员"]},
+        {"id": "regular", "name": "正式档", "products": ["membership:45次卡"]},
+    ]
+    monkeypatch.setattr(service, "collect_data", lambda _: ([org], permissions, events, []))
+    monkeypatch.setattr(service, "scope", lambda _: ([org], customers, permissions))
+    monkeypatch.setattr(service.customer_service, "list_customers", lambda: list(customers.values()))
+    monkeypatch.setattr(service.upsell_config_service, "list_levels", lambda: levels)
+    monkeypatch.setattr(service.upsell_config_service, "level_order", lambda: [
+        [("membership", "398会员")], [("membership", "45次卡")],
+    ])
+
+    result = service.analyze(
+        request, PrincipalQuery(tab="overview", organization_id="all", date_from=date(2026, 1, 1))
+    )
+    assert result["breakdown"]["traffic_upsell_levels"] == [
+        {"key": "trial", "label": "体验档", "count": 0},
+        {"key": "regular", "label": "正式档", "count": 0},
+    ]
+    group = next(item for item in result["breakdown"]["traffic"] if item["key"] == "婷婷")
+    markers = {customer["id"]: [level["key"] for level in customer["upsell_levels"]] for customer in group["customers"]}
+    assert markers == {"c1": ["trial"], "c2": ["regular"], "c3": ["trial", "regular"]}
+    assert next(customer for customer in group["customers"] if customer["id"] == "c3")["is_upsell"] is True
+
+    trial = service.analyze(
+        request, PrincipalQuery(tab="overview", organization_id="all", date_from=date(2026, 1, 1), breakdown=["upsell:trial"])
+    )
+    trial_group = next(item for item in trial["breakdown"]["traffic"] if item["key"] == "婷婷")
+    assert [customer["id"] for customer in trial_group["customers"]] == ["c1"]
+
+    both = service.analyze(
+        request, PrincipalQuery(tab="overview", organization_id="all", date_from=date(2026, 1, 1),
+                                breakdown=["upsell:trial", "upsell:regular"])
+    )
+    both_group = next(item for item in both["breakdown"]["traffic"] if item["key"] == "婷婷")
+    assert {customer["id"] for customer in both_group["customers"]} == {"c1", "c2", "c3"}
 
 
 def test_overview_referrals_only_count_configured_referrers(monkeypatch):
@@ -516,6 +711,28 @@ def test_invalid_window_and_range_rejected(client):
     assert client.post("/api/principal/query", json={"date_from": "2026-02-01", "date_to": "2026-01-01"}).status_code == 422
 
 
+def test_traffic_visit_stats_partition_invitation_statuses():
+    visits = [
+        NS(customer_id="c1", visit_date="2026-01-01", cancelled=True, arrived=False),
+        NS(customer_id="c1", visit_date="2026-01-02", cancelled=False, arrived=False),
+        NS(customer_id="c1", visit_date="2026-01-03", cancelled=False, arrived=True),
+        NS(customer_id="c2", visit_date="2025-12-31", cancelled=False, arrived=True),
+    ]
+
+    stats, first_arrival, arrival_details = service._traffic_visit_stats(visits, "2026-01-01", "2026-01-31")
+
+    assert stats["c1"] == {
+        "initiated": 3,
+        "invite": 2,
+        "cancel": 1,
+        "no_show": 1,
+        "arrive": 1,
+    }
+    assert first_arrival == {"c1": "2026-01-03"}
+    assert arrival_details["c1"]["arrive_date"] == "2026-01-03"
+    assert "c2" not in stats
+
+
 def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monkeypatch):
     from app.api import statistics
     from app.models.class_record import ClassRecord
@@ -529,7 +746,17 @@ def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monk
     monkeypatch.setattr(service.course_service, "list_courses", lambda: [NS(id="course", organization_id="a")])
     monkeypatch.setattr(service.course_type_service, "list_course_types", lambda: [])
     course = ClassRecord(id="course-record", date="2026-01-01", course_id="course", course_name="公益", teacher_ids=["teacher"], participant_ids=["c1", "c2", "c3", "hidden"], withdrawn_participant_ids=["c2"], membership_deduction_count=0, created_at="2026-01-01T00:00:00Z", updated_at="2026-01-01T00:00:00Z")
-    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (("class", "沙龙活动", lambda: [course]),))
+    owner_sessions = {
+        kind: NS(id=f"{kind}-session", date="2026-01-01", course_id="course", name=label,
+                 teacher_ids=["teacher"], participant_ids=["c1", "c2"], owner_id="c2",
+                 description='[{"id":"c2","name":"c2","count":1},{"id":"c3","name":"c3","count":1}]' if kind == "eks" else "")
+        for kind, label in (("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "能量结"))
+    }
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
+        ("class", "沙龙活动", lambda: [course]),
+        *((kind, label, lambda kind=kind: [owner_sessions[kind]])
+          for kind, label in (("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "能量结"))),
+    ))
     monkeypatch.setattr(service.visit_service, "_visits", {cid: NS(customer_id=cid, visit_date="2026-01-01", arrived=True, is_deleted=False) for cid in ("c1", "c2", "hidden")})
     payments = [NS(id="zero", customer_id="c1", organization_id="a", deal_date="2026-01-02", card_type="398会员", price=0),
                 NS(id="hidden", customer_id="hidden", organization_id="a"),
@@ -542,6 +769,12 @@ def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monk
     assert courses[0]["organization_id"] == "a"  # 不是老师所在的乙组织
     assert courses[0]["hours"] == 0
     assert courses[0]["participant_ids"] == ["c1"]
+    assert courses[0]["owner_count"] == 0
+    assert courses[0]["service_participant_count"] == 2  # 与课程记录口径一致，包含未标记到店的 c3
+    assert {item["activity_type"]: item["owner_ids"] for item in courses[1:]} == {
+        "gcs": ["c2"], "ers": ["c2"], "eks": ["c2", "c3"],
+    }
+    assert all(item["participant_ids"] == ["c1"] for item in courses[1:])
     assert [e["id"] for e in events if e["kind"] == "purchase"] == ["purchase:membership:zero"]
     # 筛选选项保留相同的可见活动/产品，但无需计算课程详情、课时和粗门关联。
     monkeypatch.setattr(statistics, "_course_owner_details", lambda *_: pytest.fail("元数据不应计算案主详情"))
@@ -580,6 +813,20 @@ def test_course_participants_use_referrer_configuration(mode, expected):
     assert service.course_participant_rows([course], []) == []
 
 
+def test_service_people_are_deduplicated_across_courses_and_roles():
+    courses = [
+        {"owner_count": 1, "owner_ids": ["owner"],
+         "service_participant_count": 2, "service_participant_ids": ["shared", "guest"]},
+        {"owner_count": 1, "owner_ids": ["shared"],
+         "service_participant_count": 2, "service_participant_ids": ["guest", "new"]},
+    ]
+    totals = service._service_visit_totals(courses)
+    assert totals == {
+        "服务人次": 6, "服务案主人次": 2, "服务参与人次": 4,
+        "服务总人数": 4, "服务案主人数": 2, "服务参与者人数": 3,
+    }
+
+
 def test_course_participants_pagination_export_and_course_scope(monkeypatch):
     def person(cid, nickname, referrer=""):
         return NS(id=cid, nickname=nickname, name="", referrer=referrer)
@@ -591,6 +838,7 @@ def test_course_participants_pagination_export_and_course_scope(monkeypatch):
     courses = [{"id": oid, "date": "2026-01-01", "organization_id": oid, "organization": oid,
                 "name": "公益", "type": "沙龙活动", "activity_type": "class", "hours": 0,
                 "participant_ids": ["c1", "c2"], "participants": 2,
+                "owner_count": 1, "service_participant_count": 2,
                 "participant_names": [("c1", "甲"), ("c2", "乙")]}
                for oid in ("a", "b")]
     monkeypatch.setattr(service, "collect_data", lambda _: (orgs, {"customer_access": {"transaction_access": "summary"}}, [], courses))
@@ -598,6 +846,9 @@ def test_course_participants_pagination_export_and_course_scope(monkeypatch):
     monkeypatch.setattr(service.upsell_config_service, "level_order", lambda: [])
     query = PrincipalQuery(tab="courses", course_view="participant", participant_scope="internal", page_size=1)
     result = service.analyze(NS(), query)
+    assert result["summary"]["服务人次"] == 6
+    assert result["summary"]["服务案主人次"] == 2
+    assert result["summary"]["服务参与人次"] == 4
     assert result["total"] == 2
     assert len(result["items"]) == 1
     exported = service.analyze(NS(), query, export=True)
@@ -614,6 +865,9 @@ def test_course_participants_pagination_export_and_course_scope(monkeypatch):
     original = service.analyze(NS(), query)
     assert original["total"] == 1
     assert original["items"][0]["participants"] == 2
+    assert original["list_summary"]["服务人次"] == 3
+    assert original["list_summary"]["服务案主人次"] == 1
+    assert original["list_summary"]["服务参与人次"] == 2
 
 
 def test_rule_ownership_is_enforced(monkeypatch):
@@ -697,6 +951,60 @@ def test_traffic_export_uses_visible_customers_and_selected_order(client, monkey
         "export_view": "traffic", "export_customer_ids": [],
     })
     assert load_workbook(io.BytesIO(empty.content)).active.max_row == 1
+
+
+def test_invite_arrivals_export_respects_display_mode_and_profile_access(client, monkeypatch):
+    import io
+
+    from openpyxl import load_workbook
+
+    def analyze(_request, query, export=False):
+        assert export and query.tab == "overview"
+        return {"columns": [], "items": [], "total": 0, "breakdown": {
+            "traffic_profile_fields": [],
+            "traffic": [{"label": "引流人甲", "customers": [{
+                "id": "customer-a", "name": "客户甲", "arrive_count": 2,
+                "visit_purpose": "敏感信息",
+                "arrival_records": [
+                    {"id": "arrival-a", "arrive_date": "2026-08-01"},
+                    {"id": "arrival-b", "arrive_date": "2026-08-02"},
+                ],
+            }]}],
+        }}
+
+    monkeypatch.setattr(service, "analyze", analyze)
+    common = {
+        "export_view": "invite_arrivals", "export_customer_ids": ["customer-a"],
+        "export_columns": ["arrive_date", "name", "visit_purpose"],
+    }
+    once = client.post("/api/principal/export", json={**common, "arrival_view": "customer"})
+    assert once.status_code == 200
+    once_sheet = load_workbook(io.BytesIO(once.content)).active
+    assert once_sheet.max_row == 2
+    assert [cell.value for cell in once_sheet[1]] == ["到店日期", "昵称"]
+
+    by_date = client.post("/api/principal/export", json={**common, "arrival_view": "date"})
+    assert by_date.status_code == 200
+    date_sheet = load_workbook(io.BytesIO(by_date.content)).active
+    assert date_sheet.max_row == 3
+    assert [date_sheet["A2"].value, date_sheet["A3"].value] == ["2026-08-02", "2026-08-01"]
+    assert date_sheet["B2"].value == "客户甲"
+
+
+def test_teacher_follow_up_export_omits_related_details(client, monkeypatch):
+    import io
+
+    from openpyxl import load_workbook
+
+    monkeypatch.setattr(service, "analyze", lambda _request, _query, export=False: {
+        "columns": [{"key": "customer", "label": "人员"}],
+        "items": [{"customer": "客户甲", "details": ["关联记录"]}], "total": 1,
+    })
+    response = client.post("/api/principal/export", json={"tab": "courses", "course_view": "teacher_follow_up"})
+    assert response.status_code == 200
+    sheet = load_workbook(io.BytesIO(response.content)).active
+    assert [cell.value for cell in sheet[1]] == ["人员"]
+    assert [cell.value for cell in sheet[2]] == ["客户甲"]
 
 
 def test_deadline_today_is_still_observing():

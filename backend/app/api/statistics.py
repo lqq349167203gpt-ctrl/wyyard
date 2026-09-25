@@ -1837,10 +1837,10 @@ def _course_activity_hours(activity_type: str, activity) -> int:
         return 1
 
 
-def _course_owner_details(activity_type, activity, customer_map, visible_customer_ids):
-    """案主沿用客户可见范围；能量结兼容多案主及历史部位记录。"""
+def _course_owner_records(activity_type, activity):
+    """读取活动案主配置；能量结兼容多案主及历史部位记录。"""
     if activity_type not in {"gcs", "ers", "eks"}:
-        return {"owner_name": "", "body_part_count": None, "owner_count": 0}
+        return []
     owners = []
     if activity_type == "eks":
         try:
@@ -1851,6 +1851,14 @@ def _course_owner_details(activity_type, activity, customer_map, visible_custome
             owners = [item for item in details if isinstance(item, dict)]
     if not owners:
         owners = [{"id": getattr(activity, "owner_id", ""), "name": getattr(activity, "owner_name", ""), "count": 1}]
+    return owners
+
+
+def _course_owner_details(activity_type, activity, customer_map, visible_customer_ids):
+    """案主沿用客户可见范围；能量结兼容多案主及历史部位记录。"""
+    if activity_type not in {"gcs", "ers", "eks"}:
+        return {"owner_name": "", "body_part_count": None, "owner_count": 0}
+    owners = _course_owner_records(activity_type, activity)
     names = []
     count = 0
     for owner in owners:
@@ -1870,6 +1878,42 @@ def _course_owner_details(activity_type, activity, customer_map, visible_custome
         # 案主人次：按可见的案主去重计数（能量结支持多案主）
         "owner_count": len(names),
     }
+
+
+def _course_owner_participants(
+    activity_type,
+    activity,
+    customer_map,
+    visible_customer_ids,
+    identity_groups,
+    daily_needs,
+    daily_notes,
+):
+    """为课程参与者名单提供可见案主行，不改变普通参与人数统计口径。"""
+    owners = []
+    seen = set()
+    for owner in _course_owner_records(activity_type, activity):
+        owner_id = owner.get("id") or getattr(activity, "owner_id", "")
+        if not owner_id or owner_id in seen or owner_id not in visible_customer_ids:
+            continue
+        customer = customer_map.get(owner_id)
+        if not customer:
+            continue
+        seen.add(owner_id)
+        member_type = getattr(customer, "member_type", "") or ""
+        daily = daily_notes.get((activity.date, owner_id), {})
+        owners.append({
+            "id": owner_id,
+            "nickname": getattr(customer, "nickname", "") or getattr(customer, "name", "") or owner_id,
+            "member_type": member_type,
+            "identity_group": identity_groups.get(member_type, "") or "老人",
+            "participation_role": "案主",
+            "daily_need": daily_needs.get((activity.date, owner_id), ""),
+            "daily_visit_id": daily.get("visit_id", ""),
+            "daily_customer_info": daily.get("customer_info", ""),
+            "daily_follow_up": daily.get("follow_up", ""),
+        })
+    return owners
 
 
 def _course_teacher_hours(activities_by_type: dict[str, list]) -> dict[str, int]:
@@ -1901,9 +1945,16 @@ def get_course_statistics(
     activity_type: str | None = Query(None, description="活动类型编码"),
     course_subtype: str | None = Query(None, description="沙龙活动或内部课程二级类目"),
     teacher_id: str | None = Query(None, description="疗愈老师客户 ID"),
+    mobile_view: str = Query("", pattern="^(|courses|reviews|participants_source)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     request: Request = None,
 ):
     """获取课程数、课时数及参与人数统计。"""
+    mobile_view = mobile_view if isinstance(mobile_view, str) else ""
+    mobile_listing = mobile_view in {"courses", "reviews"}
+    page = page if isinstance(page, int) else 1
+    page_size = page_size if isinstance(page_size, int) else 20
     all_dates = all_dates if isinstance(all_dates, bool) else False
     if all_dates:
         activities_by_type = {
@@ -1967,8 +2018,8 @@ def get_course_statistics(
     if request is not None and position_edit_permission_service.get_permissions(role)["course_records"] == "own":
         restricted_teacher_ids = request_actor_customer_ids(request)
     transaction_access = customer_access_service.transaction_access(role)
-    can_view_payment = transaction_access in {"summary", "detail"}
-    can_view_payment_details = transaction_access == "detail"
+    can_view_payment = transaction_access in {"summary", "detail"} and not mobile_view
+    can_view_payment_details = transaction_access == "detail" and not mobile_view
     identity_groups = {
         identity.name: identity.type
         for identity in member_identity_service.list_identities()
@@ -2009,7 +2060,7 @@ def get_course_statistics(
             return False
         return _matches_organization(type_key, activity)
 
-    teacher_course_hours = _course_teacher_hours({
+    teacher_course_hours = {} if mobile_view else _course_teacher_hours({
         type_key: [
             activity
             for activity in activities
@@ -2083,10 +2134,8 @@ def get_course_statistics(
             )
         )
     payment_groups = _payment_record_groups() if can_view_payment else []
-    daily_payments, daily_needs, daily_notes = _course_customer_daily_context(
-        date_from,
-        date_to,
-        payment_groups,
+    daily_payments, daily_needs, daily_notes = (
+        ({}, {}, {}) if mobile_view else _course_customer_daily_context(date_from, date_to, payment_groups)
     )
     trend_grouped: dict[str, dict[str, int | float]] = defaultdict(
         lambda: {
@@ -2144,7 +2193,7 @@ def get_course_statistics(
                     (activity.date, participant_id),
                     {"amount": 0.0, "closers": set()},
                 )
-                participant_details.append({
+                participant_row = {
                     "id": participant_id,
                     "nickname": (
                         getattr(customer, "nickname", "")
@@ -2154,6 +2203,9 @@ def get_course_statistics(
                     "member_type": member_type,
                     "identity_group": identity_group,
                     "participation_role": participant_roles[participant_id],
+                }
+                if not mobile_listing:
+                    participant_row.update({
                     "daily_need": daily_needs.get((activity.date, participant_id), ""),
                     # 「参与者」页签：这一天的邀约备注（多人填写时值里带「填写人：内容」）
                     "daily_visit_id": (daily_notes.get((activity.date, participant_id)) or {}).get("visit_id", ""),
@@ -2167,7 +2219,8 @@ def get_course_statistics(
                         if can_view_payment_details
                         else ""
                     ),
-                })
+                    })
+                participant_details.append(participant_row)
             participant_details.sort(key=lambda item: (item["nickname"], item["id"]))
             teacher_names = []
             for activity_teacher_id in teacher_ids:
@@ -2188,6 +2241,11 @@ def get_course_statistics(
                 "id": f"{type_key}:{activity.id}",
                 "activity_type": type_key,
                 "activity_type_label": label,
+                "course_subtype": (
+                    _course_subtype_name(type_key, activity)
+                    if type_key in {"class", "ics"}
+                    else ""
+                ),
                 "name": _course_activity_name(type_key, label, activity),
                 "date": activity.date,
                 "start_time": getattr(activity, "start_time", "") or "",
@@ -2204,6 +2262,15 @@ def get_course_statistics(
                 "old_count": sum(
                     item["identity_group"] != "新人"
                     for item in participant_details
+                ),
+                "owner_participants": [] if mobile_listing else _course_owner_participants(
+                    type_key,
+                    activity,
+                    customer_map,
+                    visible_customer_ids,
+                    identity_groups,
+                    daily_needs,
+                    daily_notes,
                 ),
                 "daily_transaction_amount": (
                     round(
@@ -2299,7 +2366,7 @@ def get_course_statistics(
         type_name = next((label for key, label, _ in COURSE_ACTIVITY_TYPES if key == activity_type), "全部课程")
         record_service_teacher_action(request, f"查询课程记录：老师 {teacher_name}；课程类型 {type_name}；{date_from} 至 {date_to}；共{len(course_rows)}场")
 
-    return {
+    response = {
         "date_from": date_from,
         "date_to": date_to,
         "granularity": granularity,
@@ -2336,13 +2403,28 @@ def get_course_statistics(
             }
             for subtype_name in subtype_names
         ] if activity_type == "class" else [],
-        "trend": _course_trend_rows(trend_grouped, date_from, date_to, granularity),
+        "trend": [] if mobile_view else _course_trend_rows(trend_grouped, date_from, date_to, granularity),
         "teacher_statistics": sorted(
             teacher_statistics.values(),
             key=lambda item: (-item["course_count"], -item["class_hours"], item["name"]),
         ),
         "courses": course_rows,
     }
+    if mobile_listing:
+        selected = [course for course in course_rows if mobile_view == "courses" or course["course_review"].strip()]
+        response["total"] = len(selected)
+        response["page"] = page
+        response["page_size"] = page_size
+        response["courses"] = [{
+            key: course[key] for key in (
+                "id", "activity_type", "activity_type_label", "course_subtype", "name", "date",
+                "start_time", "end_time", "class_hours", "course_review", "teachers", "owner_name",
+                "body_part_count", "participant_count", "new_count", "old_count", "participants",
+            )
+        } for course in selected[(page - 1) * page_size:page * page_size]]
+        response["trend"] = []
+        response["teacher_statistics"] = []
+    return response
 
 
 @router.get("/referrals")

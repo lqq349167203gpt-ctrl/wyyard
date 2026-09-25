@@ -1,4 +1,21 @@
-"""客户跟进页：只列自己填过的邀约备注（来访需求 / 客户信息 / 跟进点），能就地改。"""
+"""客户跟进页：本人创建及指派本人反馈的邀约备注。"""
+
+from types import SimpleNamespace as NS
+
+from app.services import visit_note_service
+
+
+def test_follow_up_list_includes_assigned_notes_without_edit_right(monkeypatch):
+    own = NS(id="own", is_deleted=False, created_by_id="account-1", created_by="甲",
+             feedback_person_id="", feedback_person="", updated_at=1)
+    assigned = NS(id="assigned", is_deleted=False, created_by_id="account-2", created_by="乙",
+                  feedback_person_id="teacher-1", feedback_person="甲", updated_at=2)
+    other = NS(id="other", is_deleted=False, created_by_id="account-2", created_by="乙",
+               feedback_person_id="teacher-2", feedback_person="丙", updated_at=3)
+    monkeypatch.setattr(visit_note_service, "_notes", {note.id: note for note in (own, assigned, other)})
+    result = visit_note_service.list_notes_for_follow_up("account-1", "甲", "", {"teacher-1"})
+    assert [note.id for note in result] == ["assigned", "own"]
+    assert visit_note_service.can_manage_note(assigned, "account-1", "甲") is False
 
 
 def _create_visit(client, customer_id: str, date: str = "2026-08-23") -> dict:
@@ -37,6 +54,7 @@ def test_customer_follow_ups_list_search_and_edit(client, created_customer):
         assert row["customer_name"] == created_customer["nickname"]
         assert row["visit_date"] == "2026-08-23"
         assert isinstance(row["activities"], list)
+
         # 三类内容都在
         assert row["visit_need"]["content"] == "想来做义工，先体验读书会"
         assert row["customer_info"]["content"] == "做电商客服，比较紧绷"

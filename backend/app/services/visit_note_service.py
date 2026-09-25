@@ -45,6 +45,13 @@ def _legacy_field(category: VisitNoteCategory) -> str:
     }[category]
 
 
+def display_author(note: VisitNote) -> str:
+    """旧版文本汇总也能区分代填记录；本人填写时沿用原展示。"""
+    creator = note.created_by or "历史记录"
+    person = note.feedback_person or creator
+    return f"{person}（{creator}创建）" if person != creator else creator
+
+
 def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
     """把多人记录汇总回旧字段，兼容统计、详情和导出等既有读取入口。"""
     from app.services import visit_service
@@ -54,8 +61,7 @@ def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
         return
     lines = []
     for note in _active_notes(visit_id, category):
-        creator = note.created_by or "历史记录"
-        lines.append(f"{creator}：{note.content}")
+        lines.append(f"{display_author(note)}：{note.content}")
     field = _legacy_field(category)
     value = "\n".join(lines)
     if str(getattr(record, field, "") or "") != value:
@@ -93,6 +99,7 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
                     content=content,
                     created_by_id=visit.created_by_id,
                     created_by=visit.created_by or "历史记录",
+                    feedback_person=visit.created_by or "历史记录",
                     created_at=visit.created_at,
                     updated_at=visit.updated_at,
                 )
@@ -127,7 +134,8 @@ def group_notes_by_visit(visit_ids: Iterable[str]) -> Dict[str, Dict[str, list[d
     for note in sorted(list_notes(visit_ids, ensure_legacy=False), key=lambda item: (item.created_at, item.id)):
         entries = grouped.setdefault(note.visit_id, {}).setdefault(note.category, [])
         entries.append({
-            "author": note.created_by or "历史记录",
+            "author": note.feedback_person or note.created_by or "历史记录",
+            "created_by": note.created_by or "历史记录",
             "content": note.content,
             "at": (note.updated_at or note.created_at).isoformat(),
         })
@@ -147,6 +155,31 @@ def list_notes_by_creator(
             note
             for note in _notes.values()
             if not note.is_deleted and can_manage_note(note, account_id, owner_name, username)
+        ),
+        key=lambda note: (note.updated_at, note.id),
+        reverse=True,
+    )
+
+
+def list_notes_for_follow_up(
+    account_id: str = "",
+    owner_name: str = "",
+    username: str = "",
+    feedback_person_ids: set[str] | None = None,
+) -> list[VisitNote]:
+    """本人创建，或由别人填写但明确指定本人为反馈人的记录。"""
+    if not account_id and not owner_name and not username and not feedback_person_ids:
+        return []
+    names = {name for name in (owner_name, username) if name}
+    person_ids = feedback_person_ids or set()
+    return sorted(
+        (
+            note for note in _notes.values()
+            if not note.is_deleted and (
+                can_manage_note(note, account_id, owner_name, username)
+                or (note.feedback_person_id and note.feedback_person_id in person_ids)
+                or (not note.feedback_person_id and note.feedback_person in names)
+            )
         ),
         key=lambda note: (note.updated_at, note.id),
         reverse=True,
@@ -247,6 +280,8 @@ def create_note(
     content: str,
     creator_id: str = "",
     creator: str = "",
+    feedback_person_id: str = "",
+    feedback_person: str = "",
 ) -> VisitNote:
     from app.services import visit_service
 
@@ -261,6 +296,9 @@ def create_note(
         existing = _find_creator_note(visit_id, category, creator_id, creator)
         if existing:
             existing.content = normalized
+            if feedback_person_id or feedback_person:
+                existing.feedback_person_id = feedback_person_id.strip()
+                existing.feedback_person = feedback_person.strip() or creator.strip()
             existing.updated_at = now
             _notes[existing.id] = existing
             _save(existing)
@@ -273,6 +311,8 @@ def create_note(
             content=normalized,
             created_by_id=creator_id,
             created_by=creator,
+            feedback_person_id=feedback_person_id.strip(),
+            feedback_person=feedback_person.strip() or creator.strip(),
             created_at=now,
             updated_at=now,
         )
@@ -282,7 +322,12 @@ def create_note(
         return note
 
 
-def update_note(note_id: str, content: str) -> VisitNote | None:
+def update_note(
+    note_id: str,
+    content: str,
+    feedback_person_id: str | None = None,
+    feedback_person: str | None = None,
+) -> VisitNote | None:
     normalized = content.strip()
     if not normalized:
         raise ValueError("记录内容不能为空")
@@ -291,6 +336,9 @@ def update_note(note_id: str, content: str) -> VisitNote | None:
         if not note:
             return None
         note.content = normalized
+        if feedback_person_id is not None or feedback_person is not None:
+            note.feedback_person_id = (feedback_person_id or "").strip()
+            note.feedback_person = (feedback_person or "").strip() or note.created_by
         note.updated_at = datetime.now(timezone.utc)
         _notes[note.id] = note
         _save(note)

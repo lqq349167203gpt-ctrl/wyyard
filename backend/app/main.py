@@ -12,6 +12,7 @@ from app.api.activity_registrations import router as activity_registrations_rout
 from app.api.activity_themes import router as activity_themes_router
 from app.api.activity_withdrawals import router as activity_withdrawals_router
 from app.api.agents import router as agents_router
+from app.api.agreement_signings import router as agreement_signings_router
 from app.api.ai_configs import router as ai_configs_router
 from app.api.analysis_logs import router as analysis_logs_router
 from app.api.audit_check import router as audit_check_router
@@ -19,7 +20,6 @@ from app.api.business_reminders import router as business_reminders_router
 from app.api.chat_history import router as chat_history_router
 from app.api.chat_logs import router as chat_logs_router
 from app.api.class_records import router as class_records_router
-from app.api.customer_follow_ups import router as customer_follow_ups_router
 from app.api.client import router as client_router
 from app.api.client_notifications import router as client_notifications_router
 from app.api.communication_records import router as communication_records_router
@@ -29,6 +29,7 @@ from app.api.courses import router as courses_router
 from app.api.custom_analysis import router as custom_analysis_router
 from app.api.customer_ai_config import router as customer_ai_config_router
 from app.api.customer_detail import router as customer_detail_router
+from app.api.customer_follow_ups import router as customer_follow_ups_router
 from app.api.customer_tags import router as customer_tags_router
 from app.api.customers import router as customers_router
 from app.api.daily_groupings import router as daily_groupings_router
@@ -68,8 +69,6 @@ from app.api.statistics import router as statistics_router
 from app.api.system_helper import router as system_helper_router
 from app.api.system_helper_config import router as system_helper_config_router
 from app.api.system_logs import router as system_logs_router
-from app.api.tea_guest_consumptions import router as tea_guest_consumptions_router
-from app.api.tea_guest_expenses import router as tea_guest_expenses_router
 from app.api.tea_seat_fees import router as tea_seat_fees_router
 from app.api.uploads import router as uploads_router
 from app.api.upsell_config import router as upsell_config_router
@@ -122,6 +121,7 @@ app.include_router(miniapp_ai_config_router)
 app.include_router(visits_router)
 app.include_router(visit_verifications_router)
 app.include_router(audit_check_router)
+app.include_router(agreement_signings_router)
 app.include_router(courses_router)
 app.include_router(spaces_router)
 app.include_router(course_types_router)
@@ -164,8 +164,6 @@ app.include_router(activity_orders_router)
 app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)
 app.include_router(payment_exports_router)
-app.include_router(tea_guest_consumptions_router)
-app.include_router(tea_guest_expenses_router)
 app.include_router(financial_router)
 app.include_router(system_helper_router)
 app.include_router(system_helper_config_router)

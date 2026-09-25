@@ -2,6 +2,12 @@ import { useMemo, useRef, useState } from "react"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  currentFeedbackPersonName,
+  FeedbackPersonSelect,
+  feedbackPersonValue,
+  type FeedbackPersonOption,
+} from "@/components/visits/feedback-person-select"
 import { customerApi, visitNoteApi, type PreviousVisitNeed, type VisitNote, type VisitNoteCategory } from "@/lib/api"
 
 interface VisitNoteCellProps {
@@ -44,6 +50,10 @@ function authorName(note: VisitNote): string {
   return name && name !== "历史记录" ? name : "未知"
 }
 
+function feedbackPersonName(note: VisitNote): string {
+  return (note.feedback_person || "").trim() || authorName(note)
+}
+
 export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickname, title, category, notes, disabled, expanded = false, privateToCreator = false, onNotesChange }: VisitNoteCellProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState("")
@@ -57,7 +67,11 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
   const [showVisitPurpose, setShowVisitPurpose] = useState(false)
   const [visitPurposeLoading, setVisitPurposeLoading] = useState(false)
   const [visitPurposeError, setVisitPurposeError] = useState("")
+  const [feedbackPeople, setFeedbackPeople] = useState<FeedbackPersonOption[]>([])
+  const [feedbackPerson, setFeedbackPerson] = useState("")
+  const [savedFeedbackPerson, setSavedFeedbackPerson] = useState("")
   const savingRef = useRef(false)
+  const currentActorName = useMemo(currentFeedbackPersonName, [])
 
   const categoryNotes = useMemo(() => {
     const seenAuthors = new Set<string>()
@@ -86,24 +100,45 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
     setOpen(true)
     setError("")
     const initialValue = myNote?.content || ""
+    const initialPerson = myNote
+      ? feedbackPersonValue({ customer_id: myNote.feedback_person_id || "", name: feedbackPersonName(myNote) })
+      : currentActorName ? `name:${currentActorName}` : ""
+    setFeedbackPeople(currentActorName ? [{ customer_id: "", name: currentActorName }] : [])
     setDraft(initialValue)
     setSavedValue(initialValue)
+    setFeedbackPerson(initialPerson)
+    setSavedFeedbackPerson(initialPerson)
     setShowPrevious(false)
     setPreviousNeed(null)
     setShowVisitPurpose(false)
     setVisitPurpose(null)
     setVisitPurposeError("")
     try {
-      const [latestNotes, previous] = await Promise.all([
+      const [latestNotes, previous, peopleResult] = await Promise.all([
         refreshNotes(),
         category === "visit_need" && customerId
           ? visitNoteApi.previousVisitNeed(customerId, visitDate, visitId)
           : Promise.resolve(null),
+        visitNoteApi.feedbackPeople().catch(() => ({
+          current_person: { customer_id: "", name: currentActorName },
+          options: currentActorName ? [{ customer_id: "", name: currentActorName }] : [],
+        })),
       ])
       const latestMine = latestNotes.find((note) => note.category === category && note.can_edit)
       const nextValue = latestMine?.content || ""
+      const preferredPerson: FeedbackPersonOption = latestMine
+        ? { customer_id: latestMine.feedback_person_id || "", name: feedbackPersonName(latestMine) }
+        : peopleResult.current_person
+      const nextPeople = [...peopleResult.options]
+      if (preferredPerson.name && !nextPeople.some(option => feedbackPersonValue(option) === feedbackPersonValue(preferredPerson))) {
+        nextPeople.unshift(preferredPerson)
+      }
+      const nextFeedbackPerson = preferredPerson.name ? feedbackPersonValue(preferredPerson) : ""
       setDraft(nextValue)
       setSavedValue(nextValue)
+      setFeedbackPeople(nextPeople)
+      setFeedbackPerson(nextFeedbackPerson)
+      setSavedFeedbackPerson(nextFeedbackPerson)
       setPreviousNeed(previous)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "加载失败")
@@ -173,16 +208,27 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
 
   const persistDraft = async () => {
     const content = draft.trim()
-    if (!content || content === savedValue.trim() || !visitId || savingRef.current) return
+    if (!content || (content === savedValue.trim() && feedbackPerson === savedFeedbackPerson) || !visitId || savingRef.current) return
+    const selectedPerson = feedbackPeople.find(option => feedbackPersonValue(option) === feedbackPerson)
     savingRef.current = true
     setSaving(true)
     setError("")
     try {
-      if (myNote) await visitNoteApi.update(myNote.id, content)
-      else await visitNoteApi.create({ visit_id: visitId, category, content })
+      if (myNote) {
+        await visitNoteApi.update(myNote.id, content, selectedPerson ? { id: selectedPerson.customer_id, name: selectedPerson.name } : undefined)
+      } else {
+        await visitNoteApi.create({
+          visit_id: visitId,
+          category,
+          content,
+          feedback_person_id: selectedPerson?.customer_id || "",
+          feedback_person: selectedPerson?.name || currentActorName,
+        })
+      }
       await refreshNotes()
       setDraft(content)
       setSavedValue(content)
+      setSavedFeedbackPerson(feedbackPerson)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "保存失败")
     } finally {
@@ -201,6 +247,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
       await refreshNotes()
       setDraft("")
       setSavedValue("")
+      setSavedFeedbackPerson(feedbackPerson)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "清空失败")
     } finally {
@@ -220,17 +267,17 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
       <span className={`min-w-0 flex-1 ${expanded ? "flex flex-col gap-1" : "truncate"} ${latest ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>
         {latest ? expanded ? categoryNotes.map((note) => (
           <span key={note.id} className="whitespace-pre-wrap break-words leading-5">
-            {privateToCreator ? note.content : <><span>{authorName(note)}</span><span>：{note.content}</span></>}
+            {privateToCreator ? note.content : <><span>{feedbackPersonName(note)}</span><span>：{note.content}</span></>}
           </span>
         )) : (
           privateToCreator ? compactText(latest.content) : <>
-            <span>{authorName(latest)}</span>
+            <span>{feedbackPersonName(latest)}</span>
             <span>：{compactText(latest.content)}</span>
           </>
         ) : ""}
       </span>
       {!privateToCreator && categoryNotes.length > 0 && (
-        <span className={`shrink-0 text-[11px] tabular-nums text-[#8f959e] ${expanded ? "mt-0.5" : ""}`}>{categoryNotes.length}人</span>
+        <span className={`shrink-0 text-[11px] tabular-nums text-[#8f959e] ${expanded ? "mt-0.5" : ""}`}>{categoryNotes.length}条</span>
       )}
     </button>
   )
@@ -246,10 +293,10 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
             sideOffset={5}
             className="block w-[280px] max-w-[280px] rounded-[4px] border-[0.5px] border-[#d3d6db] bg-white px-3 py-2.5 text-[#2b2f36] shadow-md [&>svg]:hidden"
           >
-            <div className="mb-1.5 text-[11px] text-[#8f959e]">{title} · {categoryNotes.length} 人已填写 · 点击编辑</div>
+            <div className="mb-1.5 text-[11px] text-[#8f959e]">{title} · {categoryNotes.length} 条记录 · 点击编辑</div>
             {categoryNotes.map((note) => (
               <div key={note.id} className="flex items-baseline gap-2 border-b border-[#f0f0f0] py-1 last:border-b-0">
-                <span className="max-w-[64px] shrink-0 truncate text-[12px] text-[#2b2f36]">{authorName(note)}</span>
+                <span className="max-w-[132px] shrink-0 truncate text-[12px] text-[#2b2f36]" title={feedbackPersonName(note)}>{feedbackPersonName(note)}</span>
                 <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#2b2f36]">{note.content}</span>
               </div>
             ))}
@@ -270,6 +317,10 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
           </DialogHeader>
 
           <div className="max-h-[70vh] overflow-y-auto px-[18px] pb-4 pt-3.5">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[12px] text-[#646a73]">反馈人</span>
+              <FeedbackPersonSelect options={feedbackPeople} value={feedbackPerson} onChange={setFeedbackPerson} />
+            </div>
             <div className="mb-1.5 flex items-baseline gap-2">
               <span className="text-[12px] font-medium text-[#1f2329]">我填写的</span>
               <span className="text-[11px] text-[#8f959e]">
@@ -368,8 +419,11 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
                   {colleagueNotes.map((note) => (
                     <div key={note.id} className="border-b border-[#f0f0f0] py-2 last:border-b-0">
                       <div className="flex items-baseline gap-2">
-                        <span className="max-w-[120px] truncate text-[12px] text-[#2b2f36]">{authorName(note)}</span>
-                        <span className="text-[11px] tabular-nums text-[#8f959e]">{formatTime(note.updated_at || note.created_at)}</span>
+                        <span className="max-w-[150px] truncate text-[12px] text-[#2b2f36]" title={feedbackPersonName(note)}>{feedbackPersonName(note)}</span>
+                        <span className="ml-auto flex shrink-0 items-center gap-2 text-right text-[11px] text-[#8f959e]">
+                          <span className="tabular-nums">{formatTime(note.updated_at || note.created_at)}</span>
+                          <span className="max-w-[130px] truncate" title={`创建人：${authorName(note)}`}>创建人：{authorName(note)}</span>
+                        </span>
                       </div>
                       <div className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-[#2b2f36]">{note.content}</div>
                     </div>

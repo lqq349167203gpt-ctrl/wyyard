@@ -51,11 +51,7 @@ const businessItems = [
   { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
   { title: "服务老师", icon: IconSparkles, path: "/service-teachers", permission: "service-teacher" },
   { title: "课程记录", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
-  { title: "客户跟进", icon: IconClipboardText, path: "/customer-follow-ups", permission: "customer-follow-ups" },
   { title: "组织/俱乐部", icon: IconSchool, path: "/principal", permission: "principal" },
-]
-
-const reportItems = [
   { title: "每日报表", icon: IconClipboardText, path: "/daily-report", permission: "daily-report" },
 ]
 
@@ -63,8 +59,8 @@ const courseItems = [
   { title: "客户资料", icon: IconUser, path: "/healing-records", permission: "healing-records" },
   { title: "邀约", icon: IconCalendarEvent, path: "/courses/class-records", permission: "class-records" },
   { title: "课表", icon: IconCalendar, path: "/courses/daily-activities", permission: "daily-activities" },
-  { title: "信息核对", icon: IconAlertTriangle, path: "/audit-check", permission: "audit-check" },
   { title: "落地课程", icon: IconBook, path: "/offline-course-records", permission: "offline-course-records" },
+  { title: "监管", icon: IconAlertTriangle, path: "/supervision", permission: "supervision" },
 ]
 
 const communicationItems = [
@@ -220,14 +216,13 @@ function FixedGroup({
 }
 
 function getActiveGroup(pathname: string): string {
-  if (businessItems.some(i => i.path === pathname)) return "数据"
   if (configItems.some(i => i.path === pathname)) return "信息配置"
   if (accountItems.some(i => i.path === pathname)) return "账号管理"
   if (systemItems.some(i => i.path === pathname)) return "系统配置"
   return ""
 }
 
-const GROUPS = ["数据", "信息配置", "账号管理", "系统配置"]
+const GROUPS = ["信息配置", "账号管理", "系统配置"]
 
 export function AppSidebar() {
   const location = useLocation()
@@ -272,11 +267,10 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="mt-4 pb-5">
-        <MenuGroup label="数据" items={businessItems} isOpen={openGroups["数据"]} onToggle={() => toggle("数据")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
-        <FixedGroup label="报表" items={reportItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
+        <FixedGroup label="数据" items={businessItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="业务" items={courseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="沟通" items={communicationItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
-        <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡/退课", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }, { title: "欠卡记录", path: "/debt-records", permission: "debt-records", icon: IconAlertTriangle }]} />
+        <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡/退课", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }]} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />

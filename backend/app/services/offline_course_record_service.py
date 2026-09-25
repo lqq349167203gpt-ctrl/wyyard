@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from app.services.storage import load_data, save_item, delete_item
 from app.models.offline_course_record import OfflineCourseRecord, OfflineCourseRecordCreate
+from app.services.storage import delete_item, load_data, save_item
 
 FILENAME = "offline_course_records.json"
 _records: Dict[str, OfflineCourseRecord] = {}
@@ -21,7 +21,7 @@ _load()
 def list_records(customer_id: Optional[str] = None) -> List[OfflineCourseRecord]:
     records = list(_records.values())
     if customer_id:
-        records = [r for r in records if r.customer_id == customer_id]
+        records = [r for r in records if r.customer_id == customer_id or customer_id in r.participant_ids]
     return sorted(records, key=lambda x: x.created_at, reverse=True)
 
 
@@ -38,6 +38,10 @@ def create_record(data: OfflineCourseRecordCreate, creator: str = "") -> Offline
         teacher=data.teacher,
         content=data.content,
         result=data.result,
+        course_type=data.course_type,
+        course_name=data.course_name,
+        participant_ids=data.participant_ids,
+        participant_names=data.participant_names,
         creator=creator,
         created_at=datetime.now(),
     )
@@ -51,6 +55,7 @@ def update_record(record_id: str, data: OfflineCourseRecordCreate) -> Optional[O
     if not record:
         return None
     updated = record.model_copy(update={
+        **{k: v for k, v in data.model_dump(exclude_unset=True).items() if k in {"course_name", "course_type", "participant_ids", "participant_names"}},
         "customer_id": data.customer_id,
         "customer_nickname": data.customer_nickname,
         "record_date": data.record_date,

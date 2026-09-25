@@ -12,10 +12,14 @@ class VisitNoteCreate(StrictBaseModel):
     visit_id: str
     category: VisitNoteCategory
     content: str = Field(min_length=1, max_length=5000)
+    feedback_person_id: str = ""
+    feedback_person: str = ""
 
 
 class VisitNoteUpdate(StrictBaseModel):
     content: str = Field(min_length=1, max_length=5000)
+    feedback_person_id: str | None = None
+    feedback_person: str | None = None
 
 
 class VisitNote(SafeBaseModel):
@@ -25,6 +29,8 @@ class VisitNote(SafeBaseModel):
     content: str
     created_by_id: str = ""
     created_by: str = ""
+    feedback_person_id: str = ""
+    feedback_person: str = ""
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False

@@ -45,8 +45,10 @@ export interface ConversionRule {
   date_to: string
 }
 export interface PrincipalQuery {
-  export_view?: "" | "traffic"
+  export_view?: "" | "traffic" | "invite_initiated" | "invite_arrivals"
   export_customer_ids?: string[]
+  export_columns?: string[]
+  arrival_view?: "customer" | "date"
   organization_id: string
   date_from: string | null
   date_to: string | null
@@ -62,8 +64,10 @@ export interface PrincipalQuery {
   customer_id?: string
   /** 交易列表口径：order＝每笔交易一行；customer＝同一人只显示一行 */
   list_view?: "order" | "customer"
-  course_view?: "course" | "participant"
+  course_view?: "course" | "participant" | "teacher_follow_up"
   participant_scope?: "" | "internal" | "external"
+  /** 邀约二级列表：到店口径 / 发起口径（列内容后续再定） */
+  invite_view?: "arrive" | "initiated"
   /** 排序整批数据（不是只排当前页），字段名用列的 key */
   sort_by?: string
   sort_order?: "asc" | "desc"
@@ -78,6 +82,7 @@ export interface PrincipalMetadata {
   activity_types: PrincipalOption[]
   scope: "own" | "all"
   transaction_access: "none" | "summary" | "detail"
+  can_view_follow_up: boolean
 }
 export interface PrincipalRow { id: string; details: string[]; [key: string]: string | number | string[] }
 export interface PrincipalBreakdownCustomer {
@@ -86,9 +91,13 @@ export interface PrincipalBreakdownCustomer {
   /** 引流日期 */
   referral_date?: string
   deals: number
+  /** 当前统计范围内是否产生过按升单配置判定的升单 */
+  is_upsell?: boolean
   products?: PrincipalBreakdownItem[]
   /** 会员卡卡种成交（其他付费项目没有子类） */
   subtypes?: PrincipalBreakdownItem[]
+  /** 按升单配置大类归组后的成交人数标记；单个客户在每类中最多一项 */
+  upsell_levels?: PrincipalBreakdownItem[]
   /** 会员身份（未到店 / 398卡 / 30次卡 …） */
   identity?: string
   /** 承接人 */
@@ -107,16 +116,34 @@ export interface PrincipalBreakdownCustomer {
   work_info?: string
   /** 其他信息 */
   other_info?: string
-  /** 统计区间内的邀约人次（不含已取消） */
+  /** 统计区间内发起的邀约总人次（含取消） */
+  initiated_count?: number
+  /** 统计区间内的有效邀约人次（不含已取消） */
   invite_count?: number
   /** 统计区间内的取消邀约人次 */
   cancel_count?: number
+  /** 统计区间内的未到场人次 */
+  no_show_count?: number
   /** 统计区间内的到店人次 */
   arrive_count?: number
   /** 平均到店间隔，如 "12天"，无到店时为 "-" */
   visit_interval?: string
   /** 统计区间内到场参与的活动场次 */
   activity_count?: number
+  /** 该客户在区间内出现过的邀约人（visit.referrer_handler） */
+  inviters?: string[]
+  /** 首次到店日期 YYYY-MM-DD（邀约到店列表排序用） */
+  arrive_date?: string
+  /** 首次到店时间 HH:MM */
+  arrive_time?: string
+  /** 来访需求（visit.needs） */
+  needs?: string
+  /** 首次到店记录上的邀约人 */
+  arrive_inviter?: string
+  /** 到店当天成交笔数 */
+  same_day_deals?: number
+  /** 统计区间内每次实际到店的记录，用于逐次展示和导出 */
+  arrival_records?: Array<{ id: string; arrive_date: string; arrive_time: string; needs: string; arrive_inviter: string; same_day_deals: number }>
 }
 export interface PrincipalBreakdownItem {
   key: string
@@ -124,6 +151,8 @@ export interface PrincipalBreakdownItem {
   count: number
   hours?: number
   deal_count?: number
+  initiated_count?: number
+  invite_count?: number
   buyers?: number
   people?: number
   visits?: number
@@ -138,11 +167,55 @@ export interface PrincipalBreakdown {
   buys?: PrincipalBreakdownItem[]
   courses?: { by_type: PrincipalBreakdownItem[]; by_teacher: PrincipalBreakdownItem[] }
   traffic?: PrincipalBreakdownItem[]
+  /** 升单配置大类，顺序与配置页一致 */
+  traffic_upsell_levels?: PrincipalBreakdownItem[]
+  /** 邀约人维度：每人发起 / 邀约到店人次 */
+  invite_inviters?: Array<{
+    key: string
+    label: string
+    count: number
+    initiated_count: number
+    invite_count: number
+    cancel_count?: number
+    no_show_count?: number
+    arrive_count?: number
+    records?: Array<{
+      id: string
+      date: string
+      visit_date: string
+      customer_id: string
+      customer: string
+      name: string
+      identity: string
+      referrer?: string
+      referrer_handler?: string
+      follow_up_status?: string
+      traffic_source?: string
+      tags?: string[]
+      deals?: number
+      invite_count?: number
+      cancel_count?: number
+      no_show_count?: number
+      arrive_count?: number
+      activity_count?: number
+      visit_interval?: string
+      same_day_deals?: number
+      arrive_inviter?: string
+      visit_purpose?: string
+      trauma_history?: string
+      current_block?: string
+      work_info?: string
+      other_info?: string
+      status: "cancelled" | "no_show" | "arrived"
+      status_label: string
+    }>
+  }>
   // 引流客户还能按这三个维度继续筛
   traffic_filters?: {
     stage?: PrincipalBreakdownItem[]
     source?: PrincipalBreakdownItem[]
     tag?: PrincipalBreakdownItem[]
+    upsell?: PrincipalBreakdownItem[]
     /** 会员身份人数（跟着当前所有筛选走，本身不是筛选项） */
     identity?: PrincipalBreakdownItem[]
   }
@@ -654,9 +727,11 @@ export interface ServiceTeacherCustomerItem {
   last_follow_up_by: string
   latest_customer_info_content: string
   latest_customer_info_by: string
+  latest_customer_info_created_by: string
   latest_customer_info_at: string
   latest_follow_up_content: string
   latest_follow_up_by: string
+  latest_follow_up_created_by: string
   latest_follow_up_at: string
   is_active: boolean
   is_active_30: boolean
@@ -680,6 +755,7 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
 /** 备注条目：同一条备注可能是不同人分别填写的，按填写人拆开 */
 export interface CourseParticipantNoteEntry {
   author: string
+  created_by?: string
   content: string
   at: string
 }
@@ -701,6 +777,7 @@ export interface CourseParticipantRow {
   customer_info_entries?: CourseParticipantNoteEntry[]
   follow_up_entries?: CourseParticipantNoteEntry[]
   visit_id: string
+  participant_role?: string
   /** 同一门课（同名课程）在当前筛选范围内的参与次数 */
   same_course_count: number
 }
@@ -943,8 +1020,15 @@ export interface VisitNoteSummary {
   content: string
   created_by_id: string
   created_by: string
+  feedback_person_id: string
+  feedback_person: string
   created_at: string
   updated_at: string
+}
+
+export interface FeedbackPeopleResponse {
+  current_person: { customer_id: string; name: string }
+  options: Array<{ customer_id: string; name: string }>
 }
 
 export interface VisitRecord {
@@ -1081,10 +1165,14 @@ export const visitNoteApi = {
     if (excludeVisitId) params.set("exclude_visit_id", excludeVisitId)
     return request<PreviousVisitNeed | null>(`/api/visit-notes/previous-visit-need?${params.toString()}`)
   },
-  create: (data: { visit_id: string; category: VisitNoteCategory; content: string }) =>
+  feedbackPeople: () => request<FeedbackPeopleResponse>("/api/visit-notes/feedback-people"),
+  create: (data: { visit_id: string; category: VisitNoteCategory; content: string; feedback_person_id?: string; feedback_person?: string }) =>
     request<VisitNote>("/api/visit-notes", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, content: string) =>
-    request<VisitNote>(`/api/visit-notes/${id}`, { method: "PATCH", body: JSON.stringify({ content }) }),
+  update: (id: string, content: string, feedbackPerson?: { id: string; name: string }) =>
+    request<VisitNote>(`/api/visit-notes/${id}`, { method: "PATCH", body: JSON.stringify({
+      content,
+      ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
+    }) }),
   delete: (id: string) => request<{ ok: boolean }>(`/api/visit-notes/${id}`, { method: "DELETE" }),
 }
 
@@ -1987,6 +2075,7 @@ export const internalCourseApi = {
 
 // Membership Cards
 export interface MembershipCard {
+  agreement_status?: "unsigned" | "signed" | null
   id: string
   customer_id: string
   nickname: string
@@ -2011,6 +2100,7 @@ export interface MembershipCard {
 }
 
 export interface MembershipCardCreate {
+  agreement_status?: "unsigned" | "signed" | null
   customer_id: string
   nickname: string
   card_type: string
@@ -2034,6 +2124,27 @@ export const membershipCardApi = {
   update: (id: string, data: Partial<MembershipCardCreate>) => request<MembershipCard>(`/api/membership-cards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/membership-cards/${id}`, { method: "DELETE" }),
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/membership-cards/search-customers?q=${encodeURIComponent(keyword)}`),
+}
+
+export interface AgreementSigning {
+  id: string
+  customer_id: string
+  nickname: string
+  card_type: string
+  deal_date: string | null
+  effective_date: string
+  expiry_date: string | null
+  organization_name: string
+  closer_names: string
+  agreement_status: "unsigned" | "signed"
+  period: string
+  can_sign: boolean
+  can_change_status: boolean
+}
+export type AgreementSigningResult = PaginatedResponse<AgreementSigning> & { counts: { unsigned: number; signed: number } }
+export const agreementSigningApi = {
+  list: (tab: string, nickname: string, page: number) => request<AgreementSigningResult>(`/api/agreement-signings?tab=${tab}&nickname=${encodeURIComponent(nickname)}&page=${page}&page_size=20`),
+  sign: (id: string, status: "unsigned" | "signed" = "signed") => request(`/api/agreement-signings/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ agreement_status: status }) }),
 }
 
 // Other Projects
@@ -2266,119 +2377,6 @@ export const paymentExportApi = {
     }
     return { blob: await res.blob(), filename }
   },
-}
-
-export type TeaGuestPaymentMethod = "美团" | "支付宝" | "微信" | "抖音"
-
-export interface TeaGuestConsumptionRecord {
-  id: string
-  consumption_time: string
-  guest_count: number
-  unit_price: number
-  total_amount: number
-  payment_method: TeaGuestPaymentMethod
-  notes: string
-  created_by: string
-  updated_by: string
-  created_at: string
-  updated_at: string
-}
-
-export interface TeaGuestConsumptionInput {
-  consumption_time: string
-  guest_count: number
-  unit_price: number
-  payment_method: TeaGuestPaymentMethod
-  notes: string
-}
-
-export const teaGuestConsumptionApi = {
-  listPaginated: (
-    page: number,
-    pageSize: number,
-    params?: { date_from?: string; date_to?: string; payment_method?: string },
-  ) => {
-    const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (params?.date_from) searchParams.set("date_from", params.date_from)
-    if (params?.date_to) searchParams.set("date_to", params.date_to)
-    if (params?.payment_method) searchParams.set("payment_method", params.payment_method)
-    return request<PaginatedResponse<TeaGuestConsumptionRecord>>(
-      `/api/tea-guest/consumption-records?${searchParams.toString()}`,
-    )
-  },
-  create: (data: TeaGuestConsumptionInput) =>
-    request<TeaGuestConsumptionRecord>("/api/tea-guest/consumption-records", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  update: (id: string, data: TeaGuestConsumptionInput) =>
-    request<TeaGuestConsumptionRecord>(`/api/tea-guest/consumption-records/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  delete: (id: string) =>
-    request<{ message: string }>(`/api/tea-guest/consumption-records/${id}`, { method: "DELETE" }),
-}
-
-export interface TeaGuestExpense {
-  id: string
-  cost_category: "management" | "operation"
-  expense_type: string
-  expense_time: string
-  purchase_content: string
-  amount: number
-  platform: string
-  notes: string
-  created_by: string
-  updated_by: string
-  created_at: string
-  updated_at: string
-}
-
-export interface TeaGuestExpenseInput {
-  cost_category: "management" | "operation"
-  expense_type: string
-  expense_time: string
-  purchase_content: string
-  amount: number
-  platform: string
-  notes: string
-}
-
-export interface TeaGuestExpenseType {
-  id: string
-  cost_category: "management" | "operation"
-  name: string
-  requires_platform: boolean
-  created_at: string
-}
-
-export const teaGuestExpenseApi = {
-  listPaginated: (
-    page: number,
-    pageSize: number,
-    params?: { date_from?: string; date_to?: string; cost_category?: string },
-  ) => {
-    const searchParams = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (params?.date_from) searchParams.set("date_from", params.date_from)
-    if (params?.date_to) searchParams.set("date_to", params.date_to)
-    if (params?.cost_category) searchParams.set("cost_category", params.cost_category)
-    return request<PaginatedResponse<TeaGuestExpense>>(`/api/tea-guest/expenses?${searchParams.toString()}`)
-  },
-  create: (data: TeaGuestExpenseInput) =>
-    request<TeaGuestExpense>("/api/tea-guest/expenses", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, data: TeaGuestExpenseInput) =>
-    request<TeaGuestExpense>(`/api/tea-guest/expenses/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request<{ message: string }>(`/api/tea-guest/expenses/${id}`, { method: "DELETE" }),
-  listTypes: (costCategory = "") =>
-    request<TeaGuestExpenseType[]>(`/api/tea-guest/expenses/types/list${costCategory ? `?cost_category=${costCategory}` : ""}`),
-  createType: (data: { cost_category: "management" | "operation"; name: string; requires_platform: boolean }) =>
-    request<TeaGuestExpenseType>("/api/tea-guest/expenses/types", { method: "POST", body: JSON.stringify(data) }),
-  updateType: (id: string, data: { requires_platform: boolean }) =>
-    request<TeaGuestExpenseType>(`/api/tea-guest/expenses/types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  deleteType: (id: string) =>
-    request<{ message: string }>(`/api/tea-guest/expenses/types/${id}`, { method: "DELETE" }),
 }
 
 // Space
@@ -3882,46 +3880,37 @@ export const followupRecordApi = {
 export interface CustomerFollowUpNote {
   id: string
   content: string
+  feedback_person_id: string
+  feedback_person: string
+  created_by: string
+  can_edit: boolean
   updated_at: string
-}
-
-export interface CustomerFollowUpRow {
-  id: string
-  visit_id: string
-  customer_id: string
-  customer_name: string
-  customer_identity: string
-  visit_date: string
-  visit_time: string
-  activities: string[]
-  updated_at: string
-  visit_need: CustomerFollowUpNote | null
-  customer_info: CustomerFollowUpNote | null
-  follow_up: CustomerFollowUpNote | null
 }
 
 export const customerFollowUpApi = {
-  list: (params: { keyword?: string; date_from?: string; date_to?: string; page?: number; page_size?: number } = {}) => {
-    const query = new URLSearchParams()
-    query.set("page", String(params.page ?? 1))
-    query.set("page_size", String(params.page_size ?? 20))
-    if (params.keyword) query.set("keyword", params.keyword)
-    if (params.date_from) query.set("date_from", params.date_from)
-    if (params.date_to) query.set("date_to", params.date_to)
-    return request<{ items: CustomerFollowUpRow[]; total: number; page: number; page_size: number; total_pages: number }>(`/api/customer-follow-ups?${query.toString()}`)
-  },
-  update: (noteId: string, content: string) =>
-    request<CustomerFollowUpNote>(`/api/customer-follow-ups/${noteId}`, { method: "PATCH", body: JSON.stringify({ content }) }),
-  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up", content: string) =>
-    request<CustomerFollowUpNote>("/api/customer-follow-ups", { method: "POST", body: JSON.stringify({ visit_id: visitId, category, content }) }),
+  feedbackPeople: () => request<FeedbackPeopleResponse>("/api/customer-follow-ups/feedback-people"),
+  update: (noteId: string, content: string, feedbackPerson?: { id: string; name: string }) =>
+    request<CustomerFollowUpNote>(`/api/customer-follow-ups/${noteId}`, { method: "PATCH", body: JSON.stringify({
+      content,
+      ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
+    }) }),
+  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up", content: string, feedbackPerson?: { id: string; name: string }) =>
+    request<CustomerFollowUpNote>("/api/customer-follow-ups", { method: "POST", body: JSON.stringify({
+      visit_id: visitId, category, content,
+      ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
+    }) }),
   myNote: (visitId: string, category: "visit_need" | "customer_info" | "follow_up") =>
-    request<{ id: string; content: string; updated_at: string } | null>(
+    request<CustomerFollowUpNote | null>(
       `/api/customer-follow-ups/my-note?visit_id=${encodeURIComponent(visitId)}&category=${category}`,
     ),
 }
 
 // Offline Course Records
 export interface OfflineCourseRecord {
+  course_name?: string
+  course_type?: string
+  participant_ids?: string[]
+  participant_names?: string[]
   id: string
   customer_id: string
   customer_nickname: string
@@ -3934,6 +3923,10 @@ export interface OfflineCourseRecord {
 }
 
 export interface OfflineCourseRecordCreate {
+  course_name?: string
+  course_type?: string
+  participant_ids?: string[]
+  participant_names?: string[]
   customer_id: string
   customer_nickname: string
   record_date: string
@@ -3943,22 +3936,53 @@ export interface OfflineCourseRecordCreate {
 }
 
 export const offlineCourseRecordApi = {
+  updateType: (id: string, name: string) => request<{ id: string; name: string }>(`/api/offline-course-records/types/${id}`, { method: "PUT", body: JSON.stringify({ name }) }),
+  deleteType: (id: string) => request(`/api/offline-course-records/types/${id}`, { method: "DELETE" }),
+  types: () => request<{ id: string; name: string }[]>("/api/offline-course-records/types"),
+  createType: (name: string) => request<{ id: string; name: string }>("/api/offline-course-records/types", { method: "POST", body: JSON.stringify({ name }) }),
   list: (customerId?: string) => request<OfflineCourseRecord[]>(`/api/offline-course-records${customerId ? `?customer_id=${encodeURIComponent(customerId)}` : ""}`),
   create: (data: OfflineCourseRecordCreate) => request<OfflineCourseRecord>("/api/offline-course-records", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: OfflineCourseRecordCreate) => request<OfflineCourseRecord>(`/api/offline-course-records/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/api/offline-course-records/${id}`, { method: "DELETE" }),
 }
 
-export interface DebtRecord {
+export type DebtCourseStatus = "new" | "changed" | "ok" | "resolved"
+export type DebtCourseFilter = "attention" | "ok" | "resolved" | "all"
+
+export interface DebtCourseRecord {
+  id: string
+  debt_type: string
   customer_id: string
   nickname: string
   member_type: string
-  total_count: number
-  deducted_count: number
+  source_key: string
+  course_name: string
+  course_date: string
+  start_time: string
+  end_time: string
+  teacher_names: string[]
+  status: DebtCourseStatus
   debt_count: number
-  activity_labels: string[]
+  approved_count: number
+  new_count: number
+  note: string
+  first_seen_at: string
+  reviewed_at: string
+  reviewed_by: string
+  resolved_at: string
+}
+
+export interface DebtCourseResult {
+  items: DebtCourseRecord[]
+  counts: Record<DebtCourseFilter, number>
+  customer_debt_totals: Record<string, number>
+  customer_pending_totals: Record<string, number>
+  total: number
 }
 
 export const debtRecordApi = {
-  list: (type: string) => request<DebtRecord[]>(`/api/debt-records?type=${encodeURIComponent(type)}`),
+  list: (type: string, status: DebtCourseFilter = "attention") => request<DebtCourseResult>(`/api/debt-records?type=${encodeURIComponent(type)}&status=${encodeURIComponent(status)}`),
+  summary: () => request<Record<string, number>>("/api/debt-records/summary"),
+  update: (id: string, data: { action: "confirm" | "reset"; note: string }) => request<DebtCourseRecord>(`/api/debt-records/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
+  establishBaseline: (type: string) => request<{ updated: number }>(`/api/debt-records/baseline/${encodeURIComponent(type)}`, { method: "POST" }),
 }

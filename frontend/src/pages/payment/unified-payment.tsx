@@ -103,6 +103,7 @@ interface UnifiedItem {
   payment_method?: string
   organization_id: string | null
   // 会员卡专属
+  agreement_status?: "unsigned" | "signed" | null
   card_type?: string
   total_count?: number | null
   effective_remaining?: number | null
@@ -160,7 +161,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
   }
   switch (type) {
     case "membership_card":
-      return { ...base, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by, voided: item.voided, notes: item.notes }
+      return { ...base, agreement_status: item.agreement_status, detail: item.card_type, price: item.price, effective_date: item.effective_date, remaining_count: item.remaining_count, card_type: item.card_type, total_count: item.total_count, effective_remaining: item.effective_remaining, duration_type: item.duration_type, duration_value: item.duration_value, created_by: item.created_by, voided: item.voided, notes: item.notes }
     case "oh_card_reading": {
       const dd = item.diagnosis_duration || 1
       const totalHours = dd * 0.5
@@ -265,6 +266,9 @@ export function UnifiedPaymentContent({
 
   // 会员卡表单
   const [formCardType, setFormCardType] = useState("")
+  const [formAgreementStatus, setFormAgreementStatus] = useState("")
+  const [agreementError, setAgreementError] = useState(false)
+  const needsAgreement = formType === "membership_card" && !!formCardType && !["次卡", "体验会员", "粗门次卡"].includes(formCardType)
   const [formEffectiveDate, setFormEffectiveDate] = useState(today)
   const [formDurationType, setFormDurationType] = useState<string | null>("day")
   const [formDurationValue, setFormDurationValue] = useState("")
@@ -531,6 +535,8 @@ export function UnifiedPaymentContent({
   }
 
   const resetForm = () => {
+    setFormAgreementStatus("")
+    setAgreementError(false)
     setFormCustomerId("")
     setFormNickname("")
     setFormDealDate(today)
@@ -605,6 +611,7 @@ export function UnifiedPaymentContent({
     switch (item.type) {
       case "membership_card":
         setFormCardType(item.card_type || "")
+        setFormAgreementStatus(item.agreement_status || "")
         setFormEffectiveDate(item.effective_date || "")
         setFormDurationType(item.duration_type || "day")
         setFormDurationValue(item.duration_value ? String(item.duration_value) : "")
@@ -698,6 +705,7 @@ export function UnifiedPaymentContent({
       if (Math.abs(formClosers.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) - amt) > 0.01) return
     }
     if (formType === "membership_card" && !formCardType) return
+    if (needsAgreement && !formAgreementStatus) { setAgreementError(true); return }
     if (formType === "internal_course" && !formCourseType) return
     if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
     if (formType === "other" && !formProjectName) return
@@ -718,6 +726,7 @@ export function UnifiedPaymentContent({
         const config = MEMBERSHIP_CARD_TYPES[formCardType]
         const payload: Record<string, any> = {
           customer_id: formCustomerId, nickname: formNickname, card_type: formCardType,
+          agreement_status: needsAgreement ? formAgreementStatus : null,
           price: 0,
           effective_date: formEffectiveDate, duration_type: formDurationType,
           duration_value: formDurationValue ? parseInt(formDurationValue) : null,
@@ -911,6 +920,7 @@ export function UnifiedPaymentContent({
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "会员卡类型", key: "card_type", width: 12, example: "体验会员" },
+      { header: "协议签订", key: "agreement_status", width: 12, example: "未签" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
     ],
     group_case: [
@@ -1065,6 +1075,7 @@ export function UnifiedPaymentContent({
     }
 
     if (type === "membership_card") {
+      if (cardType && !["次卡", "体验会员", "粗门次卡"].includes(cardType) && !["未签", "已签"].includes(get("协议签订"))) errors.push("协议签订须填写未签或已签")
       if (!cardType) errors.push("会员卡类型为空")
       else if (!MEMBERSHIP_CARD_TYPES[cardType]) errors.push(`会员卡类型"${cardType}"无效`)
     }
@@ -1124,7 +1135,7 @@ export function UnifiedPaymentContent({
             if (d) { mcDurType = "month"; mcDurValue = parseInt(d[1]) * 12 }
           }
         }
-        payload = { ...base, card_type: cardType, price: amount, effective_date: get("生效日期") || today, duration_type: mcDurType, duration_value: mcDurValue, remaining_count: mcConfig?.unlimited ? null : (mcConfig?.defaultCount || null) }
+        payload = { ...base, card_type: cardType, agreement_status: ["次卡", "体验会员", "粗门次卡"].includes(cardType) ? null : (get("协议签订") === "已签" ? "signed" : "unsigned"), price: amount, effective_date: get("生效日期") || today, duration_type: mcDurType, duration_value: mcDurValue, remaining_count: mcConfig?.unlimited ? null : (mcConfig?.defaultCount || null) }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${cardType}|${amount}`
         break
       }
@@ -1421,6 +1432,7 @@ export function UnifiedPaymentContent({
     }
     rows.push({ label: "成交归属", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
     rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => c.name).join("、") : "-" })
+    if (needsAgreement) rows.push({ label: "协议签订", value: formAgreementStatus === "signed" ? "已签" : "未签" })
     if (!hidePaymentDetails) {
       rows.push({ label: "成交人合计", value: `¥${formClosers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0).toLocaleString()}` })
       if (!["oh_card_reading", "tea_seat_fee", "offline_course"].includes(formType)) {
@@ -1429,7 +1441,7 @@ export function UnifiedPaymentContent({
     }
     rows.push({ label: "备注", value: formNotes || "-" })
     return rows
-  }, [formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formOhAmount, formDiagnosisTeacher, formDiagnosisDuration, formTeaQuantity, formTeaAmount, formOfflineEffectiveDate, formOfflineValidityValue, formOfflineAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited, formNotes, formPaymentMethod, formProjectEffectiveDate, formProjectValidityValue, formProjectValidityUnit])
+  }, [needsAgreement, formAgreementStatus, formType, formDealDate, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formOhAmount, formDiagnosisTeacher, formDiagnosisDuration, formTeaQuantity, formTeaAmount, formOfflineEffectiveDate, formOfflineValidityValue, formOfflineAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited, formNotes, formPaymentMethod, formProjectEffectiveDate, formProjectValidityValue, formProjectValidityUnit])
 
   return (
     <>
@@ -1523,6 +1535,7 @@ export function UnifiedPaymentContent({
                 <TableHead style={{ width: "60px" }}>状态</TableHead>
                 {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && <TableHead style={{ width: "70px" }}>{activeType === "energy_knot" ? "剩余部位" : "剩余次数"}</TableHead>}
                 <TableHead style={{ width: "100px" }}>成交人</TableHead>
+                <TableHead style={{ width: "80px" }}>协议签订</TableHead>
                 <TableHead style={{ width: "100px" }}>备注</TableHead>
                 <TableHead style={{ width: "60px" }}>创建人</TableHead>
                 <TableHead className="text-right pr-4" style={{ width: "80px" }}>操作</TableHead>
@@ -1599,6 +1612,10 @@ export function UnifiedPaymentContent({
                       {item.closers?.length
                         ? item.closers.map(c => c.name).join("、")
                         : (item.closer_name || <EmptyValue />)}
+                    </TableCell>
+                    <TableCell className="text-[#2b2f36]">
+                      {item.type === "membership_card" && item.card_type && !["次卡", "体验会员", "粗门次卡"].includes(item.card_type)
+                        ? (item.agreement_status === "signed" ? "已签" : "未签") : <EmptyValue />}
                     </TableCell>
                     <TableCell className="text-[#2b2f36] truncate" title={item.notes}>{item.notes || <EmptyValue />}</TableCell>
                     <TableCell className="text-[#8f959e] truncate">{item.created_by || <EmptyValue />}</TableCell>
@@ -2001,6 +2018,20 @@ export function UnifiedPaymentContent({
             </div>
 
             {/* ===== 公共字段：支付方式 ===== */}
+            {needsAgreement && <div className="grid grid-cols-[70px_1fr] items-start gap-2">
+              <span className="text-[12px] text-[#4e535a] text-right mt-2">协议签订</span>
+              <div>
+                <div role="radiogroup" aria-label="协议签订" className="flex gap-2">
+                  {[["unsigned", "未签"], ["signed", "已签"]].map(([value, label]) => (
+                    <button key={value} type="button" role="radio" aria-checked={formAgreementStatus === value}
+                      onClick={() => { setFormAgreementStatus(value); setAgreementError(false) }}
+                      className="inline-flex h-8 items-center gap-2 rounded px-2 text-xs text-[#4e535a] hover:bg-[#f7f8fa] focus-visible:outline-2 focus-visible:outline-[#3370ff]">
+                      <span aria-hidden className={`flex size-3.5 items-center justify-center rounded-full border ${formAgreementStatus === value ? "border-[#3370ff]" : "border-[#c9cdd4]"}`}>{formAgreementStatus === value && <span className="size-1.5 rounded-full bg-[#3370ff]" />}</span>{label}</button>
+                  ))}
+                </div>
+                {agreementError && <span className="text-xs text-red-500">请选择协议签订状态</span>}
+              </div>
+            </div>}
             {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">支付方式</span>
               <SelectDropdown

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from app.models.base import SafeBaseModel
 
@@ -18,6 +18,7 @@ class MembershipCardBase(SafeBaseModel):
     closer_id: Optional[str] = None  # 成交人ID（旧字段，兼容）
     closer_name: Optional[str] = None  # 成交人昵称（旧字段，兼容）
     closers: List[dict] = []  # 多成交人 [{"id": "xxx", "name": "张三", "amount": 100.0}]
+    agreement_status: Optional[Literal["unsigned", "signed"]] = None  # 旧记录未填按未签处理
     payment_method: Optional[str] = None  # 支付宝 / 微信 / 其他
     organization_id: Optional[str] = None
     deal_date: Optional[str] = None

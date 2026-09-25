@@ -299,6 +299,7 @@ def get_debt_record(customer_id: str) -> dict:
             "label": session.name or "能量结",
             "date": session.date,
             "count": debt_count,
+            "source_key": session.id,
         })
         remaining_debt -= debt_count
     activities.reverse()

@@ -136,11 +136,11 @@ export default function PaymentPage() {
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; } .dv-root th, .dv-root td { padding-left: 4px; padding-right: 4px; font-size: 12px; } .dv-root th.pl-4, .dv-root td.pl-4 { padding-left: 16px; } .dv-root th.pr-4, .dv-root td.pr-4 { padding-right: 16px; }`}</style>
 
       <div className="flex items-center rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex h-full min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map(tab => (
             <button
               key={tab.key}
-              className={`relative whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${
+              className={`relative flex h-full shrink-0 items-center whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${
                 activeTab === tab.key
                   ? "text-[#3370ff]"
                   : "text-[#2b2f36] hover:text-[#4e535a]"
@@ -149,7 +149,7 @@ export default function PaymentPage() {
             >
               {tab.label}
               {activeTab === tab.key && (
-                <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
+                <span className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#3370ff] rounded-t-sm" />
               )}
             </button>
           ))}

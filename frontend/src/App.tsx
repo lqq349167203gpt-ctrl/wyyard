@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom"
 import { useMemo } from "react"
 import { AppLayout } from "@/components/layout/app-layout"
-import { TeaGuestLayout } from "@/components/layout/tea-guest-layout"
 import { ConfirmHost } from "@/components/confirm-dialog"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import LoginPage from "@/pages/login"
@@ -36,20 +35,16 @@ import DisabledCustomersPage from "@/pages/disabled-customers"
 import ChatHistoryPage from "@/pages/chat-history"
 import ServiceTeachersPage from "@/pages/service-teachers"
 import DailyReportPage from "@/pages/daily-report"
-import AuditCheckPage from "@/pages/audit-check"
+import SupervisionPage from "@/pages/supervision"
 import CourseStatisticsPage from "@/pages/course-statistics"
 import PrincipalPage from "@/pages/principal"
 import CommunicationRecordsPage from "@/pages/communication-records"
 import FollowupRecordsPage from "@/pages/followup-records"
-import CustomerFollowUpsPage from "@/pages/customer-follow-ups"
 import OfflineCourseRecordsPage from "@/pages/offline-course-records"
-import DebtRecordsPage from "@/pages/debt-records"
 import CustomerTagsPage from "@/pages/customer-tags"
 import UpsellConfigPage from "@/pages/upsell-config"
 import CustomAnalysisPage from "@/pages/custom-analysis"
 import AnalysisLogsPage from "@/pages/analysis-logs"
-import TeaGuestConsumptionRecordsPage from "@/pages/tea-guest-consumption-records"
-import TeaGuestExpensesPage from "@/pages/tea-guest-expenses"
 import { hasPagePermission } from "@/lib/page-permissions"
 import { usePagePermissions } from "@/hooks/use-page-permissions"
 
@@ -85,20 +80,16 @@ const PATH_PERMISSIONS: Record<string, string> = {
   "/chat-history": "chat-history",
   "/service-teachers": "service-teacher",
   "/course-statistics": "course-statistics",
-  "/audit-check": "audit-check",
+  "/supervision": "supervision",
   "/principal": "principal",
   "/communication-records": "communication-records",
   "/followup-records": "followup-records",
-  "/customer-follow-ups": "customer-follow-ups",
   "/offline-course-records": "offline-course-records",
-  "/debt-records": "debt-records",
   "/daily-report": "daily-report",
   "/positions/teacher": "position-management",
   "/agents/:id/chat": "agents",
   "/change-password": "change-password",
   "/disabled-customers": "disabled-customers",
-  "/tea-guest/consumption-records": "tea-guest-consumption-records",
-  "/tea-guest/expenses": "tea-guest-expenses",
 }
 
 function ProtectedRoute() {
@@ -206,21 +197,19 @@ function App() {
               <Route path="/chat-history" element={<ChatHistoryPage />} />
               <Route path="/service-teachers" element={<ServiceTeachersPage />} />
               <Route path="/course-statistics" element={<CourseStatisticsPage />} />
-              <Route path="/audit-check" element={<AuditCheckPage />} />
-              <Route path="/audit-check/course" element={<Navigate to="/audit-check" replace />} />
-              <Route path="/audit-check/visit" element={<Navigate to="/audit-check" replace />} />
+              <Route path="/supervision" element={<SupervisionPage />} />
+              <Route path="/audit-check" element={<Navigate to="/supervision?tab=audit" replace />} />
+              <Route path="/agreement-signings" element={<Navigate to="/supervision?tab=agreement" replace />} />
+              <Route path="/audit-check/course" element={<Navigate to="/supervision?tab=audit" replace />} />
+              <Route path="/audit-check/visit" element={<Navigate to="/supervision?tab=audit" replace />} />
               <Route path="/principal" element={<PrincipalPage />} />
               <Route path="/communication-records" element={<CommunicationRecordsPage />} />
               <Route path="/followup-records" element={<FollowupRecordsPage />} />
-              <Route path="/customer-follow-ups" element={<CustomerFollowUpsPage />} />
               <Route path="/offline-course-records" element={<OfflineCourseRecordsPage />} />
-              <Route path="/debt-records" element={<DebtRecordsPage />} />
+              <Route path="/debt-records" element={<Navigate to="/supervision?tab=debt" replace />} />
               <Route path="/daily-report" element={<DailyReportPage />} />
             </Route>
-            <Route element={<TeaGuestLayout />}>
-              <Route path="/tea-guest/consumption-records" element={<TeaGuestConsumptionRecordsPage />} />
-              <Route path="/tea-guest/expenses" element={<TeaGuestExpensesPage />} />
-            </Route>
+            <Route path="/tea-guest/*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

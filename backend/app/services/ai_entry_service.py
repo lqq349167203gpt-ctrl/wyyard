@@ -101,6 +101,7 @@ ENTRY_PROMPT = """你是"无忧茶院"后台管理系统的 AI 数据录入助�
 - customer_id（必填）— 客户ID
 - nickname（必填）— 客户昵称
 - card_type（必填）— 卡类型（体验会员/常规通卡/半年卡/年卡）
+- agreement_status — 除次卡和体验会员外必填：unsigned（未签）或 signed（已签），必须询问用户，不得代选
 - price（必填）— 价格
 - effective_date（必填）— 生效日期，格式 YYYY-MM-DD，默认今天
 - closer_name（可选）— 成交人
@@ -383,6 +384,7 @@ def _execute_create_membership_card(data: Dict[str, Any]) -> Dict[str, Any]:
         customer_id=data["customer_id"],
         nickname=data["nickname"],
         card_type=data["card_type"],
+        agreement_status=data.get("agreement_status"),
         price=float(data.get("price", 0)),
         effective_date=data.get("effective_date", date.today().isoformat()),
         closer_name=data.get("closer_name"),

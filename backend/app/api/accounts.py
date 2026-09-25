@@ -85,14 +85,13 @@ ALL_PAGE_KEYS = [
     # 数据
     "custom-analysis", "service-teacher", "principal",
     "course-statistics",
-    "customer-follow-ups",
     # 报表
     "daily-report",
     # 业务
     "healing-records", "class-records-visitors", "class-records-activities",
     "class-records-arrival", "class-records", "daily-activities",
-    "audit-check",
-    "communication-records", "followup-records", "offline-course-records",
+    "audit-check", "agreement-signings",
+    "communication-records", "followup-records", "offline-course-records", "offline-course-types",
     # 付费
     "payment-deductions", "payment-refunds", "debt-records",
     "payment", "membership-cards", "group-cases",
@@ -104,8 +103,6 @@ ALL_PAGE_KEYS = [
     "position-management", "change-password", "disabled-customers",
     # 系统配置
     "agents", "chat-history", "system-logs", "operation-logs", "login-records", "analysis-logs",
-    # 茶客业务
-    "tea-guest-consumption-records", "tea-guest-expenses",
 ]
 
 

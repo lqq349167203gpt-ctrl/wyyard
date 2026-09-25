@@ -38,9 +38,15 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
 // 读取时继续放行旧角色，编辑保存时展开为具体页面权限并移除该 key，避免旧权限无法取消。
 const RETIRED_PAGE_KEYS = ["statistics"]
 
+// 仅用于聚合入口的可见性判断，不参与权限保存。监管页仍由三个原子权限分别控制页签。
+const AGGREGATE_PERMISSION_ALIASES: Record<string, string[]> = {
+  supervision: ["audit-check", "debt-records", "agreement-signings"],
+}
+
 export function hasPagePermission(permissions: string[], pageKey: string): boolean {
   if (permissions.includes(pageKey)) return true
-  return (LEGACY_PERMISSION_ALIASES[pageKey] || []).some((key) => permissions.includes(key))
+  return [...(LEGACY_PERMISSION_ALIASES[pageKey] || []), ...(AGGREGATE_PERMISSION_ALIASES[pageKey] || [])]
+    .some((key) => permissions.includes(key))
 }
 
 export function normalizePagePermissions(permissions: string[]): string[] {

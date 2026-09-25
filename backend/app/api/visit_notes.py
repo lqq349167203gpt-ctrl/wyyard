@@ -1,3 +1,5 @@
+from collections import Counter
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.models.visit_note import VisitNoteCreate, VisitNoteUpdate
@@ -91,13 +93,85 @@ def _require_visit_customer_scope(request: Request, visit_id: str, *, action: st
     return visit
 
 
-def _log_content(action: str, note, previous: str | None = None) -> str:
+def _log_content(action: str, note, previous: str | None = None, previous_person: str | None = None) -> str:
     category = CATEGORY_LABELS[note.category]
     customer, visit_date = _visit_context(note.visit_id)
     date_part = f"日期：{visit_date}｜" if visit_date else ""
-    if previous is not None:
-        return f"{action}{category}：{date_part}客户：{customer}｜内容：{previous} → {note.content}"
-    return f"{action}{category}：{date_part}客户：{customer}｜内容：{note.content}"
+    attribution = f"反馈人：{note.feedback_person or note.created_by or '未知'}｜创建人：{note.created_by or '未知'}｜"
+    if previous_person is not None and previous_person != (note.feedback_person or note.created_by):
+        attribution = f"反馈人：{previous_person or '未知'}→{note.feedback_person or note.created_by or '未知'}｜创建人：{note.created_by or '未知'}｜"
+    if previous is not None and previous != note.content:
+        return f"{action}{category}：{date_part}客户：{customer}｜{attribution}内容：{previous} → {note.content}"
+    return f"{action}{category}：{date_part}客户：{customer}｜{attribution}内容：{note.content}"
+
+
+def _feedback_people(request: Request) -> dict:
+    """邀约备注的反馈人候选：当前账号本人 + 系统里的课程老师。"""
+    from app.api.statistics import COURSE_ACTIVITY_TYPES, _course_activity_teacher_ids
+    from app.services import customer_service, service_teacher_customer_service
+    from app.utils.record_ownership import request_actor_customer_ids
+
+    customers = customer_service.list_customers()
+    teaching_counts = Counter(
+        teacher_id
+        for _, _, loader in COURSE_ACTIVITY_TYPES
+        for activity in loader()
+        for teacher_id in _course_activity_teacher_ids(activity)
+    )
+    options = [
+        {"name": customer.nickname or customer.name or customer.id, "customer_id": customer.id}
+        for customer in customers
+        if customer.id in teaching_counts
+        or service_teacher_customer_service.TEACHER_POSITIONS.intersection(customer.positions or [])
+    ]
+    options.sort(key=lambda item: (-teaching_counts[item["customer_id"]], item["name"], item["customer_id"]))
+
+    actor_name = (
+        getattr(request.state, "user_owner", "")
+        or getattr(request.state, "user_name", "")
+        or ""
+    ).strip()
+    own_ids = request_actor_customer_ids(request)
+    own_customer = next((customer for customer in customers if customer.id in own_ids), None)
+    current = {
+        "name": actor_name or (own_customer.nickname if own_customer else ""),
+        "customer_id": own_customer.id if own_customer else "",
+    }
+    if current["name"] and not any(
+        (current["customer_id"] and item["customer_id"] == current["customer_id"])
+        or (not current["customer_id"] and item["name"] == current["name"])
+        for item in options
+    ):
+        options.insert(0, current)
+    return {"current_person": current, "options": options}
+
+
+def _resolve_feedback_person(
+    request: Request,
+    person_id: str = "",
+    person_name: str = "",
+    existing=None,
+) -> tuple[str, str]:
+    """只接受当前账号本人或课程老师名单中的人，防止任意伪造归属。"""
+    normalized_id = person_id.strip()
+    normalized_name = person_name.strip()
+    if existing is not None:
+        saved_id = (existing.feedback_person_id or "").strip()
+        saved_name = (existing.feedback_person or existing.created_by or "").strip()
+        if (normalized_id and normalized_id == saved_id) or (
+            not normalized_id and normalized_name and normalized_name == saved_name
+        ):
+            return saved_id, saved_name
+    people = _feedback_people(request)
+    if not normalized_id and not normalized_name:
+        current = people["current_person"]
+        return current["customer_id"], current["name"]
+    for option in people["options"]:
+        if normalized_id and option["customer_id"] == normalized_id:
+            return option["customer_id"], option["name"]
+        if not normalized_id and option["name"] == normalized_name:
+            return option["customer_id"], option["name"]
+    raise HTTPException(status_code=400, detail="反馈人不在课程老师名单中")
 
 
 @router.get("")
@@ -145,10 +219,18 @@ def get_previous_visit_need(
     }
 
 
+@router.get("/feedback-people")
+def get_feedback_people(request: Request):
+    return _feedback_people(request)
+
+
 @router.post("")
 def create_visit_note(data: VisitNoteCreate, request: Request):
     _require_visit_customer_scope(request, data.visit_id, action="新增信息到")
     account_id, owner_name, username = _actor(request)
+    feedback_person_id = feedback_person = ""
+    if data.feedback_person_id or data.feedback_person:
+        feedback_person_id, feedback_person = _resolve_feedback_person(request, data.feedback_person_id, data.feedback_person)
     try:
         note = visit_note_service.create_note(
             data.visit_id,
@@ -156,6 +238,8 @@ def create_visit_note(data: VisitNoteCreate, request: Request):
             data.content,
             creator_id=account_id,
             creator=owner_name or username,
+            feedback_person_id=feedback_person_id,
+            feedback_person=feedback_person,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -178,12 +262,23 @@ def update_visit_note(note_id: str, data: VisitNoteUpdate, request: Request):
         raise HTTPException(status_code=403, detail="只能修改自己录入的信息")
     before = _snapshot(existing)
     previous = existing.content
+    previous_person = existing.feedback_person or existing.created_by
+    feedback_person_id = feedback_person = None
+    if data.feedback_person_id is not None or data.feedback_person is not None:
+        feedback_person_id, feedback_person = _resolve_feedback_person(
+            request, data.feedback_person_id or "", data.feedback_person or "", existing
+        )
     try:
-        note = visit_note_service.update_note(note_id, data.content)
+        note = visit_note_service.update_note(
+            note_id,
+            data.content,
+            feedback_person_id=feedback_person_id,
+            feedback_person=feedback_person,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     request.state.operation_log_context = {
-        "content": _log_content("修改", note, previous),
+        "content": _log_content("修改", note, previous, previous_person),
         "entity_id": note.id,
         "before_data": before,
         "after_data": _snapshot(note),

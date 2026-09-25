@@ -5,6 +5,7 @@ import { AnalysisPeriodFilter } from "@/components/analysis-period-filter"
 import { confirmDialog } from "@/components/confirm-dialog"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { SpaceDropdown } from "@/components/space-dropdown"
+import { SupervisionSecondaryLayout } from "@/components/supervision-secondary-layout"
 import { Button } from "@/components/ui/button"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import {
@@ -108,7 +109,9 @@ function Cell({
   /** 传了就说明这格能改：点一下打开这一条的编辑抽屉 */
   onEdit?: () => void
 }) {
-  const shape = { display: "-webkit-box", WebkitLineClamp: clamp, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }
+  const shape = clamp > 0
+    ? { display: "-webkit-box", WebkitLineClamp: clamp, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }
+    : { display: "block", whiteSpace: "normal" as const }
   const content = value ? (
     <span
       className={`break-words text-[12px] leading-5 ${missing ? "text-[#d4380d]" : "text-[#4e535a]"}`}
@@ -134,7 +137,7 @@ function Cell({
   )
 }
 
-function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeChange: (mode: AuditCheckMode) => void }) {
+function AuditCheckView({ mode, onModeChange, embedded = false }: { mode: AuditCheckMode; onModeChange: (mode: AuditCheckMode) => void; embedded?: boolean }) {
   const meta = MODE_META[mode]
   const editPermissions = useEditPermissions()
   const initialRange = useMemo(() => monthRange(), [])
@@ -155,6 +158,7 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
   const [dateTo, setDateTo] = useState(initialRange.date_to)
   const [keyword, setKeyword] = useState("")
   const [result, setResult] = useState<AuditCheckResult | null>(null)
+  const [otherModeCount, setOtherModeCount] = useState<{ key: string; count: number } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -236,6 +240,18 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
   }, [spaceId, dateFrom, dateTo, mode, checkedKeys])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (!spaceId || !dateFrom || !dateTo) return
+    let active = true
+    const otherMode = mode === "course" ? "visit" : "course"
+    const key = `${otherMode}:${spaceId}:${dateFrom}:${dateTo}`
+    setOtherModeCount(null)
+    auditCheckApi.list({ start_date: dateFrom, end_date: dateTo, space_id: spaceId, scope: otherMode, kinds: [] })
+      .then(response => { if (active) setOtherModeCount({ key, count: response.summary.unchecked_day_count }) })
+      .catch(() => { /* 未加载成功时不把未知数量显示成零 */ })
+    return () => { active = false }
+  }, [mode, spaceId, dateFrom, dateTo])
 
   const handleSpaceSelect = (id: string) => {
     setSpaceId(id)
@@ -328,15 +344,15 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
   const courseColumns = [
     // 时间加宽一点，19:30~21:00 这种能一行放下；短内容的列收窄，省下来的都给参与人
     { key: "time", label: "时间", width: "9%" },
-    { key: "type", label: "类型", width: "7%" },
+    { key: "type", label: "类型", width: "8%" },
     { key: "title", label: "活动名称", width: "13%" },
     { key: "teacher", label: "老师", width: "9%" },
     { key: "owner", label: "案主", width: "7%" },
-    { key: "body_parts", label: "部位", width: "4.5%" },
-    { key: "mode", label: "方式", width: "4.5%" },
-    { key: "deduction", label: "扣卡", width: "5.5%" },
+    { key: "body_parts", label: "部位", width: "4%" },
+    { key: "mode", label: "方式", width: "4%" },
+    { key: "deduction", label: "扣卡", width: "5%" },
     { key: "intro", label: "简介", width: "14%" },
-    { key: "participants", label: "参与人", width: "16.5%" },
+    { key: "participants", label: "参与人", width: "22%" },
     { key: "action", label: "操作", width: "5%" },
   ]
 
@@ -364,36 +380,37 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
     return (
       <tr key={row.id} className="border-t border-[#f5f6f7]" onDoubleClick={() => canEditRow && openDrawer()}>
         <Cell
-          width="6.5%"
+          width={courseColumns[0].width}
           value={formatTime(row.time, row.end_time)}
           missing={has("course_time")}
           label="缺时间"
           onEdit={cellEdit}
         />
-        <Cell width="7%" value={row.type_label} missing={has("course_type")} label="缺类型" onEdit={cellEdit} />
-        <Cell width="11%" value={row.title} missing={has("course_name")} label="缺名称" onEdit={cellEdit} />
-        <Cell width="8%" value={row.teacher_names.join("、")} missing={has("course_teacher")} label="缺老师" onEdit={cellEdit} />
-        <Cell width="8%" value={row.owner_name} missing={has("course_owner")} label="缺案主" onEdit={cellEdit} />
-        <Cell width="4%" value={row.body_parts ? `${row.body_parts}` : ""} missing={has("course_body_parts")} label="缺部位" />
-        <Cell width="4.5%" value={row.activity_mode} />
+        <Cell width={courseColumns[1].width} value={row.type_label} missing={has("course_type")} label="缺类型" onEdit={cellEdit} />
+        <Cell width={courseColumns[2].width} value={row.title} missing={has("course_name")} label="缺名称" onEdit={cellEdit} />
+        <Cell width={courseColumns[3].width} value={row.teacher_names.join("、")} missing={has("course_teacher")} label="缺老师" onEdit={cellEdit} />
+        <Cell width={courseColumns[4].width} value={row.owner_name} missing={has("course_owner")} label="缺案主" onEdit={cellEdit} />
+        <Cell width={courseColumns[5].width} value={row.body_parts ? `${row.body_parts}` : ""} missing={has("course_body_parts")} label="缺部位" />
+        <Cell width={courseColumns[6].width} value={row.activity_mode} />
         <Cell
-          width="5%"
+          width={courseColumns[7].width}
           value={row.public_welfare ? "公益" : (row.deduction_count ? `${row.deduction_count} 次` : "")}
           missing={has("course_zero_deduction")}
           label="0 次"
           // 扣卡次数统一在编辑抽屉里改，不在格子里弹输入框
           onEdit={canEditRow ? openDrawer : undefined}
         />
-        <Cell width="12%" value={row.intro} missing={has("course_intro")} label="缺简介" onEdit={cellEdit} />
+        <Cell width={courseColumns[8].width} value={row.intro} missing={has("course_intro")} label="缺简介" onEdit={cellEdit} />
         <Cell
-          width="12%"
+          width={courseColumns[9].width}
           value={row.participant_names.length > 0 ? `${row.participant_names.length} 人：${row.participant_names.join("、")}` : ""}
+          clamp={0}
           missing={has("course_no_participant")}
           label="无参与人"
           onEdit={canEditRow ? openDrawer : undefined}
         />
         {/* 发布列已隐藏 */}
-        <td className="px-2 py-2 align-top" style={{ width: "5%" }}>
+        <td className="px-2 py-2 align-top" style={{ width: courseColumns[10].width }}>
           {canEditRow && (
             <button type="button" onClick={openDrawer} className="whitespace-nowrap text-[12px] text-[#3370ff] hover:underline">编辑</button>
           )}
@@ -452,41 +469,28 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
   }
 
   return (
-    <div className="min-h-full bg-[#f4f5f6] p-4 pb-6">
-      {/* tab 栏：样式与付费项目页一致，最右边选空间 */}
-      <div className="mb-3 flex h-[52px] items-center rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
-        <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {MODES.map(tab => {
-            const active = tab.mode === mode
-            return (
-              <button
-                key={tab.mode}
-                type="button"
-                onClick={() => onModeChange(tab.mode)}
-                className={`relative whitespace-nowrap px-1 pb-0 text-[14px] transition-colors ${active ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"}`}
-              >
-                {tab.title}
-                {active && <span className="absolute bottom-[-16px] left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
-              </button>
-            )
-          })}
-        </div>
-        <div className="ml-4 shrink-0">
-          <SpaceDropdown spaces={spaces} selectedSpaceId={spaceId} onSelect={handleSpaceSelect} />
-        </div>
-      </div>
+    <div className={embedded ? "" : "min-h-full bg-[#f4f5f6] p-4 pb-6"}>
+      <SupervisionSecondaryLayout
+        items={MODES.map(tab => ({ key: tab.mode, label: tab.title, badge: tab.mode === mode ? (loading ? undefined : result?.summary.unchecked_day_count) : otherModeCount?.key === `${tab.mode}:${spaceId}:${dateFrom}:${dateTo}` ? otherModeCount.count : undefined }))}
+        activeKey={mode}
+        onChange={value => onModeChange(value as AuditCheckMode)}
+      >
 
       {/* 不加 overflow-hidden：筛选栏里的下拉要能盖在下面的列表上 */}
-      <div className="mb-3 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
+      <div className="bg-white">
         {/* 第一行：只看时间范围 */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-2.5">
           <span className="w-[52px] shrink-0 text-[12px] text-[#8f959e]">统计周期</span>
           <AnalysisPeriodFilter
             variant="inline"
+            label=""
             dateFrom={dateFrom}
             dateTo={dateTo}
             onChange={range => { setDateFrom(range.date_from); setDateTo(range.date_to) }}
           />
+          <div className="ml-auto shrink-0">
+            <SpaceDropdown spaces={spaces} selectedSpaceId={spaceId} onSelect={handleSpaceSelect} />
+          </div>
         </div>
 
         {/* 第二行：其它筛选条件 */}
@@ -570,7 +574,10 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="overflow-hidden rounded-b-xl bg-white">
+        <div className="flex items-center justify-between border-t border-[#e8eaed] bg-[#f7f8fa] px-4 py-2 text-[11px] text-[#8f959e]">
+          <span>日期与核对清单</span><span>{mode === "course" ? "课程" : "邀约"}明细全部显示，按日期核对</span>
+        </div>
         {visibleDays.map(day => {
           const block = mode === "course" ? day.course : day.visit
           if (!block) return null
@@ -580,17 +587,12 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
             | AuditCheckCourseRow[]
             | AuditCheckVisitRow[]
           return (
-            <div key={day.date} className="overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
-              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-[#f0f0f0] px-3 py-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="text-[12.5px] font-medium text-[#2b2f36]">{formatDay(day.date)}</span>
-                  {day.unchecked
-                    ? <span className="shrink-0 rounded-[3px] bg-[#fff7e6] px-1.5 py-0.5 text-[11px] text-[#d46b08]">未核对</span>
-                    : <span className="shrink-0 rounded-[3px] bg-[#f0f5ff] px-1.5 py-0.5 text-[11px] text-[#3370ff]">已核对{operator ? ` · ${operator}` : ""}</span>}
-                  {block.missing_count > 0
-                    ? <span className="shrink-0 rounded-[3px] bg-[#fff1f0] px-1.5 py-0.5 text-[11px] text-[#d4380d]">缺失 {block.missing_count}</span>
-                    : <span className="shrink-0 text-[11px] text-[#9aa1a9]">无缺失</span>}
-                  <span className="shrink-0 text-[11px] text-[#9aa1a9]">共 {block.total} 条</span>
+            <div key={day.date} className="border-t border-[#e8eaed] bg-white">
+              <div className="flex min-h-[52px] items-center gap-4 px-4 py-3">
+                <span className="flex w-[100px] shrink-0 items-center gap-2 text-[12px] font-medium text-[#2b2f36]"><span aria-hidden className="h-3.5 w-[3px] shrink-0 rounded-full bg-[#ebedf0]" />{formatDay(day.date)}</span>
+                <span className="w-[100px] shrink-0 text-[12px] text-[#8f959e]">{block.total > 0 ? `${block.total} ${mode === "course" ? "门课程" : "条邀约"}` : mode === "course" ? "当日无课程" : "当日无邀约记录"}</span>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  {block.total > 0 && !day.unchecked && <span className="rounded-[3px] bg-[#f0f5ff] px-1.5 py-0.5 text-[11px] text-[#3370ff]">已核对{operator ? ` · ${operator}` : ""}</span>}
                 </div>
                 {canLock && (
                   <button
@@ -605,20 +607,17 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
                 )}
               </div>
 
-              {block.total === 0 ? (
-                <div className="flex items-center gap-2 px-3 py-3 text-[12px] text-[#c0c4cc]">
-                  {mode === "course" ? "当天没有活动" : "当天没有邀约记录"}
-                </div>
-              ) : (
-                <div>
-                  <table className="w-full border-collapse text-[12px]" style={{ tableLayout: "fixed" }}>
+              {block.total > 0 && (
+                <div id={`audit-day-${mode}-${day.date}`} className="min-w-0 px-4 pb-3">
+                  <div className="overflow-hidden rounded-[6px] border border-[#e8eaed]">
+                  <table className="w-full border-collapse text-[12px] [&_td]:py-2.5 [&_tbody_tr:hover]:bg-[#fcfcfd]" style={{ tableLayout: "fixed" }}>
                     <colgroup>
                       {columns.map(column => <col key={column.key} style={{ width: column.width }} />)}
                     </colgroup>
                     <thead>
                       <tr className="bg-[#fafbfc] text-[11px] text-[#8f959e]">
                         {columns.map(column => (
-                          <th key={column.key} className="px-2 py-1.5 text-left font-normal">{column.label}</th>
+                          <th key={column.key} className="px-2 py-2 text-left font-normal">{column.label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -628,12 +627,14 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
                         : (rows as AuditCheckVisitRow[]).map(row => renderVisitRow(row, day.date, locked))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>
           )
         })}
       </div>
+      </SupervisionSecondaryLayout>
 
       {editTarget && (
         <AuditEditDrawer
@@ -653,8 +654,8 @@ function AuditCheckView({ mode, onModeChange }: { mode: AuditCheckMode; onModeCh
   )
 }
 
-export default function AuditCheckPage() {
+export default function AuditCheckPage({ embedded = false }: { embedded?: boolean }) {
   // 两个页签共用一个页面：切换时共用的筛选（周期、空间、搜索）保留，各自的缺失项勾选单独记
   const [mode, setMode] = useState<AuditCheckMode>("course")
-  return <AuditCheckView mode={mode} onModeChange={setMode} />
+  return <AuditCheckView mode={mode} onModeChange={setMode} embedded={embedded} />
 }
