@@ -24,7 +24,7 @@ def list_types(_role: str = Depends(require_page_permission("offline-course-reco
     return list(load_data(TYPE_FILE).values())
 
 
-@router.post("/types")
+@router.post("/types", dependencies=[Depends(require_page_permission("offline-course-records"))])
 def create_type(data: CourseTypeCreate, request: Request, _role: str = Depends(require_page_permission("offline-course-types"))):
     name = data.name.strip()
     if not name:
@@ -37,7 +37,7 @@ def create_type(data: CourseTypeCreate, request: Request, _role: str = Depends(r
     return item
 
 
-@router.put("/types/{type_id}")
+@router.put("/types/{type_id}", dependencies=[Depends(require_page_permission("offline-course-records"))])
 def update_type(type_id: str, data: CourseTypeCreate, request: Request, _role: str = Depends(require_page_permission("offline-course-types"))):
     types = load_data(TYPE_FILE)
     old = types.get(type_id)
@@ -58,7 +58,7 @@ def update_type(type_id: str, data: CourseTypeCreate, request: Request, _role: s
     return item
 
 
-@router.delete("/types/{type_id}")
+@router.delete("/types/{type_id}", dependencies=[Depends(require_page_permission("offline-course-records"))])
 def delete_type(type_id: str, request: Request, _role: str = Depends(require_page_permission("offline-course-types"))):
     item = load_data(TYPE_FILE).get(type_id)
     if not item:

@@ -172,7 +172,16 @@ export default function OfflineCourseRecordsPage() {
       </div>
       <div className="flex flex-1 min-h-0 min-w-0 gap-3">
         <aside className="w-[168px] shrink-0 rounded-xl bg-white flex flex-col overflow-hidden border border-[#e8eaed]">
-          <div className="px-4 py-3 border-b border-[#f0f0f0] text-[13px] text-[#2b2f36]">课程类型</div>
+          <div className="flex items-center justify-between gap-2 border-b border-[#f0f0f0] px-4 py-3">
+            <span className="text-[13px] text-[#2b2f36]">课程类型</span>
+            <button
+              type="button"
+              disabled={!canManageTypes}
+              title={canManageTypes ? "新增、修改课程类型" : "请在账号管理的信息权限中开启“管理课程类型”"}
+              onClick={() => { setTypeError(""); setEditingTypeId(""); setTypeName(""); setTypeOpen(true) }}
+              className="shrink-0 text-[12px] text-[#3370ff] hover:text-[#245edb] disabled:cursor-default disabled:text-[#a8b1bd]"
+            >类型设置</button>
+          </div>
           <nav aria-label="课程类型筛选" className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
             {[{ id: "all", name: "全部", value: "" }, ...types.map(t => ({ ...t, value: t.name }))].map(t => (
               <button
@@ -185,9 +194,6 @@ export default function OfflineCourseRecordsPage() {
               >{t.name}</button>
             ))}
           </nav>
-          {canManageTypes && <div className="p-2 border-t border-[#f0f0f0]">
-            <Button variant="ghost" size="sm" className="w-full h-8 text-[12px] text-[#646a73]" onClick={() => { setTypeError(""); setEditingTypeId(""); setTypeName(""); setTypeOpen(true) }}><Plus className="h-3.5 w-3.5 mr-1" />类型设置</Button>
-          </div>}
         </aside>
       <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0 min-w-0">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">

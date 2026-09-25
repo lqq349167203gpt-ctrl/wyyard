@@ -1,5 +1,8 @@
+import uuid
+
 from app.models.offline_course_record import OfflineCourseRecordCreate
 from app.services import offline_course_record_service as service
+from app.services import position_permission_service
 
 
 def test_group_record_is_visible_for_each_participant_and_persisted(monkeypatch):
@@ -47,3 +50,40 @@ def test_types_and_group_api(client):
     assert client.put(f"/api/offline-course-records/types/{type_id}", json={"name": "  "}).status_code == 400
     assert client.delete(f"/api/offline-course-records/{record_id}").status_code == 200
     assert client.delete(f"/api/offline-course-records/types/{type_id}").status_code == 200
+
+
+def test_type_management_requires_page_and_operation_permissions(client):
+    previous = position_permission_service.get_all().get("管理员", [])
+    suffix = uuid.uuid4().hex[:10]
+    password = f"course{suffix}9"
+    created = client.post("/api/accounts", json={
+        "owner": f"课程管理员_{suffix}",
+        "role": "管理员",
+        "username": f"course_admin_{suffix}",
+        "password": password,
+        "enabled": True,
+    })
+    assert created.status_code == 200, created.text
+    account_id = created.json()["id"]
+    type_id = ""
+    try:
+        login = client.post("/api/accounts/login", json={"username": f"course_admin_{suffix}", "password": password})
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        payload = {"name": f"测试类型_{suffix}"}
+
+        position_permission_service.set_permissions("管理员", ["offline-course-types"])
+        assert client.post("/api/offline-course-records/types", headers=headers, json=payload).status_code == 403
+
+        position_permission_service.set_permissions("管理员", ["offline-course-records"])
+        assert client.post("/api/offline-course-records/types", headers=headers, json=payload).status_code == 403
+
+        position_permission_service.set_permissions("管理员", ["offline-course-records", "offline-course-types"])
+        response = client.post("/api/offline-course-records/types", headers=headers, json=payload)
+        assert response.status_code == 200, response.text
+        type_id = response.json()["id"]
+    finally:
+        position_permission_service.set_permissions("管理员", previous)
+        if type_id:
+            client.delete(f"/api/offline-course-records/types/{type_id}")
+        client.delete(f"/api/accounts/{account_id}")

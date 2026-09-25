@@ -35,10 +35,11 @@ const ALL_PAGES = [
   { key: "healing-records", label: "客户资料" },
   { key: "class-records", label: "邀约" },
   { key: "daily-activities", label: "课表" },
-  { key: "audit-check", label: "信息核对" },
-  { key: "agreement-signings", label: "协议签订" },
   { key: "offline-course-records", label: "落地课程" },
-  { key: "offline-course-types", label: "落地课程类型设置" },
+  // 监管是一个菜单入口，三个页签分别授权。
+  { key: "audit-check", label: "信息核对" },
+  { key: "debt-records", label: "欠卡记录" },
+  { key: "agreement-signings", label: "协议签订" },
   // 沟通
   { key: "communication-records", label: "沟通记录" },
   { key: "followup-records", label: "回访记录" },
@@ -46,7 +47,6 @@ const ALL_PAGES = [
   { key: "payment", label: "付费项目" },
   { key: "payment-deductions", label: "销卡/退课" },
   { key: "payment-refunds", label: "退费" },
-  { key: "debt-records", label: "欠卡记录" },
   // 信息配置
   { key: "member-identities", label: "会员身份" },
   { key: "customer-tags", label: "客户标签" },
@@ -69,13 +69,15 @@ const ALL_PAGES = [
 
 const PERMISSION_GROUPS = [
   { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "principal", "daily-report"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records", "offline-course-types", "audit-check", "debt-records", "agreement-signings"] },
+  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records", "audit-check", "debt-records", "agreement-signings"] },
   { label: "沟通", keys: ["communication-records", "followup-records"] },
   { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },
   { label: "信息配置", keys: ["member-identities", "customer-tags", "upsell-config", "healing-identities", "organizations", "spaces"] },
   { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
   { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs", "login-records", "analysis-logs"] },
 ]
+
+const SUPERVISION_TAB_KEYS = ["audit-check", "debt-records", "agreement-signings"]
 
 const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
   principal_scope: "own",
@@ -333,6 +335,9 @@ export default function PositionManagementPage() {
     if (isSystemRole) return
     setFormPermissions(prev => {
       const next = prev.includes(pageKey) ? removePagePermissions(prev, [pageKey]) : [...prev, pageKey]
+      if (pageKey === "offline-course-records" && !next.includes(pageKey)) {
+        return removePagePermissions(next, ["offline-course-types"])
+      }
       if (!next.includes(pageKey)) {
         if (pageKey === "healing-records") {
           setFormEditPermissions(current => ({ ...current, customers: "all" }))
@@ -737,8 +742,8 @@ export default function PositionManagementPage() {
             {selectedPosition && (
               <div className="flex h-10 shrink-0 items-end gap-6 border-b border-[#e8e8e8] px-5">
                 {([
-                  { key: "pages" as PermissionSection, label: "页面权限", summary: `${formPermissions.length}/${ALL_PAGES.length}` },
-                  { key: "edit" as PermissionSection, label: "信息权限", summary: "5 类" },
+                  { key: "pages" as PermissionSection, label: "页面权限", summary: `${ALL_PAGES.filter(page => formPermissions.includes(page.key)).length}/${ALL_PAGES.length}` },
+                  { key: "edit" as PermissionSection, label: "信息权限", summary: "操作与范围" },
                 ]).map(section => {
                   const selected = permissionSection === section.key
                   return (
@@ -772,9 +777,9 @@ export default function PositionManagementPage() {
                     <div className="mb-4 flex items-start justify-between gap-4">
                       <div>
                         <div className="text-[14px] font-medium text-[#1f2329]">页面权限</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">勾选该角色可以进入的页面，页面分组全部展开显示。</div>
+                        <div className="mt-1 text-[12px] text-[#8f959e]">勾选该角色可以进入的页面；监管可按页签授权。</div>
                       </div>
-                      <span className="shrink-0 text-[12px] text-[#8f959e]">已开启 {formPermissions.length} / {ALL_PAGES.length}</span>
+                      <span className="shrink-0 text-[12px] text-[#8f959e]">已开启 {ALL_PAGES.filter(page => formPermissions.includes(page.key)).length} / {ALL_PAGES.length} 项</span>
                     </div>
                     <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
                       {PERMISSION_GROUPS.map((group) => {
@@ -795,7 +800,7 @@ export default function PositionManagementPage() {
                                     if (e.target.checked) {
                                       setFormPermissions(prev => [...new Set([...prev, ...group.keys])])
                                     } else {
-                                      setFormPermissions(prev => removePagePermissions(prev, group.keys))
+                                      setFormPermissions(prev => removePagePermissions(prev, group.label === "业务" ? [...group.keys, "offline-course-types"] : group.keys))
                                       if (group.keys.includes("class-records")) {
                                         setFormEditPermissions(current => ({ ...current, visits: "own", visit_lock: false }))
                                       }
@@ -820,7 +825,7 @@ export default function PositionManagementPage() {
                               )}
                             </div>
                             <div className="grid min-h-[52px] grid-cols-2 content-start gap-x-4 gap-y-1 px-3 py-2.5">
-                              {group.keys.map((key) => {
+                              {group.keys.filter(key => group.label !== "业务" || !SUPERVISION_TAB_KEYS.includes(key)).map((key) => {
                                 const page = ALL_PAGES.find(p => p.key === key)
                                 return (
                                   <label key={key} className={`flex items-center gap-3 rounded-[4px] py-1.5 ${isSystemRole ? "" : "cursor-pointer hover:bg-[#f7f8fa]"}`}>
@@ -835,6 +840,31 @@ export default function PositionManagementPage() {
                                   </label>
                                 )
                               })}
+                              {group.label === "业务" && (
+                                <div className="col-span-2 mt-1 border-t border-[#f0f0f0] pt-2">
+                                  <div className="mb-1 flex items-center gap-2 text-[13px] text-[#2b2f36]">
+                                    <span className="font-medium">监管</span>
+                                    <span className="text-[12px] text-[#8f959e]">按页签授权</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 pl-3">
+                                    {SUPERVISION_TAB_KEYS.map(key => {
+                                      const page = ALL_PAGES.find(item => item.key === key)
+                                      return (
+                                        <label key={key} className={`flex items-center gap-3 rounded-[4px] py-1.5 ${isSystemRole ? "" : "cursor-pointer hover:bg-[#f7f8fa]"}`}>
+                                          <input
+                                            type="checkbox"
+                                            checked={formPermissions.includes(key)}
+                                            onChange={() => handleTogglePermission(key)}
+                                            disabled={isSystemRole}
+                                            className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
+                                          />
+                                          <span className="text-[13px] text-[#2b2f36]">{page?.label || key}</span>
+                                        </label>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                           </div>
                             </div>
                         )
@@ -961,6 +991,27 @@ export default function PositionManagementPage() {
                             })}
                           </div>
                         </div>
+                      </div>
+                    </section>
+                    <section>
+                      <div className="mb-3 text-[14px] font-medium text-[#1f2329]">落地课程操作</div>
+                      <div className="rounded-[4px] border border-[#f0f0f0]">
+                        <label className={`flex min-h-[76px] items-center justify-between gap-6 px-4 py-3 ${isSystemRole || !formPermissions.includes("offline-course-records") ? "" : "cursor-pointer"}`}>
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-medium text-[#2b2f36]">管理课程类型</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">允许新增、修改和删除落地课程类型；这不是独立页面。</div>
+                            {!formPermissions.includes("offline-course-records") && !isSystemRole && (
+                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“落地课程”页面权限</div>
+                            )}
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isSystemRole || formPermissions.includes("offline-course-types")}
+                            onChange={() => handleTogglePermission("offline-course-types")}
+                            disabled={isSystemRole || !formPermissions.includes("offline-course-records")}
+                            className="h-4 w-4 shrink-0 rounded border-[#dee0e3] accent-[#3370ff]"
+                          />
+                        </label>
                       </div>
                     </section>
                     <section>
