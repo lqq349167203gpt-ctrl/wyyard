@@ -52,7 +52,7 @@ def update_agreement_status(card_id: str, status: str) -> Optional[MembershipCar
         return card
 
 # 会员卡卡种的先后顺序，与付款页「会员卡」下拉里的顺序一致（列表里没提到的排在后面）
-MEMBERSHIP_CARD_TYPE_ORDER = ("次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "45次卡", "半年卡", "年卡")
+MEMBERSHIP_CARD_TYPE_ORDER = ("次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "60次卡", "半年卡", "年卡")
 DEDUCTIONS_FILE = "membership_deductions.json"
 DEBTS_FILE = "membership_debts.json"
 DEBT_ACTIVITIES_FILE = "membership_debt_activities.json"

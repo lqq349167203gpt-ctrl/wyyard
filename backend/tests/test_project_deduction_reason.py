@@ -21,7 +21,7 @@ def test_customer_detail_keeps_each_active_card_remaining_separate(client, creat
     cards = []
     for card_type, count, effective_date in (
         ("体验会员", 4, "2026-01-01"),
-        ("45次卡", 45, "2026-02-01"),
+        ("60次卡", 60, "2026-02-01"),
     ):
         response = client.post("/api/membership-cards", json={
             "customer_id": created_customer["id"],
@@ -44,12 +44,12 @@ def test_customer_detail_keeps_each_active_card_remaining_separate(client, creat
         if item["type"] == "会员卡" and not item["voided"]
     ]
     experience = next(item for item in membership_items if item["name"] == "体验会员")
-    forty_five = next(item for item in membership_items if item["name"] == "45次卡")
+    sixty = next(item for item in membership_items if item["name"] == "60次卡")
 
     assert experience["remaining"] == 4
     assert experience["total_purchased"] == 4
-    assert forty_five["remaining"] == 45
-    assert forty_five["total_purchased"] == 45
+    assert sixty["remaining"] == 60
+    assert sixty["total_purchased"] == 60
 
     for card in cards:
         client.delete(f"/api/membership-cards/{card['id']}")

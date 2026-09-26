@@ -407,21 +407,21 @@ def test_overview_referrals_group_buyers_by_upsell_configuration(monkeypatch):
     events = [
         event("p1", "2026-01-06", customer="c1", org="all", subtype="398会员"),
         event("p2", "2026-01-07", customer="c1", org="all", subtype="398会员"),
-        event("p3", "2026-01-08", customer="c2", org="all", subtype="45次卡"),
+        event("p3", "2026-01-08", customer="c2", org="all", subtype="60次卡"),
         event("p4", "2026-01-06", customer="c3", org="all", subtype="398会员"),
-        event("p5", "2026-01-09", customer="c3", org="all", subtype="45次卡"),
+        event("p5", "2026-01-09", customer="c3", org="all", subtype="60次卡"),
     ]
     permissions = {"customer_access": {"transaction_access": "detail"}}
     levels = [
         {"id": "trial", "name": "体验档", "products": ["membership:398会员"]},
-        {"id": "regular", "name": "正式档", "products": ["membership:45次卡"]},
+        {"id": "regular", "name": "正式档", "products": ["membership:60次卡"]},
     ]
     monkeypatch.setattr(service, "collect_data", lambda _: ([org], permissions, events, []))
     monkeypatch.setattr(service, "scope", lambda _: ([org], customers, permissions))
     monkeypatch.setattr(service.customer_service, "list_customers", lambda: list(customers.values()))
     monkeypatch.setattr(service.upsell_config_service, "list_levels", lambda: levels)
     monkeypatch.setattr(service.upsell_config_service, "level_order", lambda: [
-        [("membership", "398会员")], [("membership", "45次卡")],
+        [("membership", "398会员")], [("membership", "60次卡")],
     ])
 
     result = service.analyze(

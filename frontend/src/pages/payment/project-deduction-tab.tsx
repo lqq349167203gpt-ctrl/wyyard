@@ -46,7 +46,7 @@ const CARD_TYPE_OPTIONS = [
   { value: "12次卡", label: "12次卡" },
   { value: "3月卡", label: "3月卡" },
   { value: "30次卡", label: "30次卡" },
-  { value: "45次卡", label: "45次卡" },
+  { value: "60次卡", label: "60次卡" },
   { value: "半年卡", label: "半年卡" },
   { value: "年卡", label: "年卡" },
 ]

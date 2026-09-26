@@ -21,7 +21,7 @@ def payload(customer, **extra):
     }
 
 
-@pytest.mark.parametrize("card_type", ["月卡", "12次卡", "3月卡", "30次卡", "45次卡", "半年卡", "年卡"])
+@pytest.mark.parametrize("card_type", ["月卡", "12次卡", "3月卡", "30次卡", "60次卡", "半年卡", "年卡"])
 def test_required_on_create(client, created_customer, card_type):
     response = client.post("/api/membership-cards", json=payload(created_customer, card_type=card_type))
     assert response.status_code == 400, response.text
