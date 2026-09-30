@@ -173,7 +173,7 @@ export default function OfflineCourseRecordsPage() {
       <div className="flex flex-1 min-h-0 min-w-0 gap-3">
         <aside className="w-[168px] shrink-0 rounded-xl bg-white flex flex-col overflow-hidden border border-[#e8eaed]">
           <div className="flex items-center justify-between gap-2 border-b border-[#f0f0f0] px-4 py-3">
-            <span className="text-[13px] text-[#2b2f36]">课程类型</span>
+            <span className="text-[12px] text-[#2b2f36]">课程类型</span>
             <button
               type="button"
               disabled={!canManageTypes}
@@ -190,7 +190,7 @@ export default function OfflineCourseRecordsPage() {
                 aria-pressed={searchType === t.value}
                 title={t.name}
                 onClick={() => { setSearchType(t.value); goToPage(1) }}
-                className={`w-full rounded-[4px] px-3 py-2.5 text-left text-[13px] break-words transition-colors ${searchType === t.value ? "bg-[#eef3ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
+                className={`w-full rounded-[4px] px-3 py-2.5 text-left text-[12px] break-words transition-colors ${searchType === t.value ? "bg-[#eef3ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
               >{t.name}</button>
             ))}
           </nav>
@@ -241,7 +241,7 @@ export default function OfflineCourseRecordsPage() {
         ) : filteredRecords.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
-          <Table style={{ tableLayout: "fixed" }}>
+          <Table className="[&_th]:text-[12px] [&_td]:text-[12px]" style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4" style={{ width: "90px" }}>类型</TableHead>

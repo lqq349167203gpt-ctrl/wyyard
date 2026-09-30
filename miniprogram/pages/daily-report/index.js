@@ -364,7 +364,6 @@ Page({
     const payment = this._paymentData || { cards: [], groups: [], emotions: [], ohs: [], energies: [], courses: [], others: [], deductions: [] }
     const cardSet = this._buildHasCardSet(payment, date)
     const customerRows = (visits || []).map(v => {
-      const c = customerMap[v.customer_id]
       const hasCard = cardSet.has(v.customer_id)
       const remaining = hasCard ? v.remaining_count : undefined
       return {
@@ -383,7 +382,7 @@ Page({
         remainingText: !hasCard ? '未办卡' : (remaining == null || remaining === -999 ? '不限' : remaining + '次'),
         needText: v.needs || '',
         infoText: v.feedback || v.experience || '',
-        followText: (c && c.follow_up_node) || '',
+        followText: v.healing_notes || '',
         refText: v.referrer || '',
         refHandlerText: v.referrer_handler || '',
         visitTimeText: v.arrival_time || v.visit_time || '',

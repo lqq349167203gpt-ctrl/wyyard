@@ -174,7 +174,7 @@ export default function DailyReportPage() {
         <td>${!hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
         <td class="wrap">${esc(v.needs || "-")}</td>
         <td class="wrap">${esc(v.feedback || v.experience || "-")}</td>
-        <td class="wrap">${esc(customers.find(c => c.id === v.customer_id)?.follow_up_node || "-")}</td>
+        <td class="wrap">${esc(v.healing_notes || "-")}</td>
         <td>${(transactionCounts[v.customer_id] || 0) > 0 ? transactionCounts[v.customer_id] + "笔" : "-"}</td>
         <td>${esc(v.referrer_handler || "-")}</td>
         <td>${v.arrived ? "✓" : "✗"}</td>
@@ -745,7 +745,7 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || v.experience || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{customers.find(c => c.id === v.customer_id)?.follow_up_node || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.healing_notes || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => (transactionCounts[v.customer_id] || 0) > 0 && openDetail("payment", v.customer_id, v.nickname)}>{(transactionCounts[v.customer_id] || 0) > 0 ? `${transactionCounts[v.customer_id]}笔` : <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[5px] pr-[1px] py-2 text-[#6b7178] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer_handler || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[1px] pr-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">

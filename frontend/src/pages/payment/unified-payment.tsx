@@ -1524,7 +1524,7 @@ export function UnifiedPaymentContent({
             <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4" style={{ width: "90px" }}>成交日期</TableHead>
+                <TableHead className="pl-4" style={{ width: activeType === "membership_card" ? "100px" : "90px" }}>成交日期</TableHead>
                 <TableHead style={{ width: "110px" }}>成交归属</TableHead>
                 <TableHead style={{ width: "100px" }}>用户</TableHead>
                 {activeType === "oh_card_reading" && <TableHead style={{ width: "100px" }}>诊断老师</TableHead>}
