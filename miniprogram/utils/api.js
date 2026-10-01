@@ -314,6 +314,12 @@ function _systemCoarseCancellation(data) {
 }
 
 function _extractErrorMessage(data) {
+  if (data && data.byteLength !== undefined) {
+    try {
+      const encoded = Array.from(new Uint8Array(data), byte => '%' + byte.toString(16).padStart(2, '0')).join('')
+      data = JSON.parse(decodeURIComponent(encoded))
+    } catch (error) { return '请求失败' }
+  }
   const error = data?.detail || data?.message || data?.error
   if (!error) return '请求失败'
   if (typeof error === 'string') return error
@@ -364,7 +370,20 @@ async function performRequest(path, options = {}) {
     // skipAuth（登录类）请求不附带 token：建立会话不需要已有会话，
     // 也避免过期 token 触发后端 AuthMiddleware 误拒登录请求
     const token = options.skipAuth ? '' : wx.getStorageSync('auth_token')
-    wx.request({
+    const send = payload => {
+      if (!options._upload) return wx.request(payload)
+      const { filePath, name } = options._upload
+      const headers = { ...payload.header }
+      delete headers['Content-Type'] // multipart 边界由微信生成。
+      return wx.uploadFile({ url: payload.url, filePath, name, timeout: payload.timeout, header: headers,
+        fail: payload.fail,
+        success: result => {
+          try { payload.success({ ...result, data: JSON.parse(result.data || '{}') }) }
+          catch (error) { reject(new Error('上传响应解析失败')) }
+        },
+      })
+    }
+    send({
       url: `${BASE_URL}${path}`,
       method: options.method || 'GET',
       data: options.data,
@@ -573,26 +592,17 @@ const courseTypeApi = {
 
 // 上传公开图片（活动列表图/详情图）
 function uploadPublicImage(filePath, name) {
-  const { BASE_URL } = require('./config')
-  const token = wx.getStorageSync('auth_token')
-  return new Promise((resolve, reject) => {
-    wx.uploadFile({
-      url: `${BASE_URL}/api/uploads/public-images`,
-      filePath,
-      name: name || 'file',
-      header: token ? { Authorization: `Bearer ${token}` } : {},
-      success: (res) => {
-        try {
-          const data = JSON.parse(res.data || '{}')
-          if (res.statusCode >= 200 && res.statusCode < 300) resolve(data)
-          else reject(new Error(data.detail || data.message || '上传失败'))
-        } catch (e) {
-          reject(new Error('上传响应解析失败'))
-        }
-      },
-      fail: (err) => reject(new Error(err.errMsg || '上传失败')),
-    })
-  })
+  return request('/api/uploads/public-images', { method: 'POST', _upload: { filePath, name: name || 'file' } })
+}
+
+async function downloadFile(url, filename) {
+  // 只接受当前数据源业务地址，二进制仍由请求层统一续期、来源和错误处理。
+  const path = url.startsWith(BASE_URL + '/') ? url.slice(BASE_URL.length) : url
+  if (!path.startsWith('/api/') || /[\\/]/.test(filename)) throw new Error('导出地址或文件名不正确')
+  const data = await request(path, { responseType: 'arraybuffer', timeout: 120000 })
+  const filePath = `${wx.env.USER_DATA_PATH}/${filename}`
+  await new Promise((resolve, reject) => wx.getFileSystemManager().writeFile({ filePath, data, success: resolve, fail: reject }))
+  return filePath
 }
 
 // 觉醒游戏 API
@@ -632,7 +642,15 @@ const dailyGroupingApi = {
 // 客户 API
 const customerApi = {
   light: (limit) => request(`/api/customers/light${limit ? '?limit=' + limit : ''}`),
-  detail: (id, date, principalParticipant = false, principalCourse = '') => request(`/api/customer-detail/${encodeURIComponent(id)}?${date ? 'date=' + encodeURIComponent(date) + '&' : ''}${principalParticipant ? 'principal_participant=true&principal_course=' + encodeURIComponent(principalCourse) : ''}`),
+  // 人员选择保留完整可见目录，但不计算到店统计；旧 light 调用保持兼容。
+  selector: () => request('/api/customers/light?purpose=selector'),
+  detail: (id, date, principalParticipant = false, principalCourse = '', section = '') => {
+    const params = []
+    if (date) params.push('date=' + encodeURIComponent(date))
+    if (principalParticipant) params.push('principal_participant=true', 'principal_course=' + encodeURIComponent(principalCourse))
+    if (section) params.push('section=' + encodeURIComponent(section))
+    return request(`/api/customer-detail/${encodeURIComponent(id)}${params.length ? '?' + params.join('&') : ''}`)
+  },
   list: (params = {}) => {
     const qs = Object.entries(params)
       .filter(([_, v]) => v !== undefined && v !== null && v !== '')
@@ -969,14 +987,6 @@ module.exports = {
       return request(`/api/audit-check?${query.join('&')}`)
     },
   },
-  activityThemeApi: {
-    lock: (date, spaceId = '') => request('/api/activity-themes/lock', { method: 'POST', data: { date, space_id: spaceId } }),
-    unlock: (date, spaceId = '') => request('/api/activity-themes/unlock', { method: 'POST', data: { date, space_id: spaceId } }),
-  },
-  visitVerificationApi: {
-    verify: (date, spaceId = '') => request('/api/visit-verifications/verify', { method: 'POST', data: { date, space_id: spaceId } }),
-    unverify: (date, spaceId = '') => request('/api/visit-verifications/unverify', { method: 'POST', data: { date, space_id: spaceId } }),
-  },
   activityParticipantNoteApi,
   // 客户跟进：自己填过的客户信息 / 跟进点
   customerFollowUpApi: {
@@ -1004,6 +1014,7 @@ module.exports = {
   dailyGroupingApi,
   courseTypeApi,
   uploadPublicImage,
+  downloadFile,
   PAYMENT_PROJECT_TYPES,
   groupCaseSessionApi,
   emotionalReleaseSessionApi,

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.membership_card import MembershipCardCreate
 from app.services import customer_access_service, membership_card_service
-from app.utils.pagination import paginate
+from app.utils.payment_list import payment_list_response
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -26,18 +26,10 @@ def list_cards(request: Request, page: int | None = Query(None, ge=1), page_size
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
     if card_type:
         items_dict = [i for i in items_dict if i.get("card_type") == card_type]
-    items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    # 余量不参与筛选/排序，只计算真正要返回的这一页，沿用现有扣卡口径。
-    paginated = paginate(items_dict, page, page_size or 10) if page is not None else None
-    if paginated is not None:
-        items_dict = paginated["items"]
-    # 统一使用 service 层计算有效剩余（总购买 - 销卡 - 活动扣卡）
-    for item in items_dict:
+    def decorate(item):
         card_id = item.get("id", "")
         item["effective_remaining"] = membership_card_service.get_card_effective_remaining(card_id)
-    if paginated is not None:
-        return {**paginated, "items": items_dict}
-    return items_dict
+    return payment_list_response(request, items_dict, page, page_size, subtype_field='card_type', decorate=decorate)
 
 
 @router.get("/search-customers")

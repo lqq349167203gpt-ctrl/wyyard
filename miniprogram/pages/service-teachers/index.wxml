@@ -124,6 +124,7 @@
     </view>
 
     <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="empty" wx:elif="{{loadError}}" bindtap="retryLoad">{{loadError}} · 点击重试</view>
     <view class="empty" wx:elif="{{activeTab === 'courses' && courseViewTab === 'courses' && courseRecords.length === 0}}">暂无课程记录</view>
     <view class="empty" wx:elif="{{activeTab === 'courses' && courseViewTab === 'reviews' && reviewRecords.length === 0}}">所选时间范围内暂无复盘记录</view>
     <view class="empty" wx:elif="{{activeTab === 'follow-ups' && followUpRecords.length === 0}}">暂无客户记录</view>
@@ -197,6 +198,7 @@
         </view>
       </view>
       <view class="loading" wx:if="{{participantLoading}}">加载中...</view>
+      <view class="empty" wx:elif="{{loadError}}" bindtap="retryLoad">{{loadError}} · 点击重试</view>
       <view class="empty" wx:elif="{{!participantGroups.length}}">所选条件下暂无参与者</view>
     </block>
 

@@ -1,4 +1,5 @@
 const { clientApi, resolveResourceUrl, cacheImage } = require('../../utils/api')
+const { beginRead, disposeReads } = require('../../utils/read-scope')
 
 // 类型标签 pastel 配色数量（与 wxss 中 tag-t1~t4 对应）
 const TYPE_CLASS_COUNT = 4
@@ -97,9 +98,11 @@ Page({
   },
 
   loadActivities() {
-    this.setData({ loading: true })
+    const isCurrent = beginRead(this, 'activities')
+    this.setData({ loading: true, loadError: '' })
     return clientApi.listActivities(1, this.data.pageSize)
       .then(res => {
+        if (!isCurrent()) return
         const items = (res.items || []).map(item => this._decorate(item))
         const selectedDate = this._pickInitialDate(items)
         this.setData({
@@ -121,17 +124,19 @@ Page({
           if (!shouldMoveToActivityDate) this._refreshTheme()
         })
       })
-      .catch(() => {
-        this.setData({ loading: false })
+      .catch(error => {
+        if (isCurrent()) this.setData({ loading: false, loadError: error.message || '活动加载失败，请重试' })
       })
   },
 
   loadMore() {
+    const isCurrent = beginRead(this, 'activities')
     const nextPage = this.data.page + 1
     this.setData({ loading: true })
-    clientApi.listActivities(nextPage, this.data.pageSize)
+    return clientApi.listActivities(nextPage, this.data.pageSize)
       .then(res => {
-        const all = [...this.data.activities, ...(res.items || []).map(item => this._decorate(item))]
+        if (!isCurrent()) return
+        const all = Array.from(new Map([...this.data.activities, ...(res.items || []).map(item => this._decorate(item))].map(item => [item.id, item])).values())
         const selectedDate = this.data.selectedStr || this.data.todayStr
         this.setData({
           activities: all,
@@ -147,10 +152,19 @@ Page({
           this._refreshTheme()
         })
       })
-      .catch(() => {
-        this.setData({ loading: false })
+      .catch(error => {
+        if (isCurrent()) this.setData({ loading: false, loadError: error.message || '活动加载失败，请重试' })
       })
   },
+
+  onUnload() {
+    disposeReads(this)
+    this._themeRequestSeq = (this._themeRequestSeq || 0) + 1
+    this._weekDotsRequestKey = ''
+    clearTimeout(this._tapScrollTimer)
+  },
+
+  retryLoad() { return this._refreshSelectedWeek() },
 
   // 周日历：以 anchor 所在周为准（默认已选日期/今天所在周），周一~周日
   _buildWeek(anchor, instantRecenter) {
@@ -246,6 +260,7 @@ Page({
     this._weekDotsRequestKey = requestKey
     return clientApi.listActivitiesByRange(start, end)
       .then(res => {
+        if (this._readsDisposed || this._weekDotsRequestKey !== requestKey) return
         this._actDates = this._actDates || {}
         const cursor = new Date(start.replace(/-/g, '/'))
         const last = new Date(end.replace(/-/g, '/'))
@@ -396,6 +411,8 @@ Page({
   // 统一定位到某天：选中 → 若当天尚未加载则按周补拉数据
   _gotoDate(dateStr) {
     this._lockTapScroll()
+    beginRead(this, 'activities')
+    this.setData({ loading: false, loadError: '' })
     this._syncSelected(dateStr)
     const hasLoaded = this.data.activities.some(item => item.date === dateStr)
     if (!hasLoaded) this._fetchWeekFor(dateStr)
@@ -409,6 +426,8 @@ Page({
 
   // 按周拉取活动：定位新日期时合并，页面刷新时替换当前周
   _fetchWeekFor(dateStr, replaceRange = false) {
+    const isCurrent = beginRead(this, 'activities', () => this.data.selectedStr === dateStr)
+    this.setData({ loading: true, loadError: '' })
     const d = new Date(dateStr.replace(/-/g, '/'))
     const mondayOffset = (d.getDay() + 6) % 7
     const monday = new Date(d)
@@ -419,8 +438,8 @@ Page({
     const end = this._fmtDate(sunday)
     return clientApi.listActivitiesByRange(start, end)
       .then(res => {
+        if (!isCurrent()) return
         const items = (res.items || []).map(item => this._decorate(item))
-        if (!items.length && !replaceRange) return
         const currentItems = replaceRange
           ? this.data.activities.filter(item => item.date < start || item.date > end)
           : this.data.activities
@@ -429,6 +448,7 @@ Page({
         for (const a of items) map[a.id] = a
         const all = Object.values(map)
         this.setData({
+          loading: false,
           activities: all,
           grouped: this._groupForDate(all, dateStr),
           weekCount: this._countInRange(all, this.data.weekStart, this.data.weekEnd),
@@ -437,7 +457,9 @@ Page({
           this._cacheActivityImages(all)
         })
       })
-      .catch(() => {})
+      .catch(error => {
+        if (isCurrent()) this.setData({ loading: false, loadError: error.message || '活动加载失败，请重试' })
+      })
   },
 
   _buildCalendar(year, month) {
@@ -478,6 +500,7 @@ Page({
     const end = this._fmtDate(new Date(year, month, 0))
     return clientApi.listActivitiesByRange(start, end)
       .then(res => {
+        if (this._readsDisposed || !this.data.calVisible || this.data.calYear !== year || this.data.calMonth !== month) return
         this._actDates = this._actDates || {}
         for (const item of (res.items || [])) {
           if (item.date) this._actDates[item.date] = true

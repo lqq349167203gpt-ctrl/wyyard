@@ -1,4 +1,6 @@
 const { clientApi } = require('../../utils/api')
+const { disposeReads } = require('../../utils/read-scope')
+const { loadHistory } = require('../../utils/history-page')
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const ROLE_LABELS = {
@@ -28,16 +30,14 @@ Page({
   },
 
   onShow() {
-    this.loadActivityRecords()
+    this.loadActivityRecords(true)
   },
 
-  async loadActivityRecords() {
-    this.setData({ loading: true })
-    try {
-      const res = await clientApi.getActivityRecords()
+  loadActivityRecords(reset) {
+    return loadHistory(this, reset, params => clientApi.getActivityRecords({ ...params, status: this.data.activeTab }), (records, res) => {
       const now = new Date()
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-      const items = (res.items || []).map(a => {
+      const items = records.map(a => {
         let status = ''
         if (a.date && a.start_time) {
           const actStart = new Date(`${a.date}T${a.start_time}:00`)
@@ -95,7 +95,7 @@ Page({
           timeUndecided,
           badge,
           badgeClass,
-          filterType,
+          filterType: a.filter_type || filterType,
           isToday,
           roleLabel: ROLE_LABELS[a.role] || '参与者',
           displayName: formatActivityName(a.name),
@@ -109,17 +109,19 @@ Page({
 
       this.setData({
         allItems: items,
-        totalCount: items.length,
-        signedUpCount,
-        arrivedCount,
-        missedCount,
+        totalCount: res.summary ? res.summary.total : items.length,
+        signedUpCount: res.summary ? res.summary.signedup : signedUpCount,
+        arrivedCount: res.summary ? res.summary.arrived : arrivedCount,
+        missedCount: res.summary ? res.summary.missed : missedCount,
         loading: false,
       })
       this._buildGroups(items)
-    } catch (e) {
-      this.setData({ loading: false })
-    }
+    })
   },
+
+  onReachBottom() { if (this.data.hasMore && !this.data.loadError) this.loadActivityRecords(false) },
+
+  onUnload() { disposeReads(this) },
 
   _buildGroups(items) {
     const now = new Date()
@@ -178,7 +180,7 @@ Page({
     const tab = e.currentTarget.dataset.tab
     if (tab === this.data.activeTab) return
     this.setData({ activeTab: tab })
-    this._buildGroups(this.data.allItems)
+    this.loadActivityRecords(true)
   },
 
   onFollowupTap(e) {
@@ -193,6 +195,6 @@ Page({
 
   onFollowupSaved() {
     this.setData({ selectedFollowupActivity: null })
-    this.loadActivityRecords()
+    this.loadActivityRecords(true)
   },
 })

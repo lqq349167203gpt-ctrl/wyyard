@@ -1,5 +1,6 @@
-const { customerApi, paymentApi, organizationApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
+const { paymentApi, organizationApi, PAYMENT_PROJECT_TYPES, downloadFile } = require('../../utils/api')
 const { canEditRecord } = require('../../utils/record-ownership')
+const { beginRead, disposeReads } = require('../../utils/read-scope')
 
 const TABS = [
   PAYMENT_PROJECT_TYPES[0],
@@ -129,18 +130,6 @@ function getSubtypeConfig(type) {
   return configs[type] || null
 }
 
-function buildFilterOptions(items, field, selectedValues) {
-  const selected = new Set(selectedValues || [])
-  const countMap = {}
-  items.forEach(item => {
-    const value = String(item[field] || '').trim()
-    if (value) countMap[value] = (countMap[value] || 0) + 1
-  })
-  return Object.keys(countMap)
-    .sort((a, b) => countMap[b] - countMap[a] || a.localeCompare(b, 'zh-CN'))
-    .map(name => ({ name, selected: selected.has(name) }))
-}
-
 function decorateItems(raw, type, organizations) {
   const isHealing = ['group_case', 'emotional_release', 'energy_knot'].includes(type)
   const isOhCard = type === 'oh_card_reading'
@@ -197,6 +186,9 @@ Page({
     searchMode: false,
     hasSearched: true,
     total: 0,
+    page: 1,
+    hasMore: false,
+    loadingMore: false,
     keyword: '',
     showFilterPanel: false,
     filterCount: 0,
@@ -259,8 +251,8 @@ Page({
     this.loadItems().then(() => wx.stopPullDownRefresh())
   },
 
-  onUnload() {
-    if (this._searchTimer) clearTimeout(this._searchTimer)
+  onReachBottom() {
+    if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) this.loadItems(false)
   },
 
   onTabChange(e) {
@@ -274,6 +266,7 @@ Page({
       items: [],
       hasSearched: !this.data.searchMode,
       total: 0,
+      hasMore: false,
       showFilterPanel: false,
       selectedSubtypes: [],
       subtypeLabel: subtypeConfig ? subtypeConfig.label : '',
@@ -288,80 +281,68 @@ Page({
     })
   },
 
-  async loadItems() {
+  async loadItems(reset = true) {
+    if (!reset && (this.data.loading || this.data.loadingMore)) return
+    const page = reset ? 1 : this.data.page + 1
     const requestVersion = (this._loadRequestVersion || 0) + 1
     this._loadRequestVersion = requestVersion
-    this.setData({ loading: true })
+    this.setData({ loading: reset, loadingMore: !reset, loadError: '' })
 
     try {
       const type = TABS[this.data.activeTab].key
       if (type === 'coarse_door_card') {
-        await this.loadCoarseDoorData()
-        if (requestVersion === this._loadRequestVersion) this.setData({ loading: false })
+        await this.loadCoarseDoorData(reset)
+        if (requestVersion === this._loadRequestVersion) this.setData({ loading: false, loadingMore: false })
         return
       }
       const api = paymentApi.getByType(type)
-      // 获取当前类型的完整可见记录，搜索和筛选均在前端完成，避免只筛到第一页。
-      const [res, organizations] = await Promise.all([api.list(), organizationApi.list(), this.loadCustomerSearchIndex()])
+      const hasConditions = Boolean(this.data.keyword.trim() || this.data.selectedCreators.length || this.data.selectedSubtypes.length)
+      const metadataOnly = this.data.searchMode && !hasConditions
+      const [res, organizations] = await Promise.all([
+        api.listPaginated(page, metadataOnly ? 1 : 20, {
+          keyword: this.data.keyword.trim(),
+          creator_names: JSON.stringify(this.data.selectedCreators),
+          subtypes: JSON.stringify(this.data.selectedSubtypes),
+          include_filter_options: true,
+        }),
+        organizationApi.list(),
+      ])
       if (requestVersion !== this._loadRequestVersion) return
       const raw = res.items || res.data || res || []
       const sourceItems = decorateItems(Array.isArray(raw) ? raw : [], type, Array.isArray(organizations) ? organizations : (organizations.items || []))
-      this._sourceItems = sourceItems
-      this.updateFilterOptions(() => this.applyFilters({ loading: false }))
+      this._filterOptions = res
+      const items = metadataOnly ? [] : (reset ? sourceItems : Array.from(new Map(this.data.items.concat(sourceItems).map(item => [item.id, item])).values()))
+      this._failedLoadReset = undefined
+      this.setData({ items, total: metadataOnly ? 0 : res.total, page: res.page || page, hasMore: !metadataOnly && items.length < res.total, hasSearched: !metadataOnly, loading: false, loadingMore: false })
+      this.updateFilterOptions()
     } catch (e) {
       if (requestVersion !== this._loadRequestVersion) return
       console.error('加载付费项目失败:', e)
-      this.setData({ loading: false })
+      this._failedLoadReset = reset
+      this.setData({ loading: false, loadingMore: false, loadError: e.message || '付费记录加载失败，请重试' })
     }
   },
 
-  async loadCustomerSearchIndex() {
-    if (this._customerSearchReady) return
-    if (!this._customerSearchPromise) {
-      this._customerSearchPromise = customerApi.light(1000)
-        .then(customers => {
-          const nameById = {}
-          const nameByNickname = {}
-          ;(Array.isArray(customers) ? customers : []).forEach(customer => {
-            const name = String(customer.name || '').trim().toLowerCase()
-            if (customer.id) nameById[customer.id] = name
-            if (customer.nickname) nameByNickname[customer.nickname] = name
-          })
-          this._customerNameById = nameById
-          this._customerNameByNickname = nameByNickname
-        })
-        .catch(() => {
-          this._customerNameById = {}
-          this._customerNameByNickname = {}
-        })
-        .finally(() => {
-          this._customerSearchReady = true
-          this._customerSearchPromise = null
-        })
-    }
-    await this._customerSearchPromise
-  },
-
-  matchesCustomerKeyword(item, keyword) {
-    if (!keyword) return true
-    const nickname = String(item.nickname || '').toLowerCase()
-    const name = (this._customerNameById || {})[item.customer_id]
-      || (this._customerNameByNickname || {})[item.nickname]
-      || ''
-    return nickname.includes(keyword) || name.includes(keyword)
-  },
-
-  async loadCoarseDoorData() {
-    const records = await paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡' })
+  async loadCoarseDoorData(reset = true) {
+    const isCurrent = beginRead(this, 'coarseRecords', () => TABS[this.data.activeTab].key === 'coarse_door_card')
+    const page = reset ? 1 : this.data.page + 1
+    const records = await paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡', page, page_size: 20 })
+    if (!isCurrent()) return
+    const items = (records.items || []).map(record => Object.assign({}, record, { _canDelete: !record.cancelled && canEditRecord(record, 'payments') }))
+    const coarseRecords = reset ? items : Array.from(new Map(this.data.coarseRecords.concat(items).map(item => [item.id, item])).values())
     this.setData({
-      coarseRecords: (Array.isArray(records) ? records : (records.items || []))
-        .map(record => Object.assign({}, record, { _canDelete: !record.cancelled && canEditRecord(record, 'payments') }))
-        .sort((a, b) => (
-          String(b.deduction_date || b.created_at || '').localeCompare(String(a.deduction_date || a.created_at || ''))
-          || String(b.created_at || '').localeCompare(String(a.created_at || ''))
-        )),
+      coarseRecords, page: records.page || page, total: records.total || 0,
+      hasMore: coarseRecords.length < (records.total || 0),
     })
   },
+
+  onUnload() {
+    disposeReads(this)
+    clearTimeout(this._searchTimer)
+    this._loadRequestVersion = (this._loadRequestVersion || 0) + 1
+  },
+
+  retryLoad() { return this.loadItems(this._failedLoadReset !== false) },
 
   onCoarseEntryOpen() {
     this.setData({ coarseEntryVisible: true, coarseEntryPickerOpen: false, coarseEditData: null })
@@ -413,19 +394,21 @@ Page({
     })
   },
 
-  updateFilterOptions(onComplete) {
-    const sourceItems = this._sourceItems || []
+  updateFilterOptions() {
+    const metadata = this._filterOptions || {}
     const subtypeConfig = getSubtypeConfig(TABS[this.data.activeTab].key)
-    const validCreators = new Set(sourceItems.map(item => String(item.created_by || '').trim()).filter(Boolean))
+    const creatorOptions = metadata.creator_options || []
+    const validCreators = new Set(creatorOptions.map(item => item.name))
     const selectedCreators = this.data.selectedCreators.filter(name => validCreators.has(name))
-    const creatorList = buildFilterOptions(sourceItems, 'created_by', selectedCreators)
+    const creatorList = creatorOptions.map(item => ({ ...item, selected: selectedCreators.includes(item.name) }))
 
     let selectedSubtypes = []
     let subtypeList = []
     if (subtypeConfig) {
-      const validSubtypes = new Set(sourceItems.map(item => String(item[subtypeConfig.field] || '').trim()).filter(Boolean))
+      const subtypeOptions = metadata.subtype_options || []
+      const validSubtypes = new Set(subtypeOptions.map(item => item.name))
       selectedSubtypes = this.data.selectedSubtypes.filter(name => validSubtypes.has(name))
-      subtypeList = buildFilterOptions(sourceItems, subtypeConfig.field, selectedSubtypes)
+      subtypeList = subtypeOptions.map(item => ({ ...item, selected: selectedSubtypes.includes(item.name) }))
     }
 
     this.setData({
@@ -437,7 +420,6 @@ Page({
       selectedSubtypes,
     }, () => {
       this.updateFilterCount()
-      if (onComplete) onComplete()
     })
   },
 
@@ -457,26 +439,10 @@ Page({
     this.setData({ filterCount: count })
   },
 
-  applyFilters(extraData) {
-    const keyword = this.data.keyword.trim().toLowerCase()
-    const selectedCreators = new Set(this.data.selectedCreators)
-    const selectedSubtypes = new Set(this.data.selectedSubtypes)
-    const subtypeField = this.data.subtypeField
-    const hasConditions = Boolean(keyword || selectedCreators.size || selectedSubtypes.size)
-    if (this.data.searchMode && !hasConditions) {
-      this.setData(Object.assign({ items: [], total: 0, hasSearched: false }, extraData || {}))
-      return
-    }
-    const items = (this._sourceItems || []).filter(item => {
-      if (!this.matchesCustomerKeyword(item, keyword)) return false
-      if (selectedCreators.size && !selectedCreators.has(String(item.created_by || '').trim())) return false
-      if (subtypeField && selectedSubtypes.size && !selectedSubtypes.has(String(item[subtypeField] || '').trim())) return false
-      return true
-    })
-    this.setData(Object.assign({ items, total: items.length, hasSearched: true }, extraData || {}))
-  },
+  applyFilters() { return this.loadItems(true) },
 
   onSearchInput(e) {
+    this._loadRequestVersion = (this._loadRequestVersion || 0) + 1
     this.setData({ keyword: e.detail.value })
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this._searchTimer = setTimeout(() => this.applyFilters(), 300)
@@ -650,7 +616,7 @@ Page({
     return '付费项目_' + data.exportDateFrom + '至' + data.exportDateTo + '.xlsx'
   },
 
-  onExportConfirm() {
+  async onExportConfirm() {
     if (this.data.exporting) return
     if (this.data.exportRangeType === 'custom' && this.data.exportDateFrom > this.data.exportDateTo) {
       wx.showToast({ title: '开始日期不能晚于结束日期', icon: 'none' })
@@ -659,57 +625,18 @@ Page({
     this.setData({ exporting: true })
     wx.showLoading({ title: '正在导出...' })
     const params = this.getExportParams()
-    wx.downloadFile({
-      url: paymentApi.export(params),
-      header: { Authorization: 'Bearer ' + (wx.getStorageSync('auth_token') || '') },
-      success: (res) => {
-        if (res.statusCode !== 200) {
-          wx.hideLoading()
-          this.setData({ exporting: false })
-          wx.getFileSystemManager().readFile({
-            filePath: res.tempFilePath,
-            encoding: 'utf8',
-            success: (file) => {
-              let message = '导出失败'
-              try { message = JSON.parse(file.data).detail || message } catch (e) {}
-              wx.showToast({ title: message, icon: 'none' })
-            },
-            fail: () => wx.showToast({ title: '导出失败', icon: 'none' }),
-          })
-          return
-        }
-        const filePath = `${wx.env.USER_DATA_PATH}/${this.getExportFilename()}`
-        const fileSystem = wx.getFileSystemManager()
-        const openFile = (path) => {
-          wx.hideLoading()
-          this.setData({ exporting: false, exportDialogVisible: false })
-          wx.openDocument({
-            filePath: path,
-            fileType: 'xlsx',
-            showMenu: true,
-            fail: () => wx.showToast({ title: '无法打开文件', icon: 'none' }),
-          })
-        }
-        fileSystem.readFile({
-          filePath: res.tempFilePath,
-          success: (file) => {
-            fileSystem.writeFile({
-              filePath,
-              data: file.data,
-              encoding: 'binary',
-              success: () => openFile(filePath),
-              fail: () => openFile(res.tempFilePath),
-            })
-          },
-          fail: () => openFile(res.tempFilePath),
-        })
-      },
-      fail: () => {
-        wx.hideLoading()
-        this.setData({ exporting: false })
-        wx.showToast({ title: '下载失败', icon: 'none' })
-      },
-    })
+    const filename = this.getExportFilename()
+    try {
+      const filePath = await downloadFile(paymentApi.export(params), filename)
+      if (this._readsDisposed) return
+      this.setData({ exportDialogVisible: false })
+      wx.openDocument({ filePath, fileType: 'xlsx', showMenu: true, fail: () => wx.showToast({ title: '无法打开文件', icon: 'none' }) })
+    } catch (error) {
+      wx.showToast({ title: error.message || '导出失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      if (!this._readsDisposed) this.setData({ exporting: false })
+    }
   },
 
 })

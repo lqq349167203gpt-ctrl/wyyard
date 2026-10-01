@@ -1,4 +1,5 @@
 const { paymentApi, organizationApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
+const { beginRead, disposeReads } = require('../../utils/read-scope')
 
 const TYPE_NAMES = {}
 PAYMENT_PROJECT_TYPES.forEach(t => { TYPE_NAMES[t.key] = t.label })
@@ -44,6 +45,7 @@ Page({
     if (!getApp().checkLogin()) return
     const type = options.type || 'membership_card'
     this.setData({ type, typeName: TYPE_NAMES[type] || '付费项目' })
+    this._recordId = options.id
     this.loadOrganizations()
     if (options.id) {
       this.loadItem(options.id, type)
@@ -58,16 +60,34 @@ Page({
   },
 
   async loadOrganizations() {
+    const isCurrent = beginRead(this, 'organizations')
+    this.setData({ organizationError: '' })
     try {
       const orgs = await organizationApi.list()
+      if (!isCurrent()) return
       this.setData({ organizations: orgs || [] })
-    } catch (e) {}
+      this.updateOrganizationName()
+    } catch (e) {
+      if (isCurrent()) this.setData({ organizationError: e.message || '组织加载失败，点击重试' })
+    }
   },
 
+  updateOrganizationName() {
+    if (!this.data.item) return
+    const org = this.data.organizations.find(item => item.id === this.data.item.organization_id)
+    this.setData({ 'item._orgName': org ? org.name : '' })
+  },
+
+  onUnload() { disposeReads(this) },
+  retryLoad() { return this.loadItem(this._recordId, this.data.type) },
+
   async loadItem(id, type) {
+    const isCurrent = beginRead(this, 'item')
+    this.setData({ loading: true, loadError: '' })
     try {
       const api = paymentApi.getByType(type)
       const item = await api.get(id)
+      if (!isCurrent()) return
       if (!item) {
         wx.showToast({ title: '记录不存在', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1500)
@@ -122,9 +142,10 @@ Page({
           : Boolean(item.created_by && actorName && item.created_by === actorName))
       this.setData({ item, canEdit, loading: false })
     } catch (e) {
+      if (!isCurrent()) return
       console.error('加载详情失败:', e)
       wx.showToast({ title: '加载失败', icon: 'none' })
-      this.setData({ loading: false })
+      this.setData({ loading: false, loadError: e.message || '记录加载失败，点击重试' })
     }
   },
 

@@ -1,4 +1,5 @@
 const { auditCheckApi, activityThemeApi, visitVerificationApi, spaceApi, classRecordApi } = require('../../utils/api')
+const { beginRead, disposeReads } = require('../../utils/read-scope')
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
@@ -33,6 +34,7 @@ Page({
     filterIndex: 0,
     kinds: null,
     days: [],
+    page: 1, totalDays: 0, hasMore: false, loadingMore: false,
     summary: null,
     loading: false, error: '',
     busy: false,
@@ -48,7 +50,7 @@ Page({
     const today = fmt(new Date())
     this.setData({ dateFrom: this.data.lockStart, dateTo: today, timePreset: 'all', timePresetIndex: 4 })
     // 使用课表/邀约页当前选择的空间，核对页不再单独切换空间
-    this.loadSpaces().then(loaded => { if (loaded) this.load() })
+    this.load()
   },
 
   onShow() {
@@ -56,18 +58,25 @@ Page({
   },
 
   onUnload() {
-    if (this._renderTimer) clearTimeout(this._renderTimer)
+    this._seq = (this._seq || 0) + 1
+    disposeReads(this)
+  },
+
+  onReachBottom() {
+    if (this.data.hasMore && !this.data.loading && !this.data.loadingMore) this.load(false)
   },
 
   async loadSpaces() {
+    const isCurrent = beginRead(this, 'spaces')
     try {
       const spaces = await spaceApi.list()
+      if (!isCurrent()) return false
       if (!spaces || !spaces.length) throw new Error('暂无可核对的空间')
       const savedIndex = Number(wx.getStorageSync(this.data.mode === 'course' ? 'activity_space_index' : 'visit_space_index')) || 0
       this.setData({ spaces, spaceIndex: Math.min(Math.max(savedIndex, 0), spaces.length - 1) })
       return true
     } catch (e) {
-      this.setData({ error: e.message || '空间加载失败，请重试' })
+      if (isCurrent()) this.setData({ error: e.message || '空间加载失败，请重试' })
       return false
     }
   },
@@ -154,12 +163,15 @@ Page({
     }
   },
 
-  async load() {
-    // 与 PC 端一致：当前状态的日期一次查全，不截在最近 10 天
+  async load(reset = true) {
+    if (typeof reset !== 'boolean') reset = this._retryReset !== false
+    if (!reset && (this.data.loading || this.data.loadingMore)) return
+    const page = reset ? 1 : this.data.page + 1
     const seq = this._seq = (this._seq || 0) + 1
-    if (this._renderTimer) clearTimeout(this._renderTimer)
-    this.setData({ loading: true, error: '' })
+    this.setData({ loading: reset, loadingMore: !reset, error: '' })
     try {
+      if (!this.data.spaces.length && !await this.loadSpaces()) return
+      if (seq !== this._seq) return
       const result = await auditCheckApi.list({
         startDate: this.data.dateFrom,
         endDate: this.data.dateTo,
@@ -167,30 +179,26 @@ Page({
         spaceId: (this.data.spaces[this.data.spaceIndex] || {}).id || '',
         status: this.data.filters[this.data.filterIndex].value,
         kinds: this.data.kinds === null ? undefined : this.data.kinds,
-        pageSize: 0,
+        page, pageSize: 20,
       })
       if (seq !== this._seq) return
       const lockStart = result.lock_start_date || this.data.lockStart
       if (lockStart !== this.data.lockStart) this.setData({ lockStart })
       const days = (result.days || []).map(day => this.decorateDay(day)).filter(Boolean)
       this.setData({
-        days: days.slice(0, 20),
+        days: reset ? days : Array.from(new Map(this.data.days.concat(days).map(day => [day.date, day])).values()),
+        page: result.page || page, totalDays: result.total_days || 0,
+        hasMore: (result.page || page) < (result.total_pages || 1),
         summary: result.summary || null,
-      }, () => {
-        let shown = 20
-        const append = () => {
-          if (seq !== this._seq || shown >= days.length) return
-          shown = Math.min(shown + 20, days.length)
-          this.setData({ days: days.slice(0, shown) }, () => {
-            if (seq === this._seq && shown < days.length) this._renderTimer = setTimeout(append, 16)
-          })
-        }
-        if (seq === this._seq && shown < days.length) this._renderTimer = setTimeout(append, 16)
       })
+      this._retryReset = undefined
     } catch (e) {
-      if (seq === this._seq) this.setData({ error: e.message || '加载失败', days: [] })
+      if (seq === this._seq) {
+        this._retryReset = reset
+        this.setData({ error: e.message || '加载失败' })
+      }
     } finally {
-      if (seq === this._seq) this.setData({ loading: false })
+      if (seq === this._seq) this.setData({ loading: false, loadingMore: false })
     }
   },
 

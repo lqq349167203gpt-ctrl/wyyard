@@ -465,7 +465,7 @@ def current_remaining_by_customer(customer_ids: set[str]) -> dict[str, int]:
     return result
 
 
-def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, space_id: Optional[str] = None) -> List[VisitRecord]:
+def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, space_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[VisitRecord]:
 
     records = [v for v in _visits.values() if not v.is_deleted]
     if date:
@@ -474,6 +474,10 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
         records = [r for r in records if r.customer_id == customer_id]
     if space_id is not None:
         records = [r for r in records if r.space_id == space_id]
+    if start_date:
+        records = [r for r in records if r.visit_date >= start_date]
+    if end_date:
+        records = [r for r in records if r.visit_date <= end_date]
 
     # 旧版来访需求曾直接存放在邀约主记录中。列表读取前迁移到录入人私有记录，
     # 并清空公共字段，避免后续新增的统计或导出入口意外泄露他人内容。

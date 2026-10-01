@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.other_project import OtherProjectCreate
 from app.models.other_project_deduction import OtherProjectDeductionCreate
 from app.services import customer_access_service, other_project_deduction_service, other_project_service
-from app.utils.pagination import paginate
+from app.utils.payment_list import payment_list_response
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -17,7 +17,6 @@ def list_projects(request: Request, page: int | None = Query(None, ge=1), page_s
     items = []
     for p in projects:
         d = p.model_dump(mode="json")
-        d["remaining_count"] = other_project_service.get_effective_remaining(p.id)
         items.append(d)
     items = customer_access_service.filter_record_dicts(request, items)
     if customer_ids:
@@ -29,10 +28,9 @@ def list_projects(request: Request, page: int | None = Query(None, ge=1), page_s
     if closer_name:
         kw = closer_name.lower()
         items = [i for i in items if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
-    items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    if page is not None:
-        return paginate(items, page, page_size or 10)
-    return items
+    def decorate(item):
+        item['remaining_count'] = other_project_service.get_effective_remaining(item['id'])
+    return payment_list_response(request, items, page, page_size, subtype_field='project_name', decorate=decorate)
 
 
 @router.get("/search-customers")

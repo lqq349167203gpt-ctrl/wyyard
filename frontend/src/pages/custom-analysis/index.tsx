@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import { Copy, Download, GripVertical, Plus, Save, Trash2, X } from "lucide-react"
 
 import { AnalysisDatePicker } from "@/components/analysis-date-picker"
@@ -171,11 +171,19 @@ function formatMetricValue(value: number, valueFormat: "number" | "currency", un
 
 export default function CustomAnalysisPage() {
   const [metadata, setMetadata] = useState<AnalysisMetadata | null>(null)
-  const [plan, setPlan] = useState<AnalysisPlan>(defaultPlan)
+  const [plan, setPlanState] = useState<AnalysisPlan>(defaultPlan)
+  const queryVersion = useRef(0)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [templates, setTemplates] = useState<AnalysisTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [executing, setExecuting] = useState(false)
+  // 条件改动与重置使旧查询失效，服务端返回计划则只规范化当前查询。
+  const setPlan: Dispatch<SetStateAction<AnalysisPlan>> = update => {
+    queryVersion.current += 1
+    setExecuting(false)
+    setPlanState(update)
+  }
+  useEffect(() => () => { queryVersion.current += 1 }, [])
   const [exporting, setExporting] = useState(false)
   const [metadataLoading, setMetadataLoading] = useState(true)
   const [error, setError] = useState("")
@@ -397,16 +405,19 @@ export default function CustomAnalysisPage() {
       setError(`${incompleteGroup?.name}：“${fieldLabels[incomplete.field]}”的筛选值还没填，${verb}后再查询`)
       return
     }
+    const version = ++queryVersion.current
     setExecuting(true)
     setError("")
     try {
       const data = await customAnalysisApi.execute(nextPlan, page, 20)
+      if (version !== queryVersion.current) return
       setResult(data)
-      setPlan(clonePlan(data.plan, allowedColumnFields))
+      setPlanState(clonePlan(data.plan, allowedColumnFields))
     } catch (requestError) {
+      if (version !== queryVersion.current) return
       setError(requestError instanceof Error ? requestError.message : "查询失败，请稍后重试")
     } finally {
-      setExecuting(false)
+      if (version === queryVersion.current) setExecuting(false)
     }
   }
 

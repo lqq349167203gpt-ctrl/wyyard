@@ -3,6 +3,7 @@
     <text class="loading-text">加载中...</text>
   </view>
 
+  <view wx:elif="{{loadError && !items.length && !purchaseSummary.length}}" class="empty-box" bindtap="loadDeductions">{{loadError}} · 点击重试</view>
   <block wx:else>
     <view wx:if="{{purchaseSummary.length}}" class="entitlement-section">
       <view class="section-heading">
@@ -64,10 +65,10 @@
     <view class="record-heading section-heading">
       <text class="section-title">销卡记录</text>
       <view class="section-rule"></view>
-      <text class="record-count">{{items.length}} 条</text>
+      <text class="record-count">{{total}} 条</text>
     </view>
 
-    <view wx:if="{{items.length === 0}}" class="empty-box">
+    <view wx:if="{{items.length === 0 && !loadError}}" class="empty-box">
       <view class="e-icon">
         <view class="e-chime">
           <view class="e-string"></view>
@@ -125,5 +126,8 @@
         </view>
       </block>
     </view>
+    <view wx:if="{{loadError}}" class="history-page-status" bindtap="loadDeductions">{{loadError}} · 点击重试</view>
+    <view wx:elif="{{loadingMore}}" class="history-page-status">加载中...</view>
+    <view wx:elif="{{hasMore}}" class="history-page-status" bindtap="loadDeductions">继续加载</view>
   </block>
 </view>

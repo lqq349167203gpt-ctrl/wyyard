@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.energy_knot import EnergyKnotCreate
 from app.services import customer_access_service, energy_knot_service, energy_knot_session_service
-from app.utils.pagination import paginate
+from app.utils.payment_list import payment_list_response
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -24,13 +24,9 @@ def list_knots(request: Request, page: int | None = Query(None, ge=1), page_size
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
-    items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    # 每张卡独立计算剩余（优先扣最早到期）
-    for item in items_dict:
+    def decorate(item):
         item["effective_remaining"] = energy_knot_session_service.get_purchase_remaining(item.get("id", ""))
-    if page is not None:
-        return paginate(items_dict, page, page_size or 10)
-    return items_dict
+    return payment_list_response(request, items_dict, page, page_size, decorate=decorate)
 
 
 @router.get("/search-customers")

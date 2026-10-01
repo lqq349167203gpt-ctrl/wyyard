@@ -1,4 +1,6 @@
-<view class="pd-container" wx:if="{{!loading && item}}">
+<view wx:if="{{loadError}}" class="pd-container" bindtap="retryLoad">{{loadError}}</view>
+<view class="pd-container" wx:if="{{!loading && !loadError && item}}">
+  <view wx:if="{{organizationError}}" bindtap="loadOrganizations">{{organizationError}}</view>
   <!-- 用户信息 -->
   <view class="pd-card pd-user">
     <text class="pd-username">{{item.nickname}}</text>

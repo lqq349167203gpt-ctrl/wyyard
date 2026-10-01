@@ -2,6 +2,7 @@ const { visitApi, visitNoteApi, spaceApi, customerApi, isOperationCancelled } = 
 const { formatDate, formatTime } = require('../../utils/util')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
+const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
 
 Page({
   data: {
@@ -118,7 +119,7 @@ Page({
 
   async loadCustomers() {
     try {
-      const list = await customerApi.light()
+      const list = await customerApi.selector()
       this.setData({ allCustomers: list })
     } catch (e) {
       console.error('加载客户列表失败:', e)
@@ -127,7 +128,8 @@ Page({
   },
 
   onDateChange(e) {
-    this.setData({ date: e.detail.value, previousNeed: null, previousNeedOpen: false, previousNeedError: '' })
+    invalidateRead(this, 'previousNeed')
+    this.setData({ date: e.detail.value, previousNeed: null, previousNeedOpen: false, previousNeedError: '', previousNeedLoading: false })
   },
 
   onTimeChange(e) {
@@ -203,15 +205,19 @@ Page({
     const { id, nickname } = e.currentTarget.dataset
     const field = this.data.pickerField
     if (field === 'customer') {
+      invalidateRead(this, 'previousNeed')
+      invalidateRead(this, 'visitPurpose')
       this.setData({
         customerId: id,
         customerName: nickname,
         previousNeed: null,
         previousNeedOpen: false,
         previousNeedError: '',
+        previousNeedLoading: false,
         visitPurpose: null,
         visitPurposeOpen: false,
         visitPurposeError: '',
+        visitPurposeLoading: false,
       })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: nickname, referrerHandlerId: id })
@@ -224,15 +230,19 @@ Page({
   onPickerClear(e) {
     const field = e.currentTarget.dataset.field
     if (field === 'customer') {
+      invalidateRead(this, 'previousNeed')
+      invalidateRead(this, 'visitPurpose')
       this.setData({
         customerId: '',
         customerName: '',
         previousNeed: null,
         previousNeedOpen: false,
         previousNeedError: '',
+        previousNeedLoading: false,
         visitPurpose: null,
         visitPurposeOpen: false,
         visitPurposeError: '',
+        visitPurposeLoading: false,
       })
     } else if (field === 'referrerHandler') {
       this.setData({ referrerHandler: '', referrerHandlerId: '' })
@@ -252,15 +262,20 @@ Page({
   },
 
   async loadPreviousNeed() {
-    if (!this.data.customerId || this.data.previousNeedLoading) return
+    if (!this.data.customerId) return
+    const customerId = this.data.customerId
+    const date = this.data.date
+    const isCurrent = beginRead(this, 'previousNeed', () => this.data.customerId === customerId && this.data.date === date)
     this.setData({ previousNeedLoading: true, previousNeedError: '' })
     try {
       const previousNeed = await visitNoteApi.previousVisitNeed(this.data.customerId, this.data.date)
+      if (!isCurrent()) return
       this.setData({ previousNeed, previousNeedError: '' })
     } catch (error) {
+      if (!isCurrent()) return
       this.setData({ previousNeed: null, previousNeedError: error.message || '加载上次需求失败' })
     } finally {
-      this.setData({ previousNeedLoading: false })
+      if (isCurrent()) this.setData({ previousNeedLoading: false })
     }
   },
 
@@ -286,16 +301,20 @@ Page({
   },
 
   async loadVisitPurpose() {
-    if (!this.data.customerId || this.data.visitPurposeLoading) return
+    if (!this.data.customerId) return
+    const customerId = this.data.customerId
+    const isCurrent = beginRead(this, 'visitPurpose', () => this.data.customerId === customerId)
     this.setData({ visitPurposeLoading: true, visitPurposeError: '' })
     try {
       const detail = await customerApi.detail(this.data.customerId)
+      if (!isCurrent()) return
       const visitPurpose = String(detail && detail.customer && detail.customer.tags || '').trim()
       this.setData({ visitPurpose, visitPurposeError: '' })
     } catch (error) {
+      if (!isCurrent()) return
       this.setData({ visitPurpose: null, visitPurposeError: error.message || '加载到访目的失败' })
     } finally {
-      this.setData({ visitPurposeLoading: false })
+      if (isCurrent()) this.setData({ visitPurposeLoading: false })
     }
   },
 
@@ -309,6 +328,8 @@ Page({
     }
     this.setData({ needs: current ? `${current}\n${visitPurpose}` : visitPurpose })
   },
+
+  onUnload() { disposeReads(this) },
 
   onBack() {
     wx.navigateBack()

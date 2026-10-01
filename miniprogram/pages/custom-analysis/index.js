@@ -1,4 +1,5 @@
 const { customAnalysisApi } = require('../../utils/api')
+const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
 
 const VALUELESS_OPERATORS = ['is_empty', 'is_not_empty']
 const CUSTOM_ANALYSIS_DRAFT_PREFIX = 'custom-analysis:last-state:v1'
@@ -333,7 +334,11 @@ Page({
     })
   },
 
-  syncPlanView(inputPlan) {
+  syncPlanView(inputPlan, fromResult = false) {
+    if (!fromResult) {
+      invalidateRead(this, 'query')
+      this.setData({ querying: false, queryError: '' })
+    }
     const metadata = this.data.metadata
     if (!metadata) return
     const plan = clonePlan(inputPlan)
@@ -910,7 +915,8 @@ Page({
       wx.showToast({ title: `请填写「${matched ? matched.label : blankCondition.field}」的值`, icon: 'none' })
       return
     }
-    this.setData({ querying: true })
+    const isCurrent = beginRead(this, 'query')
+    this.setData({ querying: true, queryError: '' })
     try {
       const queryPlan = clonePlan(this.data.plan)
       const normalizeConditions = conditions => conditions.map(condition => {
@@ -924,6 +930,7 @@ Page({
         conditions: normalizeConditions(group.conditions || []),
       }))
       const result = await customAnalysisApi.execute(queryPlan, page, 20)
+      if (!isCurrent()) return
       const fieldMap = {}
       const columnFields = this.data.metadata.column_fields || this.data.metadata.fields || []
       columnFields.forEach(field => { fieldMap[field.value] = field.label })
@@ -963,11 +970,13 @@ Page({
         comparisonResultRows,
         querying: false,
       })
-      this.syncPlanView(result.plan)
+      this.syncPlanView(result.plan, true)
     } catch (e) {
-      this.setData({ querying: false })
+      if (isCurrent()) this.setData({ querying: false, queryError: e.message || '查询失败，请重试' })
     }
   },
+
+  onUnload() { disposeReads(this) },
 
   onPrevPage() {
     if (this.data.result && this.data.result.page > 1) this.execute(this.data.result.page - 1)

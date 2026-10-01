@@ -1,4 +1,6 @@
 <view class="pf-container">
+  <view wx:if="{{customerLoadError}}" class="pf-placeholder" bindtap="_loadCustomers">{{customerLoadError}}</view>
+  <view wx:if="{{organizationLoadError}}" class="pf-placeholder" bindtap="_loadOrganizations">{{organizationLoadError}}</view>
   <view class="pf-card">
     <view class="pf-row">
       <text class="pf-label">成交日期</text>

@@ -275,6 +275,7 @@
       <button class="query-button" loading="{{querying}}" disabled="{{querying}}" bindtap="onQuery">查询</button>
     </view>
 
+    <view class="empty" wx:if="{{queryError}}" bindtap="onQuery">{{queryError}} · 点击重试</view>
     <view class="result-area comparison-result" wx:if="{{result && plan.analysis_mode === 'comparison'}}">
       <view class="result-heading"><text class="result-title">方案对比结果</text><text class="result-total">{{comparisonResultGroups.length}} 个对比组</text></view>
       <view class="comparison-summary-list">
@@ -333,7 +334,7 @@
             </view>
           </view>
         </view>
-        <view class="empty" wx:if="{{resultItems.length === 0}}">暂无符合条件的客户</view>
+        <view class="empty" wx:if="{{resultItems.length === 0 && !queryError}}">暂无符合条件的客户</view>
       </view>
 
       <view class="pagination" wx:if="{{result.total_pages > 1}}">

@@ -1,4 +1,6 @@
-<view class="container">
+<view wx:if="{{sourceError}}" class="empty-hint" bindtap="retrySources">{{sourceError}} · 点击重试</view>
+<view wx:if="{{sourcesLoading}}" class="empty-hint">加载选项中...</view>
+<view class="container" wx:if="{{!isEdit || customerLoaded}}">
   <!-- 基本信息 -->
   <view class="form-card">
     <view class="form-item">

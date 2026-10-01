@@ -1,4 +1,5 @@
 const { paymentApi, customerApi, organizationApi } = require('../../utils/api')
+const { beginRead, disposeReads } = require('../../utils/read-scope')
 
 const CARD_TYPES = [
   { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'month', duration_value: 1 },
@@ -183,6 +184,7 @@ Component({
   },
 
   lifetimes: {
+    detached() { disposeReads(this) },
     attached() {
       this._applyTypeDefaults(this.data.type)
       if (this.data.presetCustomer && this.data.presetCustomer.id) {
@@ -302,11 +304,16 @@ Component({
     },
 
     _loadCustomers() {
-      customerApi.light(1000).then(res => {
+      const isCurrent = beginRead(this, 'customers')
+      this.setData({ customerLoadError: '' })
+      return customerApi.selector().then(res => {
+        if (!isCurrent()) return
         const customers = res || []
         this.setData({ allCustomers: customers })
         this._filterDiagnosisTeachers(customers)
-      }).catch(() => {})
+      }).catch(error => {
+        if (isCurrent()) this.setData({ customerLoadError: error.message || '人员加载失败，点击重试' })
+      })
     },
 
     _filterDiagnosisTeachers(customers) {
@@ -317,7 +324,10 @@ Component({
     },
 
     _loadOrganizations() {
-      organizationApi.list().then(res => {
+      const isCurrent = beginRead(this, 'organizations')
+      this.setData({ organizationLoadError: '' })
+      const loading = organizationApi.list().then(res => {
+        if (!isCurrent()) return
         const orgs = res || []
         const currentOrgId = (this.data.isEdit && this.data.editData ? this.data.editData.organization_id : this.data.formData.organization_id) || ''
         const currentIndex = orgs.findIndex(item => item.id === currentOrgId)
@@ -331,16 +341,20 @@ Component({
           orgIndex,
           'formData.organization_id': orgIndex >= 0 ? orgs[orgIndex].id : '',
         })
-      }).catch(() => {})
+      }).catch(error => {
+        if (isCurrent()) this.setData({ organizationLoadError: error.message || '组织加载失败，点击重试' })
+      })
       if (this.data.type === 'coarse_door_card') {
         const customer = this.data.presetCustomer || this.data.selectedCustomer
         if (customer && customer.id) this._loadCoarseDoorOptions(customer.id)
       }
+      return loading
     },
 
     _loadCoarseDoorOptions(customerId) {
       if (!customerId || this._coarseOptionsCustomerId === customerId) return
       this._coarseOptionsCustomerId = customerId
+      const isCurrent = beginRead(this, 'coarseOptions', () => this._coarseOptionsCustomerId === customerId)
       this.setData({
         coarseOptionsLoading: true,
         coarseCourseOrganizations: [],
@@ -349,7 +363,8 @@ Component({
         coarseCourseIndex: -1,
       })
       const editing = this.data.isEdit ? this.data.editData : null
-      paymentApi.deductions.coarseDoorOptions(customerId, editing ? editing.id : '').then(result => {
+      return paymentApi.deductions.coarseDoorOptions(customerId, editing ? editing.id : '').then(result => {
+        if (!isCurrent()) return
         const courseOrganizations = result.course_organizations || result.organizations || []
         const courses = (result.courses || []).map(item => Object.assign({}, item, {
           _label: `${item.date} ${item.start_time || ''} · ${item.name} · ${item.deduction_count}次`,
@@ -365,6 +380,7 @@ Component({
           coarseOptionsLoading: false,
         })
       }).catch(error => {
+        if (!isCurrent()) return
         this._coarseOptionsCustomerId = ''
         this.setData({ coarseOptionsLoading: false })
         wx.showToast({ title: (error && error.message) || '课程加载失败', icon: 'none' })
@@ -558,6 +574,7 @@ Component({
         this._coarseAllCourses = []
         this.setData({
           selectedCustomer: null,
+          coarseOptionsLoading: false,
           'formData.customer_id': '',
           coarseCourseOrganizations: [],
           coarseCourseOrganizationIndex: -1,

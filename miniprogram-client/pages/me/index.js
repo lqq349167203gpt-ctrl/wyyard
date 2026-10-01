@@ -1,4 +1,5 @@
 const { clientApi } = require('../../utils/api')
+const { beginRead, disposeReads } = require('../../utils/read-scope')
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const ROLE_LABELS = {
@@ -88,8 +89,10 @@ Page({
   },
 
   async loadActivityTimeline() {
+    const isCurrent = beginRead(this, 'timeline')
     try {
-      const res = await clientApi.getActivityRecords({ silentAuth: true })
+      const res = await clientApi.getActivityRecords({ silentAuth: true, timeline: true })
+      if (!isCurrent()) return
       const now = new Date()
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       const items = (res.items || []).map(a => {
@@ -221,14 +224,16 @@ Page({
 
       this.setData({
         activityGroups: truncated,
-        activityTotalCount: items.length,
-        weekCount,
-        'stats.activity_count': items.length,
+        activityTotalCount: res.summary ? res.summary.total : items.length,
+        weekCount: res.summary ? res.summary.week_count : weekCount,
+        'stats.activity_count': res.summary ? res.summary.total : items.length,
       })
     } catch (e) {
-      this._syncGuestState()
+      if (isCurrent()) this._syncGuestState()
     }
   },
+
+  onUnload() { disposeReads(this) },
 
   _syncGuestState() {
     if (getApp().isLoggedIn()) return

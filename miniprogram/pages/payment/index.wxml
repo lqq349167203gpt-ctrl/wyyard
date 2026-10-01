@@ -74,7 +74,7 @@
       <text class="coarse-record-course">{{item.source_activity_name || item.reason}}</text>
       <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}<text wx:if="{{item.source_activity_date}}"> · 课程日期：{{item.source_activity_date}}</text><text wx:if="{{item.organization_name}}"> · 成交归属：{{item.organization_name}}</text><text wx:if="{{item.source_organization_name}}"> · 课程所属：{{item.source_organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
     </view>
-    <view class="empty" wx:if="{{!loading && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
+    <view class="empty" wx:if="{{!loading && !loadError && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
   </view>
 
   <view class="payment-entry-mask" wx:if="{{coarseEntryVisible}}" bindtap="onCoarseEntryClose">
@@ -153,7 +153,7 @@
   </view>
 
   <!-- 列表 -->
-  <view class="list" wx:if="{{!isCoarseDoorTab && items.length > 0}}">
+  <view class="list" wx:if="{{!isCoarseDoorTab && !loadError && items.length > 0}}">
     <view class="card" wx:for="{{items}}" wx:key="id" bindtap="onItemTap" data-item="{{item}}">
       <view class="card-main">
         <view class="card-row1">
@@ -184,13 +184,14 @@
   </view>
 
   <!-- 空状态 -->
-  <view class="empty" wx:if="{{!isCoarseDoorTab && !loading && hasSearched && items.length === 0}}">
+  <view class="empty" wx:if="{{!isCoarseDoorTab && !loading && !loadError && hasSearched && items.length === 0}}">
     <text class="empty-text">{{searchMode ? '没有找到匹配的付费记录' : (keyword || filterCount > 0 ? '没有符合条件的记录' : '暂无数据')}}</text>
     <text class="empty-hint" wx:if="{{searchMode}}">试试更短的昵称或调整筛选条件</text>
   </view>
 
   <!-- 加载中 -->
-  <view class="loading" wx:if="{{loading}}">
+  <view class="empty" wx:if="{{loadError}}" bindtap="retryLoad">{{loadError}} · 点击重试</view>
+  <view class="loading" wx:if="{{loading || loadingMore}}">
     <text class="loading-text">{{searchMode ? '搜索中...' : '加载中...'}}</text>
   </view>
 

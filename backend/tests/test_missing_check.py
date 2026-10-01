@@ -74,10 +74,10 @@ def _patch_activities(monkeypatch, records):
         internal_course_session_service,
     )
 
-    def by_date(date=None):
-        if not date:
-            return records
-        return [record for record in records if getattr(record, "date", "") == date]
+    def by_date(date=None, start_date=None, end_date=None):
+        return [record for record in records if (not date or record.date == date)
+                and (not start_date or record.date >= start_date)
+                and (not end_date or record.date <= end_date)]
 
     monkeypatch.setattr(class_record_service, "list_records", by_date)
     for service in (
@@ -86,7 +86,7 @@ def _patch_activities(monkeypatch, records):
         energy_knot_session_service,
         internal_course_session_service,
     ):
-        monkeypatch.setattr(service, "list_sessions", lambda date=None: [])
+        monkeypatch.setattr(service, "list_sessions", lambda date=None, **kwargs: [])
 
 
 def _patch_customers(monkeypatch, customers=None):
@@ -98,10 +98,10 @@ def _patch_customers(monkeypatch, customers=None):
 def _patch_visits(monkeypatch, visits):
     from app.services import visit_service
 
-    def by_date(date=None, customer_id=None, space_id=None):
-        if not date:
-            return visits
-        return [visit for visit in visits if getattr(visit, "visit_date", "") == date]
+    def by_date(date=None, customer_id=None, space_id=None, start_date=None, end_date=None):
+        return [visit for visit in visits if (not date or visit.visit_date == date)
+                and (not start_date or visit.visit_date >= start_date)
+                and (not end_date or visit.visit_date <= end_date)]
 
     monkeypatch.setattr(
         visit_service,
@@ -201,7 +201,7 @@ def test_energy_knot_intro_is_not_the_body_parts_json(monkeypatch):
         created_by="潘潘",
         created_by_id="acct1",
     )
-    monkeypatch.setattr(energy_knot_session_service, "list_sessions", lambda date=None: [session])
+    monkeypatch.setattr(energy_knot_session_service, "list_sessions", lambda date=None, **kwargs: [session])
 
     result = missing_check_service.check(
         start_date="2026-09-15",

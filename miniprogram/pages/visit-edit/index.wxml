@@ -1,3 +1,4 @@
+<view wx:if="{{sourceError}}" class="empty-hint" bindtap="retrySources">{{sourceError}} · 点击重试</view>
 <view class="container {{readOnly || verified ? 'read-only' : ''}}" wx:if="{{!loading}}">
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>

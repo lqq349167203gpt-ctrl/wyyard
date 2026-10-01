@@ -96,12 +96,40 @@ def check(
     missing_count = 0
     missing_day_count = 0
     unchecked_day_count = 0
+    # 同一查询内只读取一次来源，再按日期分组；不跨请求缓存业务状态。
+    from collections import defaultdict
+
+    from app.services import (
+        class_record_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        group_case_session_service,
+        internal_course_session_service,
+        visit_service,
+    )
+    sources = {day: {} for day in day_list}
+    if day_list and 'course' in scopes:
+        loaders = {'class': class_record_service.list_records, 'gcs': group_case_session_service.list_sessions,
+                   'ers': emotional_release_session_service.list_sessions, 'eks': energy_knot_session_service.list_sessions,
+                   'ics': internal_course_session_service.list_sessions}
+        for kind, load in loaders.items():
+            grouped = defaultdict(list)
+            for record in load(start_date=effective_start, end_date=effective_end):
+                grouped[record.date].append(record)
+            for day in day_list:
+                sources[day][kind] = grouped[day]
+    if day_list and 'visit' in scopes:
+        grouped = defaultdict(list)
+        for record in visit_service.list_visits(space_id=space_id or None, start_date=effective_start, end_date=effective_end):
+            grouped[record.visit_date].append(record)
+        for day in day_list:
+            sources[day]['visit'] = grouped[day]
     for day in day_list:
         entry: dict = {"date": day}
         day_missing = 0
         unchecked = False
         if "course" in scopes:
-            course = _course_block(day, space_id, kinds, customers, visible_customer_ids)
+            course = _course_block(day, space_id, kinds, customers, visible_customer_ids, sources=sources[day])
             entry["course"] = course
             day_missing += course["missing_count"]
             unchecked = unchecked or not course["locked"]
@@ -113,6 +141,7 @@ def check(
                 visible_customer_ids,
                 customers,
                 can_view_need=can_view_visit_need,
+                records=sources[day]['visit'],
             )
             entry["visit"] = visit
             day_missing += visit["missing_count"]
@@ -188,6 +217,7 @@ def _course_rows(
     space_id: str,
     customers: dict,
     visible_customer_ids: set[str] | None,
+    sources: dict | None = None,
 ) -> list[dict]:
     """当天某空间的全部课表活动（含展示字段），字段口径与课表页一致。"""
     from app.services import (
@@ -246,7 +276,7 @@ def _course_rows(
             "kinds": [],
         })
 
-    for record in class_record_service.list_records(day):
+    for record in sources['class'] if sources is not None else class_record_service.list_records(day):
         if space_id and _text(record.space_id) != space_id:
             continue
         add(
@@ -256,15 +286,15 @@ def _course_rows(
             type_label=_text(record.course_type),
             intro=record.course_description,
         )
-    for record in group_case_session_service.list_sessions(day):
+    for record in sources['gcs'] if sources is not None else group_case_session_service.list_sessions(day):
         if space_id and _text(record.space_id) != space_id:
             continue
         add(record, "gcs", title=_text(record.name), type_label=TYPE_LABELS["gcs"], intro=record.description)
-    for record in emotional_release_session_service.list_sessions(day):
+    for record in sources['ers'] if sources is not None else emotional_release_session_service.list_sessions(day):
         if space_id and _text(record.space_id) != space_id:
             continue
         add(record, "ers", title=_text(record.name), type_label=TYPE_LABELS["ers"], intro=record.description)
-    for record in energy_knot_session_service.list_sessions(day):
+    for record in sources['eks'] if sources is not None else energy_knot_session_service.list_sessions(day):
         if space_id and _text(record.space_id) != space_id:
             continue
         add(
@@ -276,7 +306,7 @@ def _course_rows(
             intro=record.course_description,
             body_parts=_eks_body_parts(record.description or ""),
         )
-    for record in internal_course_session_service.list_sessions(day):
+    for record in sources['ics'] if sources is not None else internal_course_session_service.list_sessions(day):
         if space_id and _text(record.space_id) != space_id:
             continue
         add(
@@ -327,11 +357,12 @@ def _visit_rows(
     customers: dict,
     *,
     can_view_need: bool = True,
+    records: list | None = None,
 ) -> list[dict]:
     """当天某空间的邀约记录（已取消的不参与核对），字段口径与邀约页一致。"""
     from app.services import visit_service
 
-    records = visit_service.list_visits(date=day, space_id=space_id or None)
+    records = records if records is not None else visit_service.list_visits(date=day, space_id=space_id or None)
     records = [
         record
         for record in records
@@ -412,11 +443,13 @@ def _course_block(
     kinds: set[str],
     customers: dict,
     visible_customer_ids: set[str] | None,
+    *,
+    sources: dict | None = None,
 ) -> dict:
     from app.services import activity_theme_service
 
     theme = activity_theme_service.get_theme_for_scope(day, space_id)
-    rows = _course_rows(day, space_id, customers, visible_customer_ids)
+    rows = _course_rows(day, space_id, customers, visible_customer_ids, sources)
     missing_count = 0
     for row in rows:
         row["kinds"] = _course_missing(row, kinds)
@@ -445,6 +478,7 @@ def _visit_block(
     customers: dict,
     *,
     can_view_need: bool = True,
+    records: list | None = None,
 ) -> dict:
     from app.services import visit_verification_service
 
@@ -455,6 +489,7 @@ def _visit_block(
         visible_customer_ids,
         customers,
         can_view_need=can_view_need,
+        records=records,
     )
     missing_count = 0
     for row in rows:

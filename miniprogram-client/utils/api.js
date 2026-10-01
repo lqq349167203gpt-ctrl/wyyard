@@ -152,13 +152,19 @@ function performRequest(options) {
       success(res) {
         const headers = res.header || {}
         const newTokenKey = Object.keys(headers).find(key => key.toLowerCase() === 'x-new-token')
-        if (newTokenKey && headers[newTokenKey]) {
+        const currentToken = app.globalData.token || wx.getStorageSync('client_token') || ''
+        if (newTokenKey && headers[newTokenKey] && token && currentToken === token) {
           app.updateToken(headers[newTokenKey])
         }
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
         } else if (res.statusCode === 401) {
+          // 旧请求的 401 不得清掉重新登录后的会话。
+          if (currentToken !== token) {
+            reject(new Error('登录状态已更新，请重试'))
+            return
+          }
           app.clearLogin()
           if (!options.silentAuth) {
             wx.showToast({ title: '请先登录', icon: 'none' })
@@ -198,11 +204,21 @@ const clientApi = {
   },
 
   // 按日期范围查询活动(含过去日期),用于日历定位
-  listActivitiesByRange(startDate, endDate) {
+  async listActivitiesByRange(startDate, endDate) {
     const params = ['page_size=100']
     if (startDate) params.push(`start_date=${startDate}`)
     if (endDate) params.push(`end_date=${endDate}`)
-    return get(`/api/client/activities?${params.join('&')}`)
+    let page = 1
+    let first
+    const items = []
+    do {
+      const result = await get(`/api/client/activities?${params.join('&')}&page=${page}`)
+      if (!first) first = result
+      items.push(...(result.items || []))
+      if (page >= Number(result.total_pages || 1)) break
+      page += 1
+    } while (true)
+    return { ...first, items: Array.from(new Map(items.map(item => [item.id, item])).values()) }
   },
 
   // 活动详情
@@ -232,7 +248,7 @@ const clientApi = {
   // 消息通知
   getNotifications(options) {
     return request({
-      url: `/api/client/notifications?_t=${Date.now()}`,
+      url: '/api/client/notifications',
       method: 'GET',
       header: { 'Cache-Control': 'no-cache' },
       ...options,
@@ -244,13 +260,13 @@ const clientApi = {
   },
 
   // 交易记录
-  getTransactions() {
-    return get('/api/client/transactions')
+  getTransactions(options = {}) {
+    return get(`/api/client/transactions${historyQuery(options)}`, options)
   },
 
   // 活动记录
-  getActivityRecords(options) {
-    return get('/api/client/activity-records', options)
+  getActivityRecords(options = {}) {
+    return get(`/api/client/activity-records${historyQuery(options)}`, options)
   },
 
   // 活动回访（同一场活动重复提交会更新原记录）
@@ -268,9 +284,15 @@ const clientApi = {
   },
 
   // 销卡记录
-  getDeductions() {
-    return get(`/api/client/deductions?_t=${Date.now()}`)
+  getDeductions(options = {}) {
+    return get(`/api/client/deductions${historyQuery(options)}`, options)
   },
+}
+
+function historyQuery(options) {
+  const fields = ['page', 'page_size', 'status', 'timeline']
+  const params = fields.filter(key => options[key] !== undefined).map(key => `${key}=${encodeURIComponent(options[key])}`)
+  return params.length ? '?' + params.join('&') : ''
 }
 
 // 微信登录 API

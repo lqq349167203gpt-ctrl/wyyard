@@ -1,6 +1,7 @@
 import uuid
 from datetime import date as date_cls
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
@@ -22,6 +23,7 @@ from app.services import (
 )
 from app.services.customer_service import get_customer, list_customers
 from app.services.storage import load_data, save_item
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/client", tags=["client"])
 
@@ -423,39 +425,38 @@ def list_activities(
         if end_date:
             items = [i for i in items if i["date"] <= end_date]
 
-    # 注入名称
-    customer_map = _build_customer_map()
-    space_map, room_map = _get_space_map()
-
-    signups_by_activity = _signup_map()
-    formatted = []
-    for item in items:
-        activity = _format_activity(item, customer_map, space_map, room_map)
-        activity["signup_count"] = _activity_signup_count(item, signups_by_activity.get(item["id"], []))
-        formatted.append(activity)
-
+    # 先按原始日期/时间排序和分页，再补当前页展示字段，避免格式化整个活动库。
+    def order_key(item):
+        return item['date'], item['data'].get('start_time') or ''
     if has_date_range:
         # 日历范围内按日期、时间顺序展示
-        formatted.sort(key=lambda x: (x["date"], x["start_time"] or ""))
+        items.sort(key=order_key)
     else:
         # 默认列表优先最近的未来活动；没有未来活动时紧接最近的历史活动
         today = date_cls.today().isoformat()
         upcoming = sorted(
-            (item for item in formatted if item["date"] >= today),
-            key=lambda x: (x["date"], x["start_time"] or ""),
+            (item for item in items if item["date"] >= today),
+            key=order_key,
         )
         past = sorted(
-            (item for item in formatted if item["date"] < today),
-            key=lambda x: (x["date"], x["start_time"] or ""),
+            (item for item in items if item["date"] < today),
+            key=order_key,
             reverse=True,
         )
-        formatted = upcoming + past
+        items = upcoming + past
 
     # 分页
-    total = len(formatted)
+    total = len(items)
     start = (page - 1) * page_size
     end = start + page_size
-    paged = formatted[start:end]
+    customer_map = _build_customer_map()
+    space_map, room_map = _get_space_map()
+    signups_by_activity = _signup_map()
+    paged = []
+    for item in items[start:end]:
+        activity = _format_activity(item, customer_map, space_map, room_map)
+        activity['signup_count'] = _activity_signup_count(item, signups_by_activity.get(item['id'], []))
+        paged.append(activity)
 
     return {
         "items": paged,
@@ -755,17 +756,40 @@ def _build_client_purchased_projects(
 
 
 @router.get("/transactions")
-def get_transactions(request: Request):
+def get_transactions(request: Request, page: int | None = None, page_size: int = 20):
     """交易记录 — 当前客户的购买记录"""
     customer_id = _current_customer_id(request)
     if not customer_id:
         raise HTTPException(status_code=401, detail="请先登录")
     records = _build_payment_records(customer_id)
-    return {"items": records, "total": len(records)}
+    return _history_page(records, page, page_size)
+
+
+def _history_page(items, page, page_size):
+    """旧调用保持全量；新调用显式分页，不从当前页推算汇总。"""
+    if page is None:
+        return {"items": items, "total": len(items)}
+    if page < 1 or not 1 <= page_size <= 100:
+        raise HTTPException(422, '页码或每页条数不正确')
+    return paginate(items, page, page_size)
+
+
+def _activity_filter_type(activity, now):
+    if activity.get('withdrawn'):
+        return 'withdrawn'
+    day = activity.get('date') or ''
+    ended = bool(day) and day < now.date().isoformat()
+    if day == now.date().isoformat() and activity.get('start_time') and activity.get('end_time'):
+        ended = activity['end_time'] <= now.strftime('%H:%M')
+    if day == now.date().isoformat() and not ended:
+        return 'signedup'
+    if activity.get('arrived'):
+        return 'arrived'
+    return 'missed' if ended else 'signedup'
 
 
 @router.get("/activity-records")
-def get_activity_records(request: Request):
+def get_activity_records(request: Request, page: int | None = None, page_size: int = 20, status: str = 'all', timeline: bool = False):
     """活动记录 — 当前客户参与的全部活动，不受发布状态限制。"""
     customer_id = _current_customer_id(request)
     if not customer_id:
@@ -785,12 +809,28 @@ def get_activity_records(request: Request):
     # 补充到场状态和活动时间
     for act in activities:
         act["arrived"] = not act.get("withdrawn", False) and act.get("date", "") in visit_dates
-        _enrich_activity_time(act)
+        # 聚合来源已包含课程时间，避免每条记录重新遍历全部课程。
         followup = followups.get(act["activity_key"])
         act["has_followup"] = followup is not None
         act["followup_content"] = followup.content if followup else ""
 
-    return {"items": activities, "total": len(activities)}
+    now = datetime.now(ZoneInfo('Asia/Shanghai'))
+    week_start = now.date() - timedelta(days=(now.weekday() + 1) % 7)
+    summary = {'total': len(activities), 'week_count': sum(week_start.isoformat() <= (a.get('date') or '') <= (week_start + timedelta(days=6)).isoformat() for a in activities)}
+    for act in activities:
+        act['filter_type'] = _activity_filter_type(act, now)
+    for key in ('signedup', 'arrived', 'missed', 'withdrawn'):
+        summary[key] = sum(a['filter_type'] == key for a in activities)
+    if status not in ('all', 'signedup', 'arrived', 'missed', 'withdrawn'):
+        raise HTTPException(422, '活动状态不正确')
+    selected = activities if status == 'all' else [a for a in activities if a['filter_type'] == status]
+    if timeline:
+        today = now.date().isoformat()
+        selected = ([a for a in selected if a.get('date') == today]
+                    + sorted((a for a in selected if a.get('date', '') > today), key=lambda a: a['date'])
+                    + sorted((a for a in selected if a.get('date', '') < today), key=lambda a: a.get('date', ''), reverse=True))
+        return {'items': selected[:7], 'total': len(selected), 'summary': summary}
+    return {**_history_page(selected, page, page_size), 'summary': summary}
 
 
 @router.get("/activity-followups")
@@ -987,7 +1027,7 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
 
 
 @router.get("/deductions")
-def get_deductions(request: Request, response: Response):
+def get_deductions(request: Request, response: Response, page: int | None = None, page_size: int = 20):
     """销卡记录 — 后台手工销卡 + 活动会员权益使用 + 专项项目使用"""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     customer_id = _current_customer_id(request)
@@ -1000,8 +1040,7 @@ def get_deductions(request: Request, response: Response):
     return {
         "purchase_summary": purchase_summary,
         "projects": projects,
-        "items": items,
-        "total": len(items),
+        **_history_page(items, page, page_size),
     }
 
 

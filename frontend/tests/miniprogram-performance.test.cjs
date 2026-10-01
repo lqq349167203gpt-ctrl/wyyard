@@ -195,7 +195,7 @@ test('客户重筛不等待旧请求，完整目录保留未加载页的引流�
   const requests = []
   const p = page('miniprogram/pages/customers/index.js', { customerApi: {
     list: params => { const d = deferred(); requests.push({ ...d, params }); return d.promise },
-    light: async () => [{ id: 'a', nickname: '引流甲', referrer: '' }, { id: 'b', nickname: '引流乙', referrer: '' },
+    selector: async () => [{ id: 'a', nickname: '引流甲', referrer: '' }, { id: 'b', nickname: '引流乙', referrer: '' },
       { id: 'unloaded', nickname: '其他客户', referrer: '引流乙' }],
   } })
   p.restoreScrollAnchor = () => {}

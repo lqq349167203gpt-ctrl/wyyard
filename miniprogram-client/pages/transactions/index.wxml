@@ -3,6 +3,7 @@
     <text class="loading-text">加载中...</text>
   </view>
 
+  <view wx:elif="{{loadError && !items.length}}" class="empty-box" bindtap="loadTransactions">{{loadError}} · 点击重试</view>
   <view wx:elif="{{items.length === 0}}" class="empty-box">
     <view class="e-icon">
       <view class="e-chime">
@@ -47,5 +48,8 @@
         </view>
       </view>
     </block>
+    <view wx:if="{{loadError}}" class="history-page-status" bindtap="loadTransactions">{{loadError}} · 点击重试</view>
+    <view wx:elif="{{loadingMore}}" class="history-page-status">加载中...</view>
+    <view wx:elif="{{hasMore}}" class="history-page-status" bindtap="loadTransactions">继续加载</view>
   </view>
 </view>

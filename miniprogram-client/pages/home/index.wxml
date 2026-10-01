@@ -64,6 +64,7 @@
   </view>
 
   <!-- 空状态 -->
+  <view wx:elif="{{loadError}}" class="empty" bindtap="retryLoad">{{loadError}} · 点击重试</view>
   <view wx:elif="{{!loading && grouped.length === 0}}" class="empty">
     <view class="e-icon">
       <view class="e-chime">

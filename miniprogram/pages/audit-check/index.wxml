@@ -32,7 +32,7 @@
   </view>
 
   <view class="summary" wx:if="{{summary}}">共 {{summary.day_count}} 天 · {{summary.unchecked_day_count}} 天未核对 · 缺信息 {{summary.missing_count}} 条</view>
-  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{error}}" class="error" bindtap="load">{{error}} · 点击重试</view>
 
   <view class="day-card" wx:for="{{days}}" wx:key="date" wx:for-item="day" wx:for-index="di">
     <view class="day-head">
@@ -71,7 +71,7 @@
     </view>
   </view>
 
-  <view class="loading" wx:if="{{loading}}">加载中…</view>
+  <view class="loading" wx:if="{{loading || loadingMore}}">加载中…</view>
   <view class="empty" wx:if="{{!loading && !days.length && !error}}">所选条件下没有要核对的记录</view>
 
   <view class="mask" wx:if="{{detail}}" bindtap="closeDetail"></view>

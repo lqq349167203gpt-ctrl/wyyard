@@ -55,7 +55,7 @@ Page({
 
   async loadActiveCustomerNames() {
     try {
-      const customers = await customerApi.light()
+      const customers = await customerApi.selector()
       this._filterCustomers = customers || []
       this.setData({
         activeCustomerNicknames: (customers || []).map(customer => customer.nickname).filter(Boolean),

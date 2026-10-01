@@ -5,6 +5,8 @@ const {
   isOperationCancelled,
 } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
+const { disposeReads } = require('../../utils/read-scope')
+const { readSource, retrySources } = require('../../utils/source-state')
 const {
   ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
   SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
@@ -83,35 +85,33 @@ Page({
     if (!getApp().checkLogin()) return
     if (options.date) this.setData({ date: options.date })
     const savedSpaceId = options.spaceId || ''
+    this._initialSpaceId = savedSpaceId
     await Promise.all([
       this.loadSpaces(savedSpaceId),
       this.loadCourses(),
       this.loadCustomers(),
     ])
+    if (this._readsDisposed) return
     await this.loadDayVisitors(this.data.date)
   },
 
   async loadSpaces(savedSpaceId) {
-    try {
-      const spaces = await spaceApi.list()
+    return readSource(this, 'spaces', () => spaceApi.list(), spaces => {
       const spaceIndex = savedSpaceId
         ? Math.max(0, spaces.findIndex(s => s.id === savedSpaceId))
         : 0
       const space = spaces[spaceIndex]
       const rooms = space?.rooms || []
       this.setData({ spaces, spaceIndex, rooms, roomIndex: 0 })
-    } catch (e) {
-      console.error('加载空间失败:', e)
-    }
+    })
   },
 
   async loadCourses() {
-    try {
-      const [types, organizations] = await Promise.all([
+    return readSource(this, 'courses', () => Promise.all([
         courseTypeApi.list(),
         // 组织名称只用于分组提示；即使组织接口临时失败，也不能阻断课程类型选择。
         organizationApi.list().catch(() => []),
-      ])
+      ]), ([types, organizations]) => {
       const organizationNames = {}
       ;(organizations || []).forEach(organization => {
         organizationNames[organization.id] = organization.name
@@ -136,7 +136,8 @@ Page({
         .forEach((course, index) => courses.push(Object.assign({}, course, {
           showOrganizationHeader: index === 0,
         })))
-      const defaultIndex = courses.findIndex(c => c.name === '读书会')
+      const selectedCourse = this.data.courses[this.data.courseIndex]
+      const defaultIndex = courses.findIndex(c => c.name === (selectedCourse?.name || '读书会'))
       const courseIndex = defaultIndex >= 0 ? defaultIndex : -1
 
       // 构建合并列表：非 class 类型 + 课程类型
@@ -151,23 +152,25 @@ Page({
       if (courseIndex >= 0) {
         unifiedIndex = unifiedTypes.findIndex(t => !t.isType && t.courseName === courses[courseIndex].name)
       }
+      if (this.data.activityType !== 'class') {
+        unifiedIndex = unifiedTypes.findIndex(t => t.isType && t.value === this.data.activityType)
+      }
       if (unifiedIndex < 0) unifiedIndex = 0
 
-      const typeLabel = courseIndex >= 0 ? courses[courseIndex].name : '沙龙活动'
+      const typeLabel = this.data.activityType !== 'class'
+        ? TYPE_LABELS[this.data.activityType]
+        : (courseIndex >= 0 ? courses[courseIndex].name : '沙龙活动')
       this.setData({ courses, courseIndex, unifiedTypes, unifiedIndex, typeLabel })
-    } catch (e) {
-      console.error('加载课程类型失败:', e)
-    }
+    })
   },
 
   async loadCustomers() {
-    try {
-      const customers = await customerApi.light()
+    return readSource(this, 'people', () => customerApi.selector(), customers => {
       this.setData({ allCustomers: customers })
-    } catch (e) {
-      console.error('加载客户列表失败:', e)
-    }
+    })
   },
+
+  retrySources() { return retrySources(this, { spaces: () => this.loadSpaces((this.data.spaces[this.data.spaceIndex] || {}).id || this._initialSpaceId), courses: () => this.loadCourses(), people: () => this.loadCustomers(), visitors: () => this.loadDayVisitors(this.data.date) }) },
 
   // ---------- 类型选择弹窗 ----------
 
@@ -435,8 +438,7 @@ Page({
   // ---------- 参与者 ----------
 
   async loadDayVisitors(date) {
-    try {
-      const visits = await visitApi.listLight(date)
+    return readSource(this, 'visitors', () => visitApi.listLight(date), visits => {
       const visitors = (visits || []).map(v => ({
         id: v.customer_id || '',
         nickname: v.customer_nickname || v.nickname || '',
@@ -448,10 +450,10 @@ Page({
         ownerName: ownerStillInvited ? this.data.ownerName : '',
       })
       this.updateParticipantList()
-    } catch (e) {
-      console.error('加载到店人员失败:', e)
-    }
+    }, () => this.data.date === date)
   },
+
+  onUnload() { disposeReads(this) },
 
   updateParticipantList() {
     const { dayVisitors, participantIds } = this.data
@@ -481,6 +483,7 @@ Page({
   // ---------- 提交 ----------
 
   async onSubmit() {
+    if (this.data.sourceError || this.data.sourcesLoading) { wx.showToast({ title: '请等待选项加载完成，失败时点击重试', icon: 'none' }); return }
     const { activityType, date } = this.data
 
     // 校验

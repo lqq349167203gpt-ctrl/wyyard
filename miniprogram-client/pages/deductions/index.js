@@ -1,4 +1,6 @@
 const { clientApi } = require('../../utils/api')
+const { disposeReads } = require('../../utils/read-scope')
+const { loadHistory } = require('../../utils/history-page')
 
 const SOURCE_LABELS = {
   manual: '人工销卡',
@@ -127,23 +129,16 @@ Page({
   },
 
   onShow() {
-    this.loadDeductions()
+    this.loadDeductions(true)
   },
 
-  async loadDeductions() {
-    this.setData({
-      loading: true,
-      items: [],
-      groups: [],
-      purchaseSummary: [],
-    })
-    try {
-      const res = await clientApi.getDeductions()
+  loadDeductions(reset) {
+    return loadHistory(this, reset, params => clientApi.getDeductions(params), (records, res) => {
       const purchaseItems = Array.isArray(res.purchase_summary) && res.purchase_summary.length > 0
         ? res.purchase_summary
         : legacyProjectsToPurchaseSummary(res.projects || [])
       const purchaseSummary = buildPurchaseSummary(purchaseItems)
-      const items = (res.items || []).map(d => {
+      const items = records.map(d => {
         const projectActivityTypeText = d.source === 'project_activity'
           ? (TYPE_LABELS[d.project_type] || d.project_type)
           : ''
@@ -172,10 +167,12 @@ Page({
         groups: this._groupByDate(items),
         loading: false,
       })
-    } catch (e) {
-      this.setData({ loading: false })
-    }
+    })
   },
+
+  onReachBottom() { if (this.data.hasMore && !this.data.loadError) this.loadDeductions(false) },
+
+  onUnload() { disposeReads(this) },
 
   _dateLabel(dateText) {
     if (!dateText) return '其他'

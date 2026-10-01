@@ -4,6 +4,7 @@
 """
 import json
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -71,7 +72,7 @@ def _build_activity_summary(activities: list[dict]) -> list[dict]:
 
 
 @router.get("/{customer_id}")
-def get_customer_detail(customer_id: str, request: Request, date: str | None = None, principal_participant: bool = False, principal_course: str = ""):
+def get_customer_detail(customer_id: str, request: Request, date: str | None = None, principal_participant: bool = False, principal_course: str = "", section: Literal['basic', 'healing', 'activities', 'purchase', 'offline_course', 'payment', 'communication', 'customer_followups'] | None = None):
     """获取单个客户的完整聚合详情"""
     # 客户角色只能查看自己的数据
     user_roles = get_request_roles(request)
@@ -114,11 +115,14 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             include_permissions=True,
         )
         basic["customer_access_permissions"] = permissions
-    basic["visit_count"] = visit_service.count_customer_visits(customer_id)
+    def include(key):
+        return section is None or section == key
+    if include('basic'):
+        basic["visit_count"] = visit_service.count_customer_visits(customer_id)
 
-    purchase_summary = _build_purchase_summary(customer_id) if can_view_cards else []
+    purchase_summary = _build_purchase_summary(customer_id) if can_view_cards and include('purchase') else []
     # date 参数：只返回该日期的活动
-    if not can_view_activities:
+    if not can_view_activities or not include('activities'):
         activities = []
     elif date:
         activities = _build_activities(customer_id, date_filter={date})
@@ -127,21 +131,24 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     healing_records = [
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)
-    ] if can_follow_up else []
-    all_payment_records = _build_payment_records(customer_id, date) if transaction_level != "none" else []
-    basic["total_payment"] = (
-        sum(float(record.get("amount") or 0) for record in all_payment_records if not record.get("voided"))
-        if transaction_level != "none"
-        else None
-    )
-    basic["transaction_count"] = (
-        sum(1 for record in all_payment_records if not record.get("cancelled"))
-        if transaction_level != "none"
-        else None
-    )
-    payment_records = all_payment_records if transaction_level == "detail" else []
-    offline_course_records = _build_offline_course_records(customer_id) if can_view_offline else []
-    visits = visit_service.list_visits(customer_id=customer_id)
+    ] if can_follow_up and include('healing') else []
+    all_payment_records = _build_payment_records(customer_id, date) if transaction_level != "none" and (include('basic') or include('payment')) else []
+    if include('basic'):
+        basic["total_payment"] = (
+            sum(float(record.get("amount") or 0) for record in all_payment_records if not record.get("voided"))
+            if transaction_level != "none"
+            else None
+        )
+        basic["transaction_count"] = (
+            sum(1 for record in all_payment_records if not record.get("cancelled"))
+            if transaction_level != "none"
+            else None
+        )
+    payment_records = all_payment_records if transaction_level == "detail" and include('payment') else []
+    offline_course_records = _build_offline_course_records(customer_id) if can_view_offline and include('offline_course') else []
+    visits = visit_service.list_visits(customer_id=customer_id) if can_follow_up and (include('basic') or include('healing')) else []
+    if include('basic'):
+        basic['first_visit'] = min((v.visit_date for v in visits if v.arrived), default='')
     notes_by_visit: dict[str, list[dict]] = {visit.id: [] for visit in visits}
     actor_id = getattr(request.state, "user_id", "") or ""
     actor_owner = getattr(request.state, "user_owner", "") or ""
@@ -153,7 +160,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             actor_owner,
             actor_username,
         )
-        if can_follow_up
+        if can_follow_up and include('healing')
         else []
     )
     for note in visible_visit_notes:
@@ -171,8 +178,8 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     visit_records = []
     from app.services import daily_customer_note_service
 
-    daily_summaries = daily_customer_note_service.visit_summaries(notes_by_visit) if can_follow_up else {}
-    for visit in (visits if can_follow_up else []):
+    daily_summaries = daily_customer_note_service.visit_summaries(notes_by_visit) if can_follow_up and include('healing') else {}
+    for visit in (visits if can_follow_up and include('healing') else []):
         record = visit.model_dump(mode="json")
         record.update(daily_summaries.get(visit.id, {}))
         record["visit_notes"] = notes_by_visit.get(visit.id, [])
@@ -187,7 +194,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
         visit_records.append(record)
 
     communication_records = []
-    if principal_participant and not is_customer_self and permissions["detail_tabs"]["communication"]:
+    if principal_participant and not is_customer_self and permissions["detail_tabs"]["communication"] and include('communication'):
         from app.services import communication_record_service
         # 此入口只读；用客户 ID 匹配，兼容旧的昵称关联记录。
         communication_records = [
@@ -204,11 +211,11 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
         "activity_followups": [
             record.model_dump(mode="json")
             for record in activity_followup_service.list_followups(customer_id)
-        ] if can_view_followups else [],
+        ] if can_view_followups and include('customer_followups') else [],
         "activity_participant_notes": [
             record.model_dump(mode="json")
             for record in activity_participant_note_service.list_customer_notes(customer_id)
-        ] if can_follow_up and not is_customer_self else [],
+        ] if can_follow_up and not is_customer_self and include('healing') else [],
         "healing_records": healing_records,
         "payment_records": payment_records,
         "offline_course_records": offline_course_records,
@@ -745,6 +752,8 @@ def _build_activities(
             activities.append({
                 "type": "沙龙类型",
                 "date": r.date,
+                "start_time": getattr(r, 'start_time', '') or '',
+                "end_time": getattr(r, 'end_time', '') or '',
                 "name": r.activity_name or r.course_name,
                 "course_type": r.course_type or "",
                 "role": role,
@@ -784,6 +793,8 @@ def _build_activities(
             activities.append({
                 "type": "觉醒游戏",
                 "date": s.date,
+                "start_time": getattr(s, 'start_time', '') or '',
+                "end_time": getattr(s, 'end_time', '') or '',
                 "name": gc_name,
                 "role": role,
                 "host": host,
@@ -823,6 +834,8 @@ def _build_activities(
             activities.append({
                 "type": "情绪释放",
                 "date": s.date,
+                "start_time": getattr(s, 'start_time', '') or '',
+                "end_time": getattr(s, 'end_time', '') or '',
                 "name": er_name,
                 "role": role,
                 "host": host,
@@ -861,6 +874,8 @@ def _build_activities(
             activities.append({
                 "type": "能量结",
                 "date": s.date,
+                "start_time": getattr(s, 'start_time', '') or '',
+                "end_time": getattr(s, 'end_time', '') or '',
                 "name": ek_name,
                 "role": role,
                 "host": host,
@@ -893,6 +908,8 @@ def _build_activities(
             activities.append({
                 "type": "内部课程",
                 "date": s.date,
+                "start_time": getattr(s, 'start_time', '') or '',
+                "end_time": getattr(s, 'end_time', '') or '',
                 "name": s.course_name,
                 "course_type": s.course_type or "",
                 "role": role,

@@ -56,15 +56,19 @@ Page({
   },
 
   async loadData() {
-    this.setData({ loading: true })
+    const version = this._loadVersion = (this._loadVersion || 0) + 1
+    this.setData({ loading: true, loadError: '' })
     try {
       const [tags, statuses] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true)])
+      if (version !== this._loadVersion) return
       this.setData({ tags: tags || [], statuses: statuses || [], loading: false })
       this.applyFilter()
     } catch (e) {
-      this.setData({ loading: false })
+      if (version === this._loadVersion) this.setData({ loading: false, loadError: e.message || '标签加载失败，请重试' })
     }
   },
+
+  onUnload() { this._loadVersion = (this._loadVersion || 0) + 1 },
 
   onPullDownRefresh() {
     if (!this.data.permissionReady || !this.data.hasPermission) {

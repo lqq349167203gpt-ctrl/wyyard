@@ -1,5 +1,6 @@
 const { serviceTeacherApi, customerFollowUpApi } = require('./api')
 const { pickerData, attributionFromPicker } = require('./feedback-person')
+const { beginRead, invalidateRead, disposeReads } = require('./read-scope')
 
 function recordText(entries, fallback) {
   if (!Array.isArray(entries) || !entries.length) return fallback || ''
@@ -181,9 +182,11 @@ module.exports = function createRecordsPage(mode) { return {
   },
 
   async loadMetadata() {
-    this.setData({ loading: true })
+    const isCurrent = beginRead(this, 'metadata')
+    this.setData({ loading: true, loadError: '' })
     try {
       const metadata = await serviceTeacherApi.metadata(mode === 'courses')
+      if (!isCurrent()) return
       const optionMap = {}
       ;(metadata.teacher_options || []).forEach(item => { optionMap[item.name] = item.customer_id || '' })
       const teachers = mode === 'courses'
@@ -199,11 +202,14 @@ module.exports = function createRecordsPage(mode) { return {
       })
       await this.loadActiveData(true)
     } catch (error) {
-      this.setData({ loading: false })
+      if (isCurrent()) this.setData({ loading: false, loadError: error.message || '老师选项加载失败，请重试' })
     }
   },
 
   loadActiveData(reset) {
+    invalidateRead(this, 'followUps')
+    this._courseRequestId = (this._courseRequestId || 0) + 1
+    this._participantRequestId = (this._participantRequestId || 0) + 1
     return this.data.activeTab === 'courses'
       ? (this.data.courseViewTab === 'participants' ? this.loadParticipants(true) : this.loadCourses(reset))
       : this.loadFollowUps(reset)
@@ -219,7 +225,7 @@ module.exports = function createRecordsPage(mode) { return {
     const requestId = (this._courseRequestId || 0) + 1
     this._courseRequestId = requestId
     const page = reset ? 1 : this.data.coursePage + 1
-    this.setData(reset ? { loading: true, courseLoadingMore: false } : { courseLoadingMore: true })
+    this.setData(reset ? { loading: true, loadError: '', courseLoadingMore: false } : { loadError: '', courseLoadingMore: true })
     try {
       const selectedType = this.data.courseTypes[this.data.courseTypeIndex] || COURSE_TYPES[0]
       const result = await serviceTeacherApi.courses({
@@ -280,9 +286,7 @@ module.exports = function createRecordsPage(mode) { return {
       }
       this.setData(update)
     } catch (error) {
-      if (requestId === this._courseRequestId) this.setData(reset
-        ? { loading: false, courseLoadingMore: false, courseRecords: [], reviewRecords: [], courseTotal: 0, courseHasMore: false, summaryCards: [] }
-        : { courseLoadingMore: false })
+      if (requestId === this._courseRequestId) this.setData({ loading: false, courseLoadingMore: false, loadError: error.message || '课程加载失败，请重试' })
     }
   },
 
@@ -294,12 +298,14 @@ module.exports = function createRecordsPage(mode) { return {
   },
 
   async loadFollowUps(reset) {
+    const teacherName = this.data.teacherName
+    const isCurrent = beginRead(this, 'followUps', () => teacherName === this.data.teacherName)
     if (!this.data.teacherName) {
       this.setData({ loading: false, followUpRecords: [], summaryCards: [] })
       return
     }
     const page = reset ? 1 : this.data.followUpPage + 1
-    this.setData({ loading: true })
+    this.setData({ loading: true, loadError: '' })
     try {
       const filter = this.data.followUpFilters[this.data.followUpFilterIndex] || FOLLOW_UP_FILTERS[0]
       const definition = this.currentFollowUpDefinition()
@@ -311,6 +317,7 @@ module.exports = function createRecordsPage(mode) { return {
         page,
         page_size: 20,
       })
+      if (!isCurrent()) return
       const records = (result.items || []).map(item => ({
         ...item,
         customerInfoAttribution: item.latest_customer_info_content ? item.latest_customer_info_by || '未知' : '',
@@ -344,8 +351,16 @@ module.exports = function createRecordsPage(mode) { return {
         ],
       })
     } catch (error) {
-      this.setData({ loading: false })
+      if (isCurrent()) this.setData({ loading: false, loadError: error.message || '跟进记录加载失败，请重试' })
     }
+  },
+
+  retryLoad() { return this.data.teachers.length ? this.loadActiveData(true) : this.loadMetadata() },
+  onUnload() {
+    disposeReads(this)
+    clearTimeout(this._participantKeywordTimer)
+    this._courseRequestId = (this._courseRequestId || 0) + 1
+    this._participantRequestId = (this._participantRequestId || 0) + 1
   },
 
 
@@ -458,7 +473,7 @@ module.exports = function createRecordsPage(mode) { return {
     const requestId = (this._participantRequestId || 0) + 1
     this._participantRequestId = requestId
     const page = reset ? 1 : this.data.participantPage + 1
-    this.setData({ participantLoading: true })
+    this.setData({ participantLoading: true, loadError: '' })
     try {
       const selectedType = this.data.courseTypes[this.data.courseTypeIndex] || COURSE_TYPES[0]
       const result = await serviceTeacherApi.courseParticipants({
@@ -501,7 +516,7 @@ module.exports = function createRecordsPage(mode) { return {
       else groups.forEach((group, index) => { update[`participantGroups[${existingCount + index}]`] = group })
       this.setData(update)
     } catch (e) {
-      if (requestId === this._participantRequestId) this.setData({ participantGroups: reset ? [] : this.data.participantGroups })
+      if (requestId === this._participantRequestId) this.setData({ loadError: e.message || '参与者加载失败，请重试' })
     } finally {
       if (requestId === this._participantRequestId) this.setData({ participantLoading: false })
     }
@@ -544,6 +559,7 @@ module.exports = function createRecordsPage(mode) { return {
   },
   /** 点某一段内容：显示所有人填写的内容，下面填我自己那份 */
   async onParticipantOpenEdit(event) {
+    const isCurrent = beginRead(this, 'participantEditor')
     const groupIndex = Number(event.currentTarget.dataset.group)
     const index = Number(event.currentTarget.dataset.index)
     const field = event.currentTarget.dataset.field
@@ -576,7 +592,7 @@ module.exports = function createRecordsPage(mode) { return {
         customerFollowUpApi.myNote(row.visit_id, field),
         customerFollowUpApi.feedbackPeople(),
       ])
-      if (!this.data.participantEditing || this.data.participantEditing.visitId !== row.visit_id || this.data.participantEditing.field !== field) return
+      if (!isCurrent() || !this.data.participantEditing || this.data.participantEditing.visitId !== row.visit_id || this.data.participantEditing.field !== field) return
       const picked = pickerData(people, mine)
       this.setData({
         participantMyNoteId: (mine && mine.id) || '',
@@ -584,13 +600,20 @@ module.exports = function createRecordsPage(mode) { return {
         feedbackOptions: picked.options,
         feedbackIndex: picked.index,
       })
-    } catch (e) { wx.showToast({ title: '记录加载失败，请重新打开', icon: 'none' }); this.setData({ participantEditing: null }) }
-    finally { this.setData({ participantEditorLoading: false }) }
+    } catch (e) {
+      if (isCurrent()) {
+        wx.showToast({ title: '记录加载失败，请重新打开', icon: 'none' })
+        this.setData({ participantEditing: null })
+      }
+    } finally { if (isCurrent()) this.setData({ participantEditorLoading: false }) }
   },
   onFeedbackChange(event) { this.setData({ feedbackIndex: Number(event.detail.value) }) },
   onParticipantDraft(event) { this.setData({ participantDraft: event.detail.value }) },
   closeParticipantEdit() {
-    if (!this.data.participantSaving) this.setData({ participantEditing: null })
+    if (!this.data.participantSaving) {
+      invalidateRead(this, 'participantEditor')
+      this.setData({ participantEditing: null, participantEditorLoading: false })
+    }
   },
   async saveParticipantEdit() {
     const editing = this.data.participantEditing

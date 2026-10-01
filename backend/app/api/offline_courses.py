@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.offline_course import OfflineCourseCreate
 from app.services import customer_access_service, offline_course_service
-from app.utils.pagination import paginate
+from app.utils.payment_list import payment_list_response
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -24,10 +24,7 @@ def list_courses(request: Request, page: int | None = Query(None, ge=1), page_si
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
-    items_dict.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-    if page is not None:
-        return paginate(items_dict, page, page_size or 10)
-    return items_dict
+    return payment_list_response(request, items_dict, page, page_size)
 
 
 @router.get("/search-customers")

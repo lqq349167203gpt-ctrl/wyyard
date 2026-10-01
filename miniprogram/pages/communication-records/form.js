@@ -85,7 +85,7 @@ Page({
   async loadCustomers() {
     try {
       if (!this.data.allCustomers.length) {
-        const res = await customerApi.light(200)
+        const res = await customerApi.selector()
         const list = Array.isArray(res) ? res : []
         this.setData({ allCustomers: list })
       }

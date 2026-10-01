@@ -10,3 +10,10 @@ page {
 .activity-image-filter {
   filter: saturate(0.8) contrast(1.03) brightness(1.02);
 }
+/* 个人历史分页提示：追加失败不替换已加载列表。 */
+.history-page-status {
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: #8f959e;
+}

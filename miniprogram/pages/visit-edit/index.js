@@ -1,5 +1,7 @@
 const { visitApi, spaceApi, customerApi, visitVerificationApi, isOperationCancelled } = require('../../utils/api')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
+const { readSource, retrySources } = require('../../utils/source-state')
+const { disposeReads } = require('../../utils/read-scope')
 
 Page({
   data: {
@@ -37,6 +39,7 @@ Page({
     if (!getApp().checkLogin()) return
     this.setData({ verified: options.verified === '1' })
     if (options.id) {
+      this._visitId = options.id
       this.loadVisit(options.id)
     }
   },
@@ -61,25 +64,19 @@ Page({
   },
 
   async loadVisit(id) {
-    try {
+    return readSource(this, 'visit', async () => {
       const visit = await visitApi.get(id)
-      let verified = this.data.verified
-      try {
-        const verification = await visitVerificationApi.getStatus(visit.visit_date || '', visit.space_id || '')
-        verified = Boolean(verification && verification.is_verified)
-      } catch (error) {
-        console.error('加载邀约核对状态失败:', error)
-      }
+      const [verification, spaces] = await Promise.all([
+        visitVerificationApi.getStatus(visit.visit_date || '', visit.space_id || ''),
+        visit.space_id ? spaceApi.list() : [],
+      ])
+      return { visit, verification, spaces }
+    }, ({ visit, verification, spaces }) => {
+      const verified = Boolean(verification && verification.is_verified)
       let spaceName = ''
       if (visit.space_id) {
-        try {
-          const spaces = await spaceApi.list()
-          const space = spaces.find(s => s.id === visit.space_id)
-          spaceName = space?.name || ''
-        } catch (e) {
-          console.error('加载空间失败:', e)
-          wx.showToast({ title: '加载空间失败', icon: 'none' })
-        }
+        const space = spaces.find(s => s.id === visit.space_id)
+        spaceName = space?.name || ''
       }
       this.setData({
         visit,
@@ -104,21 +101,17 @@ Page({
         arrivalTime: visit.arrival_time || '',
       })
       this.loadCustomers()
-    } catch (e) {
-      wx.showToast({ title: '加载失败', icon: 'none' })
-      this.setData({ loading: false })
-    }
+    })
   },
 
   async loadCustomers() {
-    try {
-      const list = await customerApi.light()
+    return readSource(this, 'people', () => customerApi.selector(), list => {
       this.setData({ allCustomers: list })
-    } catch (e) {
-      console.error('加载客户列表失败:', e)
-      wx.showToast({ title: '加载客户列表失败', icon: 'none' })
-    }
+    })
   },
+
+  retrySources() { return retrySources(this, { visit: () => this.loadVisit(this.data.id || this._visitId), people: () => this.loadCustomers() }) },
+  onUnload() { disposeReads(this) },
 
   onTimeChange(e) {
     if (this.data.verified) return
@@ -237,6 +230,7 @@ Page({
   },
 
   async onSubmit() {
+    if (this.data.sourceError || this.data.sourcesLoading) { wx.showToast({ title: '请等待信息加载完成，失败时点击重试', icon: 'none' }); return }
     if (this.data.verified) {
       wx.navigateBack()
       return

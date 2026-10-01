@@ -1,4 +1,6 @@
 const { customerApi, customerTagApi, memberIdentityApi } = require('../../utils/api')
+const { readSource } = require('../../utils/source-state')
+const { disposeReads } = require('../../utils/read-scope')
 
 function decorateCustomers(items) {
   const today = new Date()
@@ -74,6 +76,7 @@ Page({
   },
 
   onUnload() {
+    disposeReads(this)
     this._searchRequestVersion = (this._searchRequestVersion || 0) + 1
     if (this._searchTimer) clearTimeout(this._searchTimer)
   },
@@ -94,12 +97,11 @@ Page({
   async loadFilterOptions() {
     if (this.data.filterOptionsLoading) return
     this.setData({ filterOptionsLoading: true })
-    try {
-      const [identities, tags, customerResult] = await Promise.all([
-        memberIdentityApi.list().catch(() => []),
-        customerTagApi.list().catch(() => []),
-        customerApi.light(),
-      ])
+    await readSource(this, 'filters', () => Promise.all([
+        memberIdentityApi.list(),
+        customerTagApi.list(),
+        customerApi.selector(),
+      ]), ([identities, tags, customerResult]) => {
       const sourceCustomers = (customerResult && customerResult.items) || (Array.isArray(customerResult) ? customerResult : [])
       const referrerCount = {}
       sourceCustomers.forEach(customer => {
@@ -111,9 +113,8 @@ Page({
       const referrerNames = Object.keys(referrerCount).sort((a, b) => referrerCount[b] - referrerCount[a])
       this.setData({ memberTypes, customerTags, referrerNames })
       this.updateOptionLists()
-    } finally {
-      this.setData({ filterOptionsLoading: false })
-    }
+    })
+    if (!this._readsDisposed) this.setData({ filterOptionsLoading: false })
   },
 
   updateOptionLists() {

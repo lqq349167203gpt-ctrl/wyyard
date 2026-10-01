@@ -21,6 +21,7 @@
   </view>
 
   <!-- 搜索结果下拉 -->
+  <view wx:if="{{searchError}}" class="search-box" bindtap="retrySearch">{{searchError}}</view>
   <view class="dropdown" wx:if="{{showDropdown && (results.length > 0 || searching)}}">
     <view class="dropdown-loading" wx:if="{{searching}}">
       <text>搜索中...</text>

@@ -1,5 +1,6 @@
 const { customerApi, customerTagApi, communicationRecordApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
+const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
 function visitNoteRows(visit, category) {
   return (visit.visit_notes || [])
     .filter(note => note.category === category && note.content)
@@ -158,6 +159,7 @@ Page({
     paymentEntryTypes: DETAIL_PAYMENT_PROJECT_TYPES,
     paymentEntryTypeIndex: 0,
     paymentFormVisible: true,
+    sectionStates: {},
   },
 
   onLoad(options) {
@@ -184,19 +186,30 @@ Page({
     }
   },
 
-  async loadData(id) {
-    this.setData({
+  async loadData(id, section = 'basic') {
+    if (section === 'basic') {
+      this._profileVersion = (this._profileVersion || 0) + 1
+      this._loadedSections = {}
+      invalidateRead(this, 'communication')
+    }
+    const version = this._profileVersion
+    const isCurrent = beginRead(this, 'profile:' + section, () => version === this._profileVersion)
+    if (section === 'basic') this.setData({
       loading: true,
       loadError: '',
+      sectionStates: {},
       commRecords: [],
       revealedContacts: { phone: false, wechat: false },
     })
+    else this.setData({ [`sectionStates.${section}`]: { loading: true, error: '' } })
     try {
-      const [detail, customerTags] = await Promise.all([
-        customerApi.detail(id, undefined, this._principalParticipant, this._principalCourse),
-        customerTagApi.listForCustomer(id).catch(() => []),
+      const [detail, tagResult] = await Promise.all([
+        customerApi.detail(id, undefined, this._principalParticipant, this._principalCourse, section),
+        section === 'basic' ? customerTagApi.listForCustomer(id).then(items => ({ items, error: '' })).catch(error => ({ items: [], error: error.message || '客户标签加载失败' })) : { items: this.data.customerTags, error: this.data.customerTagsError || '' },
       ])
-      const c = detail.customer
+      if (!isCurrent()) return
+      const c = section === 'basic' ? detail.customer : this.data.customer
+      const customerTags = tagResult.items
 
       // 疗愈老师
       const healerIdentityText = (c.positions || [])
@@ -206,7 +219,7 @@ Page({
 
       const visitRecords = detail.visit_records || []
       const arrived = visitRecords.filter(v => v.arrived).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
-      const firstVisit = arrived.length > 0 ? arrived[0].visit_date : ''
+      const firstVisit = c.first_visit !== undefined ? c.first_visit : (arrived.length > 0 ? arrived[0].visit_date : '')
 
       // 基本信息合并字段
       const gender = c.gender || ''
@@ -263,10 +276,11 @@ Page({
       else if (ts === '朋友圈') trafficDetailLabel = '所属人'
       else if (['小红书', '抖音', '公众号', '视频号'].includes(ts)) trafficDetailLabel = '内容链接'
 
-      this.setData({
+      const resultState = {
         customer: c,
         customerAccessPermissions,
         customerTags,
+        customerTagsError: tagResult.error,
         heroTag: (customerTags[0] && customerTags[0].name) || '',
         healerText,
         firstVisit,
@@ -287,33 +301,50 @@ Page({
         offlineCourseRecords,
         trafficDetailLabel,
         loading: false,
-      })
+      }
+      if (section === 'basic') this.setData(resultState)
+      else {
+        const fields = {
+          healing: ['healingRecords', 'courseParticipantNotes', 'arrivedCount', 'cancelledCount', 'absentCount'],
+          activities: ['activities', 'activitySummary'], purchase: ['purchaseSummary'],
+          payment: ['paymentRecords'], offline_course: ['offlineCourseRecords'], customer_followups: ['activityFollowups'],
+          communication: [],
+        }[section] || []
+        const updates = { [`sectionStates.${section}`]: { loading: false, error: '' } }
+        fields.forEach(key => { updates[key] = resultState[key] })
+        this.setData(updates)
+        this._loadedSections[section] = true
+      }
       this.updateTabCounts()
 
       // 加载沟通记录
-      if (c.nickname && (!customerAccessPermissions || customerAccessPermissions.detail_tabs.communication)) {
-        this.loadCommunicationRecords(c.nickname, this._principalParticipant ? detail.communication_records || [] : undefined)
-      }
+      if (section === 'communication') await this.loadCommunicationRecords(c.nickname, detail.communication_records || [])
+      if (section === 'basic') this.loadActiveSection()
     } catch (e) {
+      if (!isCurrent()) return
       console.error('加载客户资料失败:', e)
-      this.setData({
+      if (section === 'basic') this.setData({
         loading: false,
         loadError: (e && e.message) || '客户资料加载失败',
       })
+      else this.setData({ [`sectionStates.${section}`]: { loading: false, error: (e && e.message) || '记录加载失败，点击重试' } })
     }
   },
+
+  onUnload() { disposeReads(this) },
 
   updateTabCounts() {
     const { healingRecords, courseParticipantNotes, commRecords, activities, activityFollowups, purchaseSummary, offlineCourseRecords, paymentRecords, customerAccessPermissions } = this.data
     const access = customerAccessPermissions
     const tabs = [
       (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进', count: healingRecords.length + courseParticipantNotes.length },
-      (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: commRecords.length },
+      (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: this.data.communicationLoading || this.data.communicationError ? null : commRecords.length },
       (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
       (!access || access.detail_tabs.card_statistics) && { key: 'purchase', label: '卡次', count: purchaseSummary.length },
       (!access || access.detail_tabs.offline_courses) && { key: 'offline_course', label: '课程', count: offlineCourseRecords.length },
       (!access || access.transaction_access === 'detail') && { key: 'payment', label: '交易', count: paymentRecords.length },
     ].filter(Boolean)
+    tabs.forEach(tab => { if (!(this._loadedSections || {})[tab.key]) tab.count = null })
     const activeTab = tabs.some(tab => tab.key === this.data.activeTab)
       ? this.data.activeTab
       : ((tabs[0] && tabs[0].key) || '')
@@ -322,6 +353,15 @@ Page({
       activeTab,
     })
   },
+
+  loadActiveSection() {
+    const key = this.data.activeTab
+    if (!key || (this._loadedSections || {})[key]) return
+    if (key === 'communication' && !this._principalParticipant) return this.loadCommunicationRecords(this.data.customer.nickname)
+    return this.loadData(this.data.customerId, key)
+  },
+
+  retrySection() { return this.loadActiveSection() },
 
   onRetry() {
     if (this.data.customerId) this.loadData(this.data.customerId)
@@ -337,6 +377,7 @@ Page({
     const applyTab = () => {
       this.setData({ activeTab: key })
       this._tabSwitching = false
+      this.loadActiveSection()
     }
 
     if (!shouldStabilize) {
@@ -416,8 +457,12 @@ Page({
   },
 
   async loadCommunicationRecords(nickname, providedRecords) {
+    const isCurrent = beginRead(this, 'communication')
+    this.setData({ communicationLoading: true, communicationError: '' })
+    this.updateTabCounts()
     try {
       const res = providedRecords === undefined ? await communicationRecordApi.list(nickname) : providedRecords
+      if (!isCurrent()) return
       const list = Array.isArray(res) ? res : []
       list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       list.forEach(item => {
@@ -431,9 +476,25 @@ Page({
       this.setData({ commRecords: list })
       this.updateTabCounts()
     } catch (e) {
-      this.setData({ commRecords: [] })
-      this.updateTabCounts()
+      if (isCurrent()) this.setData({ communicationError: e.message || '沟通记录加载失败，请重试' })
+    } finally {
+      if (isCurrent()) {
+        this.setData({ communicationLoading: false })
+        if (!this.data.communicationError) {
+          this._loadedSections = this._loadedSections || {}
+          this._loadedSections.communication = true
+        }
+        this.updateTabCounts()
+      }
     }
+  },
+
+  retryCommunication() {
+    if (this._principalParticipant) {
+      this._loadedSections.communication = false
+      return this.loadData(this.data.customerId, 'communication')
+    }
+    return this.loadCommunicationRecords(this.data.customer.nickname)
   },
 
   onCommunicationInput(e) {

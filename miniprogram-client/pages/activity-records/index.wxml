@@ -5,7 +5,8 @@
   </view>
 
   <!-- 空状态 -->
-  <view wx:elif="{{allItems.length === 0}}" class="empty-box">
+  <view wx:elif="{{loadError && !totalCount}}" class="empty-box" bindtap="loadActivityRecords">{{loadError}} · 点击重试</view>
+  <view wx:elif="{{totalCount === 0}}" class="empty-box">
     <view class="e-icon">
       <view class="e-chime">
         <view class="e-string"></view>
@@ -55,6 +56,7 @@
     </view>
 
     <!-- 月份分组 -->
+    <view wx:if="{{!allItems.length && !loadError}}" class="history-page-status">此状态暂无活动记录</view>
     <block wx:for="{{groups}}" wx:key="month">
       <view class="mon-head">
         <text class="mon-title">{{item.month}} 月</text>
@@ -90,7 +92,10 @@
       </view>
     </block>
 
-    <view class="end-note">· 没有更多了 ·</view>
+    <view wx:if="{{loadError}}" class="history-page-status" bindtap="loadActivityRecords">{{loadError}} · 点击重试</view>
+    <view wx:elif="{{loadingMore}}" class="history-page-status">加载中...</view>
+    <view wx:elif="{{hasMore}}" class="history-page-status" bindtap="loadActivityRecords">继续加载</view>
+    <view wx:elif="{{allItems.length}}" class="end-note">· 没有更多了 ·</view>
   </block>
 </view>
 

@@ -22,7 +22,7 @@
       <view class="filter-item {{scopeFilter === 'follow-up' ? 'active' : ''}}" data-scope="follow-up" bindtap="onFilterChange">跟进状态</view>
     </view>
 
-    <view class="tag-list" wx:if="{{!loading && filteredTags.length}}">
+    <view class="tag-list" wx:if="{{!loading && !loadError && filteredTags.length}}">
       <view class="tag-card" wx:for="{{filteredTags}}" wx:key="id">
         <view class="tag-main">
           <view class="tag-heading" wx:if="{{scopeFilter !== 'follow-up'}}">
@@ -52,7 +52,8 @@
     </view>
 
     <view class="loading" wx:if="{{loading}}">加载中...</view>
-    <view class="empty-state" wx:if="{{!loading && !filteredTags.length}}">
+    <view class="empty-state" wx:elif="{{loadError}}" bindtap="loadData">{{loadError}} · 点击重试</view>
+    <view class="empty-state" wx:elif="{{!filteredTags.length}}">
       <view class="empty-line"></view>
       <text>暂无{{scopeFilter === 'follow-up' ? '跟进状态' : '标签'}}</text>
     </view>

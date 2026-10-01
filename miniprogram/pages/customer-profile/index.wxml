@@ -51,6 +51,7 @@
       </view>
       <view class="tag-zone">
         <text class="tag-zone-label">客户标签</text>
+        <view wx:if="{{customerTagsError}}" class="empty-hint" bindtap="onRetry">{{customerTagsError}}</view>
         <view class="identity-tags" wx:if="{{customerTags.length > 0}}">
           <text class="identity-tag" wx:for="{{customerTags}}" wx:key="id">{{item.name}}</text>
         </view>
@@ -154,8 +155,10 @@
       <view class="seg-gap"></view>
     </view>
 
+    <view wx:if="{{sectionStates[activeTab].loading}}" class="empty-hint">加载中...</view>
+    <view wx:elif="{{sectionStates[activeTab].error}}" class="empty-hint" bindtap="retrySection">{{sectionStates[activeTab].error}} · 点击重试</view>
     <!-- 跟进点 -->
-    <view class="tab-panel" wx:if="{{activeTab === 'healing'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'healing' && !sectionStates.healing.loading && !sectionStates.healing.error}}">
       <view wx:if="{{healingRecords.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-summary" wx:if="{{healingRecords.length > 0}}">
         <text><text class="dot dot-blue"></text>已到店 {{arrivedCount}}</text>
@@ -205,7 +208,7 @@
     </view>
 
     <!-- 沟通记录 -->
-    <view class="tab-panel" wx:if="{{activeTab === 'communication'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'communication' && !sectionStates.communication.loading && !sectionStates.communication.error}}">
       <view class="comm-compose" wx:if="{{!isViewOnly}}">
         <input
           class="comm-input"
@@ -224,8 +227,10 @@
           hover-stay-time="80"
         >{{commSaving ? '...' : '新增'}}</view>
       </view>
-      <view wx:if="{{commRecords.length === 0}}" class="empty-hint">暂无记录</view>
-      <view class="rec-list" wx:if="{{commRecords.length > 0}}">
+      <view wx:if="{{communicationLoading}}" class="empty-hint">加载中...</view>
+      <view wx:elif="{{communicationError}}" class="empty-hint" bindtap="retryCommunication">{{communicationError}} · 点击重试</view>
+      <view wx:elif="{{commRecords.length === 0}}" class="empty-hint">暂无记录</view>
+      <view class="rec-list" wx:if="{{!communicationLoading && !communicationError && commRecords.length > 0}}">
         <view class="rec" wx:for="{{commRecords}}" wx:key="id">
           <view class="rec-head">
             <text class="rec-date">{{item._dateStr}}</text>
@@ -240,7 +245,7 @@
     </view>
 
     <!-- 活动记录 -->
-    <view class="tab-panel" wx:if="{{activeTab === 'activities'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'activities' && !sectionStates.activities.loading && !sectionStates.activities.error}}">
       <view class="rec-summary activity-rec-summary" wx:if="{{activitySummary.length > 0}}">
         <text wx:for="{{activitySummary}}" wx:key="key" class="activity-summary-text {{item.key === 'withdrawn' ? 'withdrawn' : ''}}">
           {{item.label}} <text class="activity-summary-count">{{item.count}}</text> 次
@@ -271,7 +276,7 @@
     </view>
 
     <!-- 卡次统计 -->
-    <view class="tab-panel" wx:if="{{activeTab === 'purchase'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'purchase' && !sectionStates.purchase.loading && !sectionStates.purchase.error}}">
       <view wx:if="{{purchaseSummary.length === 0}}" class="empty-hint">暂无记录</view>
       <block wx:else>
         <view class="sec-label">卡次统计</view>
@@ -326,7 +331,7 @@
     </view>
 
     <!-- 线下落地课程 -->
-    <view class="tab-panel" wx:if="{{activeTab === 'offline_course'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'offline_course' && !sectionStates.offline_course.loading && !sectionStates.offline_course.error}}">
       <view wx:if="{{offlineCourseRecords.length === 0}}" class="empty-hint">暂无记录</view>
       <view class="rec-list" wx:if="{{offlineCourseRecords.length > 0}}">
         <view class="rec" wx:for="{{offlineCourseRecords}}" wx:key="id">
@@ -347,7 +352,7 @@
     </view>
 
     <!-- 交易记录 -->
-    <view class="tab-panel" wx:if="{{activeTab === 'payment'}}">
+    <view class="tab-panel" wx:if="{{activeTab === 'payment' && !sectionStates.payment.loading && !sectionStates.payment.error}}">
       <view class="payment-entry-toolbar" wx:if="{{canCreatePayment}}">
         <text class="payment-entry-caption">付费记录</text>
         <view class="payment-entry-button" bindtap="onPaymentEntryOpen">

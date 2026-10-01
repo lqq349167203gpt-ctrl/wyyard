@@ -1,4 +1,6 @@
 const { clientApi } = require('../../utils/api')
+const { disposeReads } = require('../../utils/read-scope')
+const { loadHistory } = require('../../utils/history-page')
 
 const TYPE_LABELS = {
   purchase: '购卡',
@@ -13,14 +15,12 @@ Page({
   },
 
   onShow() {
-    this.loadTransactions()
+    this.loadTransactions(true)
   },
 
-  async loadTransactions() {
-    this.setData({ loading: true, items: [], groups: [] })
-    try {
-      const res = await clientApi.getTransactions()
-      const items = (res.items || []).map(r => {
+  loadTransactions(reset) {
+    return loadHistory(this, reset, params => clientApi.getTransactions(params), records => {
+      const items = records.map(r => {
         const isRefund = r.type === 'refund' || r.amount < 0
         return {
           ...r,
@@ -38,10 +38,12 @@ Page({
         groups: this._groupByDate(items),
         loading: false,
       })
-    } catch (e) {
-      this.setData({ loading: false })
-    }
+    })
   },
+
+  onReachBottom() { if (this.data.hasMore && !this.data.loadError) this.loadTransactions(false) },
+
+  onUnload() { disposeReads(this) },
 
   _formatDate(str) {
     if (!str) return ''

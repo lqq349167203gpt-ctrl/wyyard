@@ -1,5 +1,6 @@
 <page-meta page-style="{{showFilterPanel ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page search-page">
+  <view wx:if="{{sourceError}}" class="empty-hint" bindtap="loadFilterOptions">{{sourceError}} · 点击重试</view>
   <view class="no-permission" wx:if="{{!hasPagePermission}}">
     <text class="no-permission-text">无权限访问此页面</text>
   </view>

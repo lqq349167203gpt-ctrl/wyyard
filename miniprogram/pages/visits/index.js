@@ -1,4 +1,4 @@
-const { visitApi, spaceApi, visitVerificationApi } = require('../../utils/api')
+const { visitApi, spaceApi, visitVerificationApi, downloadFile } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
@@ -689,51 +689,16 @@ Page({
 
   // ---- 导出 ----
 
-  onExportTap() {
+  async onExportTap() {
     const url = visitApi.export(this.data.currentDate, this.data.spaceId || undefined)
     wx.showLoading({ title: '正在导出...' })
-    wx.downloadFile({
-      url,
-      header: { Authorization: 'Bearer ' + (wx.getStorageSync('auth_token') || '') },
-      success: (res) => {
-        if (res.statusCode !== 200) {
-          wx.hideLoading()
-          wx.showToast({ title: '导出失败', icon: 'none' })
-          return
-        }
-        const [y, m, d] = (this.data.currentDate || '').split('-')
-        const fileName = y ? `${y}年${Number(m)}月${Number(d)}日邀约名单.xlsx` : '邀约名单.xlsx'
-        const newPath = `${wx.env.USER_DATA_PATH}/${fileName}`
-        const fs = wx.getFileSystemManager()
-        const openFile = (p) => {
-          wx.hideLoading()
-          wx.openDocument({
-            filePath: p,
-            fileType: 'xlsx',
-            showMenu: true,
-            success: () => {},
-            fail: () => wx.showToast({ title: '无法打开文件', icon: 'none' }),
-          })
-        }
-        // 读取临时文件，写入中文文件名路径后打开
-        fs.readFile({
-          filePath: res.tempFilePath,
-          success: (data) => {
-            fs.writeFile({
-              filePath: newPath,
-              data: data.data,
-              encoding: 'binary',
-              success: () => openFile(newPath),
-              fail: () => openFile(res.tempFilePath),
-            })
-          },
-          fail: () => openFile(res.tempFilePath),
-        })
-      },
-      fail: () => {
-        wx.hideLoading()
-        wx.showToast({ title: '下载失败', icon: 'none' })
-      },
-    })
+    const [y, m, d] = (this.data.currentDate || '').split('-')
+    const fileName = y ? `${y}年${Number(m)}月${Number(d)}日邀约名单.xlsx` : '邀约名单.xlsx'
+    try {
+      const filePath = await downloadFile(url, fileName)
+      wx.openDocument({ filePath, fileType: 'xlsx', showMenu: true, fail: () => wx.showToast({ title: '无法打开文件', icon: 'none' }) })
+    } catch (error) {
+      wx.showToast({ title: error.message || '导出失败', icon: 'none' })
+    } finally { wx.hideLoading() }
   },
 })

@@ -1,5 +1,6 @@
 const { visitNoteApi, customerApi } = require('../../utils/api')
 const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
+const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
 
 function formatTime(value) {
   if (!value) return ''
@@ -42,16 +43,27 @@ Component({
 
   observers: {
     'visitId, category': function onSourceChange(visitId, category) {
+      invalidateRead(this, 'notes')
+      invalidateRead(this, 'previousNeed')
+      invalidateRead(this, 'visitPurpose')
+      invalidateRead(this, 'feedbackPeople')
+      this.setData({ myNote: null, otherNotes: [], personCount: 0, loading: false, loadError: '', editorOpen: false, editorValue: '', previousNeed: null, previousOpen: false, previousError: '', previousLoading: false, visitPurpose: null, visitPurposeOpen: false, visitPurposeError: '', visitPurposeLoading: false })
       if (visitId && category) this.loadNotes()
     },
   },
 
+  lifetimes: { detached() { disposeReads(this) } },
+
   methods: {
     async loadNotes() {
-      if (!this.properties.visitId || this.data.loading) return
-      this.setData({ loading: true })
+      if (!this.properties.visitId) return
+      const visitId = this.properties.visitId
+      const category = this.properties.category
+      const isCurrent = beginRead(this, 'notes', () => this.properties.visitId === visitId && this.properties.category === category)
+      this.setData({ loading: true, loadError: '' })
       try {
         const notes = await visitNoteApi.list(this.properties.visitId)
+        if (!isCurrent()) return
         const categoryNotes = (notes || [])
           .filter((note) => note.category === this.properties.category)
           .filter((note) => !this.properties.privateToCreator || note.can_edit)
@@ -83,14 +95,18 @@ Component({
           personCount: merged.length,
         })
       } catch (error) {
-        console.error('加载协作记录失败:', error)
+        if (isCurrent()) this.setData({ loadError: error.message || '记录加载失败，请重试' })
       } finally {
-        this.setData({ loading: false })
+        if (isCurrent()) this.setData({ loading: false })
       }
     },
 
     onAdd() {
       if (this.properties.readOnly) return
+      if (this.data.loading || this.data.loadError) {
+        wx.showToast({ title: '请先完成记录读取，失败时可点击重试', icon: 'none' })
+        return
+      }
       this.setData({
         editorOpen: true,
         editorValue: this.data.myNote ? this.data.myNote.content : '',
@@ -105,13 +121,14 @@ Component({
     },
 
     async loadFeedbackPeople() {
+      const isCurrent = beginRead(this, 'feedbackPeople', () => this.data.editorOpen)
       try {
         const response = await visitNoteApi.feedbackPeople()
-        if (!this.data.editorOpen) return
+        if (!isCurrent()) return
         const picked = pickerData(response, this.data.myNote)
         this.setData({ feedbackOptions: picked.options, feedbackIndex: picked.index })
       } catch (error) {
-        wx.showToast({ title: '反馈人加载失败', icon: 'none' })
+        if (isCurrent()) wx.showToast({ title: '反馈人加载失败', icon: 'none' })
       }
     },
 
@@ -130,7 +147,11 @@ Component({
     },
 
     async loadPreviousNeed() {
-      if (!this.properties.customerId || this.data.previousLoading) return
+      if (!this.properties.customerId) return
+      const customerId = this.properties.customerId
+      const visitId = this.properties.visitId
+      const date = this.properties.visitDate
+      const isCurrent = beginRead(this, 'previousNeed', () => this.data.editorOpen && this.properties.customerId === customerId && this.properties.visitId === visitId && this.properties.visitDate === date)
       this.setData({ previousLoading: true, previousError: '' })
       try {
         const previousNeed = await visitNoteApi.previousVisitNeed(
@@ -138,11 +159,13 @@ Component({
           this.properties.visitDate,
           this.properties.visitId,
         )
+        if (!isCurrent()) return
         this.setData({ previousNeed, previousError: '' })
       } catch (error) {
+        if (!isCurrent()) return
         this.setData({ previousNeed: null, previousError: error.message || '加载上次需求失败' })
       } finally {
-        this.setData({ previousLoading: false })
+        if (isCurrent()) this.setData({ previousLoading: false })
       }
     },
 
@@ -168,16 +191,20 @@ Component({
     },
 
     async loadVisitPurpose() {
-      if (!this.properties.customerId || this.data.visitPurposeLoading) return
+      if (!this.properties.customerId) return
+      const customerId = this.properties.customerId
+      const isCurrent = beginRead(this, 'visitPurpose', () => this.data.editorOpen && this.properties.customerId === customerId)
       this.setData({ visitPurposeLoading: true, visitPurposeError: '' })
       try {
         const detail = await customerApi.detail(this.properties.customerId)
+        if (!isCurrent()) return
         const visitPurpose = String(detail && detail.customer && detail.customer.tags || '').trim()
         this.setData({ visitPurpose, visitPurposeError: '' })
       } catch (error) {
+        if (!isCurrent()) return
         this.setData({ visitPurpose: null, visitPurposeError: error.message || '加载到访目的失败' })
       } finally {
-        this.setData({ visitPurposeLoading: false })
+        if (isCurrent()) this.setData({ visitPurposeLoading: false })
       }
     },
 
@@ -198,10 +225,13 @@ Component({
 
     onEditorClose() {
       if (this.data.saving) return
+      ;['previousNeed', 'visitPurpose', 'feedbackPeople'].forEach(key => invalidateRead(this, key))
       this.setData({
         editorOpen: false,
         editorValue: '',
         previousOpen: false,
+        previousLoading: false,
+        visitPurposeLoading: false,
         previousNeed: null,
         previousError: '',
         visitPurpose: null,

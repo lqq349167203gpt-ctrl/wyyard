@@ -5,6 +5,7 @@
   </view>
 
   <!-- 我填写的 -->
+  <view class="section-label" wx:if="{{loadError}}" bindtap="loadNotes">{{loadError}} · 点击重试</view>
   <view class="section-label">
     <text class="section-label-text">我填写的<text wx:if="{{myNote}}"> · {{myNote.feedbackText}}</text></text>
     <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新 · 创建人：{{myNote.creatorText}}<text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>

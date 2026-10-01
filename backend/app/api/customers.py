@@ -376,11 +376,12 @@ async def create_customer(data: CustomerCreate, request: Request):
 
 
 @router.get("/light")
-async def list_customers_light(request: Request):
+async def list_customers_light(request: Request, purpose: Literal['full', 'selector'] = 'full'):
     """轻量端点：只返回常用字段，供人员到场/引流记录等页面使用"""
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
     visit_days: dict[str, set[str]] = {}
-    for visit in visit_service.list_basic_visits({c.id for c in customers}):
+    visits = visit_service.list_basic_visits({c.id for c in customers}) if purpose == 'full' else []
+    for visit in visits:
         if visit.arrived:
             visit_days.setdefault(visit.customer_id, set()).add(visit.visit_date)
     return [
@@ -390,7 +391,7 @@ async def list_customers_light(request: Request):
             "name": c.name or "",
             "gender": c.gender or "",
             "member_type": c.member_type or "",
-            "visit_count": len(visit_days.get(c.id, set())),
+            **({"visit_count": len(visit_days.get(c.id, set()))} if purpose == 'full' else {}),
             "positions": c.positions or [],
             "created_at": c.created_at.isoformat() if c.created_at else "",
             "traffic_source": c.traffic_source or "",

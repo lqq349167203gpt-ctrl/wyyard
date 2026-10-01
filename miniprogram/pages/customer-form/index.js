@@ -1,5 +1,7 @@
 const { customerApi, customerTagApi, followUpStatusApi } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
+const { readSource, retrySources } = require('../../utils/source-state')
+const { disposeReads } = require('../../utils/read-scope')
 
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
@@ -120,21 +122,14 @@ Page({
   },
 
   async loadFollowUpStatuses() {
-    try {
-      const statuses = await followUpStatusApi.list()
+    return readSource(this, 'statuses', () => followUpStatusApi.list(), statuses => {
       this.setData({ followUpStatuses: (statuses || []).map(item => item.name) })
-    } catch (e) {
-      this.setData({ followUpStatuses: [this.data.follow_up_status || '未配置'] })
-    }
+    })
   },
 
   async loadCustomerTags(customerId) {
     this.setData({ tagLoading: true })
-    try {
-      const tags = await customerTagApi.list()
-      const selectedTags = customerId
-        ? await customerTagApi.listForCustomer(customerId)
-        : []
+    const loaded = await readSource(this, 'tags', () => Promise.all([customerTagApi.list(), customerId ? customerTagApi.listForCustomer(customerId) : []]), ([tags, selectedTags]) => {
       const selectedTagIds = (selectedTags || []).map(tag => tag.id)
       this.setData({
         customerTags: tags || [],
@@ -142,11 +137,8 @@ Page({
         selectedTagText: this.buildTagText(tags || [], selectedTagIds),
         tagsLoaded: true,
       })
-    } catch (e) {
-      this.setData({ tagsLoaded: false })
-    } finally {
-      this.setData({ tagLoading: false })
-    }
+    })
+    if (!this._readsDisposed) this.setData({ tagsLoaded: loaded, tagLoading: false })
   },
 
   buildTagText(tags, selectedIds) {
@@ -222,20 +214,17 @@ Page({
   },
 
   async loadCustomers() {
-    try {
-      const list = await customerApi.light()
+    return readSource(this, 'people', () => customerApi.selector(), list => {
       this.setData({ allCustomers: list })
-    } catch (e) {
-      console.error('加载客户列表失败:', e)
-    }
+    })
   },
 
   async loadCustomer(id) {
-    try {
-      const customer = await customerApi.detail(id)
+    return readSource(this, 'customer', () => customerApi.detail(id, undefined, false, '', 'basic'), customer => {
       const c = customer.customer || customer
       const ts = c.traffic_source || ''
       this.setData({
+        customerLoaded: true,
         nickname: c.nickname || '',
         name: c.name || '',
         gender: c.gender || '',
@@ -261,10 +250,11 @@ Page({
         tags: c.tags || '',
         other_info: c.other_info || '',
       })
-    } catch (e) {
-      wx.showToast({ title: '加载失败', icon: 'none' })
-    }
+    })
   },
+
+  retrySources() { return retrySources(this, { customer: () => this.loadCustomer(this.data.id), statuses: () => this.loadFollowUpStatuses(), tags: () => this.loadCustomerTags(this.data.id), people: () => this.loadCustomers() }) },
+  onUnload() { disposeReads(this) },
 
   onInput(e) {
     const field = e.currentTarget.dataset.field
@@ -399,6 +389,7 @@ Page({
   },
 
   async onSubmit() {
+    if (this.data.sourceError || this.data.sourcesLoading) { wx.showToast({ title: '请等待信息加载完成，失败时点击重试', icon: 'none' }); return }
     if (!this.data.nickname.trim()) {
       wx.showToast({ title: '请输入昵称', icon: 'none' })
       return
