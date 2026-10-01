@@ -14,6 +14,41 @@ let _lastTrackedPagePath = ''
 const DEVICE_ID_KEY = 'wyyard_device_id'
 const DEFAULT_EDIT_PERMISSIONS = { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
 const SECURITY_AUTH_REASONS = ['disabled', 'password_changed', 'kicked']
+// 仅复用在途读取，完成即移除；不缓存业务结果，不合并写入、日志和心跳。
+const pendingReads = new Map()
+const SHARED_READ_RESOURCES = new Set([
+  'customers', 'member-identities', 'spaces', 'organizations', 'course-types',
+  'customer-tags', 'follow-up-statuses', 'visits', 'class-records', 'daily-report',
+  'communication-records', 'visit-verifications', 'activity-themes',
+  'membership-cards', 'group-cases', 'emotional-releases', 'energy-knots',
+  'internal-courses', 'oh-card-readings', 'other-projects', 'tea-seat-fees', 'offline-courses',
+])
+
+function request(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase()
+  const resource = path.split('?')[0].split('/')[2]
+  const readOnlyPost = method === 'POST' && (
+    ['/api/principal/query', '/api/custom-analysis/execute', '/api/custom-analysis/parse', '/api/login-records/heartbeat'].includes(path.split('?')[0])
+    || path.split('?')[0].endsWith('/export') || path.split('?')[0].endsWith('/contact-access')
+  )
+  const write = method !== 'GET' && !readOnlyPost
+  if (write) pendingReads.clear()
+  const load = () => performRequest(path, options).then(result => {
+    if (write) pendingReads.clear()
+    return result
+  })
+  if (method !== 'GET' || options._authRetry || options.skipAuth || !SHARED_READ_RESOURCES.has(resource)
+    || /\/(export|contact-access)(\?|$)/.test(path)) return load()
+  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+  const page = pages.length ? pages[pages.length - 1].route : ''
+  const key = JSON.stringify([BASE_URL, wx.getStorageSync('auth_token'), wx.getStorageSync('currentUser'),
+    wx.getStorageSync('userPermissions'), wx.getStorageSync('userEditPermissions'), page, path,
+    options.data, options.responseType, options.timeout, !!options.silent])
+  if (pendingReads.has(key)) return pendingReads.get(key)
+  const promise = load().finally(() => { if (pendingReads.get(key) === promise) pendingReads.delete(key) })
+  pendingReads.set(key, promise)
+  return promise
+}
 
 function _getDeviceId() {
   let deviceId = wx.getStorageSync(DEVICE_ID_KEY)
@@ -35,6 +70,7 @@ function _getResponseHeader(headers, name) {
 
 function _saveLoginState(data) {
   if (!data || !data.token || !data.account) return false
+  pendingReads.clear()
   const permissions = data.permissions || []
   const editPermissions = data.edit_permissions || DEFAULT_EDIT_PERMISSIONS
   wx.setStorageSync('auth_token', data.token)
@@ -125,6 +161,7 @@ function _silentRelogin() {
 function _clearAuthAndGoLogin(reason) {
   if (_logoutScheduled) return
   _logoutScheduled = true
+  pendingReads.clear()
   _loginPromise = null
   _silentLoginPromise = null
   wx.removeStorageSync('auth_token')
@@ -322,7 +359,7 @@ function _pageTrackingHeaders() {
   }
 }
 
-async function request(path, options = {}) {
+async function performRequest(path, options = {}) {
   return new Promise((resolve, reject) => {
     // skipAuth（登录类）请求不附带 token：建立会话不需要已有会话，
     // 也避免过期 token 触发后端 AuthMiddleware 误拒登录请求
@@ -434,6 +471,7 @@ const visitApi = {
 
 const visitNoteApi = {
   list: (visitId) => request(`/api/visit-notes?visit_id=${encodeURIComponent(visitId)}`),
+  feedbackPeople: () => request('/api/visit-notes/feedback-people'),
   previousVisitNeed: (customerId, beforeDate, excludeVisitId) => {
     const params = [`customer_id=${encodeURIComponent(customerId)}`]
     if (beforeDate) params.push(`before_date=${encodeURIComponent(beforeDate)}`)
@@ -441,7 +479,7 @@ const visitNoteApi = {
     return request(`/api/visit-notes/previous-visit-need?${params.join('&')}`)
   },
   create: (data) => request('/api/visit-notes', { method: 'POST', data }),
-  update: (id, content) => request(`/api/visit-notes/${id}`, { method: 'PATCH', data: { content } }),
+  update: (id, content, attribution = {}) => request(`/api/visit-notes/${id}`, { method: 'PATCH', data: { content, ...attribution } }),
   delete: (id) => request(`/api/visit-notes/${id}`, { method: 'DELETE' }),
 }
 
@@ -819,6 +857,13 @@ const paymentApi = {
 
 // 沟通记录
 const communicationRecordApi = {
+  get: (id) => request(`/api/communication-records/${encodeURIComponent(id)}`),
+  listPage: (params = {}) => {
+    const query = Object.entries(params).filter(([key, value]) => key !== 'creator_names' && value !== undefined && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    ;(params.creator_names || []).forEach(name => query.push(`creator_names=${encodeURIComponent(name)}`))
+    return request(`/api/communication-records?${query.join('&')}`)
+  },
   list: (customerNickname) => {
     const qs = customerNickname ? `?customer_nickname=${encodeURIComponent(customerNickname)}` : ''
     return request(`/api/communication-records${qs}`)
@@ -893,9 +938,13 @@ const customAnalysisApi = {
 }
 
 module.exports = {
+  dailyReportApi: {
+    read: (date, spaceId) => request(`/api/daily-report?date=${encodeURIComponent(date)}&mobile=true&space_id=${encodeURIComponent(spaceId || '')}`),
+    finance: (date) => request(`/api/daily-report/finance-sources?date=${encodeURIComponent(date)}&mobile=true`, { silent: true }),
+  },
   ensureAuthSource,
   principalApi: {
-    metadata: () => request('/api/principal/metadata'),
+    metadata: (lite = false) => request('/api/principal/metadata' + (lite ? '?lite=true' : '')),
     rules: () => request('/api/principal/rules'),
     ruleFields: () => request('/api/principal/rule-fields'),
     query: (data) => request('/api/principal/query', { method: 'POST', data }),
@@ -931,17 +980,12 @@ module.exports = {
   activityParticipantNoteApi,
   // 客户跟进：自己填过的客户信息 / 跟进点
   customerFollowUpApi: {
-    list: (params = {}) => {
-      const query = [`page=${params.page || 1}`, `page_size=${params.pageSize || 20}`]
-      if (params.keyword) query.push(`keyword=${encodeURIComponent(params.keyword)}`)
-      if (params.dateFrom) query.push(`date_from=${params.dateFrom}`)
-      if (params.dateTo) query.push(`date_to=${params.dateTo}`)
-      return request(`/api/customer-follow-ups?${query.join('&')}`)
-    },
-    update: (noteId, content) => request(`/api/customer-follow-ups/${noteId}`, { method: 'PATCH', data: { content } }),
-    create: (visitId, category, content) => request('/api/customer-follow-ups', {
+    feedbackPeople: () => request('/api/customer-follow-ups/feedback-people'),
+    myNote: (visitId, category) => request(`/api/customer-follow-ups/my-note?visit_id=${encodeURIComponent(visitId)}&category=${encodeURIComponent(category)}`),
+    update: (noteId, content, attribution = {}) => request(`/api/customer-follow-ups/${noteId}`, { method: 'PATCH', data: { content, ...attribution } }),
+    create: (visitId, category, content, attribution = {}) => request('/api/customer-follow-ups', {
       method: 'POST',
-      data: { visit_id: visitId, category, content },
+      data: { visit_id: visitId, category, content, ...attribution },
     }),
   },
   visitVerificationApi,

@@ -1,20 +1,5 @@
 const { communicationRecordApi } = require('../../utils/api')
-
-function decorateRecords(items) {
-  return items
-    .slice()
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    .map(item => {
-      const record = Object.assign({}, item)
-      if (record.created_at) {
-        const date = new Date(record.created_at)
-        record._dateStr = `${date.getMonth() + 1}/${date.getDate()}`
-      } else {
-        record._dateStr = ''
-      }
-      return record
-    })
-}
+const { communicationList } = require('../../utils/communication-list')
 
 Page({
   data: {
@@ -24,6 +9,11 @@ Page({
     filtered: [],
     recordsReady: false,
     loading: false,
+    loadingMore: false,
+    error: '',
+    page: 1,
+    total: 0,
+    hasMore: false,
     hasSearched: false,
     showFilterPanel: false,
     filterCount: 0,
@@ -47,63 +37,6 @@ Page({
       this._needRefresh = false
       this.loadRecords()
     }
-  },
-
-  onUnload() {
-    if (this._searchTimer) clearTimeout(this._searchTimer)
-  },
-
-  async loadRecords() {
-    if (this.hasActiveCriteria()) this.setData({ loading: true, hasSearched: true })
-    try {
-      const result = await communicationRecordApi.list()
-      const records = decorateRecords(Array.isArray(result) ? result : [])
-      const creatorCounts = {}
-      records.forEach(record => {
-        const creator = (record.creator || '').trim()
-        if (creator) creatorCounts[creator] = (creatorCounts[creator] || 0) + 1
-      })
-      const creatorNames = Object.keys(creatorCounts).sort((a, b) => (
-        creatorCounts[b] - creatorCounts[a] || a.localeCompare(b, 'zh-CN')
-      ))
-      const visibleCreators = new Set(creatorNames)
-      const selectedCreators = this.data.selectedCreators.filter(name => visibleCreators.has(name))
-      this.setData({ records, recordsReady: true, creatorNames, selectedCreators })
-      this.updateCreatorList()
-      this.updateFilterCount()
-      this.applySearch()
-    } catch (error) {
-      this.setData({ records: [], filtered: [], recordsReady: true, loading: false })
-      wx.showToast({ title: (error && error.message) || '加载失败', icon: 'none' })
-    }
-  },
-
-  hasActiveCriteria() {
-    return Boolean(this.data.keyword.trim() || this.data.selectedCreators.length)
-  },
-
-  applySearch() {
-    if (!this.hasActiveCriteria()) {
-      this.setData({ filtered: [], hasSearched: false, loading: false })
-      return
-    }
-    if (!this.data.recordsReady) {
-      this.setData({ hasSearched: true, loading: true })
-      return
-    }
-    const keyword = this.data.keyword.trim().toLowerCase()
-    const selected = new Set(this.data.selectedCreators)
-    const hasCreatorFilter = selected.size > 0
-    const filtered = this.data.records.filter(record => {
-      if (
-        keyword
-        && !(record.customer_nickname || '').toLowerCase().includes(keyword)
-        && !(record.customer_name || '').toLowerCase().includes(keyword)
-      ) return false
-      if (hasCreatorFilter && !selected.has((record.creator || '').trim())) return false
-      return true
-    })
-    this.setData({ filtered, hasSearched: true, loading: false })
   },
 
   updateCreatorList() {
@@ -205,4 +138,5 @@ Page({
       },
     })
   },
+  ...communicationList(true),
 })

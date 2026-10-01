@@ -1,4 +1,5 @@
-<view class="page">
+<page-meta page-style="{{participantEditing ? 'overflow:hidden;height:100vh;' : ''}}" />
+<view class="page {{activeTab === 'courses' && courseViewTab === 'courses' ? 'course-records-page' : ''}} {{activeTab === 'courses' && courseViewTab === 'participants' ? 'course-participants-page' : ''}} {{activeTab === 'courses' && courseViewTab === 'reviews' ? 'course-reviews-page' : ''}}">
   <!-- 课程记录 / 参与者 / 复盘记录：放到页面顶部（与组织/俱乐部页面的 tab 一致） -->
   <view class="course-view-tabs" wx:if="{{activeTab === 'courses'}}">
     <view class="course-view-tab {{courseViewTab === 'courses' ? 'active' : ''}}" data-tab="courses" bindtap="onCourseViewTab">课程记录</view>
@@ -7,38 +8,21 @@
   </view>
   <view class="top-card">
 
-    <view class="filter-row">
+    <view class="filter-row {{activeTab === 'courses' ? 'course-filter-row' : ''}}">
       <text class="filter-label">{{activeTab === 'courses' ? '课程老师' : '服务老师'}}</text>
       <picker class="filter-picker" mode="selector" range="{{teachers}}" range-key="name" value="{{teacherIndex}}" bindchange="onTeacherChange">
-        <view class="picker-value"><text class="picker-text">{{teacherName || '请选择'}}</text><view class="picker-arrow"></view></view>
+        <view class="picker-value {{activeTab === 'courses' ? 'course-filter-value course-primary-filter-value' : ''}}"><text class="picker-text">{{teacherName || '请选择'}}</text><view class="picker-arrow {{activeTab === 'courses' ? 'course-picker-arrow' : ''}}"></view></view>
       </picker>
     </view>
 
     <block wx:if="{{activeTab === 'courses'}}">
-      <view class="filter-row">
+      <view class="filter-row course-filter-row" wx:if="{{courseViewTab !== 'participants'}}">
         <text class="filter-label">课程类型</text>
         <picker class="filter-picker" mode="selector" range="{{courseTypes}}" range-key="label" value="{{courseTypeIndex}}" bindchange="onCourseTypeChange">
-          <view class="picker-value"><text class="picker-text">{{courseTypes[courseTypeIndex].label}}</text><view class="picker-arrow"></view></view>
+          <view class="picker-value course-filter-value course-primary-filter-value"><text class="picker-text">{{courseTypes[courseTypeIndex].label}}</text><view class="picker-arrow course-picker-arrow"></view></view>
         </picker>
       </view>
-      <!-- 参与者页签的筛选跟上面的课程筛选同一套样式 -->
-      <view class="filter-row" wx:if="{{courseViewTab === 'participants'}}">
-        <text class="filter-label">昵称</text>
-        <input class="filter-input" value="{{participantKeyword}}" placeholder="昵称或姓名" placeholder-class="filter-input-placeholder" confirm-type="search" bindinput="onParticipantKeywordDebounced" bindconfirm="onParticipantSearch" />
-      </view>
-      <view class="filter-row" wx:if="{{courseViewTab === 'participants'}}">
-        <text class="filter-label">客户身份</text>
-        <picker class="filter-picker" mode="selector" range="{{participantMemberTypes}}" range-key="label" value="{{participantMemberTypeIndex}}" bindchange="onParticipantMemberType">
-          <view class="picker-value"><text class="picker-text">{{participantMemberTypes[participantMemberTypeIndex].label}}</text><view class="picker-arrow"></view></view>
-        </picker>
-      </view>
-      <view class="filter-row" wx:if="{{courseViewTab === 'participants'}}">
-        <text class="filter-label">人员</text>
-        <picker class="filter-picker" mode="selector" range="{{participantIdentityOptions}}" range-key="label" value="{{participantIdentityIndex}}" bindchange="onParticipantIdentity">
-          <view class="picker-value"><text class="picker-text">{{participantIdentityOptions[participantIdentityIndex].label}}</text><view class="picker-arrow"></view></view>
-        </picker>
-      </view>
-      <view class="filter-row align-start">
+      <view class="filter-row course-filter-row">
         <text class="filter-label">周期</text>
         <view class="course-presets">
           <view
@@ -50,18 +34,43 @@
           >{{item.label}}</view>
         </view>
       </view>
-      <view class="filter-row align-start">
+      <view class="filter-row course-filter-row">
         <text class="filter-label">自定义</text>
-        <view class="date-range">
+        <view class="date-range course-date-range">
           <picker class="date-picker" mode="date" value="{{courseDateFrom}}" end="{{courseDateTo}}" bindchange="onDateFromChange">
-            <view class="date-value {{courseDateFrom ? '' : 'placeholder'}}">{{courseDateFrom || '选择日期'}}</view>
+            <view class="date-value course-date-value {{courseDateFrom ? '' : 'placeholder'}}"><text class="date-text">{{courseDateFrom || '选择日期'}}</text><view class="picker-arrow course-picker-arrow"></view></view>
           </picker>
           <text class="date-separator">至</text>
           <picker class="date-picker" mode="date" value="{{courseDateTo}}" start="{{courseDateFrom}}" bindchange="onDateToChange">
-            <view class="date-value {{courseDateTo ? '' : 'placeholder'}}">{{courseDateTo || '选择日期'}}</view>
+            <view class="date-value course-date-value {{courseDateTo ? '' : 'placeholder'}}"><text class="date-text">{{courseDateTo || '选择日期'}}</text><view class="picker-arrow course-picker-arrow"></view></view>
           </picker>
         </view>
       </view>
+      <block wx:if="{{courseViewTab === 'participants'}}">
+        <block wx:if="{{participantFiltersExpanded}}">
+          <view class="filter-row course-filter-row">
+            <text class="filter-label">课程类型</text>
+            <picker class="filter-picker" mode="selector" range="{{courseTypes}}" range-key="label" value="{{courseTypeIndex}}" bindchange="onCourseTypeChange">
+              <view class="picker-value course-filter-value course-primary-filter-value"><text class="picker-text">{{courseTypes[courseTypeIndex].label}}</text><view class="picker-arrow course-picker-arrow"></view></view>
+            </picker>
+          </view>
+          <view class="filter-row course-filter-row">
+            <text class="filter-label">昵称</text>
+            <input class="filter-input participant-filter-input" value="{{participantKeyword}}" placeholder="搜索参与者" placeholder-class="filter-input-placeholder" confirm-type="search" bindinput="onParticipantKeywordDebounced" bindconfirm="onParticipantSearch" />
+          </view>
+          <view class="filter-row course-filter-row">
+            <text class="filter-label">人员</text>
+            <picker class="filter-picker" mode="selector" range="{{participantIdentityOptions}}" range-key="label" value="{{participantIdentityIndex}}" bindchange="onParticipantIdentity">
+              <view class="picker-value course-filter-value course-primary-filter-value"><text class="picker-text">{{participantIdentityOptions[participantIdentityIndex].label}}</text><view class="picker-arrow course-picker-arrow"></view></view>
+            </picker>
+          </view>
+        </block>
+        <view class="participant-filter-toggle" bindtap="onToggleParticipantFilters">
+          <text>{{participantFiltersExpanded ? '收起筛选' : '展开筛选'}}</text>
+          <text class="participant-filter-active" wx:if="{{!participantFiltersExpanded && (courseTypeIndex > 0 || participantIdentityIndex > 0 || participantKeyword)}}">已设置</text>
+          <view class="participant-filter-chevron {{participantFiltersExpanded ? 'expanded' : ''}}"></view>
+        </view>
+      </block>
     </block>
 
     <block wx:else>
@@ -93,13 +102,21 @@
   <view class="summary-card" wx:if="{{summaryCards.length && !(activeTab === 'courses' && courseViewTab !== 'courses')}}">
     <view class="summary-item" wx:for="{{summaryCards}}" wx:key="label">
       <text class="summary-label">{{item.label}}</text>
-      <view><text class="summary-value">{{item.value}}</text><text class="summary-unit">{{item.unit}}</text></view>
+      <view class="summary-value-row"><text class="summary-value">{{item.value}}</text><text class="summary-unit">{{item.unit}}</text></view>
     </view>
   </view>
 
-  <view class="records-card">
-    <view class="records-head">
-      <text class="records-title">{{activeTab === 'courses' ? (courseViewTab === 'reviews' ? '复盘记录' : '课程记录') : '客户列表'}}</text>
+  <view class="records-card {{summaryCards.length && !(activeTab === 'courses' && courseViewTab !== 'courses') ? 'with-summary' : ''}} {{activeTab === 'courses' && courseViewTab === 'participants' ? 'participant-list' : ''}} {{activeTab === 'courses' && courseViewTab === 'courses' ? 'course-list' : ''}} {{activeTab === 'courses' && courseViewTab === 'reviews' ? 'review-list' : ''}}">
+    <view class="records-head {{activeTab === 'courses' && courseViewTab === 'courses' ? 'course-records-head' : ''}} {{activeTab === 'courses' && courseViewTab === 'participants' ? 'participants-records-head' : ''}} {{activeTab === 'courses' && courseViewTab === 'reviews' ? 'reviews-records-head' : ''}}">
+      <view class="records-title-group" wx:if="{{activeTab === 'courses' && (courseViewTab === 'participants' || courseViewTab === 'courses' || courseViewTab === 'reviews')}}">
+        <view class="records-title-mark"></view>
+        <text class="records-title" wx:if="{{courseViewTab === 'courses'}}">{{teacherName}} · 课程记录</text>
+        <text class="records-title" wx:elif="{{courseViewTab === 'participants'}}">参与者列表</text>
+        <text class="records-title" wx:else>复盘记录</text>
+        <text class="p-count-inline" wx:if="{{courseViewTab === 'participants' && participantTotal}}">共 {{participantTotal}} 场课 · {{participantTotalParticipants}} 人</text>
+        <text class="p-count-inline" wx:if="{{courseViewTab === 'courses' && courseTotal}}">共 {{courseTotal}} 场课</text>
+      </view>
+      <text class="records-title" wx:else>{{activeTab === 'courses' ? '课程记录' : '客户列表'}}</text>
       <view class="records-actions">
         <view class="outline-button {{exporting ? 'disabled' : ''}}" bindtap="onExport">导出</view>
         <view class="outline-button" wx:if="{{activeTab === 'follow-ups'}}" bindtap="onToggleContent">{{contentExpanded ? '缩略' : '展开'}}</view>
@@ -107,68 +124,72 @@
     </view>
 
     <view class="loading" wx:if="{{loading}}">加载中...</view>
-    <view class="empty" wx:elif="{{activeTab === 'courses' && courseViewTab !== 'reviews' && courseRecords.length === 0}}">暂无课程记录</view>
+    <view class="empty" wx:elif="{{activeTab === 'courses' && courseViewTab === 'courses' && courseRecords.length === 0}}">暂无课程记录</view>
     <view class="empty" wx:elif="{{activeTab === 'courses' && courseViewTab === 'reviews' && reviewRecords.length === 0}}">所选时间范围内暂无复盘记录</view>
     <view class="empty" wx:elif="{{activeTab === 'follow-ups' && followUpRecords.length === 0}}">暂无客户记录</view>
 
     <block wx:elif="{{activeTab === 'courses' && courseViewTab === 'reviews'}}">
       <view class="course-record" wx:for="{{reviewRecords}}" wx:key="id">
-        <view class="record-primary">
-          <text class="course-name">{{item.name || '—'}}</text>
-          <text class="course-type">{{item.activity_type_label || '—'}}</text>
-        </view>
-        <view class="record-meta"><text>{{item.date}}</text><text>{{item.timeText}}</text><text>{{item.class_hours}}课时</text></view>
-        <view class="teacher-line"><text class="detail-label">老师/成就君</text><text class="detail-value">{{item.teacherText}}</text></view>
-        <view class="teacher-line" wx:if="{{item.activity_type === 'gcs' || item.activity_type === 'ers' || item.activity_type === 'eks'}}"><text class="detail-label">案主</text><text class="detail-value">{{item.owner_name || '—'}}</text></view>
-        <view class="participant-summary"><text>参与 {{item.participant_count}}人</text><text>新人 {{item.new_count}}人</text><text>老人 {{item.old_count}}人</text></view>
-        <view class="name-line">
-          <text class="detail-label">新人名单</text>
-          <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
-          <text class="empty-dash" wx:else>—</text>
-        </view>
-        <view class="name-line">
-          <text class="detail-label">老人名单</text>
-          <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
-          <text class="empty-dash" wx:else>—</text>
-        </view>
-        <view class="review-block">
-          <view class="review-head">
-            <text class="detail-label">复盘内容</text>
-            <text class="review-toggle" data-id="{{item.id}}" bindtap="onToggleReview">{{reviewExpanded[item.id] ? '缩略' : '展开'}}</text>
+        <view class="review-course-head">
+          <view class="record-primary">
+            <text class="course-name">{{item.name || '—'}}</text>
+            <text class="course-type">{{item.activityTypeText || '—'}}</text>
           </view>
-          <text class="review-text {{reviewExpanded[item.id] ? 'expanded' : ''}}">{{item.reviewText}}</text>
+          <view class="record-meta"><text>{{item.date}}</text><text>{{item.timeText}}</text><text>{{item.class_hours}}课时</text></view>
+        </view>
+        <view class="review-course-body">
+          <view class="teacher-line"><text class="detail-label">老师</text><text class="detail-value">{{item.teacherText}}</text></view>
+          <view class="teacher-line" wx:if="{{item.activity_type === 'gcs' || item.activity_type === 'ers' || item.activity_type === 'eks'}}"><text class="detail-label">案主</text><text class="detail-value">{{item.owner_name || '—'}}</text></view>
+          <view class="name-line">
+            <text class="detail-label">新人<text wx:if="{{item.new_count > 0}}"> {{item.new_count}}</text></text>
+            <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
+          <view class="name-line">
+            <text class="detail-label">老人<text wx:if="{{item.old_count > 0}}"> {{item.old_count}}</text></text>
+            <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
+          <view class="review-block">
+            <view class="review-head">
+              <text class="detail-label">复盘内容</text>
+              <text class="review-toggle" data-id="{{item.id}}" bindtap="onToggleReview">{{reviewExpanded[item.id] ? '缩略' : '展开'}}</text>
+            </view>
+            <text class="review-text {{reviewExpanded[item.id] ? 'expanded' : ''}}">{{item.reviewText}}</text>
+          </view>
         </view>
       </view>
     </block>
 
     <block wx:elif="{{activeTab === 'courses' && courseViewTab === 'participants'}}">
-      <view class="p-count" wx:if="{{participantTotal}}">共 {{participantTotal}} 场课 · {{participantTotalParticipants}} 人</view>
-
       <!-- 按课程分组：一组 = 一堂课，下面是这堂课的参与者 -->
       <view class="p-group" wx:for="{{participantGroups}}" wx:key="course_id" wx:for-item="group" wx:for-index="gi">
         <view class="p-group-head">
           <text class="p-group-course">{{group.dateText}} · {{group.course_name || '未命名课程'}}</text>
-          <text class="p-group-count">{{group.participants.length}} 人</text>
+          <view class="p-group-meta">
+            <text class="p-group-type">{{group.activityTypeText}}</text>
+            <text class="p-group-count">{{group.participantCount}}人</text>
+          </view>
         </view>
         <view class="p-record" wx:for="{{group.participants}}" wx:key="id" wx:for-item="item" wx:for-index="index">
           <view class="p-head">
             <view class="p-title">
               <text class="p-name" data-id="{{item.customer_id}}" bindtap="onParticipantCustomer">{{item.nickname || '未命名'}}</text>
+              <text class="p-role" wx:if="{{item.participantRoleText}}">{{item.participantRoleText}}</text>
               <text class="p-identity" wx:if="{{item.identityText}}">{{item.identityText}}</text>
             </view>
-            <text class="p-same-count" wx:if="{{item.same_course_count}}">同类活动 {{item.same_course_count}} 次</text>
           </view>
-          <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
-            <text class="p-field-label">当天来访需求</text>
+          <view class="p-field {{!item.visit_need ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
+            <text class="p-field-label">来访需求</text>
             <text class="p-field-value" wx:if="{{item.visit_need}}">{{item.visit_need}}</text>
             <view class="p-field-input" wx:else>点击填写</view>
           </view>
-          <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
+          <view class="p-field {{!item.customer_info ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">客户信息</text>
             <text class="p-field-value" wx:if="{{item.customer_info}}">{{item.customer_info}}</text>
             <view class="p-field-input" wx:else>点击填写</view>
           </view>
-          <view class="p-field" data-group="{{gi}}" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
+          <view class="p-field {{!item.follow_up ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">跟进点</text>
             <text class="p-field-value" wx:if="{{item.follow_up}}">{{item.follow_up}}</text>
             <view class="p-field-input" wx:else>点击填写</view>
@@ -180,25 +201,32 @@
     </block>
 
     <block wx:elif="{{activeTab === 'courses'}}">
-      <view class="course-record" wx:for="{{courseRecords}}" wx:key="id">
-        <view class="record-primary">
-          <text class="course-name">{{item.name || '—'}}</text>
-          <text class="course-type">{{item.activity_type_label || '—'}}</text>
+      <view class="course-record course-record-card" wx:for="{{courseRecords}}" wx:key="id">
+        <view class="course-card-head">
+          <view class="course-head-title">
+            <text class="course-head-date">{{item.displayDate || item.date}}</text>
+            <text class="course-head-separator">·</text>
+            <text class="course-head-name">{{item.name || '—'}}</text>
+          </view>
+          <view class="course-head-meta">
+            <text class="course-head-time">{{item.timeText}} · {{item.class_hours}}课时</text>
+            <text class="course-head-meta-separator">·</text>
+            <text class="course-type">{{item.activityTypeText || '—'}}</text>
+          </view>
         </view>
-        <view class="record-meta"><text>{{item.date}}</text><text>{{item.timeText}}</text><text>{{item.class_hours}}课时</text></view>
-        <view class="teacher-line"><text class="detail-label">老师/成就君</text><text class="detail-value">{{item.teacherText}}</text></view>
-        <view class="teacher-line" wx:if="{{item.activity_type === 'gcs' || item.activity_type === 'ers' || item.activity_type === 'eks'}}"><text class="detail-label">案主</text><text class="detail-value">{{item.owner_name || '—'}}</text></view>
-        <view class="teacher-line" wx:if="{{item.activity_type === 'eks'}}"><text class="detail-label">部位数</text><text class="detail-value">{{item.body_part_count}}</text></view>
-        <view class="participant-summary"><text>参与 {{item.participant_count}}人</text><text>新人 {{item.new_count}}人</text><text>老人 {{item.old_count}}人</text></view>
-        <view class="name-line">
-          <text class="detail-label">新人名单</text>
-          <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
-          <text class="empty-dash" wx:else>—</text>
-        </view>
-        <view class="name-line">
-          <text class="detail-label">老人名单</text>
-          <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
-          <text class="empty-dash" wx:else>—</text>
+        <view class="course-card-body">
+          <view class="teacher-line" wx:if="{{item.activity_type === 'gcs' || item.activity_type === 'ers' || item.activity_type === 'eks'}}"><text class="detail-label">案主</text><text class="detail-value">{{item.owner_name || '—'}}</text></view>
+          <view class="teacher-line" wx:if="{{item.activity_type === 'eks'}}"><text class="detail-label">部位数</text><text class="detail-value">{{item.body_part_count}}</text></view>
+          <view class="name-line">
+            <text class="detail-label">新人<text wx:if="{{item.new_count > 0}}"> {{item.new_count}}</text></text>
+            <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
+          <view class="name-line">
+            <text class="detail-label">老人<text wx:if="{{item.old_count > 0}}"> {{item.old_count}}</text></text>
+            <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
         </view>
       </view>
     </block>
@@ -213,7 +241,7 @@
         <view class="note-block">
           <text class="note-title">最近客户信息</text>
           <view class="note-entry" wx:if="{{item.latest_customer_info_content}}">
-            <text class="note-author">{{item.latest_customer_info_by || '未知'}}</text>
+            <text class="note-author">{{item.customerInfoAttribution || '未知'}}</text>
             <text class="note-content {{contentExpanded ? 'expanded' : ''}}">{{item.latest_customer_info_content}}</text>
           </view>
           <text class="empty-dash" wx:else>—</text>
@@ -222,7 +250,7 @@
         <view class="note-block">
           <text class="note-title">最近跟进点</text>
           <view class="note-entry" wx:if="{{item.latest_follow_up_content}}">
-            <text class="note-author">{{item.latest_follow_up_by || '未知'}}</text>
+            <text class="note-author">{{item.followUpAttribution || '未知'}}</text>
             <text class="note-content {{contentExpanded ? 'expanded' : ''}}">{{item.latest_follow_up_content}}</text>
           </view>
           <text class="empty-dash" wx:else>—</text>
@@ -231,27 +259,41 @@
       </view>
       <view class="load-more" wx:if="{{followUpHasMore}}">继续上拉加载</view>
     </block>
+    <view class="loading" wx:if="{{activeTab === 'courses' && courseViewTab !== 'participants' && courseLoadingMore}}">加载中...</view>
   </view>
 
   <!-- 参与者：填写 / 修改自己那一条（上面显示所有人填写的内容做参考） -->
   <view class="sheet-mask" wx:if="{{participantEditing}}" catchtouchmove="noop" bindtap="closeParticipantEdit"></view>
-  <view class="edit-sheet" wx:if="{{participantEditing}}">
-    <view class="sheet-head">
+  <view class="edit-sheet {{participantEditing.hasReference ? 'edit-sheet-reference' : 'edit-sheet-compact'}}" wx:if="{{participantEditing}}">
+    <view class="sheet-head" catchtouchmove="noop">
       <text class="sheet-title">填写{{participantEditing.title}}</text>
       <text class="sheet-close" bindtap="closeParticipantEdit">关闭</text>
     </view>
-    <scroll-view class="edit-body" scroll-y>
+    <scroll-view class="edit-body" wx:if="{{participantEditing.hasReference}}" scroll-y>
       <text class="edit-subtitle">{{participantEditing.dateText}} · {{participantEditing.nickname}} · {{participantEditing.courseName}}</text>
-      <view class="edit-reference" wx:if="{{participantEditing.all}}">
-        <text class="edit-reference-title">这一条已经填写的内容（含其他人填写的）</text>
-        <text class="edit-reference-text">{{participantEditing.all}}</text>
+      <view class="edit-reference" wx:if="{{participantEditing.hasReference}}">
+        <text class="edit-reference-title">别人填写的</text>
+        <block wx:if="{{participantEditing.allEntries.length}}">
+          <view class="reference-entry" wx:for="{{participantEditing.allEntries}}" wx:key="at">
+            <view class="reference-meta"><text class="reference-author">{{item.author || '未知'}}</text><view class="reference-right"><text wx:if="{{item.timeText}}">{{item.timeText}}</text><text wx:if="{{item.created_by}}">创建人：{{item.created_by}}</text></view></view>
+            <text class="edit-reference-text">{{item.content}}</text>
+          </view>
+        </block>
+        <text class="edit-reference-text" wx:else>{{participantEditing.all}}</text>
       </view>
       <text class="edit-label">我填写的内容</text>
-      <textarea class="edit-input" value="{{participantDraft}}" maxlength="5000" placeholder="写清楚这次来的情况和下一步跟进安排" bindinput="onParticipantDraft" />
+      <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
+      <textarea class="edit-input" value="{{participantDraft}}" maxlength="5000" placeholder="{{participantEditing.placeholder}}" placeholder-class="edit-input-placeholder" adjust-position="{{true}}" cursor-spacing="20" fixed="{{true}}" bindinput="onParticipantDraft" />
     </scroll-view>
-    <view class="edit-actions">
+    <scroll-view class="edit-body edit-body-compact" wx:else scroll-y>
+      <text class="edit-subtitle">{{participantEditing.dateText}} · {{participantEditing.nickname}} · {{participantEditing.courseName}}</text>
+      <text class="edit-label">我填写的内容</text>
+      <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
+      <textarea class="edit-input" value="{{participantDraft}}" maxlength="5000" placeholder="{{participantEditing.placeholder}}" placeholder-class="edit-input-placeholder" adjust-position="{{true}}" cursor-spacing="20" fixed="{{true}}" bindinput="onParticipantDraft" />
+    </scroll-view>
+    <view class="edit-actions" catchtouchmove="noop">
       <text class="edit-button cancel" bindtap="closeParticipantEdit">取消</text>
-      <text class="edit-button confirm {{participantSaving ? 'disabled' : ''}}" bindtap="saveParticipantEdit">{{participantSaving ? '保存中' : '保存'}}</text>
+      <text class="edit-button confirm {{participantSaving || participantEditorLoading ? 'disabled' : ''}}" bindtap="saveParticipantEdit">{{participantSaving ? '保存中' : (participantEditorLoading ? '加载中' : '保存')}}</text>
     </view>
   </view>
 </view>

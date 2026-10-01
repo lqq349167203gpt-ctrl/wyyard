@@ -1,7 +1,10 @@
+from collections import Counter
+
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.communication_record import CommunicationRecordCreate
 from app.services import communication_record_service, customer_access_service, customer_service
+from app.utils.pagination import paginate
 from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/communication-records", tags=["communication-records"])
@@ -65,7 +68,12 @@ def _require_customer_access(request: Request, nickname: str, customer_id: str =
 
 
 @router.get("")
-def list_communication_records(request: Request, customer_nickname: str = Query(None)):
+def list_communication_records(
+    request: Request, customer_nickname: str = Query(None),
+    page: int | None = Query(None, ge=1), page_size: int = Query(10, ge=1, le=100),
+    nickname: str = Query(""), member_type: str = Query(""), creator: str = Query(""),
+    creator_names: list[str] | None = Query(None),
+):
     records = communication_record_service.list_records()
     if customer_nickname:
         customer = _require_customer_access(request, customer_nickname)
@@ -73,6 +81,7 @@ def list_communication_records(request: Request, customer_nickname: str = Query(
             r.customer_id == customer.id if r.customer_id else r.customer_nickname == customer_nickname
         )]
         customer_names = {customer.nickname: customer.name or ""}
+        visible_customers = [customer]
     else:
         role = get_request_roles(request)
         if not customer_access_service.can_view_detail_tab(role, "communication"):
@@ -91,10 +100,32 @@ def list_communication_records(request: Request, customer_nickname: str = Query(
         records = [record for record in records if (
             record.customer_id in visible_ids if record.customer_id else record.customer_nickname in visible_names
         )]
-    return [
+    # 创建人选项来自完整可见集合，不随当前页或其他筛选丢失。
+    creators = sorted({r.creator.strip() for r in records if r.creator and r.creator.strip()})
+    creator_counts = Counter(r.creator.strip() for r in records if r.creator and r.creator.strip())
+    identities = {c.nickname: c.member_type or "" for c in visible_customers}
+    records = [r for r in records if (
+        (not nickname or nickname.lower() in r.customer_nickname.lower() or nickname.lower() in customer_names.get(r.customer_nickname, "").lower())
+        and (not member_type or identities.get(r.customer_nickname, "") == member_type)
+        and (not creator or r.creator == creator)
+        and (not isinstance(creator_names, list) or not creator_names or r.creator in creator_names)
+    )]
+    result = paginate(records, page, page_size) if page is not None else None
+    items = [
         _record_response(record, request, customer_names.get(record.customer_nickname, ""))
-        for record in records
+        for record in (result["items"] if result is not None else records)
     ]
+    return {**result, "items": items, "creators": creators, "creator_counts": creator_counts} if result is not None else items
+
+
+@router.get("/{record_id}")
+def get_communication_record(record_id: str, request: Request):
+    record = communication_record_service.get_record(record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="沟通记录不存在")
+    customer = _require_customer_access(request, record.customer_nickname, record.customer_id)
+    record = record.model_copy(update={"customer_nickname": customer.nickname})
+    return _record_response(record, request, customer.name or "")
 
 
 @router.post("")

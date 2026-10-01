@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { loginRecordApi, type UsageOverview, type AccountActivityRecord, type AccountActivityType } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Button } from "@/components/ui/button"
@@ -18,9 +18,7 @@ function Details({ filters, pageName = "" }: { filters: Filters; pageName?: stri
   const [keyword, setKeyword] = useState("")
   const [search, setSearch] = useState("")
   const fetch = useCallback((p: number, size: number) => loginRecordApi.listPaginated({ ...filters, source: filters.source as "pc" | "miniprogram" || undefined, account_id: filters.account_id || undefined, event_type: kind as AccountActivityType || undefined, page_name: pageName || undefined, keyword: search || undefined }, p, size), [filters, kind, pageName, search])
-  const paging = useServerPagination<AccountActivityRecord>(fetch, { pageSize: 20 })
-  const previous = useRef(fetch)
-  useEffect(() => { if (previous.current !== fetch) { previous.current = fetch; paging.resetPage() } }, [fetch, paging.resetPage])
+  const paging = useServerPagination<AccountActivityRecord>(fetch, { pageSize: 20, queryKey: JSON.stringify([filters, kind, pageName, search]) })
   return <div className="space-y-3">
     <SelectDropdown value={kind} onChange={setKind} options={[{ value: "", label: "全部记录" }, ...["login", "page_view", "operation", "usage"].map(value => ({ value, label: labels[value] }))]} className="w-36" />
     <form className="flex gap-2" onSubmit={e => { e.preventDefault(); setSearch(keyword.trim()) }}><input aria-label="搜索操作内容" placeholder="搜索页面或操作内容" value={keyword} onChange={e => setKeyword(e.target.value)} className="h-8 rounded border px-2" /><Button size="sm" variant="outline">查询</Button></form>

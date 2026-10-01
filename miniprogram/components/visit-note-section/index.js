@@ -1,4 +1,5 @@
 const { visitNoteApi, customerApi } = require('../../utils/api')
+const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
 
 function formatTime(value) {
   if (!value) return ''
@@ -25,6 +26,8 @@ Component({
     personCount: 0,      // 已填写人数
     editorOpen: false,
     editorValue: '',
+    feedbackOptions: [],
+    feedbackIndex: 0,
     saving: false,
     loading: false,
     previousNeed: null,
@@ -57,6 +60,7 @@ Component({
             return Object.assign({}, note, {
               timeText: formatTime(note.created_at),
               creatorText: creator && creator !== '历史记录' ? creator : '未知',
+              feedbackText: String(note.feedback_person || '').trim() || creator || '未知',
             })
           })
         // 每人一条：按创建人归并取最新；可编辑的那条视为"我填写的"
@@ -97,6 +101,22 @@ Component({
         visitPurposeOpen: false,
         visitPurposeError: '',
       })
+      this.loadFeedbackPeople()
+    },
+
+    async loadFeedbackPeople() {
+      try {
+        const response = await visitNoteApi.feedbackPeople()
+        if (!this.data.editorOpen) return
+        const picked = pickerData(response, this.data.myNote)
+        this.setData({ feedbackOptions: picked.options, feedbackIndex: picked.index })
+      } catch (error) {
+        wx.showToast({ title: '反馈人加载失败', icon: 'none' })
+      }
+    },
+
+    onFeedbackChange(event) {
+      this.setData({ feedbackIndex: Number(event.detail.value) })
     },
 
     async onTogglePrevious() {
@@ -195,15 +215,17 @@ Component({
       const content = (this.data.editorValue || '').trim()
       if (!content || this.data.saving) return
       const wasEditing = !!this.data.myNote
+      const attribution = attributionFromPicker(this.data.feedbackOptions, this.data.feedbackIndex)
       this.setData({ saving: true })
       try {
         if (this.data.myNote) {
-          await visitNoteApi.update(this.data.myNote.id, content)
+          await visitNoteApi.update(this.data.myNote.id, content, attribution)
         } else {
           await visitNoteApi.create({
             visit_id: this.properties.visitId,
             category: this.properties.category,
             content,
+            ...attribution,
           })
         }
         this.setData({ editorOpen: false, editorValue: '' })

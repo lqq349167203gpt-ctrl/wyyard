@@ -1,6 +1,6 @@
 .container {
   padding: 24rpx 32rpx;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   min-height: 100vh;
 }
 
@@ -56,7 +56,7 @@
 
 .goal-input {
   min-height: 40rpx;
-  padding: 8rpx 0;
+  padding: 0;
   line-height: 40rpx;
 }
 

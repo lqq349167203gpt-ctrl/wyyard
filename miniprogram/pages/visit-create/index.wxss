@@ -1,8 +1,15 @@
 .container {
   padding: 24rpx 32rpx;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   min-height: 100vh;
 }
+.feedback-field { display: flex; align-items: center; gap: 16rpx; margin-bottom: 8rpx; color: #646a73; font-size: 26rpx; }
+.feedback-label { display: flex; flex-shrink: 0; align-items: center; gap: 8rpx; }
+.feedback-label-dot { width: 12rpx; height: 12rpx; flex-shrink: 0; border-radius: 50%; background: #f4dc84; }
+.feedback-field picker { flex: 0 1 200rpx; min-width: 0; margin-left: auto; }
+.feedback-picker { display: flex; align-items: center; justify-content: space-between; height: 58rpx; box-sizing: border-box; padding: 0 16rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fcfcfc; color: #2b2f36; font-size: 26rpx; }
+.feedback-picker-text { flex: 1; min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-picker-arrow { flex-shrink: 0; width: 0; height: 0; margin-left: 12rpx; border-top: 7rpx solid #9aa1a9; border-right: 7rpx solid transparent; border-left: 7rpx solid transparent; }
 
 .placeholder {
   color: #b0b5bb;
@@ -38,7 +45,7 @@
 
 .goal-input {
   min-height: 40rpx;
-  padding: 8rpx 0;
+  padding: 0;
   line-height: 40rpx;
 }
 
@@ -228,7 +235,7 @@
 }
 
 .need-heading {
-  margin-bottom: 16rpx;
+  margin-bottom: 8rpx;
 }
 
 .need-reference-actions {

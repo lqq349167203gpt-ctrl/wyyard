@@ -169,8 +169,12 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             }
         )
     visit_records = []
+    from app.services import daily_customer_note_service
+
+    daily_summaries = daily_customer_note_service.visit_summaries(notes_by_visit) if can_follow_up else {}
     for visit in (visits if can_follow_up else []):
         record = visit.model_dump(mode="json")
+        record.update(daily_summaries.get(visit.id, {}))
         record["visit_notes"] = notes_by_visit.get(visit.id, [])
         record["needs"] = next(
             (

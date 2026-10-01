@@ -62,10 +62,10 @@
 
     <view class="search-result-summary" wx:if="{{hasSearched && !loading}}">
       <text class="search-result-title">搜索结果</text>
-      <text class="search-result-count">共 {{filtered.length}} 条</text>
+      <text class="search-result-count">共 {{total}} 条</text>
     </view>
 
-    <view class="list-area search-results-card" wx:if="{{!loading && filtered.length > 0}}">
+    <view class="list-area search-results-card" wx:if="{{filtered.length > 0}}">
       <view
         class="record-item"
         wx:for="{{filtered}}"
@@ -88,8 +88,9 @@
       </view>
     </view>
 
-    <view class="loading" wx:if="{{loading}}"><text>搜索中...</text></view>
-    <view class="empty-state search-empty" wx:if="{{hasSearched && !loading && filtered.length === 0}}">
+    <view class="loading" wx:if="{{loading || loadingMore}}"><text>搜索中...</text></view>
+    <view class="loading" wx:if="{{error}}" bindtap="retryList"><text>{{error}} · 点击重试</text></view>
+    <view class="empty-state search-empty" wx:if="{{hasSearched && !loading && !error && filtered.length === 0}}">
       <view class="empty-circle"><text class="empty-char">空</text></view>
       <text class="empty-text">没有找到匹配的沟通记录</text>
       <text class="empty-hint">试试更短的昵称或调整创建人筛选</text>

@@ -28,6 +28,7 @@ import {
 import { SpaceDropdown } from "@/components/space-dropdown"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { ActivityBatchTable, type HistoryEntry } from "./activity-batch-table"
+import { LoadError } from "@/components/load-error"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
 import { POSITION_ENERGY_TEACHER, POSITION_COURSE_TEACHER } from "@/lib/positions"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
@@ -1686,6 +1687,9 @@ export default function DailyActivitiesPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
   const [courses, setCourses] = useState<{id: string, name: string}[]>([])
+  const [allCourseTypes, setAllCourseTypes] = useState<CourseType[]>([])
+  const [configurationError, setConfigurationError] = useState("")
+  const configurationSequence = useRef(0)
   const [teachers, setTeachers] = useState<CustomerLight[]>([])
   const [calendarCounts, setCalendarCounts] = useState<Record<string, number>>({})
   const [spaces, setSpaces] = useState<Space[]>([])
@@ -2256,8 +2260,12 @@ export default function DailyActivitiesPage() {
     else setDetailIcsSessions(current => current.map(updateRecord))
   }, [])
   const load = () => {
-    courseTypeApi.list().then(data => setCourses(data.filter(t => t.category !== "other").map(t => ({ id: t.name, name: t.name })))).catch(() => {})
-    spaceApi.list().then((list) => {
+    const sequence = ++configurationSequence.current
+    setConfigurationError("")
+    Promise.all([courseTypeApi.list(), spaceApi.list(), customerApi.light(), memberIdentityApi.list()]).then(([types, list, customers, identities]) => {
+      if (sequence !== configurationSequence.current) return
+      setAllCourseTypes(types)
+      setCourses(types.filter(t => t.category !== "other").map(t => ({ id: t.name, name: t.name })))
       setSpaces(list)
       if (list.length > 0) {
         if (!selectedSpaceId || !list.some(s => s.id === selectedSpaceId)) {
@@ -2265,17 +2273,15 @@ export default function DailyActivitiesPage() {
           localStorage.setItem("selected-space-id", list[0].id)
         }
       }
-    }).catch(() => {})
-    customerApi.light()
-      .then((customers) => {
-        setAllCustomers(customers)
-        setTeachers(customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999)))
-      })
-      .catch(() => {})
-    memberIdentityApi.list().then(setMemberIdentities).catch(() => {})
+      setAllCustomers(customers)
+      setTeachers(customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999)))
+      setMemberIdentities(identities)
+    }).catch(error => {
+      if (sequence === configurationSequence.current) setConfigurationError(error instanceof Error ? error.message : "课表配置加载失败")
+    })
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); return () => { configurationSequence.current++ } }, [])
   useEffect(() => { loadDateData(detailDate) }, [detailDate, selectedSpaceId])
 
   const handleSpaceSelect = useCallback((id: string) => {
@@ -2710,6 +2716,7 @@ export default function DailyActivitiesPage() {
   return (
     <div className="flex flex-col min-h-0 min-w-0" style={{ height: 'calc(100vh - 48px)', paddingRight: historyPanelOpen ? 320 : 0 }}>
       <div className="flex flex-col min-h-0 min-w-0 flex-1 gap-2 px-6 pt-4 pb-6 overflow-x-clip">
+        <LoadError error={configurationError} onRetry={load} />
         {/* 月份导航 + 空间 */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-0 relative">
@@ -2830,6 +2837,7 @@ export default function DailyActivitiesPage() {
           ) : (
             <ActivityBatchTable
               date={detailDate}
+              courseTypes={allCourseTypes}
               courses={courses}
               customers={allCustomers}
               invitedCustomerIds={detailVisits.map(visit => visit.customer_id)}

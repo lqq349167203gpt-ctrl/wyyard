@@ -3,6 +3,7 @@
 // 后端地址由 utils/config.js 的 DEV 总开关决定（上线/提审前切为 false 即指向生产）
 const { DEV, BASE_URL } = require('./config')
 const imageCacheTasks = {}
+const pendingReads = new Map()
 
 function resolveResourceUrl(url) {
   if (!url) return ''
@@ -116,6 +117,24 @@ function cacheImage(url) {
 }
 
 function request(options) {
+  const method = (options.method || 'GET').toUpperCase()
+  // 只合并同一会话的在途业务读取，返回后即释放；登录和其他写入绝不合并。
+  if (method !== 'GET') {
+    pendingReads.clear()
+    return performRequest(options).then(result => { pendingReads.clear(); return result })
+  }
+  if (!options.url.startsWith('/api/client/')) return performRequest(options)
+  const token = getApp().globalData.token || wx.getStorageSync('client_token') || ''
+  const key = JSON.stringify([BASE_URL, token, options.url, options.data, options.header, !!options.silentAuth])
+  if (pendingReads.has(key)) return pendingReads.get(key)
+  const promise = performRequest(options).finally(() => {
+    if (pendingReads.get(key) === promise) pendingReads.delete(key)
+  })
+  pendingReads.set(key, promise)
+  return promise
+}
+
+function performRequest(options) {
   return new Promise((resolve, reject) => {
     const app = getApp()
     const token = app.globalData.token || wx.getStorageSync('client_token') || ''

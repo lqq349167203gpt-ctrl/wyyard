@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { X, Inbox } from "lucide-react"
-import { followupRecordApi, customerApi, type ActivityFollowup, type Customer } from "@/lib/api"
-import { usePagination } from "@/hooks/use-pagination"
+import { followupRecordApi, customerApi, type ActivityFollowup } from "@/lib/api"
+import { useServerPagination } from "@/hooks/use-server-pagination"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import {
@@ -9,9 +11,8 @@ import {
 } from "@/components/ui/table"
 
 export default function FollowupRecordsPage() {
-  const [records, setRecords] = useState<ActivityFollowup[]>([])
-  const [loading, setLoading] = useState(false)
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const directory = useReadResource(customerApi.light, [])
+  const customers = directory.data
   const [searchCustomerId, setSearchCustomerId] = useState("")
 
   const customerIdToName = useMemo(() => {
@@ -22,29 +23,11 @@ export default function FollowupRecordsPage() {
     return map
   }, [customers])
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await followupRecordApi.list()
-      setRecords(res.items || [])
-    } catch {
-      setRecords([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-    customerApi.list().then(setCustomers).catch(() => setCustomers([]))
-  }, [fetchData])
-
-  const filteredRecords = useMemo(() => {
-    if (!searchCustomerId) return records
-    return records.filter(r => r.customer_id === searchCustomerId)
-  }, [records, searchCustomerId])
-
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex,
+    loading, error: loadError, refresh: fetchData } = useServerPagination<ActivityFollowup>(
+    (page, pageSize) => followupRecordApi.listPaginated(searchCustomerId, page, pageSize),
+    { pageSize: 10, queryKey: searchCustomerId },
+  )
 
   const handleClear = () => {
     setSearchCustomerId("")
@@ -59,6 +42,8 @@ export default function FollowupRecordsPage() {
 
   return (
     <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <LoadError error={loadError} onRetry={fetchData} />
+      <LoadError error={directory.error} onRetry={directory.refresh} />
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
       {/* 标题栏 */}
       <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
@@ -96,8 +81,8 @@ export default function FollowupRecordsPage() {
         </div>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
-        ) : filteredRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
+        ) : totalItems === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">{loadError ? "数据尚未加载成功" : "暂无数据"}</span></div>
         ) : (
           <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>

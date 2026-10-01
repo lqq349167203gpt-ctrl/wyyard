@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useServerPagination } from "@/hooks/use-server-pagination"
+import { LoadError } from "@/components/load-error"
 import { PaginationBar } from "@/components/pagination-bar"
 
 const PAGE_SIZE = 20
@@ -50,7 +51,7 @@ export default function SystemLogsPage() {
 
   const {
     paginatedItems: pagedLogs, currentPage, totalPages, totalItems,
-    goToPage, startIndex, endIndex, loading,
+    goToPage, startIndex, endIndex, loading, error, refresh,
   } = useServerPagination<SystemLog>(fetchLogs, { pageSize: PAGE_SIZE })
 
   const handleFilterChange = (field: string, value: string) => {
@@ -179,7 +180,8 @@ export default function SystemLogsPage() {
       </div>
 
       {/* 日志列表 */}
-      {!loading && totalItems === 0 ? (
+      <LoadError error={error} onRetry={refresh} />
+      {!loading && !error && totalItems === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">暂无系统日志</div>
       ) : (
         <>

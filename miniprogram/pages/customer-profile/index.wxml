@@ -171,17 +171,17 @@
               <text class="rec-inviter" wx:if="{{item.referrer_handler}}">邀约人：{{item.referrer_handler}}</text>
             </view>
           </view>
-          <view class="rec-kv" wx:if="{{item.needs}}">
+          <view class="rec-kv" wx:if="{{item.needs || item.needNotes.length}}">
             <text class="k">来访需求</text>
-            <text class="v">{{item.needs}}</text>
+            <view class="v"><block wx:if="{{item.needNotes.length}}"><view class="visit-note-entry" wx:for="{{item.needNotes}}" wx:for-item="note" wx:key="id"><view class="visit-note-meta"><text>{{note.feedbackText}}</text><text>创建人：{{note.creatorText}}</text></view><text class="visit-note-content">{{note.content}}</text></view></block><text wx:else>{{item.needs}}</text></view>
           </view>
-          <view class="rec-kv" wx:if="{{item.feedback || item.experience}}">
+          <view class="rec-kv" wx:if="{{item.feedback || item.experience || item.infoNotes.length}}">
             <text class="k">客户信息</text>
-            <text class="v">{{item.feedback || item.experience}}</text>
+            <view class="v"><block wx:if="{{item.infoNotes.length}}"><view class="visit-note-entry" wx:for="{{item.infoNotes}}" wx:for-item="note" wx:key="id"><view class="visit-note-meta"><text>{{note.feedbackText}}</text><text>创建人：{{note.creatorText}}</text></view><text class="visit-note-content">{{note.content}}</text></view></block><text wx:else>{{item.feedback || item.experience}}</text></view>
           </view>
-          <view class="rec-kv" wx:if="{{item.growth_record}}">
+          <view class="rec-kv" wx:if="{{item.growth_record || item.followNotes.length}}">
             <text class="k">跟进点</text>
-            <text class="v">{{item.growth_record}}</text>
+            <view class="v"><block wx:if="{{item.followNotes.length}}"><view class="visit-note-entry" wx:for="{{item.followNotes}}" wx:for-item="note" wx:key="id"><view class="visit-note-meta"><text>{{note.feedbackText}}</text><text>创建人：{{note.creatorText}}</text></view><text class="visit-note-content">{{note.content}}</text></view></block><text wx:else>{{item.growth_record}}</text></view>
           </view>
         </view>
       </view>

@@ -1,6 +1,6 @@
 .container {
   padding: 24rpx 32rpx;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   min-height: 100vh;
 }
 

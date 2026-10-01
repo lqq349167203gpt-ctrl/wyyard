@@ -3,7 +3,7 @@ const { formatDate } = require('../../utils/util')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
-const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
+const { readScheduleDate, writeScheduleDate } = require('../../utils/schedule-date')
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
@@ -128,12 +128,10 @@ Page({
       canManageVisitVerification: currentUser.role === '超级管理员' || editPermissions.visit_lock === true,
     })
     const now = new Date()
-    const savedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('visit_selected_date')
+    const savedDate = readScheduleDate('')
     const date = savedDate || formatDate(now)
     const d = parseLocalDate(date) || now
-    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
-    wx.setStorageSync('visit_selected_date', date)
-    wx.setStorageSync('activity_selected_date', date)
+    writeScheduleDate(date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -151,7 +149,7 @@ Page({
     if (!getApp().checkLogin()) return
     if (!this._initialized) return
 
-    const sharedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY)
+    const sharedDate = readScheduleDate(this.data.currentDate)
     if (sharedDate && sharedDate !== this.data.currentDate && parseLocalDate(sharedDate)) {
       this._selectDate(sharedDate)
       return
@@ -234,9 +232,7 @@ Page({
     if (!d) return
     const counts = this._calendarCounts || {}
     const useSoftTransition = fromWeekSwipe && !this.data.loading && this.data.visits.length > 0
-    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
-    wx.setStorageSync('visit_selected_date', date)
-    wx.setStorageSync('activity_selected_date', date)
+    writeScheduleDate(date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -313,12 +309,10 @@ Page({
 
   // ---------- 数据 ----------
 
+  onUnload() { this._loadSequence = (this._loadSequence || 0) + 1 },
+
   async loadData(spaceId, options = {}) {
-    if (this._loading) {
-      this._pendingLoad = { spaceId, options }
-      return
-    }
-    this._loading = true
+    const sequence = this._loadSequence = (this._loadSequence || 0) + 1
     const silent = Boolean(options.silent)
     if (!silent) this.setData({ loading: true })
     try {
@@ -334,7 +328,7 @@ Page({
         visitVerificationApi.list(this._countRangeStart(), this._countRangeEnd(), sid || ''),
       ])
       const currentSpaceId = this.data.spaceId || ''
-      if (reqDate !== this.data.currentDate || String(sid || '') !== String(currentSpaceId)) return
+      if (sequence !== this._loadSequence || reqDate !== this.data.currentDate || String(sid || '') !== String(currentSpaceId)) return
       const verificationMap = {}
       ;(verifications || []).forEach(item => { verificationMap[item.date] = Boolean(item.is_verified) })
       this._verificationMap = verificationMap
@@ -342,6 +336,7 @@ Page({
       const isDayVerified = Boolean(verificationMap[reqDate])
       // 迁移 localStorage 排序到后端 sort_order；已核对日期不能再迁移历史排序。
       if (!isDayVerified) await this._migrateLocalOrder(visits || [])
+      if (sequence !== this._loadSequence) return
 
       const visibleVisits = (visits || []).map(v => Object.assign({}, v, {
         can_edit: canEditRecord(v, 'visits'),
@@ -372,13 +367,11 @@ Page({
         }
       })
     } catch (e) {
+      if (sequence !== this._loadSequence) return
       console.error('加载数据失败:', e)
-      if (!this._pendingLoad) this.setData({ loading: false, dateSwitching: false })
+      this.setData({ loading: false, dateSwitching: false })
     } finally {
-      this._loading = false
-      const pendingLoad = this._pendingLoad
-      this._pendingLoad = null
-      if (pendingLoad) this.loadData(pendingLoad.spaceId, pendingLoad.options)
+      if (sequence === this._loadSequence) this.setData({ loading: false })
     }
   },
 

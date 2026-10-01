@@ -65,16 +65,13 @@ def _get_record_amount(record) -> float:
 
 def _payment_record_groups() -> list[list]:
     """返回所有会产生成交记录的项目数据。"""
-    return [
-        membership_card_service.list_cards(),
-        group_case_service.list_cases(),
-        emotional_release_service.list_releases(),
-        energy_knot_service.list_knots(),
-        internal_course_service.list_courses(),
-        offline_course_service.list_courses(),
-        oh_card_reading_service.list_readings(),
-        other_project_service.list_projects(),
-    ]
+    from app.services.payment_sources import payment_record_groups
+
+    # 保留该统计入口原有产品范围和顺序，不因公共读取而增加茶位费。
+    return list(payment_record_groups((
+        "membership-cards", "group-cases", "emotional-releases", "energy-knots",
+        "internal-courses", "offline-courses", "oh-card-readings", "other-projects",
+    )))
 
 
 def _record_matches_teacher(record, teacher_id: str, teacher_names: set[str]) -> bool:

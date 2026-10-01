@@ -7,28 +7,20 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from app.services import (
-    emotional_release_service,
-    energy_knot_service,
-    group_case_service,
-    internal_course_service,
-    membership_card_service,
-    offline_course_service,
-    oh_card_reading_service,
     organization_service,
-    other_project_service,
-    tea_seat_fee_service,
 )
+from app.services.payment_sources import payment_loader
 
 PROJECT_SOURCES = (
-    ("membership_card", "会员卡", membership_card_service.list_cards),
-    ("group_case", "觉醒游戏", group_case_service.list_cases),
-    ("emotional_release", "情绪释放", emotional_release_service.list_releases),
-    ("oh_card_reading", "OH卡诊断", oh_card_reading_service.list_readings),
-    ("energy_knot", "能量结", energy_knot_service.list_knots),
-    ("internal_course", "内部课程", internal_course_service.list_courses),
-    ("tea_seat_fee", "茶位费", tea_seat_fee_service.list_fees),
-    ("offline_course", "线下落地课程", offline_course_service.list_courses),
-    ("other", "其他项目", other_project_service.list_projects),
+    ("membership_card", "会员卡", payment_loader("membership-cards")),
+    ("group_case", "觉醒游戏", payment_loader("group-cases")),
+    ("emotional_release", "情绪释放", payment_loader("emotional-releases")),
+    ("oh_card_reading", "OH卡诊断", payment_loader("oh-card-readings")),
+    ("energy_knot", "能量结", payment_loader("energy-knots")),
+    ("internal_course", "内部课程", payment_loader("internal-courses")),
+    ("tea_seat_fee", "茶位费", payment_loader("tea-seat-fees")),
+    ("offline_course", "线下落地课程", payment_loader("offline-courses")),
+    ("other", "其他项目", payment_loader("other-projects")),
 )
 
 HEADERS = [

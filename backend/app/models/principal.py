@@ -86,6 +86,8 @@ class PrincipalQuery(StrictBaseModel):
     date_from: date | None = None
     date_to: date | None = None
     tab: Literal["overview", "courses", "orders", "conversion"] = "overview"
+    # 成交面板复用本次数据计算经营概况，避免前端另发一份全量查询。
+    include_overview: bool = False
     product: str = ""
     # 课程记录：活动类型与沙龙具体课程（仅课程列表生效）
     activity_type: str = ""

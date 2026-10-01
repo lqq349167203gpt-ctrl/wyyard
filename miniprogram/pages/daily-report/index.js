@@ -1,5 +1,6 @@
-const { visitApi, classRecordApi, customerApi, memberIdentityApi, paymentApi, spaceApi, organizationApi } = require('../../utils/api')
+const { visitApi, customerApi, dailyReportApi, spaceApi, organizationApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
+const { readScheduleDate, writeScheduleDate } = require('../../utils/schedule-date')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -109,6 +110,11 @@ Page({
     currentSpaceName: '',
     activeTab: 'customers',
     loading: true,
+    error: '',
+    financeLoading: false,
+    financeReady: false,
+    financeError: '',
+    hasFinance: false,
     visits: [],
     activities: [],
     financeRows: [],
@@ -126,7 +132,7 @@ Page({
     detailHeader: [],
   },
 
-  // 静态数据缓存（首次加载拉取，切换日期/空间不重复拉）
+  // 当前日期来源保存在逻辑层，避免向视图层重复传输历史记录。
   _customers: [],
   _customerMap: {},
   _memberIdentities: [],
@@ -138,33 +144,30 @@ Page({
       this.setData({ hasPagePermission: false })
       return
     }
-    const now = new Date()
-    const savedDate = wx.getStorageSync('visit_selected_date')
-    const date = savedDate || formatDate(now)
-    const d = savedDate ? new Date(savedDate) : now
-    this.setData({
-      currentDate: date,
-      currentDateShort: this._formatDateShort(date),
-      currentWeekday: '周' + WEEKDAYS[d.getDay()],
-      calYear: d.getFullYear(),
-      calMonth: d.getMonth(),
-    })
-    this._loadStatic().then(() => this.loadSpaces()).then(() => {
+    this._applyDate(readScheduleDate(formatDate(new Date())))
+    this.loadSpaces().then(() => {
+      if (this._destroyed) return
       this._ready = true
-      if (this._pendingShowLoad) {
-        this._pendingShowLoad = false
-        this.loadData()
-      }
+      this._applyDate(readScheduleDate(this.data.currentDate))
+      this.loadData()
     })
   },
 
   onShow() {
     if (!getApp().checkLogin()) return
     if (!this._ready) {
-      this._pendingShowLoad = true
       return
     }
+    this._applyDate(readScheduleDate(this.data.currentDate))
     this.loadData()
+  },
+
+  _applyDate(date) {
+    const [year, month, day] = date.split('-').map(Number)
+    const d = new Date(year, month - 1, day)
+    writeScheduleDate(date)
+    this.setData({ currentDate: date, currentDateShort: this._formatDateShort(date),
+      currentWeekday: '周' + WEEKDAYS[d.getDay()], calYear: year, calMonth: month - 1 })
   },
 
   _formatDateShort(date) {
@@ -172,43 +175,6 @@ Page({
     return `${d.getMonth() + 1}月${d.getDate()}日`
   },
 
-  // ---------- 静态数据（客户/会员身份/付费项目/销卡记录）----------
-
-  async _loadStatic() {
-    try {
-      const [customers, memberIdentities, paymentData, organizations] = await Promise.all([
-        customerApi.list(),
-        memberIdentityApi.list(),
-        this._loadPaymentData(),
-        organizationApi.list(),
-      ])
-      const customerMap = {}
-      for (const c of customers) customerMap[c.id] = c
-      this._customers = customers
-      this._customerMap = customerMap
-      this._memberIdentities = memberIdentities || []
-      this._paymentData = paymentData
-      this._organizations = organizations || []
-    } catch (e) {
-      console.error('加载静态数据失败:', e)
-    }
-  },
-
-  async _loadPaymentData() {
-    const [cards, groups, emotions, ohs, energies, courses, others, deductions, teaFees, offlineCourses] = await Promise.all([
-      paymentApi.membershipCards.list().catch(() => []),
-      paymentApi.groupCases.list().catch(() => []),
-      paymentApi.emotionalReleases.list().catch(() => []),
-      paymentApi.ohCardReadings.list().catch(() => []),
-      paymentApi.energyKnots.list().catch(() => []),
-      paymentApi.internalCourses.list().catch(() => []),
-      paymentApi.otherProjects.list().catch(() => []),
-      paymentApi.deductions.list().catch(() => []),
-      paymentApi.teaSeatFees.list().catch(() => []),
-      paymentApi.offlineCourses.list().catch(() => []),
-    ])
-    return { cards, groups, emotions, ohs, energies, courses, others, deductions, teaFees, offlineCourses }
-  },
 
   // ---------- 空间 ----------
 
@@ -224,10 +190,8 @@ Page({
         spaceId: space?.id || '',
         currentSpaceName: space?.name || '',
       })
-      await this.loadData()
     } catch (e) {
       console.error('加载空间失败:', e)
-      this.loadData()
     }
   },
 
@@ -281,16 +245,8 @@ Page({
 
   onCalendarDayTap(e) {
     const date = e.currentTarget.dataset.date
-    const d = new Date(date)
-    wx.setStorageSync('visit_selected_date', date)
-    this.setData({
-      currentDate: date,
-      currentDateShort: this._formatDateShort(date),
-      currentWeekday: '周' + WEEKDAYS[d.getDay()],
-      calYear: d.getFullYear(),
-      calMonth: d.getMonth(),
-      calendarExpanded: false,
-    })
+    this._applyDate(date)
+    this.setData({ calendarExpanded: false })
     this.loadData()
   },
 
@@ -302,6 +258,7 @@ Page({
         end_date: this._monthEnd(calYear, calMonth),
         space_id: spaceId || undefined,
       })
+      if (this._destroyed || calYear !== this.data.calYear || calMonth !== this.data.calMonth || spaceId !== this.data.spaceId) return
       this._calendarCounts = counts || {}
       this.setData({
         calendarDays: buildCalendar(calYear, calMonth, this.data.currentDate, this._calendarCounts),
@@ -319,40 +276,80 @@ Page({
   // ---------- 数据加载 ----------
 
   async loadData() {
-    if (this._loading) return
-    this._loading = true
-    this.setData({ loading: true })
+    const sequence = this._loadSequence = (this._loadSequence || 0) + 1
+    this._detailSequence = (this._detailSequence || 0) + 1
+    this._paymentData = null
+    this.setData({ loading: true, error: '', financeReady: false, financeLoading: false, financeError: '', detailOpen: false })
     try {
       const { currentDate, spaceId, calYear, calMonth } = this.data
       const sid = spaceId || undefined
-      const [counts, visits, dashboard] = await Promise.all([
+      const [counts, report] = await Promise.all([
         visitApi.counts({ start_date: `${calYear}-${pad(calMonth + 1)}-01`, end_date: this._monthEnd(calYear, calMonth), space_id: sid }),
-        visitApi.list(currentDate, sid),
-        classRecordApi.dashboard(currentDate, sid),
+        dailyReportApi.read(currentDate, sid),
       ])
+      if (sequence !== this._loadSequence) return
+      this._customers = report.customers || []
+      this._customerMap = Object.fromEntries(this._customers.map(c => [c.id, c]))
+      this._memberIdentities = report.identities || []
       this._calendarCounts = counts || {}
-      const result = this._assemble(visits || [], dashboard || {}, currentDate)
+      this._report = report
+      const hasFinance = report.transaction_access === 'detail'
+      this.setData({ hasFinance, ...(!hasFinance && ['finance', 'deductions'].includes(this.data.activeTab) ? { activeTab: 'customers' } : {}) })
+      const result = this._assemble(report, currentDate)
       this.setData(Object.assign({
         calendarDays: buildCalendar(calYear, calMonth, currentDate, this._calendarCounts),
         loading: false,
       }, result))
+      if (this.data.hasFinance) await this._loadFinance(sequence, currentDate)
     } catch (e) {
+      if (sequence !== this._loadSequence) return
       console.error('加载每日报表失败:', e)
-      this.setData({ loading: false })
-    } finally {
-      this._loading = false
+      this.setData({ loading: false, error: e.message || '加载失败，请重试' })
     }
   },
 
-  _assemble(visits, dashboard, date) {
+  async _loadFinance(sequence, date) {
+    this.setData({ financeLoading: true, financeError: '' })
+    try {
+      const [result, organizations] = await Promise.all([dailyReportApi.finance(date), organizationApi.list()])
+      if (sequence !== this._loadSequence) return
+      this._organizations = organizations || []
+      const sources = result.sources || {}
+      this._paymentData = { cards: sources['membership-cards'] || [], groups: sources['group-cases'] || [],
+        emotions: sources['emotional-releases'] || [], ohs: sources['oh-card-readings'] || [],
+        energies: sources['energy-knots'] || [], courses: sources['internal-courses'] || [],
+        others: sources['other-projects'] || [], teaFees: sources['tea-seat-fees'] || [],
+        offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [] }
+      const assembled = this._assemble(this._report, date)
+      for (const key of ['visits', 'activities']) {
+        const opened = new Set(this.data[key].filter(row => row.open).map(row => row.id))
+        assembled[key].forEach(row => { row.open = opened.has(row.id) })
+      }
+      this.setData({ ...assembled, financeReady: true })
+    } catch (error) {
+      if (sequence === this._loadSequence) this.setData({ financeError: error.message || '财务来源加载失败，请重试' })
+    } finally {
+      if (sequence === this._loadSequence) this.setData({ financeLoading: false })
+    }
+  },
+
+  retryData() { return this.loadData() },
+  retryFinance() { return this._loadFinance(this._loadSequence, this.data.currentDate) },
+  onUnload() {
+    this._destroyed = true
+    this._loadSequence = (this._loadSequence || 0) + 1
+    this._detailSequence = (this._detailSequence || 0) + 1
+  },
+
+  _assemble(report, date) {
+    const { visits = [], dashboard = {} } = report
     const customerMap = this._customerMap
     const identityTypeMap = {}
     for (const m of this._memberIdentities) {
       if (m.type && m.name) identityTypeMap[m.name] = m.type
     }
 
-    // 活动 tab：统一 6 类 session
-    const activities = this._buildActivities(dashboard, identityTypeMap, customerMap)
+    const activities = this._buildActivities(report.activities || [], identityTypeMap, customerMap)
 
     // 客户 tab
     const todayActMap = {}
@@ -373,13 +370,13 @@ Page({
         identityText: v.member_type || '',
         hasIdentity: !!v.member_type,
         arrived: !!v.arrived,
-        amountText: this._buildPaymentRecords(v.customer_id, date).length + '笔',
+        amountText: this._paymentData ? this._buildPaymentRecords(v.customer_id, date).length + '笔' : '—',
         hasAmount: this._buildPaymentRecords(v.customer_id, date).length > 0,
         invitedCount: v.invitation_count || 0,
         cancelledCount: v.cancelled_count || 0,
         arrivedCount: v.arrived_count || 0,
         todayActCount: todayActMap[v.customer_id] || 0,
-        remainingText: !hasCard ? '未办卡' : (remaining == null || remaining === -999 ? '不限' : remaining + '次'),
+        remainingText: !this._paymentData ? '—' : !hasCard ? '未办卡' : (remaining == null || remaining === -999 ? '不限' : remaining + '次'),
         needText: v.needs || '',
         infoText: v.feedback || v.experience || '',
         followText: v.healing_notes || '',
@@ -414,9 +411,11 @@ Page({
     }
   },
 
-  _buildActivities(dashboard, identityTypeMap, customerMap) {
-    const list = []
-    const build = (r, name, type, isWelfare, source) => {
+  _buildActivities(records, identityTypeMap, customerMap) {
+    return records.map(r => {
+      const name = r.course_name
+      const type = r.course_type
+      const isWelfare = r.is_public_welfare
       const teacherIds = r.teacher_ids || []
       const allIds = []
       const pushId = (id) => { if (id) allIds.push(id) }
@@ -436,7 +435,7 @@ Page({
         else oldMembers.push(c.nickname)
       })
       return {
-        id: `${source}_${r.id}`,
+        id: r.id,
         name: name || type,
         type,
         isWelfare: !!isWelfare,
@@ -452,25 +451,7 @@ Page({
         open: false,
         membershipDeductionCount: r.membership_deduction_count || 1,
       }
-    }
-
-    ;(dashboard.class_records || []).forEach(r => {
-      list.push(build(r, r.activity_name || r.course_name || '', r.course_type || '沙龙', r.is_public_welfare, 'cr'))
     })
-    ;(dashboard.gcs_sessions || []).forEach(r => {
-      list.push(build(r, r.name || (r.owner_name ? '觉醒游戏·' + r.owner_name : '觉醒游戏'), '觉醒', false, 'gcs'))
-    })
-    ;(dashboard.ers_sessions || []).forEach(r => {
-      list.push(build(r, r.name || (r.achiever_name ? '情绪释放·' + r.achiever_name : '情绪释放'), '情绪释放', false, 'ers'))
-    })
-    ;(dashboard.eks_sessions || []).forEach(r => {
-      list.push(build(r, r.name || ((r.teacher_names || [])[0] ? '能量结·' + r.teacher_names[0] : '能量结'), '能量结', false, 'eks'))
-    })
-    ;(dashboard.ics_sessions || []).forEach(r => {
-      list.push(build(r, r.course_name || r.course_type || '', '内部课程', false, 'ics'))
-    })
-    list.sort((a, b) => (a.timeText || '').localeCompare(b.timeText || ''))
-    return list
   },
 
   _buildHasCardSet(payment, date) {
@@ -778,6 +759,8 @@ Page({
   },
 
   async openDetail(customerId, type, nickname) {
+    if (type === 'payment' && !this.data.financeReady) return
+    const sequence = this._detailSequence = (this._detailSequence || 0) + 1
     const titleMap = { visit: '到店记录', invited: '受邀记录', cancelled: '取消记录', activity_today: '今日参与记录', payment: '成交详情' }
     const headerMap = {
       visit: [
@@ -853,8 +836,9 @@ Page({
             })
         }
       }
-      this.setData({ detailLoading: false, detailRows: records })
+      if (sequence === this._detailSequence) this.setData({ detailLoading: false, detailRows: records })
     } catch (e) {
+      if (sequence !== this._detailSequence) return
       console.error('加载客户详情失败:', e)
       this.setData({ detailLoading: false, detailRows: [] })
     }
@@ -916,6 +900,7 @@ Page({
   },
 
   onDetailClose() {
+    this._detailSequence = (this._detailSequence || 0) + 1
     this.setData({ detailOpen: false })
   },
 

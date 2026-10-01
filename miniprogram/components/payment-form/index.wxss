@@ -400,3 +400,6 @@
   background-color: #3370ff;
   color: #ffffff;
 }
+.pf-agreement-options { display: flex; align-items: center; justify-content: flex-end; flex: 1; min-width: 0; gap: 12rpx; }
+.pf-agreement-option { display: flex; align-items: center; justify-content: center; min-width: 92rpx; height: 52rpx; box-sizing: border-box; padding: 0 16rpx; border: 1rpx solid #dee0e3; border-radius: 8rpx; background: #fff; font-size: 24rpx; color: #646a73; }
+.pf-agreement-option.selected { border-color: #3370ff; background: #eef4ff; color: #3370ff; font-weight: 500; }

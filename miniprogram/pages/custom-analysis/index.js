@@ -341,7 +341,7 @@ Page({
     const allowedColumnValues = new Set(columnFields.map(item => item.value))
     plan.columns = (plan.columns || []).filter(value => allowedColumnValues.has(value))
     if (!plan.columns.includes('nickname')) plan.columns.unshift('nickname')
-    plan.columns = plan.columns.slice(0, 10)
+    plan.columns = plan.columns.slice(0, 15)
     const conditionRows = this.buildConditionRows(plan.conditions, plan)
     const comparisonGroupRows = (plan.comparison_groups || []).map((group, index) => {
       const selectedPeriod = periodSelection(group)
@@ -801,9 +801,9 @@ Page({
     if (value === 'nickname') return
     const plan = clonePlan(this.data.plan)
     if (plan.columns.includes(value)) plan.columns = plan.columns.filter(item => item !== value)
-    else if (plan.columns.length < 10) plan.columns.push(value)
+    else if (plan.columns.length < 15) plan.columns.push(value)
     else {
-      wx.showToast({ title: '最多选择10列', icon: 'none' })
+      wx.showToast({ title: '最多选择15列', icon: 'none' })
       return
     }
     this.syncPlanView(plan)

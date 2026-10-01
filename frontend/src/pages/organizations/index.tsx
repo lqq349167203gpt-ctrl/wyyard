@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { organizationApi, customerApi, courseTypeApi, uploadApi, type Organization, type Customer, type CourseType } from "@/lib/api"
+import { organizationApi, customerApi, courseTypeApi, uploadApi, type Organization, type CustomerLight as Customer, type CourseType } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 
@@ -25,6 +25,8 @@ export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+  const loadSequence = useRef(0)
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -72,27 +74,27 @@ export default function OrganizationsPage() {
   const [actEditingIsOther, setActEditingIsOther] = useState(false)
 
   const loadData = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    setLoading(true)
+    setLoadError("")
     try {
-      const orgs = await organizationApi.list().catch((e) => { console.error("加载组织失败:", e); return [] as Organization[] })
+      const [orgs, custs, types, viewers] = await Promise.all([
+        organizationApi.list(), customerApi.light(), courseTypeApi.list(), organizationApi.listDataViewers(),
+      ])
+      if (sequence !== loadSequence.current) return
       setOrganizations(orgs)
       setActiveOrgId(prev => prev || (orgs.length > 0 ? orgs[0].id : null))
-    } catch {}
-    try {
-      const custs = await customerApi.list().catch((e) => { console.error("加载客户失败:", e); return [] as Customer[] })
       setCustomers(custs)
-    } catch {}
-    try {
-      const types = await courseTypeApi.list().catch(() => [] as CourseType[])
       setCourseTypes(types)
-    } catch {}
-    try {
-      const viewers = await organizationApi.listDataViewers().catch(() => ({ data_viewer_ids: [] }))
       setDataViewerIds(viewers.data_viewer_ids || [])
-    } catch {}
-    setLoading(false)
+    } catch (error) {
+      if (sequence === loadSequence.current) setLoadError(error instanceof Error ? error.message : "组织信息加载失败")
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadData(); return () => { loadSequence.current++ } }, [loadData])
 
   useEffect(() => {
     const newMap = new Map<string, string>()
@@ -172,7 +174,9 @@ export default function OrganizationsPage() {
           name: item.name,
           member_type: item.member_type,
           visit_count: item.visit_count,
-        } as Customer)
+          positions: [], position_sort_orders: {}, created_at: "", traffic_source: "",
+          traffic_source_detail: "", referrer: "", referral_date: "", space_id: "",
+        })
       }
     }
     for (const customer of customers) {
@@ -586,6 +590,7 @@ export default function OrganizationsPage() {
 
   return (
     <div className="px-6 pb-6 pt-12">
+      {loadError && <div role="alert" className="mb-3 text-sm text-red-600">{loadError}（数据未更新）<button className="ml-3 text-[#3370ff]" onClick={loadData}>重试</button></div>}
       <div className="mb-5 flex items-start justify-between">
         <div>
           <h1 className="text-[18px] font-medium text-[#2b2f36]">组织信息</h1>
@@ -669,7 +674,7 @@ export default function OrganizationsPage() {
             {loading ? (
             <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
             ) : sortedOrganizations.length === 0 ? (
-            <div className="py-14 text-center text-[12px] text-[#8f959e]">暂无组织，请先新增组织</div>
+            <div className="py-14 text-center text-[12px] text-[#8f959e]">{loadError ? "组织数据尚未加载成功" : "暂无组织，请先新增组织"}</div>
             ) : (
             <Table>
               <TableHeader>
@@ -868,7 +873,7 @@ export default function OrganizationsPage() {
         ) : loading ? (
           <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
         ) : activityGroups.length === 0 ? (
-          <div className="py-14 text-center text-[12px] text-[#8f959e]">暂无活动配置</div>
+          <div className="py-14 text-center text-[12px] text-[#8f959e]">{loadError ? "活动配置尚未加载成功" : "暂无活动配置"}</div>
         ) : (
           <Table>
             <TableHeader>

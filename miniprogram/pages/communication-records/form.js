@@ -29,9 +29,7 @@ Page({
 
   async loadDetail(id) {
     try {
-      const res = await communicationRecordApi.list()
-      const list = Array.isArray(res) ? res : []
-      const item = list.find(r => r.id === id)
+      const item = await communicationRecordApi.get(id)
       if (!item) {
         wx.showToast({ title: '记录不存在', icon: 'none' })
         setTimeout(() => wx.navigateBack(), 1000)

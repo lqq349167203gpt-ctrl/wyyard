@@ -981,31 +981,17 @@ def calendar_counts():
     return dict(counts)
 
 
-@router.get("/dashboard")
-def dashboard(
-    date: str = Query(...),
-    space_id: str = Query(""),
-    request: Request = None,
-):
-    """单次请求返回当天全部数据，替代 8 个独立 API 调用"""
-    from datetime import datetime, timedelta
-
+def read_day_courses(date: str, space_id: str = "", request: Request = None, *, include_note_counts: bool = True):
+    """课表与日报共用的当日课程来源，统一日期、空间及客户可见范围。"""
     from app.services import (
-        daily_grouping_service,
         emotional_release_session_service,
         energy_knot_session_service,
         group_case_session_service,
         internal_course_session_service,
-        visit_service,
+        space_service,
     )
 
-    # 计算日期范围（21 天窗口，与前端一致）
-    d = datetime.strptime(date, "%Y-%m-%d")
-    start_date = (d - timedelta(days=7)).strftime("%Y-%m-%d")
-    end_date = (d + timedelta(days=13)).strftime("%Y-%m-%d")
-
     # 构建 room_id → room_name / space_id → space_name 映射（含已删除）
-    from app.services import space_service
     room_map: dict[str, str] = {}
     space_map: dict[str, str] = {}
     for sp in space_service.get_all_spaces():
@@ -1021,26 +1007,9 @@ def dashboard(
             r.space_name = space_map.get(sid, "") if sid else ""
             r.room_name = room_map.get(rid, "") if rid else ""
 
-    # 日历计数：按空间筛选
-    from collections import defaultdict
-    cal_counts: dict[str, int] = defaultdict(int)
     def _match_space(record) -> bool:
         return not space_id or getattr(record, "space_id", "") == space_id
-    for r in class_record_service.list_records():
-        if r.date and _match_space(r):
-            cal_counts[r.date] += 1
-    for s in group_case_session_service.list_sessions():
-        if s.date and _match_space(s):
-            cal_counts[s.date] += 1
-    for s in emotional_release_session_service.list_sessions():
-        if s.date and _match_space(s):
-            cal_counts[s.date] += 1
-    for s in energy_knot_session_service.list_sessions():
-        if s.date and _match_space(s):
-            cal_counts[s.date] += 1
-    for s in internal_course_session_service.list_sessions():
-        if s.date and _match_space(s):
-            cal_counts[s.date] += 1
+
     records_cr = class_record_service.list_records(date)
     records_gcs = group_case_session_service.list_sessions(date)
     records_ers = emotional_release_session_service.list_sessions(date)
@@ -1123,36 +1092,91 @@ def dashboard(
         if owner_id and owner_id not in visible_ids:
             d["owner_name"] = ""
 
-    activity_note_rows = (
-        ("class_record", cr_dicts),
-        ("group_case", gcs_dicts),
-        ("emotional_release", ers_dicts),
-        ("energy_knot", eks_dicts),
-        ("internal_course", ics_dicts),
+    if include_note_counts:
+        activity_note_rows = (
+            ("class_record", cr_dicts),
+            ("group_case", gcs_dicts),
+            ("emotional_release", ers_dicts),
+            ("energy_knot", eks_dicts),
+            ("internal_course", ics_dicts),
+        )
+        for activity_source, activity_rows in activity_note_rows:
+            for activity in activity_rows:
+                withdrawn_ids = set(activity.get("withdrawn_participant_ids", []) or [])
+                active_ids = {
+                    participant["id"]
+                    for participant in activity.get("participants", [])
+                    if participant.get("id") and not participant.get("withdrawn")
+                }
+                owner_id = str(activity.get("owner_id") or "")
+                if (
+                    activity_source in {"group_case", "emotional_release", "energy_knot"}
+                    and owner_id in visible_ids
+                    and owner_id not in withdrawn_ids
+                ):
+                    active_ids.add(owner_id)
+                completed_ids = activity_participant_note_service.completed_customer_ids(
+                    activity_source,
+                    activity["id"],
+                )
+                activity["participant_note_total_count"] = len(active_ids)
+                activity["participant_note_completed_count"] = len(
+                    active_ids.intersection(completed_ids)
+                )
+
+    return {
+        "class_records": cr_dicts,
+        "gcs_sessions": gcs_dicts,
+        "ers_sessions": ers_dicts,
+        "eks_sessions": eks_dicts,
+        "ics_sessions": ics_dicts,
+    }, visible_ids
+
+
+@router.get("/dashboard")
+def dashboard(
+    date: str = Query(...),
+    space_id: str = Query(""),
+    request: Request = None,
+):
+    """单次请求返回当天全部数据，替代 8 个独立 API 调用"""
+    from datetime import datetime, timedelta
+
+    from app.services import (
+        daily_grouping_service,
+        emotional_release_session_service,
+        energy_knot_session_service,
+        group_case_session_service,
+        internal_course_session_service,
+        visit_service,
     )
-    for activity_source, activity_rows in activity_note_rows:
-        for activity in activity_rows:
-            withdrawn_ids = set(activity.get("withdrawn_participant_ids", []) or [])
-            active_ids = {
-                participant["id"]
-                for participant in activity.get("participants", [])
-                if participant.get("id") and not participant.get("withdrawn")
-            }
-            owner_id = str(activity.get("owner_id") or "")
-            if (
-                activity_source in {"group_case", "emotional_release", "energy_knot"}
-                and owner_id in visible_ids
-                and owner_id not in withdrawn_ids
-            ):
-                active_ids.add(owner_id)
-            completed_ids = activity_participant_note_service.completed_customer_ids(
-                activity_source,
-                activity["id"],
-            )
-            activity["participant_note_total_count"] = len(active_ids)
-            activity["participant_note_completed_count"] = len(
-                active_ids.intersection(completed_ids)
-            )
+
+    # 计算日期范围（21 天窗口，与前端一致）
+    d = datetime.strptime(date, "%Y-%m-%d")
+    start_date = (d - timedelta(days=7)).strftime("%Y-%m-%d")
+    end_date = (d + timedelta(days=13)).strftime("%Y-%m-%d")
+
+    # 日历计数：按空间筛选
+    from collections import defaultdict
+    cal_counts: dict[str, int] = defaultdict(int)
+    def _match_space(record) -> bool:
+        return not space_id or getattr(record, "space_id", "") == space_id
+    for r in class_record_service.list_records():
+        if r.date and _match_space(r):
+            cal_counts[r.date] += 1
+    for s in group_case_session_service.list_sessions():
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
+    for s in emotional_release_session_service.list_sessions():
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
+    for s in energy_knot_session_service.list_sessions():
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
+    for s in internal_course_session_service.list_sessions():
+        if s.date and _match_space(s):
+            cal_counts[s.date] += 1
+    course_data, visible_ids = read_day_courses(date, space_id, request)
 
     visible_visit_ids = list(visible_ids)
     visit_counts = (
@@ -1180,11 +1204,7 @@ def dashboard(
     ]
 
     return {
-        "class_records": cr_dicts,
-        "gcs_sessions": gcs_dicts,
-        "ers_sessions": ers_dicts,
-        "eks_sessions": eks_dicts,
-        "ics_sessions": ics_dicts,
+        **course_data,
         "visits": dashboard_visits,
         "visit_counts": visit_counts,
         "calendar_counts": dict(cal_counts),

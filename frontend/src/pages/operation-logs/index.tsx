@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef } from "react"
 import { X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { operationLogApi, accountApi, customerApi, organizationApi } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
-import type { OperationLog, AccountLight, Customer, Organization } from "@/lib/api"
+import type { OperationLog, AccountLight, CustomerLight as Customer, Organization } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useServerPagination } from "@/hooks/use-server-pagination"
+import { LoadError } from "@/components/load-error"
+import { useReadResource } from "@/hooks/use-read-resource"
 import { PaginationBar } from "@/components/pagination-bar"
 
 const PAGE_SIZE = 20
@@ -507,9 +509,10 @@ export default function OperationLogsPage() {
   const [dateTo, setDateTo] = useState("")
   const [keywordFilter, setKeywordFilter] = useState("")
   const [selectedLog, setSelectedLog] = useState<OperationLog | null>(null)
-  const [accounts, setAccounts] = useState<AccountLight[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const directory = useReadResource<[AccountLight[], Customer[], Organization[]]>(
+    () => Promise.all([accountApi.listLight(), customerApi.light(), organizationApi.list()]), [[], [], []],
+  )
+  const [accounts, customers, organizations] = directory.data
   const filtersRef = useRef({ operatorFilter, methodFilter, sectionFilter, sourceFilter, dateFrom, dateTo, keywordFilter })
 
   const fetchLogs = useCallback(async (page: number, pageSize: number) => {
@@ -527,14 +530,9 @@ export default function OperationLogsPage() {
 
   const {
     paginatedItems: pagedLogs, currentPage, totalPages, totalItems,
-    goToPage, startIndex, endIndex, loading,
+    goToPage, startIndex, endIndex, loading, error, refresh,
   } = useServerPagination<OperationLog>(fetchLogs, { pageSize: PAGE_SIZE })
 
-  useEffect(() => {
-    accountApi.listLight().then(setAccounts).catch(() => {})
-    customerApi.list().then(setCustomers).catch(() => {})
-    organizationApi.list().then(setOrganizations).catch(() => {})
-  }, [])
 
   const getNameById = (id: string) => {
     const c = customers.find(c => c.id === id)
@@ -927,7 +925,9 @@ export default function OperationLogsPage() {
       </div>
 
       {/* 日志列表 */}
-      {!loading && totalItems === 0 ? (
+      <LoadError error={error} onRetry={refresh} />
+      <LoadError error={directory.error} onRetry={directory.refresh} />
+      {!loading && !error && totalItems === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">暂无操作记录</div>
       ) : (
         <>

@@ -284,49 +284,57 @@ export function SelectDropdown({
 
   return (
     <div ref={rootRef} data-dropdown className={`relative ${className}`}>
-      <button type="button"
+      <div
         style={{ borderRadius: radiusValue }}
-        className={`flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : singleLineMulti ? "h-8 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${buttonClassName}`}
-        onMouseDown={handleToggle}
-        disabled={disabled}
+        className={`relative flex items-center justify-between w-full border border-input bg-transparent ${sm ? "h-7 px-2 text-[12px]" : singleLineMulti ? "h-8 px-2 text-[12px]" : "min-h-8 px-2 text-[12px]"} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${buttonClassName}`}
       >
+        {/* 展开按钮与清除/移除按钮并列，保留原布局和原生键盘操作。 */}
+        <button type="button" disabled={disabled} aria-expanded={open}
+          aria-label={triggerLabel || currentLabel || currentLabels.join("、") || placeholder}
+          className="absolute inset-0 rounded-[inherit] disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-[#3370ff]"
+          onClick={handleToggle} onKeyDown={e => { if (e.key === "Escape") close() }} />
         {triggerLabel ? (
-          <span className="truncate text-[#3370ff]">{triggerLabel}</span>
+          <span className="relative pointer-events-none truncate text-[#3370ff]">{triggerLabel}</span>
         ) : multi && currentLabels.length > 0 ? (
           <div
             title={singleLineMulti ? currentLabels.join("、") : undefined}
+            onClick={handleToggle}
             className={singleLineMulti
-              ? "flex min-w-0 flex-1 flex-nowrap gap-1 overflow-x-auto whitespace-nowrap py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              : "flex flex-wrap gap-1 py-1"}
+              ? "relative flex min-w-0 flex-1 flex-nowrap gap-1 overflow-x-auto whitespace-nowrap py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              : "relative flex flex-wrap gap-1 py-1"}
           >
             {currentLabels.map((label, i) => (
               <span key={i} className="inline-flex shrink-0 items-center gap-0.5 rounded bg-[#f0f1f2] px-1.5 py-0.5 text-[11px] text-[#2b2f36]">
                 {label}
-                <button type="button" className="text-[#8f959e] hover:text-[#f54a45]"
-                  onMouseDown={(e) => { e.stopPropagation(); const arr = (value as string[]).filter((_, idx) => idx !== i); (onChange as (value: string[]) => void)(arr) }}>
+                <button type="button" className="pointer-events-auto text-[#8f959e] hover:text-[#f54a45]"
+                  aria-label={`移除${label}`} disabled={disabled}
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); const arr = (value as string[]).filter((_, idx) => idx !== i); (onChange as (value: string[]) => void)(arr) }}>
                   <X className="h-3 w-3" />
                 </button>
               </span>
             ))}
           </div>
         ) : (
-          <span className={`truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : `${placeholderColor || "text-[#c0c4cc]"} font-normal`)}`}>
+          <span className={`relative pointer-events-none truncate ${textColor || (currentLabel || (multi && currentLabels.length > 0) ? "text-[#2b2f36]" : `${placeholderColor || "text-[#c0c4cc]"} font-normal`)}`}>
             {currentLabel || (multi ? placeholder : placeholder)}
           </span>
         )}
-        <span className="flex items-center shrink-0 ml-1">
+        <span className="relative pointer-events-none flex items-center shrink-0 ml-1">
           {clearable && !multi && currentLabel && (
             <button
               type="button"
-              className="text-[#8f959e] hover:text-[#f54a45] mr-0.5"
-              onMouseDown={(e) => { e.stopPropagation(); (onChange as (value: string) => void)("") }}
+              aria-label="清空选择" disabled={disabled}
+              className="pointer-events-auto text-[#8f959e] hover:text-[#f54a45] mr-0.5"
+              onMouseDown={e => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); (onChange as (value: string) => void)("") }}
             >
               <X className={sm ? "h-3 w-3" : "h-3.5 w-3.5"} />
             </button>
           )}
           {!hideChevron && <ChevronDown className={`${sm ? "h-3 w-3" : "h-3.5 w-3.5"} text-[#8f959e]`} />}
         </span>
-      </button>
+      </div>
 
       {open && createPortal(
         <>

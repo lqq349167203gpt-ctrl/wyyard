@@ -440,8 +440,32 @@ def count_arrived_chargeable_activities(customer_id: str) -> int:
     return count
 
 
+def current_remaining_by_customer(customer_ids: set[str]) -> dict[str, int]:
+    """邀约统一余量口径：有效卡合计，不扣历史欠卡，保留内部课程不限次权益。"""
+    from app.services import internal_course_service, membership_card_service
+
+    if not customer_ids:
+        return {}
+    remaining_map = membership_card_service.list_current_card_remaining(customer_ids)
+    today = datetime.now().strftime("%Y-%m-%d")
+    active_course_customer_ids = {
+        course.customer_id
+        for course in internal_course_service.list_courses()
+        if course.customer_id in customer_ids
+        and course.effective_date
+        and course.expiry_date
+        and course.effective_date <= today <= course.expiry_date
+    }
+    result = {}
+    for customer_id in customer_ids:
+        remaining = remaining_map.get(customer_id, 0)
+        result[customer_id] = -999 if remaining == "unlimited" or (
+            isinstance(remaining, int) and remaining <= 0 and customer_id in active_course_customer_ids
+        ) else remaining
+    return result
+
+
 def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, space_id: Optional[str] = None) -> List[VisitRecord]:
-    from app.services import membership_card_service
 
     records = [v for v in _visits.values() if not v.is_deleted]
     if date:
@@ -492,17 +516,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
                 all_arrived_counts[v.customer_id] = all_arrived_counts.get(v.customer_id, 0) + 1
 
     customer_ids = {record.customer_id for record in records if record.customer_id}
-    remaining_map = membership_card_service.list_current_card_remaining(customer_ids)
-    from app.services import internal_course_service
-    today = datetime.now().strftime("%Y-%m-%d")
-    active_course_customer_ids = {
-        course.customer_id
-        for course in internal_course_service.list_courses()
-        if course.customer_id in customer_ids
-        and course.effective_date
-        and course.expiry_date
-        and course.effective_date <= today <= course.expiry_date
-    }
+    remaining_map = current_remaining_by_customer(customer_ids)
 
     for r in records:
         r.visit_count = len(all_visit_dates.get(r.customer_id, set()))
@@ -515,16 +529,7 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
                 r.member_type = customer.member_type or ""
         r.activity_count = all_activity_counts.get(r.customer_id, 0)
         r.welfare_count = all_welfare_counts.get(r.customer_id, 0)
-        # 当前有效卡余量不扣除历史欠卡；会员卡耗尽后，内部课程权益仍按不限次展示。
-        current_remaining = remaining_map.get(r.customer_id, 0)
-        if current_remaining == "unlimited" or (
-            isinstance(current_remaining, int)
-            and current_remaining <= 0
-            and r.customer_id in active_course_customer_ids
-        ):
-            r.remaining_count = -999
-        else:
-            r.remaining_count = current_remaining
+        r.remaining_count = remaining_map.get(r.customer_id, 0)
         r.activities = all_activities.get((r.customer_id, r.visit_date), [])
 
     if records:
@@ -543,7 +548,6 @@ def list_visits(date: Optional[str] = None, customer_id: Optional[str] = None, s
 
 def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None) -> List[dict]:
     """轻量版：只返回列表页需要的字段，不计算活动详情"""
-    from app.services import membership_card_service
 
     records = [v for v in _visits.values() if not v.is_deleted]
     if date:
@@ -571,17 +575,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
             all_arrived_counts[visit.customer_id] = all_arrived_counts.get(visit.customer_id, 0) + 1
 
     customer_ids = {record.customer_id for record in records if record.customer_id}
-    remaining_map = membership_card_service.list_current_card_remaining(customer_ids)
-    from app.services import internal_course_service
-    today = datetime.now().strftime("%Y-%m-%d")
-    active_course_customer_ids = {
-        course.customer_id
-        for course in internal_course_service.list_courses()
-        if course.customer_id in customer_ids
-        and course.effective_date
-        and course.expiry_date
-        and course.effective_date <= today <= course.expiry_date
-    }
+    remaining_map = current_remaining_by_customer(customer_ids)
 
     result = []
     for r in sorted(records, key=lambda r: (r.cancelled, r.sort_order, -r.created_at.timestamp())):
@@ -592,16 +586,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
             if not member_type and customer:
                 member_type = customer.member_type or ""
 
-            # 当前有效卡余量不扣除历史欠卡；会员卡耗尽后，内部课程权益仍按不限次展示。
-            current_remaining = remaining_map.get(r.customer_id, 0)
-            if current_remaining == "unlimited" or (
-                isinstance(current_remaining, int)
-                and current_remaining <= 0
-                and r.customer_id in active_course_customer_ids
-            ):
-                remaining_count = -999
-            else:
-                remaining_count = current_remaining
+            remaining_count = remaining_map.get(r.customer_id, 0)
 
             result.append({
                 "id": r.id,
@@ -762,6 +747,9 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
         record.updated_at = datetime.now(timezone.utc)
         _visits[visit_id] = record
         _save(visit_id)
+    if requested_cancelled is True:
+        from app.services import daily_grouping_service
+        daily_grouping_service.remove_cancelled_customer(record.visit_date, record.customer_id)
     # 从未到店 → 已到店：执行会员活动扣费
     if not old_arrived and new_arrived:
         _deduct_for_arrival(record)

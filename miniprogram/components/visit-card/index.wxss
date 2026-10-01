@@ -1,6 +1,6 @@
 .card {
   background-color: #ffffff;
-  border-bottom: 1rpx solid #f1f2f4;
+  border-bottom: 2rpx solid #f2f3f5;
 }
 
 .card.last {
@@ -25,6 +25,8 @@
   color: #b0b5bb;
 }
 
+.card.cancelled .needs-content { color: #b0b5bb; }
+
 .card.read-only .nickname {
   color: #8f959e;
 }
@@ -32,7 +34,7 @@
 .card-main {
   display: flex;
   align-items: flex-start;
-  padding: 24rpx 28rpx 22rpx;
+  padding: 30rpx 34rpx 26rpx;
 }
 
 .move-btns {
@@ -139,42 +141,50 @@
 .row-meta {
   display: flex;
   align-items: baseline;
-  gap: 10rpx;
-  margin-top: 10rpx;
+  gap: 16rpx;
+  margin-top: 12rpx;
   color: #8f959e;
-  font-size: 23rpx;
+  font-size: 22rpx;
 }
 
 .meta-sep {
   color: #ccd3da;
 }
 
+.visit-details {
+  margin-top: 26rpx;
+  padding-top: 30rpx;
+  border-top: 2rpx solid #f9fafb;
+}
+
 .needs-row {
   display: flex;
   align-items: flex-start;
-  margin-top: 9rpx;
-  font-size: 23rpx;
+  gap: 16rpx;
+  font-size: 24rpx;
   color: #646a73;
-  line-height: 1.6;
+  line-height: 37rpx;
+}
+
+.needs-row + .needs-row {
+  margin-top: 24rpx;
 }
 
 .needs-label {
-  color: #8f959e;
-  flex-shrink: 0;
-  margin-right: 10rpx;
+  width: 130rpx;
+  color: #9aa1a9;
+  flex: 0 0 130rpx;
 }
 
 .needs-content {
   flex: 1;
   min-width: 0;
+  color: #33393f;
   word-break: break-all;
 }
 
-.goal-content {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.needs-content.empty {
+  color: #b0b5bb;
 }
 
 .arrival-badge {
@@ -218,9 +228,9 @@
 .card-actions {
   display: flex;
   align-items: center;
-  margin-top: 16rpx;
-  padding-top: 14rpx;
-  border-top: 1rpx solid #f5f6f7;
+  margin-top: 30rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid #f9fafb;
 }
 
 .creator-text {
@@ -247,6 +257,25 @@
   padding: 4rpx 0;
 }
 
+.outlined-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 52rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid #dcdfe4;
+  border-radius: 8rpx;
+  background-color: #ffffff;
+  font-size: 22rpx;
+}
+
+.outlined-action:active {
+  opacity: 0.78;
+}
+
 .delete-btn {
   color: #d97070;
+  border-color: #e7b9c2;
 }

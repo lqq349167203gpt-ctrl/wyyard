@@ -33,6 +33,7 @@ from app.api.customer_follow_ups import router as customer_follow_ups_router
 from app.api.customer_tags import router as customer_tags_router
 from app.api.customers import router as customers_router
 from app.api.daily_groupings import router as daily_groupings_router
+from app.api.daily_report import router as daily_report_router
 from app.api.debt_records import router as debt_records_router
 from app.api.emotional_release_sessions import router as emotional_release_sessions_router
 from app.api.emotional_releases import router as emotional_releases_router
@@ -164,6 +165,7 @@ app.include_router(activity_orders_router)
 app.include_router(project_deductions_router)
 app.include_router(project_refunds_router)
 app.include_router(payment_exports_router)
+app.include_router(daily_report_router)
 app.include_router(financial_router)
 app.include_router(system_helper_router)
 app.include_router(system_helper_config_router)

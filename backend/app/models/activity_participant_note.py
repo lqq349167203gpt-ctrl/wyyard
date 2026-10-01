@@ -36,6 +36,8 @@ class ActivityParticipantNote(SafeBaseModel):
     end_time: str = ""
     created_by_id: str = ""
     created_by: str = ""
+    feedback_person_id: str = ""
+    feedback_person: str = ""
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False

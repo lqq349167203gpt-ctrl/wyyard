@@ -2,7 +2,7 @@
   padding: 24rpx 32rpx;
   padding-bottom: 180rpx;
   min-height: 100vh;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
 }
 
 /* 客户信息卡 */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
-import { positionPermissionApi, type PositionEditPermissions } from "@/lib/api"
+import { customerApi, positionPermissionApi, type PositionEditPermissions } from "@/lib/api"
+import { storePagePermissions } from "@/hooks/use-page-permissions"
 
 const DEFAULT_PERMISSIONS: PositionEditPermissions = {
   customers: "all",
@@ -43,7 +44,7 @@ function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>
     customers: permissions?.customers === "view" ? "view" : "all",
     visits: ["view", "own", "all"].includes(permissions?.visits || "") ? permissions!.visits! : "own",
     activities: ["view", "own", "all"].includes(permissions?.activities || "") ? permissions!.activities! : "own",
-    activity_teachers: permissions?.activity_teachers === "view" ? "view" : "own",
+    activity_teachers: ["view", "own", "all"].includes(permissions?.activity_teachers || "") ? permissions!.activity_teachers! : "own",
     activity_participants: ["view", "own", "all"].includes(permissions?.activity_participants || "")
       ? permissions!.activity_participants!
       : "all",
@@ -95,9 +96,30 @@ function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>
 
 export function storeEditPermissions(permissions?: Partial<PositionEditPermissions>) {
   const normalized = normalizeEditPermissions(permissions)
-  localStorage.setItem("userEditPermissions", JSON.stringify(normalized))
+  const serialized = JSON.stringify(normalized)
+  if (localStorage.getItem("userEditPermissions") === serialized) return normalized
+  customerApi.clearLightCache()
+  localStorage.setItem("userEditPermissions", serialized)
   window.dispatchEvent(new CustomEvent("edit-permissions-changed", { detail: normalized }))
   return normalized
+}
+
+let permissionsRequest: { account: string; promise: Promise<void> } | null = null
+
+/** 所有页面共用账号的有效权限；只合并并发请求，不缓存权限结果。 */
+export function refreshAccountPermissions(force = false): Promise<void> {
+  const account = localStorage.getItem("currentUser") || ""
+  if (!account || localStorage.getItem("isLoggedIn") !== "true") return Promise.resolve()
+  if (!force && permissionsRequest?.account === account) return permissionsRequest.promise
+  const promise = positionPermissionApi.getMine().then(result => {
+    if (permissionsRequest?.promise !== promise || localStorage.getItem("currentUser") !== account || localStorage.getItem("isLoggedIn") !== "true") return
+    storePagePermissions(result.pages || [])
+    storeEditPermissions(result.edit_permissions)
+  }).finally(() => {
+    if (permissionsRequest?.promise === promise) permissionsRequest = null
+  })
+  permissionsRequest = { account, promise }
+  return promise
 }
 
 function readStoredEditPermissions(): PositionEditPermissions {
@@ -118,18 +140,7 @@ export function useEditPermissions() {
     }
     window.addEventListener("edit-permissions-changed", updateFromEvent)
 
-    let cancelled = false
-    const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
-    if (user.role) {
-      positionPermissionApi.get(user.role)
-        .then((result) => {
-          if (!cancelled) setPermissions(storeEditPermissions(result.edit_permissions))
-        })
-        .catch(() => {})
-    }
-
     return () => {
-      cancelled = true
       window.removeEventListener("edit-permissions-changed", updateFromEvent)
     }
   }, [])

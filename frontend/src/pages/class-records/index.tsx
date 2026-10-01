@@ -9,7 +9,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { customerApi, visitApi, dailyGroupingApi, spaceApi, visitVerificationApi, type CustomerLight, type Space, type VisitVerification } from "@/lib/api"
-import type { VisitRowSummary } from "@/components/visits/batch-input-table"
 
 import CustomerDetailView from "@/pages/healing-records/components/detail-view"
 import { SpaceDropdown } from "@/components/space-dropdown"
@@ -55,7 +54,6 @@ export default function ClassRecordsPage() {
   const [activityNickname, setActivityNickname] = useState("")
 
   // 共享状态
-  const [dayVisits, setDayVisits] = useState<{ id: string; nickname: string; member_type: string }[]>([])
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
   const [calendarVisitCounts, setCalendarVisitCounts] = useState<Record<string, number>>({})
   const [verificationMap, setVerificationMap] = useState<Record<string, VisitVerification>>({})
@@ -93,35 +91,16 @@ export default function ClassRecordsPage() {
   useEffect(() => { load() }, [])
 
   // 加载人员分组
-  const groupsLoadedDateRef = useRef<string>("")
+  const [groupsRefreshKey, setGroupsRefreshKey] = useState(0)
   useEffect(() => {
+    let current = true
+    setGroups([])
     dailyGroupingApi.get(detailDate).then((data) => {
-      groupsLoadedDateRef.current = detailDate
-      setGroups(data.groups || [])
-    }).catch(() => { groupsLoadedDateRef.current = detailDate; setGroups([]) })
-  }, [detailDate])
-
-  // 人员删除后，同步清理分组中的该人员并持久化
-  useEffect(() => {
-    // 仅当 groups 和 dayVisits 都已加载为当前日期时才清理
-    if (groupsLoadedDateRef.current !== detailDate) return
-    if (groups.length === 0 || dayVisits.length === 0) return
-    const visitIdSet = new Set(dayVisits.map(v => v.id))
-    const hasStale = groups.some(g =>
-      (g.leader_id && !visitIdSet.has(g.leader_id)) ||
-      (g.deputy_id && !visitIdSet.has(g.deputy_id)) ||
-      g.member_ids.some(id => !visitIdSet.has(id))
-    )
-    if (!hasStale) return
-    const cleaned = groups.map(g => ({
-      ...g,
-      leader_id: g.leader_id && visitIdSet.has(g.leader_id) ? g.leader_id : "",
-      deputy_id: g.deputy_id && visitIdSet.has(g.deputy_id) ? g.deputy_id : "",
-      member_ids: g.member_ids.filter(id => visitIdSet.has(id)),
-    })).filter(g => g.leader_id || g.deputy_id || g.member_ids.length > 0)
-    setGroups(cleaned)
-    dailyGroupingApi.upsert({ date: detailDate, groups: cleaned }).catch(() => {})
-  }, [detailDate, dayVisits, groups])
+      if (current) setGroups(data.groups || [])
+    }).catch(() => { if (current) setGroups([]) })
+    return () => { current = false }
+  }, [detailDate, groupsRefreshKey])
+  // 删除/取消邀约时后端已清理分组；这里只重读，不能用局部可见名单覆盖整天分组。
 
   // 加载日期范围内的到场人数（轻量 API，日期滑块需要）
   const refreshVisitCounts = useCallback(() => {
@@ -135,6 +114,11 @@ export default function ClassRecordsPage() {
       .catch(() => {})
   }, [dateRangeStart, selectedSpaceId, spacesLoaded])
   useEffect(() => { refreshVisitCounts() }, [refreshVisitCounts])
+
+  const refreshAfterSave = useCallback(() => {
+    refreshVisitCounts()
+    setGroupsRefreshKey(key => key + 1)
+  }, [refreshVisitCounts])
 
   const handleSpaceSelect = useCallback((id: string) => {
     startTransition(() => {
@@ -163,9 +147,6 @@ export default function ClassRecordsPage() {
   const canManageVerification = isSuperAdmin || editPermissions.visit_lock
   const hasPerm = (key: string) => isSuperAdmin || userPermissions.includes(key) || userPermissions.includes("class-records")
 
-  const handleVisitsDataLoaded = useCallback((visits: VisitRowSummary[]) => {
-    setDayVisits(visits.map(v => ({ id: v.customer_id, nickname: v.nickname, member_type: v.member_type || "" })))
-  }, [])
 
   const loadVerificationRange = useCallback((startDate: string, endDate: string) => {
     if (!selectedSpaceId) return
@@ -323,8 +304,7 @@ export default function ClassRecordsPage() {
                 setActivityDialogOpen(true)
               })
             }}
-            onDataLoaded={handleVisitsDataLoaded}
-            onCountsRefresh={refreshVisitCounts}
+            onCountsRefresh={refreshAfterSave}
             spaceId={selectedSpaceId}
             onRequireSpaces={spaces.length === 0 ? () => setNoSpacesDialogOpen(true) : undefined}
             groups={groups}

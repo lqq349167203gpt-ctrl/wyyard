@@ -16,6 +16,7 @@ import { EmptyValue } from "@/components/empty-value"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { TeacherFollowUpDialog, TeacherFollowUpList } from "./teacher-follow-up-list"
+import { principalRecordRows, type PrincipalRecordType } from "@/lib/principal-record-details"
 
 const INITIAL_RULE: ConversionRule = {
   name: "粗门初次到场 → 会员卡首购",
@@ -166,7 +167,7 @@ const TRAFFIC_COLUMN_DEFS: TrafficColumnDef[] = [
 type TrafficColumnConfig = { key: string; label: string; visible: boolean }
 const TRAFFIC_COLUMNS_STORAGE = "principal:traffic-columns"
 /** 引流客户列表最多同时显示的列数 */
-const MAX_TRAFFIC_COLUMNS = 10
+const MAX_TRAFFIC_COLUMNS = 15
 /** 只保留前 N 个勾选的列，避免历史配置超过上限 */
 const clampTrafficColumns = (config: TrafficColumnConfig[]): TrafficColumnConfig[] => {
   let visibleCount = 0
@@ -608,6 +609,8 @@ function ActionEditor({ value, onChange, metadata }: { value: ConversionAction; 
 
 export default function PrincipalPage() {
   const [metadata, setMetadata] = useState<PrincipalMetadata | null>(null)
+  const fullMetadataLoaded = useRef(false)
+  const rulesLoaded = useRef(false)
   const [rules, setRules] = useState<SavedConversionRule[]>([])
   // 转化分析的条件（规则 + 范围 + 周期）留在浏览器里：离开页面再回来不会被重置
   const conversionDraft = loadConversionDraft()
@@ -622,6 +625,7 @@ export default function PrincipalPage() {
   const [result, setResult] = useState<PrincipalResult | null>(null)
   // 当前结果属于哪个 tab：转化分析没点「查询」前不显示旧数据
   const [resultTab, setResultTab] = useState<PrincipalQuery["tab"] | "">("")
+  const [resultQueryKey, setResultQueryKey] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [detail, setDetail] = useState<PrincipalRow | null>(null)
@@ -638,12 +642,21 @@ export default function PrincipalPage() {
   const [detailCustomerId, setDetailCustomerId] = useState("")
   const [detailCourseId, setDetailCourseId] = useState("")
   // 引流客户列表里点数字：邀约 / 取消邀约 / 到店 / 参与活动的明细
-  const [trafficRecordDetail, setTrafficRecordDetail] = useState<{ customerId: string; name: string; type: "invited" | "cancelled" | "arrived" | "activity" } | null>(null)
+  const [trafficRecordDetail, setTrafficRecordDetail] = useState<{ customerId: string; name: string; type: PrincipalRecordType; from: string | null; to: string | null; activityKeys?: string[] } | null>(null)
   const [trafficRecordRows, setTrafficRecordRows] = useState<Array<Record<string, unknown>>>([])
   const [trafficRecordLoading, setTrafficRecordLoading] = useState(false)
   const [trafficRecordExpanded, setTrafficRecordExpanded] = useState(false)
+  const [trafficRecordError, setTrafficRecordError] = useState("")
   // 点「成交笔数」打开的弹窗：这个客户在当前范围内的每一笔成交
-  const [dealDetail, setDealDetail] = useState<{ customer: string; rows: PrincipalRow[]; loading: boolean } | null>(null)
+  const [dealDetail, setDealDetail] = useState<{ customer: string; query: PrincipalQuery; period: string } | null>(null)
+  const [dealResultKey, setDealResultKey] = useState("")
+  const dealQueryKey = JSON.stringify(dealDetail)
+  const dealPagination = useServerPagination<PrincipalRow>(async (page, size, isCurrent) => {
+    const result = await principalApi.query(dealDetail!.query, page, size)
+    if (isCurrent()) setDealResultKey(dealQueryKey)
+    return result
+  }, { pageSize: 20, queryKey: dealQueryKey, enabled: !!dealDetail })
+  const dealReady = dealResultKey === dealQueryKey && !dealPagination.loading && !dealPagination.error
   // 交易列表口径：每笔交易一行 / 同一人只显示一行
   const [listView, setListView] = useState<"order" | "customer">("order")
   const [inviteArriveView, setInviteArriveView] = useState<"customer" | "date">("customer")
@@ -707,7 +720,7 @@ export default function PrincipalPage() {
   const visibleTrafficColumns = listTrafficColumns
     .filter(item => item.visible)
     .map(item => ({ ...TRAFFIC_COLUMN_DEFS.find(def => def.key === item.key)!, visible: true }))
-  // 表格宽度按实际列宽计算（列数已限制在 10 列内），不再强制一个更大的最小宽度，
+  // 表格宽度按实际列宽计算（列数已限制在 15 列内），不再强制一个更大的最小宽度，
   // 避免列少时表格仍撑出屏幕。
   const trafficTableMinWidth = visibleTrafficColumns.reduce((total, column) => {
     const px = Number.parseInt(column.width.match(/(\d+)px/)?.[1] ?? "84", 10)
@@ -768,6 +781,7 @@ export default function PrincipalPage() {
   }
   // 二级勾选交给后端筛（否则只筛当前一页，翻页就对不上）；引流人组的客户列表在前端筛
   const serverPicks = breakdownPicks.filter(value => !value.startsWith("traffic:"))
+  const resultKey = JSON.stringify([query, listTab, serverPicks, listView, sortBy, sortOrder])
   // 点「查询」时置 true：这一次请求要写进分析日志
   const logAnalysisRef = useRef(false)
   const pagination = useServerPagination<PrincipalRow>(async (page, size) => {
@@ -777,27 +791,19 @@ export default function PrincipalPage() {
       const blank = blankConditionMessage()
       if (blank) throw new Error(blank)
     }
-    const listQuery = { ...query, tab: listTab, breakdown: serverPicks, list_view: listView, sort_by: sortBy, sort_order: sortOrder }
+    const listQuery = { ...query, tab: listTab, include_overview: listTab !== query.tab, breakdown: serverPicks, list_view: listView, sort_by: sortBy, sort_order: sortOrder }
     // 只有使用者主动点「查询」这一次才让后端记分析日志（切 tab、翻页不记）
     const logAnalysis = logAnalysisRef.current
     logAnalysisRef.current = false
-    const responsePromise = principalApi.query(
+    const resolved = await principalApi.query(
       logAnalysis && listQuery.tab === "conversion" ? { ...listQuery, log_analysis: true } : listQuery,
       page,
       size,
     )
-    // 经营概况展开「成交」时列表来自「交易记录」，但卡片与二级拆分必须仍用概况自己的口径
-    const panelPromise = listTab !== query.tab
-      ? principalApi.query({ ...listQuery, tab: query.tab }, page, size)
-      : null
-    const [response, panel] = await Promise.all([responsePromise, panelPromise])
-    let resolved = response
-    if (listTab !== query.tab) {
-      if (panel) resolved = { ...response, summary: panel.summary, breakdown: panel.breakdown }
-    }
     if (current === version.current) {
       setResult(resolved); setRuleError("")
       setResultTab(query.tab)
+      setResultQueryKey(resultKey)
       // 换了范围后，选过的维度如果已经不在这批数据里（比如这段时间没有会员卡成交），就把它去掉
       if (query.tab === "overview") {
         const options = availablePicks(resolved)
@@ -806,9 +812,28 @@ export default function PrincipalPage() {
     }
     return resolved
   }, { pageSize: PAGE_SIZE })
+  const hasCurrentResult = !!result && resultTab === query.tab && resultQueryKey === resultKey
   useEffect(() => {
-    Promise.all([principalApi.metadata(), principalApi.rules()]).then(([meta, saved]) => { setMetadata(meta); setRules(saved) }).catch(e => setError(e.message))
-  }, [])
+    if (fullMetadataLoaded.current) return
+    let current = true
+    const lite = query.tab === "overview"
+    principalApi.metadata(lite).then(meta => {
+      if (!current) return
+      setMetadata(meta)
+      fullMetadataLoaded.current = !lite
+    }).catch(e => { if (current) setError(e.message) })
+    return () => { current = false }
+  }, [query.tab])
+  useEffect(() => {
+    if (query.tab !== "conversion" || rulesLoaded.current) return
+    let current = true
+    principalApi.rules().then(saved => {
+      if (!current) return
+      setRules(saved)
+      rulesLoaded.current = true
+    }).catch(e => { if (current) setError(e.message) })
+    return () => { current = false }
+  }, [query.tab])
   // 条件字段按需加载：只有打开「转化分析」才拉一次，口径与自定义筛选同源
   useEffect(() => {
     if (query.tab !== "conversion" || ruleFields) return
@@ -904,19 +929,26 @@ export default function PrincipalPage() {
     else { setSortBy(key); setSortOrder("asc") }
   }
   // 点「成交笔数」：把这个客户在当前范围内的成交逐笔列出来（和列里的数字对齐）
-  async function openCustomerDeals(customerId: string, customerName: string, fallback: PrincipalRow | null) {
+  function openCustomerDeals(customerId: string, customerName: string, fallback: PrincipalRow | null) {
+    if (!hasCurrentResult || pagination.loading || pagination.error) return
     if (!customerId) {
       if (fallback) setDetail(fallback)
       return
     }
-    setDealDetail({ customer: customerName, rows: fallback ? [fallback] : [], loading: true })
-    try {
-      // 弹窗里始终逐笔列出，不受列表的「同一人仅显示一次」影响
-      const response = await principalApi.query({ ...query, tab: "orders", breakdown: serverPicks, list_view: "order", customer_id: customerId }, 1, 100)
-      setDealDetail({ customer: customerName, rows: response.items, loading: false })
-    } catch {
-      setDealDetail({ customer: customerName, rows: fallback ? [fallback] : [], loading: false })
-    }
+    setDealResultKey("")
+    // 弹窗固定打开时的条件，复用公共分页与过期请求保护，不截断超过100笔的成交。
+    setDealDetail({ customer: customerName, period: dateSummary,
+      query: { ...query, tab: "orders", breakdown: serverPicks, list_view: "order", customer_id: customerId },
+    })
+  }
+  function openTrafficRecords(customer: PrincipalBreakdownCustomer, type: PrincipalRecordType) {
+    if (!hasCurrentResult || pagination.loading || pagination.error) return
+    const period = result?.breakdown?.record_period
+    setTrafficRecordRows([])
+    setTrafficRecordError("")
+    setTrafficRecordLoading(true)
+    setTrafficRecordDetail({ customerId: String(customer.id ?? ""), name: customer.name, type,
+      from: period?.from ?? query.date_from, to: period?.to ?? query.date_to, activityKeys: customer.activity_keys })
   }
   // 点「邀约次数 / 取消邀约次数 / 到店次数 / 参与活动」：列出这个客户的对应明细
   useEffect(() => {
@@ -927,24 +959,14 @@ export default function PrincipalPage() {
     let active = true
     setTrafficRecordLoading(true)
     setTrafficRecordExpanded(false)
+    setTrafficRecordError("")
     customerDetailApi.get(trafficRecordDetail.customerId)
       .then(detail => {
         if (!active) return
-        const { type } = trafficRecordDetail
-        const rows: Array<Record<string, unknown>> = type === "activity"
-          ? (detail.activities ?? []).map(item => ({
-            date: item.date, type: item.type, name: item.name,
-            teacher: item.host || "-", role: item.role || "-",
-          }))
-          : (detail.visit_records ?? [])
-            .filter(record => type === "cancelled" ? record.cancelled : type === "arrived" ? record.arrived : true)
-            .map(record => ({
-              date: record.visit_date, referrer: record.referrer_handler || "-",
-              needs: record.needs || "-", arrived: record.arrived, cancelled: record.cancelled,
-            }))
-        setTrafficRecordRows(rows)
+        const { type, from, to, activityKeys } = trafficRecordDetail
+        setTrafficRecordRows(principalRecordRows(detail, type, from, to, activityKeys))
       })
-      .catch(() => { if (active) setTrafficRecordRows([]) })
+      .catch(error => { if (active) { setTrafficRecordRows([]); setTrafficRecordError(error instanceof Error ? error.message : "明细加载失败") } })
       .finally(() => { if (active) setTrafficRecordLoading(false) })
     return () => { active = false }
   }, [trafficRecordDetail])
@@ -1050,6 +1072,7 @@ export default function PrincipalPage() {
     } catch (e) { setError(e instanceof Error ? e.message : "删除失败") } finally { setBusy(false) }
   }
   async function download() {
+    if (!hasCurrentResult || pagination.loading || pagination.error) return
     setBusy(true); setError("")
     try { const blob = await principalApi.download({ ...query, tab: listTab, list_view: listView, breakdown: serverPicks,
       ...(showTrafficList ? { export_view: "traffic" as const, export_customer_ids: sortedTrafficCustomers.map(customer => customer.id).filter((id): id is string => !!id) } : {}),
@@ -1408,7 +1431,7 @@ export default function PrincipalPage() {
   const inviteArriveRows = useMemo(() => {
     const customers = trafficCustomers.filter(customer => (customer.arrive_count ?? 0) > 0 || customer.arrive_date)
     const rows = inviteArriveView === "date"
-      ? customers.flatMap(customer => (customer.arrival_records ?? []).map(arrival => ({ ...customer, ...arrival, arrival_id: arrival.id })))
+      ? customers.flatMap(customer => (customer.arrival_records ?? []).map(arrival => ({ ...customer, ...arrival, id: customer.id, arrival_id: arrival.id })))
       : customers
     const dir = trafficSortOrder === "asc" ? 1 : -1
     if (!trafficSortBy) {
@@ -1654,23 +1677,23 @@ export default function PrincipalPage() {
           : <EmptyValue />
       case "invite_count":
         return customer.invite_count
-          ? <button type="button" onClick={() => setTrafficRecordDetail({ customerId: String(customer.id ?? ""), name: customer.name, type: "invited" })} className="cursor-pointer tabular-nums hover:underline">{customer.invite_count}</button>
+          ? <button type="button" onClick={() => openTrafficRecords(customer, "invited")} className="cursor-pointer tabular-nums hover:underline">{customer.invite_count}</button>
           : <EmptyValue />
       case "cancel_count":
         return customer.cancel_count
-          ? <button type="button" onClick={() => setTrafficRecordDetail({ customerId: String(customer.id ?? ""), name: customer.name, type: "cancelled" })} className="cursor-pointer tabular-nums hover:underline">{customer.cancel_count}</button>
+          ? <button type="button" onClick={() => openTrafficRecords(customer, "cancelled")} className="cursor-pointer tabular-nums hover:underline">{customer.cancel_count}</button>
           : <EmptyValue />
       case "arrive_count":
         return customer.arrive_count
-          ? <button type="button" onClick={() => setTrafficRecordDetail({ customerId: String(customer.id ?? ""), name: customer.name, type: "arrived" })} className="cursor-pointer tabular-nums hover:underline">{customer.arrive_count}</button>
+          ? <button type="button" onClick={() => openTrafficRecords(customer, "arrived")} className="cursor-pointer tabular-nums hover:underline">{customer.arrive_count}</button>
           : <EmptyValue />
       case "visit_interval":
         return customer.visit_interval && customer.visit_interval !== "-"
-          ? <button type="button" onClick={() => setTrafficRecordDetail({ customerId: String(customer.id ?? ""), name: customer.name, type: "arrived" })} className="cursor-pointer tabular-nums hover:underline">{customer.visit_interval}</button>
+          ? <button type="button" onClick={() => openTrafficRecords(customer, "arrived")} className="cursor-pointer tabular-nums hover:underline">{customer.visit_interval}</button>
           : <EmptyValue />
       case "activity_count":
         return customer.activity_count
-          ? <button type="button" onClick={() => setTrafficRecordDetail({ customerId: String(customer.id ?? ""), name: customer.name, type: "activity" })} className="cursor-pointer tabular-nums hover:underline">{customer.activity_count}</button>
+          ? <button type="button" onClick={() => openTrafficRecords(customer, "activity")} className="cursor-pointer tabular-nums hover:underline">{customer.activity_count}</button>
           : <EmptyValue />
       default:
         return <EmptyValue />
@@ -2174,9 +2197,10 @@ export default function PrincipalPage() {
                         : item.courseDeal
                           ? () => update({ course_deal: active ? "" : item.courseDeal })
                           : undefined
+                    const isInitiatedMetric = item.label === "发起邀约次"
                     const chipClass = `min-w-[104px] flex-1 border-r border-[#f2f3f5] px-4 py-2.5 text-left last:border-r-0 ${
                       clickable ? "cursor-pointer hover:bg-[#f7f8fa]" : "cursor-default"
-                    } ${active ? "bg-[#f0f5ff]" : ""}`
+                    } ${active ? "bg-[#f0f5ff]" : isInitiatedMetric ? "bg-[#f0f2f5]" : ""}`
                     const chipBody = (
                       <>
                         <div className="flex min-w-0 items-center gap-1 text-[11px] text-[#8f959e]">
@@ -2230,7 +2254,7 @@ export default function PrincipalPage() {
         </div>
       )}
 
-      {!pagination.error && result && query.tab !== "overview" && (query.tab !== "conversion" || resultTab === "conversion") && (
+      {!pagination.error && result && query.tab !== "overview" && (query.tab !== "conversion" || hasCurrentResult) && (
         <div className={`mt-4 ${query.tab === "conversion" ? "" : "border-t border-[#f0f0f0] pt-4"}`}>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {Object.entries(result.summary).map(([label, value]) => (
@@ -2277,7 +2301,7 @@ export default function PrincipalPage() {
         <div className="flex items-center justify-between gap-3 border-b-[0.5px] border-[#f0f0f0] px-3.5 py-2.5">
           <div className="flex min-w-0 items-baseline gap-2">
             <div className="truncate text-[13px] font-medium text-[#2b2f36]">{dateSummary} · {showTrafficList ? "引流客户" : listUnitLabel}</div>
-            {result && (
+            {hasCurrentResult && (
               <span className="shrink-0 text-[12px] text-[#8f959e]">
                 {showInviteInitiatedList
                   ? `共 ${inviteInitiatorRows.length} 位邀约人 · ${inviteInitiatedTotal} 人次`
@@ -2306,7 +2330,7 @@ export default function PrincipalPage() {
                 onChange={changeInviteColumns}
                 onReset={defaultInviteColumns}
                 resetLabel="恢复默认"
-                maxColumns={10}
+                maxColumns={15}
               />
               <SelectDropdown
                 size="sm"
@@ -2320,7 +2344,7 @@ export default function PrincipalPage() {
               <button
                 type="button"
                 onClick={download}
-                disabled={busy || pagination.loading || !!pagination.error}
+                disabled={busy || pagination.loading || !!pagination.error || !hasCurrentResult}
                 className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50">
                 <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
               </button>
@@ -2346,7 +2370,7 @@ export default function PrincipalPage() {
             )}
             <ColumnSettings config={listTrafficColumns} onChange={changeTrafficColumns} />
             <button type="button" onClick={download}
-              disabled={busy || pagination.loading || !!pagination.error}
+              disabled={busy || pagination.loading || !!pagination.error || !hasCurrentResult}
               className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50">
               <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
             </button>
@@ -2393,7 +2417,7 @@ export default function PrincipalPage() {
               <button
                 type="button"
                 onClick={download}
-                disabled={busy || pagination.loading || !!pagination.error}
+                disabled={busy || pagination.loading || !!pagination.error || !hasCurrentResult}
                 className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:text-[#b7bdc6]"
               >
                 <Download className="h-3.5 w-3.5" />
@@ -2403,7 +2427,7 @@ export default function PrincipalPage() {
           )}
         </div>
 
-        {query.tab === "conversion" && resultTab !== "conversion" ? (
+        {query.tab === "conversion" && !hasCurrentResult ? (
           <div className="py-24 text-center text-[13px] text-[#8f959e]">点「查询」按当前范围与规则出结果</div>
         ) : showInviteInitiatedList ? (
           <>
@@ -2494,7 +2518,16 @@ export default function PrincipalPage() {
                         if (column.key === "name") {
                           return (
                             <TableCell key={column.key} className={`${base} text-[12px] font-medium text-[#2b2f36]`}>
-                              {customer.name || <EmptyValue />}
+                              {customer.id && customer.name ? (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDetailCourseId(""); setDetailCustomerId(String(customer.id)) }}
+                                  className="max-w-full truncate text-left hover:text-[#3370ff] hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#3370ff]"
+                                  title={customer.name}
+                                >
+                                  {customer.name}
+                                </button>
+                              ) : customer.name || <EmptyValue />}
                             </TableCell>
                           )
                         }
@@ -2756,7 +2789,7 @@ export default function PrincipalPage() {
                 onChange={changeInitiatedColumns}
                 onReset={defaultInitiatedColumns}
                 resetLabel="恢复默认"
-                maxColumns={10}
+                maxColumns={15}
               />
               <button
                 type="button"
@@ -2846,13 +2879,13 @@ export default function PrincipalPage() {
         <DialogHeader className="border-b-[0.5px] border-[#f0f0f0] px-5 py-3">
           <DialogTitle className="text-[14px] font-medium text-[#1f2329]">{dealDetail?.customer || "成交明细"}</DialogTitle>
           <p className="mt-1 text-[12px] leading-5 text-[#8f959e]">
-            {dealDetail?.loading ? "加载中…" : `${dateSummary} · 共 ${dealDetail?.rows.length ?? 0} 笔成交`}
+            {dealPagination.error ? "成交明细未加载成功" : !dealReady ? "加载中…" : `${dealDetail?.period} · 共 ${dealPagination.totalItems} 笔成交`}
           </p>
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 py-4">
-          {dealDetail?.rows.map((row, index) => (
+          {dealReady && dealPagination.paginatedItems.map((row, index) => (
             <div key={row.id} className="flex items-start gap-3 rounded-[6px] border border-[#f0f1f3] bg-[#fcfcfd] px-3 py-2.5">
-              <span className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] bg-[#f0f2f5] text-[11px] tabular-nums text-[#646a73]">{index + 1}</span>
+              <span className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] bg-[#f0f2f5] text-[11px] tabular-nums text-[#646a73]">{dealPagination.startIndex + index}</span>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12.5px] font-medium text-[#2b2f36]">{String(row.date ?? "")} · {String(row.label ?? "")}</div>
                 <div className="mt-0.5 truncate text-[11.5px] text-[#8f959e]">
@@ -2861,8 +2894,11 @@ export default function PrincipalPage() {
               </div>
             </div>
           ))}
-          {!dealDetail?.loading && !dealDetail?.rows.length && <p className="py-8 text-center text-[13px] text-[#8f959e]">暂无成交记录</p>}
+          {dealPagination.error ? <p role="alert" className="py-8 text-center text-[13px] text-red-600">{dealPagination.error}<button className="ml-2 text-[#3370ff]" onClick={dealPagination.refresh}>重试</button></p>
+            : !dealReady ? <p className="py-8 text-center text-[13px] text-[#8f959e]">加载中…</p>
+            : !dealPagination.paginatedItems.length && <p className="py-8 text-center text-[13px] text-[#8f959e]">暂无成交记录</p>}
         </div>
+        {dealReady && <PaginationBar currentPage={dealPagination.currentPage} totalPages={dealPagination.totalPages} totalItems={dealPagination.totalItems} startIndex={dealPagination.startIndex} endIndex={dealPagination.endIndex} onPageChange={dealPagination.goToPage} />}
         <DialogFooter className="!mx-0 !mb-0 !rounded-b-none !bg-transparent border-t-[0.5px] border-[#f0f0f0] px-5 py-2.5">
           <Button variant="outline" size="sm" onClick={() => setDealDetail(null)} className="h-8 rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white px-4 text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">关闭</Button>
         </DialogFooter>
@@ -2881,7 +2917,7 @@ export default function PrincipalPage() {
               {trafficRecordDetail?.type === "activity" && " · 参与活动"}
             </DialogTitle>
             <p className="mt-1 text-[12px] leading-5 text-[#8f959e]">
-              {trafficRecordLoading ? "加载中…" : `共 ${trafficRecordRows.length} 条`}
+              {trafficRecordLoading ? "加载中…" : trafficRecordError ? "明细未加载成功" : `共 ${trafficRecordRows.length} 条`}
             </p>
           </div>
           {!trafficRecordLoading && trafficRecordRows.length > 0 && (
@@ -2935,7 +2971,8 @@ export default function PrincipalPage() {
               ))}
             </>
           )}
-          {!trafficRecordLoading && !trafficRecordRows.length && <p className="py-8 text-center text-[13px] text-[#8f959e]">暂无数据</p>}
+          {trafficRecordError && <p role="alert" className="py-8 text-center text-[13px] text-red-600">{trafficRecordError}<button className="ml-2 text-[#3370ff]" onClick={() => setTrafficRecordDetail(current => current ? { ...current } : null)}>重试</button></p>}
+          {!trafficRecordLoading && !trafficRecordError && !trafficRecordRows.length && <p className="py-8 text-center text-[13px] text-[#8f959e]">暂无数据</p>}
         </div>
         <DialogFooter className="!mx-0 !mb-0 !rounded-b-none !bg-transparent border-t-[0.5px] border-[#f0f0f0] px-5 py-2.5">
           <Button variant="outline" size="sm" onClick={() => setTrafficRecordDetail(null)} className="h-8 rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white px-4 text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">关闭</Button>

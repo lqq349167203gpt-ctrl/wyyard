@@ -35,14 +35,19 @@ def _filter_visible_visits(request: Request | None, records: list) -> list:
     return [record for record in records if record.customer_id in visible_ids]
 
 
-def _fill_member_type(record, private_need: str = ""):
+def _fill_member_type(record, private_need: str = "", *, refresh_remaining: bool = False, shared_summary: dict | None = None):
     """从客户信息实时填充会员身份、昵称和引流来源"""
     data = record.model_dump(mode="json")
+    from app.services import daily_customer_note_service
+
+    data.update(daily_customer_note_service.visit_summary(record.id) if shared_summary is None else shared_summary)
     customer = get_customer(record.customer_id)
     data["member_type"] = customer.member_type if customer else ""
     data["nickname"] = customer.nickname if customer else ""
     data["referrer"] = customer.referrer if customer else ""
     data["needs"] = private_need
+    if refresh_remaining:
+        data["remaining_count"] = visit_service.current_remaining_by_customer({record.customer_id}).get(record.customer_id, 0)
     return data
 
 
@@ -174,9 +179,12 @@ async def list_visits(
         visit_service.list_visits(date, customer_id, space_id),
     )
     need_map, note_map = _visit_note_maps(request, [record.id for record in records])
+    from app.services import daily_customer_note_service
+
+    summaries = daily_customer_note_service.visit_summaries({record.id for record in records})
     items = []
     for record in records:
-        item = _fill_member_type(record, need_map.get(record.id, ""))
+        item = _fill_member_type(record, need_map.get(record.id, ""), shared_summary=summaries.get(record.id, {}))
         item["visit_notes"] = note_map.get(record.id, [])
         items.append(item)
     role = get_request_roles(request) if request else ["超级管理员"]
@@ -197,8 +205,12 @@ async def list_visits_light(
     try:
         items = visit_service.list_visits_light(date, space_id)
         need_map = _private_need_map(request, [str(item.get("id") or "") for item in items])
+        from app.services import daily_customer_note_service
+
+        summaries = daily_customer_note_service.visit_summaries({str(item.get("id") or "") for item in items})
         for item in items:
             item["needs"] = need_map.get(str(item.get("id") or ""), "")
+            item.update(summaries.get(str(item.get("id") or ""), {}))
         visible_ids = _visible_customer_ids(request)
         if visible_ids is None:
             return items
@@ -381,7 +393,7 @@ async def get_visit(visit_id: str, request: Request):
         raise HTTPException(status_code=404, detail="记录不存在")
     customer_access_service.require_customer_scope(request, record.customer_id)
     need_map, note_map = _visit_note_maps(request, [record.id])
-    item = _fill_member_type(record, need_map.get(record.id, ""))
+    item = _fill_member_type(record, need_map.get(record.id, ""), refresh_remaining=True)
     item["visit_notes"] = note_map.get(record.id, [])
     return item
 
@@ -408,7 +420,7 @@ async def create_visit(data: VisitRecordCreate, request: Request):
                     or ""
                 ),
             )
-        return _fill_member_type(record, initial_need)
+        return _fill_member_type(record, initial_need, refresh_remaining=True)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -500,7 +512,7 @@ async def update_visit(visit_id: str, data: dict, request: Request):
             )
 
     need_map = _private_need_map(request, [record.id])
-    return _fill_member_type(record, need_map.get(record.id, ""))
+    return _fill_member_type(record, need_map.get(record.id, ""), refresh_remaining=True)
 
 
 @router.delete("/{visit_id}")

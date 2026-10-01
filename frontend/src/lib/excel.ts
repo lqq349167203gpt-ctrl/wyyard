@@ -1,4 +1,9 @@
-import ExcelJS from "exceljs"
+import type ExcelJS from "exceljs"
+
+/** 只有开始导入/导出时才下载 Excel 库，失败后下次操作可重试。 */
+export async function loadExcel() {
+  return (await import("exceljs")).default
+}
 
 // exceljs 单元格值 → 导入用的原始字符串/数字
 // 兼容富文本、超链接、公式结果、共享字符串与日期单元格

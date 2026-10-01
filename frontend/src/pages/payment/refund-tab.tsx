@@ -1,6 +1,8 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useState, useRef, useCallback, useMemo } from "react"
 import { Banknote, Inbox, Pencil, Trash2, X } from "lucide-react"
 import { useServerPagination } from "@/hooks/use-server-pagination"
+import { LoadError } from "@/components/load-error"
+import { useReadResource } from "@/hooks/use-read-resource"
 import { PaginationBar } from "@/components/pagination-bar"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -12,7 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, projectRefundApi, type Customer, type ProjectRefund } from "@/lib/api"
+import { customerApi, projectRefundApi, type CustomerLight as Customer, type ProjectRefund } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 
@@ -54,7 +56,8 @@ type RefundableItem = {
 }
 
 export function RefundTab() {
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const directory = useReadResource<Customer[]>(customerApi.light, [])
+  const customers = directory.data
 
   const nicknameToCustomer = useMemo(() => {
     const map: Record<string, Customer> = {}
@@ -77,7 +80,7 @@ export function RefundTab() {
   }, [])
   const {
     paginatedItems: refunds, currentPage, totalPages, totalItems,
-    goToPage, startIndex, endIndex, loading: refundsLoading, refresh: refreshRefunds,
+    goToPage, resetPage, startIndex, endIndex, loading: refundsLoading, error, refresh: refreshRefunds,
   } = useServerPagination<ProjectRefund>(fetchRefunds)
 
   // 弹窗
@@ -89,6 +92,7 @@ export function RefundTab() {
   const [refundAmount, setRefundAmount] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
+  const [itemsError, setItemsError] = useState("")
   const availableItemsRequestRef = useRef(0)
 
   // 编辑弹窗
@@ -108,29 +112,23 @@ export function RefundTab() {
   const handleFilterChange = useCallback((value: string) => {
     setSearchNickname(value)
     appliedNicknameRef.current = value
-    refreshRefunds()
-  }, [refreshRefunds])
+    resetPage()
+  }, [resetPage])
 
   const handleTypeChange = useCallback((value: string) => {
     setSearchProjectType(value)
     appliedProjectTypeRef.current = value === "all" ? "" : value
-    refreshRefunds()
-  }, [refreshRefunds])
+    resetPage()
+  }, [resetPage])
 
   const handleClearSearch = useCallback(() => {
     setSearchNickname("")
     setSearchProjectType("all")
     appliedNicknameRef.current = ""
     appliedProjectTypeRef.current = ""
-    refreshRefunds()
-  }, [refreshRefunds])
+    resetPage()
+  }, [resetPage])
 
-  // 加载客户列表
-  useEffect(() => {
-    customerApi.list().then((data) => {
-      setCustomers(data)
-    }).catch(() => {})
-  }, [])
 
   // 选中用户后：并行查询全部类型，合并所有可退费项目
   const handleSelectCustomer = useCallback(async (c: Customer) => {
@@ -140,8 +138,9 @@ export function RefundTab() {
     setSelectedItemKey("")
     setAvailableItems([])
     setLoadingItems(true)
-    const groupedItems = await Promise.all(PROJECT_TYPE_OPTIONS.map(async (option) => {
-      try {
+    setItemsError("")
+    try {
+      const groupedItems = await Promise.all(PROJECT_TYPE_OPTIONS.map(async (option) => {
         const items = await projectRefundApi.getAvailableItems(c.id, option.value)
         return items.map((item) => ({
           ...item,
@@ -149,13 +148,13 @@ export function RefundTab() {
           project_type_label: option.label,
           selection_key: `${option.value}:${item.id}`,
         }))
-      } catch {
-        return []
-      }
-    }))
-    if (requestId !== availableItemsRequestRef.current) return
-    setAvailableItems(groupedItems.flat())
-    setLoadingItems(false)
+      }))
+      if (requestId === availableItemsRequestRef.current) setAvailableItems(groupedItems.flat())
+    } catch (error) {
+      if (requestId === availableItemsRequestRef.current) setItemsError(error instanceof Error ? error.message : "可退项目加载失败")
+    } finally {
+      if (requestId === availableItemsRequestRef.current) setLoadingItems(false)
+    }
   }, [])
 
   const handleClearCustomer = useCallback(() => {
@@ -165,6 +164,7 @@ export function RefundTab() {
     setSelectedItemKey("")
     setAvailableItems([])
     setLoadingItems(false)
+    setItemsError("")
   }, [])
 
   const selectedItem = availableItems.find(i => i.selection_key === selectedItemKey)
@@ -228,6 +228,7 @@ export function RefundTab() {
 
   return (
     <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <LoadError error={directory.error} onRetry={directory.refresh} />
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
       {/* 标题栏 */}
       <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
@@ -272,9 +273,10 @@ export function RefundTab() {
             <Banknote className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 退费
           </Button>
         </div>
+        {error && <div role="alert" className="px-4 py-3 text-sm text-destructive">{error}<button type="button" className="ml-3 text-[#3370ff]" onClick={refreshRefunds}>重试</button></div>}
         {refundsLoading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
-        ) : totalItems === 0 ? (
+        ) : totalItems === 0 && !error ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
           <Table style={{ tableLayout: "fixed" }}>
@@ -378,6 +380,8 @@ export function RefundTab() {
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
               ) : loadingItems ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">正在加载可退项目...</div>
+              ) : itemsError ? (
+                <LoadError error={itemsError} onRetry={() => { const customer = customers.find(c => c.id === customerId); if (customer) void handleSelectCustomer(customer) }} />
               ) : availableItems.length === 0 ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">该用户暂无可退项目</div>
               ) : (

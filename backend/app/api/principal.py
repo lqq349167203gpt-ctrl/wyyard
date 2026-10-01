@@ -7,7 +7,7 @@ from app.api.service_teacher_customers import _xlsx_response
 from app.middleware.jwt_auth import require_page_permission
 from app.models.operation_log import OperationLogCreate
 from app.models.principal import CONDITION_FIELD_ORDER, CONDITION_FIELDS, ConversionRule, PrincipalQuery
-from app.services import operation_log_service, principal_mobile_service, principal_service
+from app.services import operation_log_service, principal_mobile_service, principal_query_cache, principal_service
 from app.services.storage import load_data, load_item, save_item
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
@@ -160,7 +160,7 @@ def rule_fields(request: Request):
 
 @router.post("/query")
 def query(data: PrincipalQuery, request: Request):
-    result = principal_service.analyze(request, data)
+    result = principal_query_cache.query_result(request, data)
     if data.mobile_group:
         result = principal_mobile_service.mobile_result(result, data)
     if data.tab == "conversion" and data.log_analysis:

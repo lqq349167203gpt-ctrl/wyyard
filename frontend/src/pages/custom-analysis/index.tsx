@@ -48,8 +48,8 @@ const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   created_by: "客户录入人",
   referral_date: "引流日期",
   created_at: "创建日期",
-  invitation_dates: "邀约日期",
-  invitation_created_dates: "邀约创建日期",
+  invitation_dates: "邀约到店日期",
+  invitation_created_dates: "发起邀约日期",
   inviter_names: "邀约人",
   invitation_creators: "邀约创建人",
   invitation_count_period: "期间邀约次数",
@@ -139,7 +139,7 @@ function clonePlan(plan: AnalysisPlan, allowedColumns?: Set<AnalysisField>): Ana
     row_display_mode: plan.row_display_mode === "activity_participations"
       ? "unique_customers"
       : plan.row_display_mode ?? "unique_customers",
-    columns: columns.slice(0, 10),
+    columns: columns.slice(0, 15),
   }
 }
 
@@ -804,12 +804,12 @@ export default function CustomAnalysisPage() {
           </div>
 
           {plan.analysis_mode === "single" && <div>
-            <div className="mb-1.5 flex items-baseline gap-2"><span className="text-[12px] font-medium text-[#3370ff]">③ 显示列</span><span className="text-[11px] text-[#8f959e]">最多 10 列，拖动排序</span></div>
+            <div className="mb-1.5 flex items-baseline gap-2"><span className="text-[12px] font-medium text-[#3370ff]">③ 显示列</span><span className="text-[11px] text-[#8f959e]">最多 15 列，拖动排序</span></div>
             <div className="flex min-h-7 flex-wrap gap-1.5">
               {plan.columns.map((field, index) => <div key={field} draggable onDragStart={() => setDraggedColumnIndex(index)} onDragEnd={() => setDraggedColumnIndex(null)} onDragOver={event => event.preventDefault()} onDrop={() => { if (draggedColumnIndex !== null) reorderColumn(draggedColumnIndex, index); setDraggedColumnIndex(null) }} className={`flex h-7 cursor-grab items-center rounded-[4px] border border-[#e5e7ea] bg-[#fafbfc] px-2 text-[11px] text-[#4e535a] active:cursor-grabbing ${draggedColumnIndex === index ? "opacity-50" : ""}`} title="拖动调整列表顺序"><GripVertical className="mr-1 h-3.5 w-3.5 text-[#a1a6ad]" /><span>{fieldLabels[field]}</span></div>)}
               <SelectDropdown value={plan.columns} options={columnOptions} onChange={value => {
-                const selectedColumns = value.slice(0, 10) as AnalysisField[]
-                const nextColumns: AnalysisField[] = selectedColumns.includes("nickname") ? selectedColumns : ["nickname", ...selectedColumns].slice(0, 10) as AnalysisField[]
+                const selectedColumns = value.slice(0, 15) as AnalysisField[]
+                const nextColumns: AnalysisField[] = selectedColumns.includes("nickname") ? selectedColumns : ["nickname", ...selectedColumns].slice(0, 15) as AnalysisField[]
                 setPlan(current => ({ ...current, columns: nextColumns }))
               }} multi triggerLabel="+ 添加" hideChevron className="w-[64px]" buttonClassName="!h-7 !rounded-[4px] !border !border-dashed !border-[#b9cdf8] !bg-white !px-2 !text-[11px] !shadow-none" dropdownWidth={280} menuMaxHeight={300} />
             </div>

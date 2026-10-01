@@ -1,7 +1,7 @@
 .container {
   min-height: 100vh;
   box-sizing: border-box;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   padding: 0 0 80rpx;
 }
 
@@ -555,7 +555,12 @@
   min-width: 0;
   line-height: 1.6;
   word-break: break-all;
+  white-space: pre-wrap;
 }
+.visit-note-entry + .visit-note-entry { margin-top: 10rpx; }
+.visit-note-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 14rpx; color: #8f959e; font-size: 22rpx; }
+.visit-note-meta text:last-child { flex-shrink: 0; text-align: right; }
+.visit-note-content { display: block; white-space: pre-wrap; }
 
 .rec-sub {
   font-size: 24rpx;

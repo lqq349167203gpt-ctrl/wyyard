@@ -72,17 +72,12 @@ def get_daily_payment_totals(request: Request, date: str = Query(...)):
 def get_daily_payment_counts(request: Request, date: str = Query(...)):
     """按成交日期统计有效订单笔数，零金额订单同样计入。"""
     customer_access_service.require_transaction_access(request, detail=True)
-    from app.services import offline_course_service, tea_seat_fee_service
+    from app.services.payment_sources import payment_record_groups
 
     visible_ids = customer_access_service.visible_customer_ids(request, customer_service.list_all_customers())
     counts: dict[str, int] = {}
-    loaders = [membership_card_service.list_cards, group_case_service.list_cases,
-               emotional_release_service.list_releases, energy_knot_service.list_knots,
-               internal_course_service.list_courses, oh_card_reading_service.list_readings,
-               other_project_service.list_projects, offline_course_service.list_courses,
-               tea_seat_fee_service.list_fees]
-    for loader in loaders:
-        for record in loader():
+    for records in payment_record_groups():
+        for record in records:
             if record.customer_id not in visible_ids or record.deal_date != date:
                 continue
             if getattr(record, "voided", False) or getattr(record, "is_deleted", False):

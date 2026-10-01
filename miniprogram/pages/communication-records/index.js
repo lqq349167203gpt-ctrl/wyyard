@@ -1,20 +1,5 @@
 const { communicationRecordApi } = require('../../utils/api')
-
-function decorateRecords(items) {
-  return items
-    .slice()
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    .map(item => {
-      const record = Object.assign({}, item)
-      if (record.created_at) {
-        const date = new Date(record.created_at)
-        record._dateStr = `${date.getMonth() + 1}/${date.getDate()}`
-      } else {
-        record._dateStr = ''
-      }
-      return record
-    })
-}
+const { communicationList } = require('../../utils/communication-list')
 
 Page({
   data: {
@@ -22,6 +7,11 @@ Page({
     records: [],
     filtered: [],
     loading: false,
+    loadingMore: false,
+    error: '',
+    page: 1,
+    total: 0,
+    hasMore: false,
     showFilterPanel: false,
     filterCount: 0,
     creatorNames: [],
@@ -44,42 +34,6 @@ Page({
     }
     this.setData({ hasPagePermission: true })
     this.loadList()
-  },
-
-  async loadList() {
-    this.setData({ loading: true })
-    try {
-      const res = await communicationRecordApi.list()
-      const records = decorateRecords(Array.isArray(res) ? res : [])
-      const creatorCounts = {}
-      records.forEach(record => {
-        const creator = (record.creator || '').trim()
-        if (creator) creatorCounts[creator] = (creatorCounts[creator] || 0) + 1
-      })
-      const creatorNames = Object.keys(creatorCounts).sort((a, b) => (
-        creatorCounts[b] - creatorCounts[a] || a.localeCompare(b, 'zh-CN')
-      ))
-      const visibleCreators = new Set(creatorNames)
-      const selectedCreators = this.data.selectedCreators.filter(name => visibleCreators.has(name))
-      this.setData({ records, creatorNames, selectedCreators })
-      this.updateCreatorList()
-      this.updateFilterCount()
-      this.applyFilter()
-    } catch (err) {
-      console.error('[communication-records] 加载失败:', err)
-      this.setData({ records: [], filtered: [] })
-    }
-    this.setData({ loading: false })
-  },
-
-  applyFilter() {
-    const { records, selectedCreators } = this.data
-    const selected = new Set(selectedCreators)
-    const hasCreatorFilter = selected.size > 0
-    const filtered = records.filter(r => {
-      return !hasCreatorFilter || selected.has((r.creator || '').trim())
-    })
-    this.setData({ filtered })
   },
 
   updateCreatorList() {
@@ -175,4 +129,5 @@ Page({
       },
     })
   },
+  ...communicationList(false),
 })

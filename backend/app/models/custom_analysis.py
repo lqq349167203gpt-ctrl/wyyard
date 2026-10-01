@@ -194,7 +194,7 @@ class AnalysisPlan(StrictBaseModel):
             "total_consumption",
         ],
         min_length=1,
-        max_length=10,
+        max_length=15,
     )
     sort_by: AnalysisField = "referral_date"
     sort_order: Literal["asc", "desc"] = "desc"
@@ -216,7 +216,7 @@ class AnalysisPlan(StrictBaseModel):
                 result.append(field)
         if "nickname" not in result:
             result.insert(0, "nickname")
-        return result[:10]
+        return result[:15]
 
     @field_validator("metrics")
     @classmethod

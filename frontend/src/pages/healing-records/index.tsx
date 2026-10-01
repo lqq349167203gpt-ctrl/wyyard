@@ -29,6 +29,7 @@ export default function HealingRecordsPage() {
   const [identityNames, setIdentityNames] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
   const [spaces, setSpaces] = useState<Space[]>([])
+  const [spacesLoading, setSpacesLoading] = useState(false)
   const [inviteTarget, setInviteTarget] = useState<Customer | null>(null)
   const [inviteDate, setInviteDate] = useState("")
   const [inviteSpaceId, setInviteSpaceId] = useState("")
@@ -66,13 +67,23 @@ export default function HealingRecordsPage() {
   }, [])
 
   useEffect(() => {
-    customerApi.clearLightCache()
     customerApi.light().then(setCustomers).catch(() => {})
     memberIdentityApi.list().then(list => setIdentityNames(list.map(i => i.name).reverse())).catch(() => {})
     customerTagApi.list().then(setAvailableTags).catch(() => setAvailableTags([]))
-    spaceApi.list().then(setSpaces).catch(() => setSpaces([]))
     loadSummary()
   }, [loadSummary])
+
+  useEffect(() => {
+    if (!inviteTarget || spaces.length) return
+    let cancelled = false
+    setSpacesLoading(true)
+    spaceApi.list().then(data => {
+      if (!cancelled) { setSpaces(data); setSpacesLoading(false) }
+    }).catch(() => {
+      if (!cancelled) { setSpacesLoading(false); setInviteError("空间加载失败，请关闭后重试") }
+    })
+    return () => { cancelled = true }
+  }, [inviteTarget, spaces.length])
 
   useEffect(() => {
     if (inviteTarget && !inviteSpaceId && spaces.length > 0) {
@@ -348,7 +359,7 @@ export default function HealingRecordsPage() {
                 value={inviteSpaceId}
                 options={spaces.map(space => ({ value: space.id, label: space.name }))}
                 onChange={setInviteSpaceId}
-                placeholder={spaces.length ? "请选择空间" : "暂无可用空间"}
+                placeholder={spacesLoading ? "加载空间..." : spaces.length ? "请选择空间" : "暂无可用空间"}
                 disabled={spaces.length === 0}
               />
             </div>

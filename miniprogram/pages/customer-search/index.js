@@ -74,6 +74,7 @@ Page({
   },
 
   onUnload() {
+    this._searchRequestVersion = (this._searchRequestVersion || 0) + 1
     if (this._searchTimer) clearTimeout(this._searchTimer)
   },
 
@@ -97,7 +98,7 @@ Page({
       const [identities, tags, customerResult] = await Promise.all([
         memberIdentityApi.list().catch(() => []),
         customerTagApi.list().catch(() => []),
-        customerApi.list({ page: 1, page_size: 100 }).catch(() => ({ items: [] })),
+        customerApi.light(),
       ])
       const sourceCustomers = (customerResult && customerResult.items) || (Array.isArray(customerResult) ? customerResult : [])
       const referrerCount = {}

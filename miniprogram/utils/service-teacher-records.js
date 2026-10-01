@@ -1,4 +1,10 @@
 const { serviceTeacherApi, customerFollowUpApi } = require('./api')
+const { pickerData, attributionFromPicker } = require('./feedback-person')
+
+function recordText(entries, fallback) {
+  if (!Array.isArray(entries) || !entries.length) return fallback || ''
+  return entries.map(entry => `${entry.author || '未知'}：${entry.content || ''}`).join('\n')
+}
 
 const COURSE_TYPES = [
   { value: 'all', label: '全部课程' },
@@ -31,6 +37,15 @@ function formatDate(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+function formatCourseDate(value) {
+  if (!value) return ''
+  const parts = String(value).slice(0, 10).split('-').map(Number)
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return value
+  const month = parts[1]
+  const day = parts[2]
+  return `${month}月${day}日`
+}
+
 function presetRange(preset) {
   const to = new Date()
   if (preset === 'all') return { from: '', to: '' }
@@ -53,6 +68,13 @@ function formatDateTime(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+function formatNoteTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 function daysSince(value) {
   if (!value) return '从未录入'
   const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000))
@@ -71,6 +93,7 @@ function safeFilename(value) {
 }
 
 module.exports = function createRecordsPage(mode) { return {
+  noop() {},
   data: {
     activeTab: mode,
     loading: true,
@@ -93,6 +116,10 @@ module.exports = function createRecordsPage(mode) { return {
     includeFollowUp: true,
     summaryCards: [],
     courseRecords: [],
+    coursePage: 1,
+    courseTotal: 0,
+    courseHasMore: false,
+    courseLoadingMore: false,
     // 课程记录页：课程列表 / 复盘记录两个子页签（与 PC 一致）
     courseViewTab: 'courses',
     reviewRecords: [],
@@ -105,8 +132,12 @@ module.exports = function createRecordsPage(mode) { return {
     participantTotal: 0,
     participantHasMore: false,
     participantLoading: false,
+    participantEditorLoading: false,
+    feedbackOptions: [],
+    feedbackIndex: 0,
     participantKeyword: '',
     participantSearchKeyword: '',
+    participantFiltersExpanded: false,
     participantMemberType: '',
     participantMemberTypes: [{ value: '', label: '全部客户身份' }],
     participantMemberTypeIndex: 0,
@@ -142,6 +173,10 @@ module.exports = function createRecordsPage(mode) { return {
   onReachBottom() {
     if (this.data.activeTab === 'follow-ups' && this.data.followUpHasMore && !this.data.loading) {
       this.loadFollowUps(false)
+    } else if (this.data.activeTab === 'courses' && this.data.courseViewTab === 'participants' && this.data.participantHasMore && !this.data.participantLoading) {
+      this.loadParticipants(false)
+    } else if (this.data.activeTab === 'courses' && this.data.courseViewTab !== 'participants' && this.data.courseHasMore && !this.data.loading && !this.data.courseLoadingMore) {
+      this.loadCourses(false)
     }
   },
 
@@ -169,15 +204,22 @@ module.exports = function createRecordsPage(mode) { return {
   },
 
   loadActiveData(reset) {
-    return this.data.activeTab === 'courses' ? this.loadCourses() : this.loadFollowUps(reset)
+    return this.data.activeTab === 'courses'
+      ? (this.data.courseViewTab === 'participants' ? this.loadParticipants(true) : this.loadCourses(reset))
+      : this.loadFollowUps(reset)
   },
 
-  async loadCourses() {
+  async loadCourses(reset = true) {
     if (!this.data.teacherName || !this.data.teacherId) {
-      this.setData({ loading: false, courseRecords: [], summaryCards: [] })
+      this._courseRequestId = (this._courseRequestId || 0) + 1
+      this.setData({ loading: false, courseLoadingMore: false, courseRecords: [], reviewRecords: [], courseTotal: 0, courseHasMore: false, summaryCards: [] })
       return
     }
-    this.setData({ loading: true })
+    if (!reset && (this.data.loading || this.data.courseLoadingMore)) return
+    const requestId = (this._courseRequestId || 0) + 1
+    this._courseRequestId = requestId
+    const page = reset ? 1 : this.data.coursePage + 1
+    this.setData(reset ? { loading: true, courseLoadingMore: false } : { courseLoadingMore: true })
     try {
       const selectedType = this.data.courseTypes[this.data.courseTypeIndex] || COURSE_TYPES[0]
       const result = await serviceTeacherApi.courses({
@@ -187,36 +229,60 @@ module.exports = function createRecordsPage(mode) { return {
         granularity: 'day',
         activity_type: selectedType.value,
         teacher_id: this.data.teacherId,
+        mobile_view: this.data.courseViewTab,
+        page,
+        page_size: 20,
       })
+      if (requestId !== this._courseRequestId) return
       const totals = (result.statistics || []).reduce((summary, item) => ({
         courseCount: summary.courseCount + Number(item.course_count || 0),
         classHours: summary.classHours + Number(item.class_hours || 0),
         participantCount: summary.participantCount + Number(item.participant_count || 0),
       }), { courseCount: 0, classHours: 0, participantCount: 0 })
       const activityTypes = [{ value: 'all', label: '全部课程' }].concat(result.activity_types || COURSE_TYPES.slice(1))
-      const records = (result.courses || []).map(course => ({
-        ...course,
-        timeText: course.start_time ? `${course.start_time}${course.end_time ? `~${course.end_time}` : ''}` : '—',
-        teacherText: (course.teachers || []).join('、') || '—',
-        newNames: participantNames(course, 'new'),
-        oldNames: participantNames(course, 'old'),
-      }))
-      this.setData({
+      const records = (result.courses || []).map(course => {
+        const { participants, ...rest } = course
+        return {
+          ...rest,
+          displayDate: formatCourseDate(course.date),
+          timeText: course.start_time ? `${course.start_time}${course.end_time ? `~${course.end_time}` : ''}` : '—',
+          teacherText: (course.teachers || []).join('、') || '—',
+          activityTypeText: course.activity_type_label === '沙龙活动'
+            ? (course.course_subtype || course.course_type || '')
+            : (course.activity_type_label || ''),
+          newNames: participantNames(course, 'new'),
+          oldNames: participantNames(course, 'old'),
+        }
+      })
+      const listKey = this.data.courseViewTab === 'reviews' ? 'reviewRecords' : 'courseRecords'
+      const list = listKey === 'reviewRecords'
+        ? records.map(course => ({ ...course, reviewText: (course.course_review || '').trim() }))
+        : records
+      const existingCount = reset ? 0 : this.data[listKey].length
+      const update = {
         loading: false,
+        courseLoadingMore: false,
         courseTypes: activityTypes,
-        courseRecords: records,
-        // 复盘记录：只保留填了复盘内容的课程，和 PC 的「复盘记录」页签一致
-        reviewRecords: records
-          .filter(course => (course.course_review || '').trim())
-          .map(course => ({ ...course, reviewText: (course.course_review || '').trim() })),
+        coursePage: page,
+        courseTotal: Number(result.total || 0),
+        courseHasMore: existingCount + list.length < Number(result.total || 0),
         summaryCards: [
           { label: '课程数', value: totals.courseCount, unit: '场' },
           { label: '课时数', value: totals.classHours, unit: '课时' },
-          { label: '参与人次', value: totals.participantCount, unit: '人次' },
+          { label: '服务总人次', value: totals.participantCount, unit: '人次' },
         ],
-      })
+      }
+      if (reset) {
+        update[listKey] = list
+        update[listKey === 'reviewRecords' ? 'courseRecords' : 'reviewRecords'] = []
+      } else {
+        list.forEach((record, index) => { update[`${listKey}[${existingCount + index}]`] = record })
+      }
+      this.setData(update)
     } catch (error) {
-      this.setData({ loading: false, courseRecords: [], summaryCards: [] })
+      if (requestId === this._courseRequestId) this.setData(reset
+        ? { loading: false, courseLoadingMore: false, courseRecords: [], reviewRecords: [], courseTotal: 0, courseHasMore: false, summaryCards: [] }
+        : { courseLoadingMore: false })
     }
   },
 
@@ -247,6 +313,8 @@ module.exports = function createRecordsPage(mode) { return {
       })
       const records = (result.items || []).map(item => ({
         ...item,
+        customerInfoAttribution: item.latest_customer_info_content ? item.latest_customer_info_by || '未知' : '',
+        followUpAttribution: item.latest_follow_up_content ? item.latest_follow_up_by || '未知' : '',
         displayName: item.nickname || item.name || '—',
         customerInfoAtText: formatDateTime(item.latest_customer_info_at),
         followUpAtText: formatDateTime(item.latest_follow_up_at),
@@ -288,15 +356,15 @@ module.exports = function createRecordsPage(mode) { return {
   },
 
   onCourseTypeChange(event) {
-    this.setData({ courseTypeIndex: Number(event.detail.value) }, () => this.loadCourses())
+    this.setData({ courseTypeIndex: Number(event.detail.value) }, () => this.loadActiveData(true))
   },
 
   onDateFromChange(event) {
-    this.setData({ courseRangePreset: 'custom', courseDateFrom: event.detail.value }, () => this.loadCourses())
+    this.setData({ courseRangePreset: 'custom', courseDateFrom: event.detail.value }, () => this.loadActiveData(true))
   },
 
   onDateToChange(event) {
-    this.setData({ courseRangePreset: 'custom', courseDateTo: event.detail.value }, () => this.loadCourses())
+    this.setData({ courseRangePreset: 'custom', courseDateTo: event.detail.value }, () => this.loadActiveData(true))
   },
 
   onCourseRangePresetTap(event) {
@@ -306,7 +374,7 @@ module.exports = function createRecordsPage(mode) { return {
       courseRangePreset,
       courseDateFrom: range.from,
       courseDateTo: range.to,
-    }, () => this.loadCourses())
+    }, () => this.loadActiveData(true))
   },
 
   onFollowUpFilterChange(event) {
@@ -334,8 +402,16 @@ module.exports = function createRecordsPage(mode) { return {
   // 课程记录页：切「课程记录 / 复盘记录」
   onCourseViewTab(event) {
     const tab = event.currentTarget.dataset.tab
-    this.setData({ courseViewTab: tab })
+    if (tab === this.data.courseViewTab) return
+    this._courseRequestId = (this._courseRequestId || 0) + 1
+    this._participantRequestId = (this._participantRequestId || 0) + 1
+    this.setData({ courseViewTab: tab, loading: false, courseLoadingMore: false, participantLoading: false })
     if (tab === 'participants') this.loadParticipants(true)
+    else this.loadCourses(true)
+  },
+
+  onToggleParticipantFilters() {
+    this.setData({ participantFiltersExpanded: !this.data.participantFiltersExpanded })
   },
 
   // ---- 参与者：昵称/姓名、客户身份、新人老人 三个筛选，时间跟上面的课程周期一致 ----
@@ -343,24 +419,46 @@ module.exports = function createRecordsPage(mode) { return {
     const parts = String(row.course_date || '').split('-')
     return {
       ...row,
+      visit_need: recordText(row.visit_need_entries, row.visit_need),
+      customer_info: recordText(row.customer_info_entries, row.customer_info),
+      follow_up: recordText(row.follow_up_entries, row.follow_up),
       dateText: parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : (row.course_date || ''),
       identityText: row.member_type || row.identity_group || '',
+      participantRoleText: row.participant_role === '案主' ? '案主' : '',
     }
   },
 
   formatParticipantGroup(group) {
     const parts = String(group.course_date || '').split('-')
+    const activityTypeLabel = group.activity_type_label || ''
+    const participants = group.participants || []
+    const firstParticipant = participants[0] || {}
+    const courseSubtype = group.course_subtype || firstParticipant.course_subtype || firstParticipant.course_type || ''
     return {
       ...group,
       dateText: parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : (group.course_date || ''),
-      participants: (group.participants || []).map(item => this.formatParticipant(item)),
+      participantCount: participants.length,
+      activityTypeText: activityTypeLabel === '沙龙活动'
+        ? courseSubtype
+        : activityTypeLabel,
+      participants: participants
+        .slice()
+        .sort((left, right) => Number(right.participant_role === '案主') - Number(left.participant_role === '案主'))
+        .map(item => this.formatParticipant(item)),
     }
   },
 
   async loadParticipants(reset) {
-    if (!this.data.teacherId || this.data.participantLoading) return
+    if (!this.data.teacherId) {
+      this._participantRequestId = (this._participantRequestId || 0) + 1
+      this.setData({ participantGroups: [], participantTotal: 0, participantTotalParticipants: 0, participantHasMore: false, participantLoading: false })
+      return
+    }
+    if (this.data.participantLoading && !reset) return
+    const requestId = (this._participantRequestId || 0) + 1
+    this._participantRequestId = requestId
     const page = reset ? 1 : this.data.participantPage + 1
-    this.setData({ participantLoading: true, ...(reset ? { participantGroups: [] } : {}) })
+    this.setData({ participantLoading: true })
     try {
       const selectedType = this.data.courseTypes[this.data.courseTypeIndex] || COURSE_TYPES[0]
       const result = await serviceTeacherApi.courseParticipants({
@@ -375,6 +473,7 @@ module.exports = function createRecordsPage(mode) { return {
         page,
         page_size: 20,
       })
+      if (requestId !== this._participantRequestId) return
       // 兼容旧后端：返回的是「一行一个参与者」的平铺结构时，按课程重新包成分组
       const rawItems = result.items || []
       const grouped = rawItems.length && rawItems[0] && rawItems[0].participants
@@ -384,31 +483,34 @@ module.exports = function createRecordsPage(mode) { return {
             const list = []
             rawItems.forEach(row => {
               const key = row.course_id || `${row.course_date}|${row.course_name}`
-              if (!map[key]) { map[key] = { course_id: key, course_date: row.course_date, course_name: row.course_name, activity_type_label: row.activity_type_label, participants: [] }; list.push(map[key]) }
+              if (!map[key]) { map[key] = { course_id: key, course_date: row.course_date, course_name: row.course_name, activity_type_label: row.activity_type_label, course_subtype: row.course_subtype, participants: [] }; list.push(map[key]) }
               map[key].participants.push(row)
             })
             return list
           })()
       const groups = grouped.map(group => this.formatParticipantGroup(group))
-      const records = reset ? groups : this.data.participantGroups.concat(groups)
-      this.setData({
-        participantGroups: records,
+      const existingCount = reset ? 0 : this.data.participantGroups.length
+      const update = {
         participantPage: result.page || page,
         participantTotal: result.total || 0,
         participantTotalParticipants: result.total_participants || 0,
-        participantHasMore: records.length < (result.total || 0),
+        participantHasMore: existingCount + groups.length < (result.total || 0),
         participantMemberTypes: [{ value: '', label: '全部客户身份' }].concat((result.member_types || []).map(value => ({ value, label: value }))),
-      })
+      }
+      if (reset) update.participantGroups = groups
+      else groups.forEach((group, index) => { update[`participantGroups[${existingCount + index}]`] = group })
+      this.setData(update)
     } catch (e) {
-      this.setData({ participantGroups: reset ? [] : this.data.participantGroups })
+      if (requestId === this._participantRequestId) this.setData({ participantGroups: reset ? [] : this.data.participantGroups })
     } finally {
-      this.setData({ participantLoading: false })
+      if (requestId === this._participantRequestId) this.setData({ participantLoading: false })
     }
   },
 
   onParticipantKeyword(event) { this.setData({ participantKeyword: event.detail.value }) },
   // 输入即查（防抖 400ms），不用再点按钮
-  onParticipantKeywordDebounced() {
+  onParticipantKeywordDebounced(event) {
+    this.setData({ participantKeyword: event.detail.value })
     if (this._participantKeywordTimer) clearTimeout(this._participantKeywordTimer)
     this._participantKeywordTimer = setTimeout(() => {
       this.setData({ participantSearchKeyword: (this.data.participantKeyword || '').trim() })
@@ -449,33 +551,57 @@ module.exports = function createRecordsPage(mode) { return {
     const row = group && group.participants[index]
     if (!row) return
     const titles = { visit_need: '来访需求', customer_info: '客户信息', follow_up: '跟进点' }
+    const placeholders = { visit_need: '填写来访需求...', customer_info: '填写客户信息...', follow_up: '填写跟进点...' }
+    const noteEntries = row[`${field}_entries`] || []
+    const hasReference = noteEntries.length
+      ? noteEntries.some(entry => String(entry.content || '').trim())
+      : Boolean(String(row[field] || '').trim())
     this.setData({
       participantEditing: {
         groupIndex, index, field, visitId: row.visit_id,
         title: titles[field] || '内容',
+        placeholder: placeholders[field] || '填写内容...',
+        hasReference,
         nickname: row.nickname, dateText: row.dateText, courseName: row.course_name,
         all: row[field] || '',
+        allEntries: noteEntries.map(entry => ({ ...entry, timeText: formatNoteTime(entry.at) })),
       },
       participantDraft: '',
       participantMyNoteId: '',
+      participantEditorLoading: !!row.visit_id,
     })
     if (!row.visit_id) return
     try {
-      const mine = await customerFollowUpApi.myNote(row.visit_id, field)
-      this.setData({ participantMyNoteId: (mine && mine.id) || '', participantDraft: (mine && mine.content) || '' })
-    } catch (e) { /* 拿不到就按新填写处理 */ }
+      const [mine, people] = await Promise.all([
+        customerFollowUpApi.myNote(row.visit_id, field),
+        customerFollowUpApi.feedbackPeople(),
+      ])
+      if (!this.data.participantEditing || this.data.participantEditing.visitId !== row.visit_id || this.data.participantEditing.field !== field) return
+      const picked = pickerData(people, mine)
+      this.setData({
+        participantMyNoteId: (mine && mine.id) || '',
+        participantDraft: (mine && mine.content) || '',
+        feedbackOptions: picked.options,
+        feedbackIndex: picked.index,
+      })
+    } catch (e) { wx.showToast({ title: '记录加载失败，请重新打开', icon: 'none' }); this.setData({ participantEditing: null }) }
+    finally { this.setData({ participantEditorLoading: false }) }
   },
+  onFeedbackChange(event) { this.setData({ feedbackIndex: Number(event.detail.value) }) },
   onParticipantDraft(event) { this.setData({ participantDraft: event.detail.value }) },
-  closeParticipantEdit() { if (!this.data.participantSaving) this.setData({ participantEditing: null }) },
+  closeParticipantEdit() {
+    if (!this.data.participantSaving) this.setData({ participantEditing: null })
+  },
   async saveParticipantEdit() {
     const editing = this.data.participantEditing
     const content = (this.data.participantDraft || '').trim()
     if (!editing || !content) { wx.showToast({ title: '内容不能为空', icon: 'none' }); return }
-    if (this.data.participantSaving) return
+    if (this.data.participantSaving || this.data.participantEditorLoading) return
     this.setData({ participantSaving: true })
     try {
-      if (this.data.participantMyNoteId) await customerFollowUpApi.update(this.data.participantMyNoteId, content)
-      else await customerFollowUpApi.create(editing.visitId, editing.field, content)
+      const attribution = attributionFromPicker(this.data.feedbackOptions, this.data.feedbackIndex)
+      if (this.data.participantMyNoteId) await customerFollowUpApi.update(this.data.participantMyNoteId, content, attribution)
+      else await customerFollowUpApi.create(editing.visitId, editing.field, content, attribution)
       this.setData({ participantEditing: null, participantDraft: '' })
       wx.showToast({ title: '已保存', icon: 'none' })
       this.loadParticipants(true)

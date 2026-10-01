@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { ChevronLeft, ChevronRight, ChevronDown, Edit, Trash2, Download, Clock, Undo2, Redo2 } from "lucide-react"
-import ExcelJS from "exceljs"
+import type ExcelJS from "exceljs"
+import { loadExcel } from "@/lib/excel"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -523,6 +524,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   }
 
   const handleExport = async () => {
+    const ExcelJS = await loadExcel().catch(() => { alert("导出组件加载失败，请重试"); return null })
+    if (!ExcelJS) return
     // 直接从 API 读取最新数据，不依赖状态，确保导出内容是最新的
     const freshVisits = await visitApi.list(selectedDate, undefined, spaceId).catch(() => visits)
     const visibleIdSet = new Set(customerList.map(c => c.id))

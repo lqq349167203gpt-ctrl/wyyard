@@ -52,17 +52,17 @@
     <view class="tab {{activeTab === 'activities' ? 'active' : ''}}" data-tab="activities" bindtap="onTabChange">
       活动<text class="cnt">{{tabCounts.activities}}</text>
     </view>
-    <view class="tab {{activeTab === 'finance' ? 'active' : ''}}" data-tab="finance" bindtap="onTabChange">
-      财务<text class="cnt">{{tabCounts.finance}}</text>
+    <view wx:if="{{hasFinance}}" class="tab {{activeTab === 'finance' ? 'active' : ''}}" data-tab="finance" bindtap="onTabChange">
+      财务<text wx:if="{{financeReady}}" class="cnt">{{tabCounts.finance}}</text>
     </view>
-    <view class="tab {{activeTab === 'deductions' ? 'active' : ''}}" data-tab="deductions" bindtap="onTabChange">
-      销卡<text class="cnt">{{tabCounts.deductions}}</text>
+    <view wx:if="{{hasFinance}}" class="tab {{activeTab === 'deductions' ? 'active' : ''}}" data-tab="deductions" bindtap="onTabChange">
+      销卡<text wx:if="{{financeReady}}" class="cnt">{{tabCounts.deductions}}</text>
     </view>
   </view>
 
   <!-- ================= 客户 ================= -->
   <view class="r-body" wx:if="{{activeTab === 'customers'}}">
-    <block wx:if="{{!loading}}">
+    <block wx:if="{{!loading && !error}}">
       <view
         class="c-card {{item.arrived ? 'green' : 'grey'}} {{item.open ? 'open' : ''}}"
         wx:for="{{visits}}"
@@ -104,7 +104,7 @@
 
   <!-- ================= 活动 ================= -->
   <view class="r-body" wx:if="{{activeTab === 'activities'}}">
-    <block wx:if="{{!loading}}">
+    <block wx:if="{{!loading && !error}}">
       <view class="section-note">点击卡片展开老人 / 新人名单</view>
       <view
         class="act-card {{item.open ? 'open' : ''}}"
@@ -136,7 +136,7 @@
 
   <!-- ================= 财务 ================= -->
   <view class="r-body" wx:if="{{activeTab === 'finance'}}">
-    <block wx:if="{{!loading}}">
+    <block wx:if="{{!loading && !error && financeReady}}">
       <view class="fin-summary">
         <text class="label">交易笔数</text>
         <text class="total">{{financeRows.length}}笔</text>
@@ -174,7 +174,7 @@
 
   <!-- ================= 销卡 ================= -->
   <view class="r-body" wx:if="{{activeTab === 'deductions'}}">
-    <block wx:if="{{!loading}}">
+    <block wx:if="{{!loading && !error && financeReady}}">
       <view class="section-note">仅显示当日有销卡的客户，公益活动不计入</view>
       <view class="f-card" wx:for="{{deductionRows}}" wx:key="id">
         <view class="f-l1">
@@ -195,6 +195,11 @@
     </block>
   </view>
 
+  <view class="empty-state" wx:if="{{error}}" bindtap="retryData">{{error}} · 点击重试</view>
+  <block wx:if="{{activeTab === 'finance' || activeTab === 'deductions'}}">
+    <view class="loading" wx:if="{{financeLoading}}">加载中...</view>
+    <view class="empty-state" wx:if="{{financeError}}" bindtap="retryFinance">{{financeError}} · 点击重试</view>
+  </block>
   <!-- 加载中 -->
   <view class="loading" wx:if="{{loading}}">
     <text>加载中...</text>

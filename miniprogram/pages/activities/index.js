@@ -4,7 +4,7 @@ const { BADGE_COLORS } = require('../../utils/activity-constants')
 const { canEditActivityContent, canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
-const SHARED_SCHEDULE_DATE_KEY = 'schedule_selected_date'
+const { readScheduleDate, writeScheduleDate } = require('../../utils/schedule-date')
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
@@ -245,11 +245,9 @@ Page({
       return
     }
     this.refreshActionPermissions()
-    const date = options.date || wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY) || wx.getStorageSync('activity_selected_date') || formatDate(new Date())
+    const date = options.date || readScheduleDate(formatDate(new Date()))
     const d = parseLocalDate(date) || new Date()
-    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
-    wx.setStorageSync('visit_selected_date', date)
-    wx.setStorageSync('activity_selected_date', date)
+    writeScheduleDate(date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -265,7 +263,7 @@ Page({
   onShow() {
     if (!getApp().checkLogin()) return
     this.refreshActionPermissions()
-    const sharedDate = wx.getStorageSync(SHARED_SCHEDULE_DATE_KEY)
+    const sharedDate = readScheduleDate(this.data.currentDate)
     if (sharedDate && this.data.currentDate && sharedDate !== this.data.currentDate && parseLocalDate(sharedDate)) {
       this._selectDate(sharedDate)
       return
@@ -350,9 +348,7 @@ Page({
     if (!d) return
     const counts = this._calendarCounts || {}
     const useSoftTransition = fromWeekSwipe && !this.data.loading && this.data.records.length > 0
-    wx.setStorageSync(SHARED_SCHEDULE_DATE_KEY, date)
-    wx.setStorageSync('activity_selected_date', date)
-    wx.setStorageSync('visit_selected_date', date)
+    writeScheduleDate(date)
     this.setData({
       currentDate: date,
       currentDateShort: this._formatDateShort(date),
@@ -587,11 +583,6 @@ Page({
         else if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
         r.metaText = metaParts.join(' · ')
         r.rosterCount = rosterParticipants.length
-        r.noteTotalCount = Number(rawRecord.participant_note_total_count || 0)
-        r.noteCompletedCount = Number(rawRecord.participant_note_completed_count || 0)
-        r.noteProgressText = r.noteTotalCount > 0
-          ? `${r.noteCompletedCount}/${r.noteTotalCount} 已填写`
-          : ''
         r.participantRosterText = rosterParticipants.length
           ? `${rosterParticipants.length} 人 · ${rosterParticipants.map(function(item) { return item.nickname }).join('、')}`
           : '0 人'

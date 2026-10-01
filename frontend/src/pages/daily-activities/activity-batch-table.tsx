@@ -7,7 +7,7 @@ import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 import {
   classRecordApi, groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
-  courseTypeApi, organizationApi, activityOrderApi,
+  organizationApi, activityOrderApi,
   isOperationCancelled,
   type CustomerLight, type Space, type MemberIdentity, type CourseType, type Organization,
 } from "@/lib/api"
@@ -19,6 +19,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { CardCallbacks } from "./index"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { createTableDragPreview } from "@/lib/table-drag-preview"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 
 type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 
@@ -260,6 +262,7 @@ export interface HistoryEntry {
 
 interface ActivityBatchTableProps {
   date: string
+  courseTypes: CourseType[]
   courses: {id: string, name: string}[]
   customers: CustomerLight[]
   invitedCustomerIds?: string[]
@@ -295,7 +298,7 @@ interface ActivityBatchTableProps {
 }
 
 export function ActivityBatchTable({
-  date, courses, customers, invitedCustomerIds, teachers, spaces, spaceId,
+  date, courses, courseTypes, customers, invitedCustomerIds, teachers, spaces, spaceId,
   records, onReload, onParticipantsSaved, callbacks, getMemberName, memberIdentities,
   onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onFlushRef, onHistoryPushed,
   previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
@@ -317,11 +320,13 @@ export function ActivityBatchTable({
   const [membershipDeductionDrafts, setMembershipDeductionDrafts] = useState<Record<number, string>>({})
   const lastEditedEksRef = useRef<ActivityRow | null>(null)
   const eksEditsRef = useRef<Map<string, { owner_id: string; owner_name: string; billing_description: string }>>(new Map())
+  const dateRef = useRef(date)
+  dateRef.current = date
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
-  const fetchedRemainingRef = useRef<Set<string>>(new Set())
+  const [remainingError, setRemainingError] = useState("")
   const prevOwnerRef = useRef<Record<number, string>>({})
-  const [courseTypes, setCourseTypes] = useState<CourseType[]>([])
-  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const configuration = useReadResource<Organization[]>(organizationApi.list, [])
+  const organizations = configuration.data
   const [editingDescriptionKey, setEditingDescriptionKey] = useState<number | null>(null)
   const [descriptionDraft, setDescriptionDraft] = useState("")
   const [editingReviewKey, setEditingReviewKey] = useState<number | null>(null)
@@ -594,12 +599,6 @@ export function ActivityBatchTable({
     onCaptureRef?.(captureCurrentState)
   }, [captureCurrentState, onCaptureRef])
 
-  // 加载活动类型（沙龙子类型）
-  useEffect(() => {
-    courseTypeApi.list().then(setCourseTypes).catch(() => {})
-    organizationApi.list().then(setOrganizations).catch(() => {})
-  }, [])
-
   // 动态构建类型选项
   const typeOptions = useMemo(() => {
     const salonTypes = courseTypes.filter(type => type.category !== "other")
@@ -651,24 +650,32 @@ export function ActivityBatchTable({
   // 每一行最近一次「服务端已保存」的样子：保存被用户取消时用它把这一行还原回去
   const savedRowsRef = useRef<Record<number, ActivityRow>>({})
 
+  const remainingSequences = useRef<Record<string, number>>({})
   const fetchRemaining = useCallback(async (type: string, customerId: string) => {
     if (!customerId) return
+    const sequence = (remainingSequences.current[type] || 0) + 1
+    remainingSequences.current[type] = sequence
+    const isCurrent = () => dateRef.current === date && remainingSequences.current[type] === sequence
     try {
-      let results: any[] = []
+      const requestedDate = date
+      let results: { id: string; remaining: number }[] = []
       if (type === "eks") results = await energyKnotSessionApi.searchCustomers("", date)
       else if (type === "gcs") results = await groupCaseSessionApi.searchCustomers("", date)
       else if (type === "ers") results = await emotionalReleaseSessionApi.searchCustomers("", date)
       else return
+      if (dateRef.current !== requestedDate || !isCurrent()) return
       const map: Record<string, number> = {}
       for (const r of results) map[r.id] = r.remaining
       setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
-    } catch {}
+    } catch (error) {
+      if (isCurrent()) setRemainingError(error instanceof Error ? error.message : "案主次数加载失败")
+    }
   }, [date])
 
   // 从 records 加载行数据（优先从 API 获取排序，fallback 到 localStorage）
   const prevRecordsRef = useRef<string | null>(null)
   useEffect(() => {
-    const sig = records.map(r => `${r.type}-${r.data.id}`).join(",")
+    const sig = `${date}|${spaceId}|${records.map(r => `${r.type}-${r.data.id}`).join(",")}`
     if (prevRecordsRef.current !== null && sig === prevRecordsRef.current) return
     prevRecordsRef.current = sig
 
@@ -714,13 +721,15 @@ export function ActivityBatchTable({
     buildRows(localOrder)
 
     // 再从 API 获取排序（覆盖 localStorage）
+    let current = true
     activityOrderApi.get(date, spaceId || "").then(apiOrder => {
-      if (apiOrder.length > 0) {
+      if (current && apiOrder.length > 0) {
         buildRows(apiOrder)
         // 同步回 localStorage
         try { localStorage.setItem(orderKey, JSON.stringify(apiOrder)) } catch {}
       }
     }).catch(() => {})
+    return () => { current = false }
   }, [records, courses, date, spaceId, spaces, courseTypes])
 
   // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
@@ -1340,28 +1349,12 @@ export function ActivityBatchTable({
 
   // 预加载案主剩余次数（组件挂载后立即加载，确保首次搜索即可显示）
   useEffect(() => {
-    fetchedRemainingRef.current.clear()
+    dateRef.current = date
     setRemainingMap({})
-    const types = ["eks", "gcs", "ers"] as const
-    for (const type of types) {
-      if (fetchedRemainingRef.current.has(type)) continue
-      fetchedRemainingRef.current.add(type)
-      ;(async () => {
-        try {
-          const results = type === "eks"
-            ? await energyKnotSessionApi.searchCustomers("", date)
-            : type === "gcs"
-              ? await groupCaseSessionApi.searchCustomers("", date)
-              : await emotionalReleaseSessionApi.searchCustomers("", date)
-          const map: Record<string, number> = {}
-          for (const r of results) map[r.id] = r.remaining
-          setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
-        } catch {
-          fetchedRemainingRef.current.delete(type)
-        }
-      })()
-    }
-  }, [date])
+    setRemainingError("")
+    for (const type of ["eks", "gcs", "ers"]) void fetchRemaining(type, "all")
+    return () => { dateRef.current = "" }
+  }, [date, fetchRemaining])
 
   const handleCreate = async (type: string, classCourseType?: string) => {
     const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
@@ -1475,6 +1468,8 @@ export function ActivityBatchTable({
 
   return (
     <div className={`relative flex min-h-0 flex-1 flex-col rounded-[2px] bg-white ${isLocked ? "activity-table-locked" : ""}`}>
+      <LoadError error={configuration.error} onRetry={configuration.refresh} />
+      <LoadError error={remainingError} onRetry={() => { setRemainingError(""); for (const type of ["eks", "gcs", "ers"]) void fetchRemaining(type, "all") }} />
       {isPreview && (
         <div className="px-3 py-2 bg-[#f5eeff] border-b border-[#e0d0f5]">
           <span className="text-[12px] text-[#7c3aed]">正在预览历史版本</span>

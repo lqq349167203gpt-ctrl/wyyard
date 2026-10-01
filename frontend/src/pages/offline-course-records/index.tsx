@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { Plus, X, Edit, Trash2, Inbox } from "lucide-react"
 import { offlineCourseRecordApi, customerApi, type OfflineCourseRecord, type OfflineCourseRecordCreate, type CustomerLight } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -6,7 +6,9 @@ import { usePagePermissions } from "@/hooks/use-page-permissions"
 import { POSITION_COURSE_TEACHER } from "@/lib/positions"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { usePagination } from "@/hooks/use-pagination"
+import { useServerPagination } from "@/hooks/use-server-pagination"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import {
@@ -14,14 +16,14 @@ import {
 } from "@/components/ui/table"
 
 export default function OfflineCourseRecordsPage() {
-  const [records, setRecords] = useState<OfflineCourseRecord[]>([])
-  const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<OfflineCourseRecordCreate>({ customer_id: "", customer_nickname: "", participant_ids: [], participant_names: [], course_type: "", course_name: "", record_date: new Date().toLocaleDateString("sv-SE"), teacher: "", content: "", result: "" })
   const [saving, setSaving] = useState(false)
-  const [customers, setCustomers] = useState<CustomerLight[]>([])
+  const directory = useReadResource<CustomerLight[]>(customerApi.light, [])
+  const customers = directory.data
   const permissions = usePagePermissions()
-  const [types, setTypes] = useState<{ id: string; name: string }[]>([])
+  const typeResource = useReadResource(offlineCourseRecordApi.types, [])
+  const { data: types, setData: setTypes } = typeResource
   const [typeOpen, setTypeOpen] = useState(false)
   const [typeName, setTypeName] = useState("")
   const [editingTypeId, setEditingTypeId] = useState("")
@@ -38,7 +40,7 @@ export default function OfflineCourseRecordsPage() {
       const item = editingTypeId ? await offlineCourseRecordApi.updateType(editingTypeId, typeName.trim()) : await offlineCourseRecordApi.createType(typeName.trim())
       setTypes(previous => editingTypeId ? previous.map(t => t.id === item.id ? item : t) : [...previous, item])
       if (oldName) {
-        setRecords(previous => previous.map(r => r.course_type === oldName ? { ...r, course_type: item.name } : r))
+        fetchData()
         setForm(previous => previous.course_type === oldName ? { ...previous, course_type: item.name } : previous)
         setEditForm(previous => previous.course_type === oldName ? { ...previous, course_type: item.name } : previous)
         setSearchType(previous => previous === oldName ? item.name : previous)
@@ -69,35 +71,12 @@ export default function OfflineCourseRecordsPage() {
     ...courseTeachers.map(c => ({ value: c.nickname, label: c.nickname })),
   ], [courseTeachers])
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await offlineCourseRecordApi.list()
-      setRecords(res)
-    } catch {
-      setError("课程记录加载失败，请重试")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-    customerApi.light().then(setCustomers).catch(() => setError("人员加载失败，请刷新重试"))
-    offlineCourseRecordApi.types().then(setTypes).catch(() => setError("课程类型加载失败"))
-  }, [fetchData])
   const courseCustomers = customers
-
-  const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      if (searchCustomerId && r.customer_id !== searchCustomerId && !r.participant_ids?.includes(searchCustomerId)) return false
-      if (searchType && r.course_type !== searchType) return false
-      if (searchTeacher && r.teacher !== searchTeacher) return false
-      return true
-    })
-  }, [records, searchCustomerId, searchTeacher, searchType])
-
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex,
+    loading, error: loadError, refresh: fetchData } = useServerPagination<OfflineCourseRecord>(
+    (page, pageSize) => offlineCourseRecordApi.listPaginated({ customer_id: searchCustomerId, course_type: searchType, teacher: searchTeacher }, page, pageSize),
+    { pageSize: 10, queryKey: JSON.stringify([searchCustomerId, searchType, searchTeacher]) },
+  )
 
   const handleClear = () => {
     setSearchCustomerId("")
@@ -158,6 +137,9 @@ export default function OfflineCourseRecordsPage() {
 
   return (
     <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <LoadError error={loadError} onRetry={fetchData} />
+      <LoadError error={directory.error} onRetry={directory.refresh} />
+      <LoadError error={typeResource.error} onRetry={typeResource.refresh} />
       <style>{`
         .dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }
         div.offline-course-participants { height: 32px; min-width: 0; padding: 0 10px; border-color: #e1e4e7; }
@@ -189,7 +171,7 @@ export default function OfflineCourseRecordsPage() {
                 type="button"
                 aria-pressed={searchType === t.value}
                 title={t.name}
-                onClick={() => { setSearchType(t.value); goToPage(1) }}
+                onClick={() => setSearchType(t.value)}
                 className={`w-full rounded-[4px] px-3 py-2.5 text-left text-[12px] break-words transition-colors ${searchType === t.value ? "bg-[#eef3ff] text-[#3370ff]" : "text-[#4e535a] hover:bg-[#f7f8fa]"}`}
               >{t.name}</button>
             ))}
@@ -238,7 +220,7 @@ export default function OfflineCourseRecordsPage() {
         </div>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
-        ) : filteredRecords.length === 0 ? (
+        ) : totalItems === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
           <Table className="[&_th]:text-[12px] [&_td]:text-[12px]" style={{ tableLayout: "fixed" }}>

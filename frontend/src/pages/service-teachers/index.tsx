@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Download } from "lucide-react"
-import ExcelJS from "exceljs"
+import { loadExcel } from "@/lib/excel"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -301,7 +301,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       })
   }, [mode])
 
-  const fetchCustomers = useCallback(async (page: number, pageSize: number) => {
+  const fetchCustomers = useCallback(async (page: number, pageSize: number, isCurrent: () => boolean) => {
     if (mode === "courses") return { items: [], total: 0, page: 1, page_size: pageSize, total_pages: 1 }
     const result = await serviceTeacherCustomerApi.list({
       service_teacher: teacher,
@@ -311,15 +311,14 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       page,
       page_size: pageSize,
     })
-    setSummary(result.summary)
+    if (isCurrent()) setSummary(result.summary)
     return result
   }, [mode, followUpDays, followUpDefinition, followUpFilter, teacher])
 
-  const pagination = useServerPagination<ServiceTeacherCustomerItem>(fetchCustomers, { pageSize: PAGE_SIZE })
-
-  useEffect(() => {
-    pagination.resetPage()
-  }, [teacher, followUpDays, followUpDefinition, followUpFilter, pagination.resetPage])
+  const pagination = useServerPagination<ServiceTeacherCustomerItem>(fetchCustomers, {
+    pageSize: PAGE_SIZE,
+    queryKey: JSON.stringify([mode, teacher, followUpDays, followUpDefinition, followUpFilter]),
+  })
 
   const teacherSelectOptions = useMemo(() => {
     if (mode === "courses") return teacherOptions.map(option => ({ value: option.customer_id, label: option.name }))
@@ -547,6 +546,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     if (!teacher || courseExporting || courseRows.length === 0) return
     setCourseExporting(true)
     try {
+      const ExcelJS = await loadExcel()
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet("课程记录", { views: [{ showGridLines: false }] })
       worksheet.columns = [
@@ -625,6 +625,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         page += 1
       } while (page <= totalPages)
 
+      const ExcelJS = await loadExcel()
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet("跟进记录", { views: [{ showGridLines: false }] })
       worksheet.columns = [

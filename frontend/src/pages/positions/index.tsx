@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { GraduationCap, Plus, Trash2 } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -9,15 +9,16 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, type Customer } from "@/lib/api"
+import { customerApi, type CustomerLight as Customer } from "@/lib/api"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { POSITION_COURSE_DEPT } from "@/lib/positions"
 
 export default function PositionsPage() {
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: customers, loading, error: loadError, refresh: loadCustomers } = useReadResource<Customer[]>(customerApi.light, [])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingTeacher, setDeletingTeacher] = useState<Customer | null>(null)
@@ -25,16 +26,6 @@ export default function PositionsPage() {
 
   const [selectedNicknames, setSelectedNicknames] = useState<string[]>([])
 
-  const loadCustomers = () => {
-    customerApi.list()
-      .then(setCustomers)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    loadCustomers()
-  }, [])
 
   // Filter customers who have POSITION_COURSE_DEPT position
   const courseTeachers = customers.filter(c => c.positions?.includes(POSITION_COURSE_DEPT))
@@ -79,6 +70,7 @@ export default function PositionsPage() {
 
   return (
     <div className="px-6 pt-12 pb-6 space-y-3">
+      <LoadError error={loadError} onRetry={loadCustomers} />
       {/* 页面头部 */}
       <div className="flex items-center justify-between pb-2">
         <div>

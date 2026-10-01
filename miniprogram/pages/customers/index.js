@@ -34,7 +34,7 @@ Page({
     daysFilterMax: 60,
     // 分页
     page: 1,
-    pageSize: 100,
+    pageSize: 20,
     total: 0,
     hasMore: true,
     isViewOnly: false,
@@ -56,6 +56,7 @@ Page({
   async loadActiveCustomerNames() {
     try {
       const customers = await customerApi.light()
+      this._filterCustomers = customers || []
       this.setData({
         activeCustomerNicknames: (customers || []).map(customer => customer.nickname).filter(Boolean),
         activeCustomerNamesLoaded: true,
@@ -117,12 +118,12 @@ Page({
     })
   },
 
-  // 更新引流人列表（从已加载客户中提取，按人数从多到少排列）
+  // 选项来自完整可见的轻量目录，不能随着列表分页而遗漏。
   updateReferrerList() {
     const { customers, selectedReferrers, activeCustomerNicknames, activeCustomerNamesLoaded } = this.data
     const activeNames = new Set(activeCustomerNicknames)
     const countMap = {}
-    for (const c of customers) {
+    for (const c of this._filterCustomers || customers) {
       const name = (c.referrer || '').trim()
       if (name && (!activeCustomerNamesLoaded || activeNames.has(name))) {
         countMap[name] = (countMap[name] || 0) + 1
@@ -170,22 +171,21 @@ Page({
   },
 
   onUnload() {
+    this._loadSequence = (this._loadSequence || 0) + 1
     if (this._searchTimer) clearTimeout(this._searchTimer)
   },
 
   async loadData(reset) {
-    if (this._loadingRequest || this.data.loading || this.data.loadingMore) return
-    this._loadingRequest = true
+    if (!reset && (this.data.loading || this.data.loadingMore || !this.data.hasMore)) return
+    const sequence = this._loadSequence = (this._loadSequence || 0) + 1
     const page = reset ? 1 : this.data.page + 1
     if (reset) {
-      this.setData({ loading: true })
+      this.setData({ loading: true, loadingMore: false })
     } else {
       this.setData({ loadingMore: true })
     }
 
     try {
-      const token = wx.getStorageSync('auth_token')
-      console.log('[loadData] 请求前 token:', token ? token.substring(0, 20) + '...' : '无')
       const res = await customerApi.list({
         page,
         page_size: this.data.pageSize,
@@ -197,10 +197,10 @@ Page({
         last_visit_days_min: this.data.daysFilterMin > 0 ? this.data.daysFilterMin : undefined,
         last_visit_days_max: this.data.daysFilterMax < 60 ? this.data.daysFilterMax : undefined,
       })
-      console.log('[loadData] 请求成功, items数量:', res?.items?.length ?? res?.length ?? 'N/A')
+      if (sequence !== this._loadSequence) return
 
       const items = (res && res.items) || (Array.isArray(res) ? res : [])
-      const total = (res && res.total) || items.length
+      const total = res?.total ?? items.length
       const customers = reset ? items : (this.data.customers || []).concat(items)
 
       // 计算距离上次到店的天数
@@ -236,13 +236,15 @@ Page({
       // 下一页数据会被重新分配到各会员身份组，可能插入当前视口上方。
       // 以当前第一条可见客户作为锚点，重排后恢复其屏幕位置，避免整页跳动。
       const scrollAnchor = reset ? null : await this.captureScrollAnchor()
+      if (sequence !== this._loadSequence) return
       this.applyFilters(scrollAnchor)
     } catch (e) {
+      if (sequence !== this._loadSequence) return
       console.error('[loadData] 加载客户失败:', e.message, e)
       this.setData({ loading: false, loadingMore: false, initialized: true })
       wx.showToast({ title: '加载失败', icon: 'none' })
     } finally {
-      this._loadingRequest = false
+      if (sequence === this._loadSequence) this.setData({ loading: false, loadingMore: false })
     }
   },
 

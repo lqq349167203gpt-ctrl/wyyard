@@ -3,13 +3,13 @@ import { useCallback, useEffect, useState, type CSSProperties } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Button } from "@/components/ui/button"
-import { clearAuthState, positionPermissionApi } from "@/lib/api"
-import { storePagePermissions } from "@/hooks/use-page-permissions"
-import { storeEditPermissions } from "@/hooks/use-edit-permissions"
+import { clearAuthState } from "@/lib/api"
+import { refreshAccountPermissions } from "@/hooks/use-edit-permissions"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { SystemHelperChat, type ChatMessage } from "@/components/system-helper-chat"
 import { LogOut } from "lucide-react"
 import { useUsageTracking } from "@/hooks/use-usage-tracking"
+import { RouteContent } from "@/components/route-content"
 
 const PAGE_TITLES: Record<string, string> = {
 
@@ -76,12 +76,7 @@ export function AppLayout() {
   const syncPagePermissions = useCallback(() => {
     if (!userRole || userRole === "超级管理员") return
     // 用当前账号的有效权限（多角色并集）；按主要角色刷新会把其它角色授予的页面丢掉
-    positionPermissionApi.getMine()
-      .then(result => {
-        storePagePermissions(result.pages || [])
-        storeEditPermissions(result.edit_permissions)
-      })
-      .catch(() => {})
+    refreshAccountPermissions().catch(() => {})
   }, [userRole])
 
   useEffect(() => {
@@ -120,7 +115,7 @@ export function AppLayout() {
           </div>
         </header>
         <main className="flex-1 min-w-0 overflow-y-auto bg-white">
-          <Outlet />
+          <RouteContent><Outlet /></RouteContent>
         </main>
       </SidebarInset>
 

@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { Plus, X, Edit, Trash2, Inbox } from "lucide-react"
-import { communicationRecordApi, customerApi, memberIdentityApi, type CommunicationRecord, type CommunicationRecordCreate, type Customer } from "@/lib/api"
+import { communicationRecordApi, customerApi, memberIdentityApi, type CommunicationRecord, type CommunicationRecordCreate } from "@/lib/api"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { usePagination } from "@/hooks/use-pagination"
+import { useServerPagination } from "@/hooks/use-server-pagination"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
@@ -12,13 +14,15 @@ import {
 } from "@/components/ui/table"
 
 export default function CommunicationRecordsPage() {
-  const [records, setRecords] = useState<CommunicationRecord[]>([])
-  const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<CommunicationRecordCreate>({ customer_nickname: "", content: "" })
   const [saving, setSaving] = useState(false)
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [identityNames, setIdentityNames] = useState<string[]>([])
+  const directory = useReadResource(async () => {
+    const [customers, identities] = await Promise.all([customerApi.light(), memberIdentityApi.list()])
+    return { customers, identities }
+  }, { customers: [], identities: [] })
+  const { customers, identities } = directory.data
+  const identityNames = identities.map(i => i.name).reverse()
 
   // 编辑状态
   const [editTarget, setEditTarget] = useState<CommunicationRecord | null>(null)
@@ -34,11 +38,16 @@ export default function CommunicationRecordsPage() {
   const [searchIdentity, setSearchIdentity] = useState("")
   const [searchCreator, setSearchCreator] = useState("")
 
-  const creatorOptions = useMemo(() => (
-    [...new Set(records.map(record => record.creator?.trim()).filter(Boolean) as string[])]
-      .sort((a, b) => a.localeCompare(b, "zh-CN"))
-      .map(name => ({ value: name, label: name }))
-  ), [records])
+  const [creators, setCreators] = useState<string[]>([])
+  const creatorOptions = creators.map(name => ({ value: name, label: name }))
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex,
+    loading, error: loadError, refresh: fetchData } = useServerPagination<CommunicationRecord>(
+    async (page, pageSize, isCurrent) => {
+      const result = await communicationRecordApi.listPaginated({ nickname: searchNickname, member_type: searchIdentity, creator: searchCreator }, page, pageSize)
+      if (isCurrent()) setCreators(result.creators)
+      return result
+    }, { pageSize: 10, queryKey: JSON.stringify([searchNickname, searchIdentity, searchCreator]) },
+  )
 
   // 客户昵称→身份映射
   const nicknameToIdentity = useMemo(() => {
@@ -56,43 +65,6 @@ export default function CommunicationRecordsPage() {
     })
     return map
   }, [customers])
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await communicationRecordApi.list()
-      setRecords(res)
-    } catch {
-      setRecords([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-    customerApi.list().then(setCustomers).catch(() => setCustomers([]))
-    memberIdentityApi.list().then(list => setIdentityNames(list.map(i => i.name).reverse())).catch(() => setIdentityNames([]))
-  }, [fetchData])
-
-  // 筛选后的记录
-  const filteredRecords = useMemo(() => {
-    return records.filter(r => {
-      if (
-        searchNickname
-        && !r.customer_nickname.includes(searchNickname)
-        && !(nicknameToName[r.customer_nickname] || "").includes(searchNickname)
-      ) return false
-      if (searchIdentity) {
-        const identity = nicknameToIdentity[r.customer_nickname] || ""
-        if (identity !== searchIdentity) return false
-      }
-      if (searchCreator && r.creator !== searchCreator) return false
-      return true
-    })
-  }, [records, searchNickname, searchIdentity, searchCreator, nicknameToIdentity, nicknameToName])
-
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredRecords, { pageSize: 10 })
 
   const handleClear = () => {
     setSearchNickname("")
@@ -153,6 +125,8 @@ export default function CommunicationRecordsPage() {
 
   return (
     <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+      <LoadError error={loadError} onRetry={fetchData} />
+      <LoadError error={directory.error} onRetry={directory.refresh} />
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; }`}</style>
       {/* 标题栏 */}
       <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
@@ -207,8 +181,8 @@ export default function CommunicationRecordsPage() {
         </div>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
-        ) : filteredRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
+        ) : totalItems === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">{loadError ? "数据尚未加载成功" : "暂无数据"}</span></div>
         ) : (
           <Table style={{ tableLayout: "fixed" }}>
             <TableHeader>

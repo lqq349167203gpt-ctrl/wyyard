@@ -1,9 +1,17 @@
 .note-card {
-  margin-bottom: 20rpx;
-  padding: 24rpx 28rpx;
+  margin-bottom: 28rpx;
+  padding: 28rpx 28rpx;
   border-radius: 12rpx;
   background: #ffffff;
 }
+
+.feedback-field { display: flex; align-items: center; gap: 16rpx; padding: 14rpx 28rpx 0; color: #646a73; font-size: 26rpx; }
+.feedback-label { display: flex; flex-shrink: 0; align-items: center; gap: 8rpx; }
+.feedback-label-dot { width: 12rpx; height: 12rpx; flex-shrink: 0; border-radius: 50%; background: #f4dc84; }
+.feedback-field picker { flex: 0 1 200rpx; min-width: 0; margin-left: auto; }
+.feedback-picker { display: flex; align-items: center; justify-content: space-between; height: 58rpx; box-sizing: border-box; padding: 0 16rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fcfcfc; color: #2b2f36; font-size: 26rpx; }
+.feedback-picker-text { flex: 1; min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-picker-arrow { flex-shrink: 0; width: 0; height: 0; margin-left: 12rpx; border-top: 7rpx solid #9aa1a9; border-right: 7rpx solid transparent; border-left: 7rpx solid transparent; }
 
 .note-header,
 .note-meta,
@@ -34,8 +42,8 @@
 
 /* 分区标签：纯文字，无装饰 */
 .section-label {
-  margin-top: 16rpx;
-  margin-bottom: 8rpx;
+  margin-top: 20rpx;
+  margin-bottom: 12rpx;
 }
 
 .section-label.others {
@@ -94,21 +102,21 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: #4e535a;
-  font-size: 24rpx;
+  color: #8f959e;
+  font-size: 22rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .note-time {
-  margin-left: 16rpx;
   color: #8f959e;
   font-size: 22rpx;
 }
+.note-meta-right { display: flex; align-items: center; gap: 14rpx; margin-left: auto; flex-shrink: 0; color: #8f959e; font-size: 22rpx; text-align: right; }
 
 .note-content {
   display: block;
-  margin-top: 4rpx;
+  margin-top: 10rpx;
   color: #2b2f36;
   font-size: 28rpx;
   line-height: 1.55;
@@ -128,34 +136,46 @@
   position: fixed;
   z-index: 200;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(31, 35, 41, 0.34);
 }
 
 .editor-panel {
   position: fixed;
   z-index: 201;
-  right: 24rpx;
-  bottom: calc(24rpx + env(safe-area-inset-bottom));
-  left: 24rpx;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 82vh;
+  box-sizing: border-box;
   overflow: hidden;
-  border-radius: 12rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: 16rpx 16rpx 0 0;
   background: #ffffff;
 }
 
+.editor-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(82vh - 300rpx);
+}
+
 .editor-header {
-  padding: 26rpx 28rpx;
+  flex-shrink: 0;
+  padding: 26rpx 30rpx;
   border-bottom: 1rpx solid #f0f0f0;
 }
 
 .editor-title {
   color: #1f2329;
-  font-size: 30rpx;
+  font-size: 31rpx;
   font-weight: 500;
 }
 
 .editor-close {
-  color: #8f959e;
-  font-size: 28rpx;
+  color: #3370ff;
+  font-size: 27rpx;
 }
 
 .editor-header-actions,
@@ -220,43 +240,45 @@
 .editor-input {
   box-sizing: border-box;
   width: calc(100% - 56rpx);
-  height: 220rpx;
-  margin: 28rpx;
-  padding: 20rpx;
-  border: 1rpx solid #dee0e3;
+  height: 260rpx;
+  margin: 12rpx 28rpx 20rpx;
+  padding: 18rpx;
+  border: 0;
   border-radius: 8rpx;
+  background: #f5f6f7;
   color: #2b2f36;
-  font-size: 30rpx;
+  font-size: 28rpx;
   line-height: 1.6;
 }
 
 .editor-footer {
-  padding: 0 28rpx 28rpx;
+  flex-shrink: 0;
+  padding: 16rpx 28rpx 26rpx;
+  background: #ffffff;
 }
 
 .editor-hint {
   color: #8f959e;
-  font-size: 24rpx;
+  font-size: 22rpx;
 }
 
 .editor-submit {
-  width: 120rpx;
-  height: 64rpx;
-  margin: 0;
-  padding: 0;
-  border: 0;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 230rpx;
+  height: 72rpx;
+  box-sizing: border-box;
+  margin-left: auto;
   border-radius: 8rpx;
   background: #3370ff;
   color: #ffffff;
-  font-size: 28rpx;
-  line-height: 64rpx;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 1;
 }
 
-.editor-submit::after {
-  border: 0;
-}
-
-.editor-submit[disabled] {
-  background: #c9cdd4;
-  color: #ffffff;
+.editor-submit-disabled {
+  opacity: 0.7;
 }

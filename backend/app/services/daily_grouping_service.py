@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from app.models.daily_grouping import DailyGrouping, DailyGroupingUpsert
-from app.services.storage import load_data, save_data, save_item
 from app.services import visit_service
+from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "daily_groupings.json"
 _groupings: Dict[str, DailyGrouping] = {}
@@ -37,6 +37,30 @@ def get_grouping(date: str) -> Optional[DailyGrouping]:
         if g.date == date:
             return g
     return None
+
+
+def remove_cancelled_customer(date: str, customer_id: str) -> None:
+    """明确取消邀约后移除分组成员；同日仍有有效邀约则保留，不依赖前端可见范围。"""
+    if any(v.customer_id == customer_id and v.visit_date == date and not v.is_deleted and not v.cancelled
+           for v in visit_service._visits.values()):
+        return
+    grouping = get_grouping(date)
+    if not grouping:
+        return
+    changed = False
+    groups = []
+    for group in grouping.groups:
+        if group.leader_id == customer_id or group.deputy_id == customer_id or customer_id in group.member_ids:
+            changed = True
+            group.leader_id = "" if group.leader_id == customer_id else group.leader_id
+            group.deputy_id = "" if group.deputy_id == customer_id else group.deputy_id
+            group.member_ids = [member for member in group.member_ids if member != customer_id]
+        if group.leader_id or group.deputy_id or group.member_ids:
+            groups.append(group)
+    if changed:
+        grouping.groups = groups
+        grouping.updated_at = datetime.now(timezone.utc)
+        _save(grouping.id)
 
 
 def upsert_grouping(data: DailyGroupingUpsert) -> DailyGrouping:

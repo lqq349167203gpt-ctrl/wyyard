@@ -20,24 +20,16 @@ from app.services import (
     communication_record_service,
     customer_service,
     customer_tag_service,
-    emotional_release_service,
     emotional_release_session_service,
-    energy_knot_service,
     energy_knot_session_service,
     follow_up_status_service,
-    group_case_service,
     group_case_session_service,
-    internal_course_service,
     internal_course_session_service,
-    membership_card_service,
-    offline_course_service,
-    oh_card_reading_service,
-    other_project_service,
     project_refund_service,
     system_helper_config_service,
-    tea_seat_fee_service,
     visit_service,
 )
+from app.services.payment_sources import payment_loader
 from app.utils.cn_datetime import TZ
 
 FIELD_LABELS = {
@@ -54,8 +46,8 @@ FIELD_LABELS = {
     "service_teacher": "服务老师",
     "referral_date": "引流日期",
     "created_at": "创建日期",
-    "invitation_dates": "邀约日期",
-    "invitation_created_dates": "邀约创建日期",
+    "invitation_dates": "邀约到店日期",
+    "invitation_created_dates": "发起邀约日期",
     "first_visit_date": "首次到访",
     "last_visit_date": "最近到访",
     "invitation_count": "受邀次数",
@@ -272,15 +264,15 @@ def _item_date(item: Any, *fields: str) -> str:
 def _payment_events() -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     sources = [
-        (membership_card_service.list_cards, "price", "会员卡", "card_type"),
-        (group_case_service.list_cases, "amount", "觉醒游戏", ""),
-        (emotional_release_service.list_releases, "amount", "情绪释放", ""),
-        (energy_knot_service.list_knots, "amount", "能量结", ""),
-        (internal_course_service.list_courses, "price", "内部课程", "course_type"),
-        (offline_course_service.list_courses, "amount", "落地课程", ""),
-        (oh_card_reading_service.list_readings, "amount", "OH卡梳理", ""),
-        (tea_seat_fee_service.list_fees, "amount", "茶位费", ""),
-        (other_project_service.list_projects, "fee", "其他项目", "project_name"),
+        (payment_loader("membership-cards"), "price", "会员卡", "card_type"),
+        (payment_loader("group-cases"), "amount", "觉醒游戏", ""),
+        (payment_loader("emotional-releases"), "amount", "情绪释放", ""),
+        (payment_loader("energy-knots"), "amount", "能量结", ""),
+        (payment_loader("internal-courses"), "price", "内部课程", "course_type"),
+        (payment_loader("offline-courses"), "amount", "落地课程", ""),
+        (payment_loader("oh-card-readings"), "amount", "OH卡梳理", ""),
+        (payment_loader("tea-seat-fees"), "amount", "茶位费", ""),
+        (payment_loader("other-projects"), "fee", "其他项目", "project_name"),
     ]
     for list_items, amount_field, category, product_field in sources:
         for item in list_items():
@@ -1419,7 +1411,7 @@ def _llm_plan(query: str) -> AnalysisPlan | None:
   "conditions": [{{"field": "字段", "operator": "运算符", "value": "值"}}],
   "card_metric": "拆分对比使用的统计指标",
   "card_dimension": "维度或none",
-  "columns": ["nickname", "其他需要展示的字段，最多10项"],
+  "columns": ["nickname", "其他需要展示的字段，最多15项"],
   "sort_by": "排序字段",
   "sort_order": "asc或desc"
 }}
@@ -1462,7 +1454,7 @@ def _date_field_from_query(query: str) -> str:
     # 「邀约创建人」「课表创建人」是人员字段，不能被当成「邀约创建日期」
     if "邀约创建人" in query or "课表创建人" in query:
         return "invitation_dates"
-    if "邀约创建" in query or "创建邀约" in query:
+    if any(word in query for word in ("邀约创建", "创建邀约", "发起邀约", "邀约发起")):
         return "invitation_created_dates"
     if "邀约" in query:
         return "invitation_dates"
@@ -1618,7 +1610,7 @@ def _local_plan(query: str, actor_id: str) -> AnalysisPlan:
     for condition in conditions:
         if condition.field not in columns and condition.field not in {"created_at"}:
             columns.insert(min(len(columns), 5), condition.field)
-    columns = columns[:10]
+    columns = columns[:15]
     sort_by = "referral_date"
     if any(word in normalized_query for word in ["消费最高", "消费最多", "按消费"]):
         sort_by = "total_consumption"

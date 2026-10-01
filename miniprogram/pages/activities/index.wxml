@@ -126,7 +126,6 @@
           </view>
           <view class="card-roster-strip" catchtap="onParticipantsOpen" data-record="{{item}}">
             <text class="card-roster-names">{{item.participantRosterText}}</text>
-            <text class="card-roster-progress" wx:if="{{item.noteProgressText}}">{{item.noteProgressText}}</text>
             <text class="card-roster-entry">名单 ›</text>
           </view>
         </view>

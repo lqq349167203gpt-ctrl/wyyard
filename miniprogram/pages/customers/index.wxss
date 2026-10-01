@@ -1,6 +1,6 @@
 .page {
   min-height: 100vh;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   padding-bottom: 140rpx;
 }
 
@@ -396,6 +396,7 @@
   margin: 0 24rpx;
   overflow: hidden;
   box-sizing: border-box;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .c-row {

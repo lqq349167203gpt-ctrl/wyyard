@@ -16,22 +16,15 @@ from app.services import (
     customer_access_service,
     customer_service,
     customer_tag_service,
-    emotional_release_service,
-    energy_knot_service,
-    group_case_service,
-    internal_course_service,
     membership_card_service,
-    offline_course_service,
-    oh_card_reading_service,
     organization_service,
-    other_project_service,
     position_edit_permission_service,
     project_deduction_service,
-    tea_seat_fee_service,
     upsell_config_service,
     visit_note_service,
     visit_service,
 )
+from app.services.payment_sources import payment_loader
 from app.services.principal_conversion_service import calculate_conversion
 from app.utils.request_roles import get_request_roles
 
@@ -49,15 +42,15 @@ def _collate(text: str) -> str:
         return text
 
 PRODUCTS = (
-    ("membership", "会员卡", membership_card_service.list_cards, "card_type"),
-    ("group_case", "觉醒游戏", group_case_service.list_cases, ""),
-    ("emotional", "情绪释放", emotional_release_service.list_releases, ""),
-    ("energy", "能量结", energy_knot_service.list_knots, ""),
-    ("oh", "OH卡", oh_card_reading_service.list_readings, ""),
-    ("internal", "内部课程", internal_course_service.list_courses, "course_type"),
-    ("other", "其他项目", other_project_service.list_projects, "project_name"),
-    ("tea", "茶位费", tea_seat_fee_service.list_fees, ""),
-    ("offline", "线下课程", offline_course_service.list_courses, "course_name"),
+    ("membership", "会员卡", payment_loader("membership-cards"), "card_type"),
+    ("group_case", "觉醒游戏", payment_loader("group-cases"), ""),
+    ("emotional", "情绪释放", payment_loader("emotional-releases"), ""),
+    ("energy", "能量结", payment_loader("energy-knots"), ""),
+    ("oh", "OH卡", payment_loader("oh-card-readings"), ""),
+    ("internal", "内部课程", payment_loader("internal-courses"), "course_type"),
+    ("other", "其他项目", payment_loader("other-projects"), "project_name"),
+    ("tea", "茶位费", payment_loader("tea-seat-fees"), ""),
+    ("offline", "线下课程", payment_loader("offline-courses"), "course_name"),
 )
 
 
@@ -713,7 +706,9 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         summary.update({"交易笔数": len(ranged_all), "成交人数": len(buyers)})
     # 经营概况：二级拆分（点这些项可以筛选下面的列表）
     breakdown = {}
-    if query.tab == "overview":
+    if query.tab == "overview" or (query.tab == "orders" and query.include_overview):
+        # 明细沿用实际统计边界（结束日期最多到今天），不由前端重新推算。
+        breakdown["record_period"] = {"from": start, "to": end}
         # 引流人存在客户档案上，这里按可见范围取一次客户（只经营概况需要）
         _, customers, _ = scope(request)
         product_labels = {key: label for key, label, _, _ in PRODUCTS}
@@ -906,11 +901,10 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         basic_visits = visit_service.list_basic_visits(referred_ids)
         visit_stats, first_arrival, arrival_details = _traffic_visit_stats(basic_visits, start, end)
         # 参与活动：该客户在统计区间内到场参与的课程/活动场次
-        activity_counts = Counter(
-            event["customer_id"]
-            for event in events
-            if event.get("kind") == "attendance" and start <= event.get("date", "") <= end
-        )
+        activity_keys = defaultdict(list)
+        for event in events:
+            if event.get("kind") == "attendance" and start <= event.get("date", "") <= end:
+                activity_keys[event["customer_id"]].append(event["course_key"])
         # 当日成交：到店当天的成交笔数（含粗门次卡扣卡）
         purchase_counts: Counter = Counter()
         for event in events:
@@ -938,7 +932,8 @@ def analyze(request, query: PrincipalQuery, *, export=False):
             entry["cancel_count"] = bucket.get("cancel", 0)
             entry["no_show_count"] = bucket.get("no_show", 0)
             entry["arrive_count"] = bucket.get("arrive", 0)
-            entry["activity_count"] = activity_counts.get(customer_id, 0)
+            entry["activity_keys"] = activity_keys.get(customer_id, [])
+            entry["activity_count"] = len(entry["activity_keys"])
             arrive_count = bucket.get("arrive", 0)
             first = first_arrival.get(customer_id)
             entry["visit_interval"] = (

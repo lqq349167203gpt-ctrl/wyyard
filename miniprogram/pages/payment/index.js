@@ -166,6 +166,9 @@ function decorateItems(raw, type, organizations) {
       _priceText: formatPrice(price),
       _metaPrimary: buildMetaPrimary(item, type, detail),
       _creator: item.created_by || '',
+      _closerNames: (item.closers || []).map(closer => closer.name).filter(Boolean).join('、') || item.closer_name || '',
+      _agreementStatus: type === 'membership_card' && item.card_type && !['次卡', '体验会员', '粗门次卡'].includes(item.card_type)
+        ? (item.agreement_status === 'signed' ? '已签' : '未签') : '',
       _effective: (isOhCard || isTeaSeat) ? '' : formatDate(item.effective_date),
       _expiry: (isOhCard || isTeaSeat) ? '' : expiry,
       _diagnosisTeacher: isOhCard ? (item.diagnosis_teacher || '') : '',

@@ -1,4 +1,3 @@
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Iterable
@@ -8,11 +7,12 @@ from app.models.activity_participant_note import (
     ActivityParticipantNoteCategory,
     ActivityParticipantNoteSource,
 )
+from app.services.daily_customer_note_service import note_lock
 from app.services.storage import load_data, save_item
 
 FILENAME = "activity_participant_notes.json"
 _notes: dict[str, ActivityParticipantNote] = {}
-_note_lock = threading.RLock()
+_note_lock = note_lock
 
 
 def _load() -> None:
@@ -37,26 +37,25 @@ def list_notes(
     customer_ids: Iterable[str] = (),
 ) -> list[ActivityParticipantNote]:
     ids = {customer_id for customer_id in customer_ids if customer_id}
+    from app.services import daily_customer_note_service
+
     return sorted(
-        (
-            note
-            for note in _notes.values()
-            if note.activity_source == activity_source
-            and note.session_id == session_id
-            and not note.is_deleted
-            and (not ids or note.customer_id in ids)
-        ),
+        daily_customer_note_service.for_course(activity_source, session_id, ids),
         key=lambda note: (note.updated_at, note.id),
         reverse=True,
     )
 
 
 def list_customer_notes(customer_id: str) -> list[ActivityParticipantNote]:
+    from app.services import visit_service
+
+    visit_days = {v.visit_date for v in visit_service.list_basic_visits({customer_id}) if not v.cancelled}
     return sorted(
         (
             note
             for note in _notes.values()
             if note.customer_id == customer_id and not note.is_deleted
+            and note.activity_date not in visit_days
         ),
         key=lambda note: (note.activity_date, note.updated_at, note.id),
         reverse=True,
@@ -91,6 +90,8 @@ def update_note_content(
     content: str,
     actor_id: str = "",
     actor_name: str = "",
+    feedback_person_id: str | None = None,
+    feedback_person: str | None = None,
 ) -> ActivityParticipantNote:
     """客户跟进页里直接改自己填过的内容；不是本人填的不能改。"""
     normalized = content.strip()
@@ -102,7 +103,15 @@ def update_note_content(
             raise LookupError("记录不存在")
         if not can_manage_note(note, actor_id, actor_name):
             raise PermissionError("只能修改自己填写的记录")
+        if note_id.startswith("visit-note|"):
+            from app.services import visit_note_service
+
+            visit_note_service.update_note(note_id.split("|")[-1], normalized)
+            return get_note(note_id)
         note.content = normalized
+        if feedback_person_id is not None or feedback_person is not None:
+            note.feedback_person_id = (feedback_person_id or "").strip()
+            note.feedback_person = (feedback_person or "").strip() or note.created_by
         note.updated_at = datetime.now(timezone.utc)
         _notes[note.id] = note
         _save(note)
@@ -110,6 +119,10 @@ def update_note_content(
 
 
 def get_note(note_id: str) -> ActivityParticipantNote | None:
+    if note_id.startswith("visit-note|"):
+        from app.services import daily_customer_note_service
+
+        return daily_customer_note_service.resolve_course_note(note_id)
     note = _notes.get(note_id)
     return note if note and not note.is_deleted else None
 
@@ -146,16 +159,19 @@ def upsert_note(
         existing = next(
             (
                 note
-                for note in _notes.values()
-                if note.activity_source == activity_source
-                and note.session_id == session_id
-                and note.customer_id == customer_id
+                for note in list_notes(activity_source, session_id, {customer_id})
+                if note.customer_id == customer_id
                 and note.category == category
                 and not note.is_deleted
                 and can_manage_note(note, actor_id, actor_name)
             ),
             None,
         )
+        if existing:
+            return update_note_content(
+                note_id=existing.id, content=normalized_content,
+                actor_id=actor_id, actor_name=actor_name,
+            )
         note = ActivityParticipantNote(
             id=existing.id if existing else str(uuid.uuid4())[:12],
             activity_source=activity_source,
@@ -178,6 +194,12 @@ def upsert_note(
 
 
 def delete_note(note_id: str) -> bool:
+    if note_id.startswith("visit-note|"):
+        from app.services import visit_note_service
+
+        if not get_note(note_id):
+            return False
+        return visit_note_service.delete_note(note_id.split("|")[-1])
     with _note_lock:
         note = get_note(note_id)
         if not note:

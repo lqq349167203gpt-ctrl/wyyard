@@ -1,12 +1,12 @@
-import { useEffect, useState, useMemo, startTransition } from "react"
+import { useEffect, useState, useMemo, useRef, startTransition } from "react"
 import { ChevronRight, ChevronLeft, ChevronUp, ChevronDown } from "lucide-react"
-import { visitApi, classRecordApi, customerApi, memberIdentityApi, membershipCardApi, groupCaseApi, emotionalReleaseApi, ohCardReadingApi, energyKnotApi, internalCourseApi, otherProjectApi, projectDeductionApi, customerDetailApi, groupCaseSessionApi, emotionalReleaseSessionApi, energyKnotSessionApi, type VisitRecord, type ClassRecord, type Customer, type MemberIdentity, type CustomerDetail, type ActivityRecord } from "@/lib/api"
+import { visitApi, dailyReportApi, customerDetailApi, type VisitRecord, type DailyReportActivity, type CustomerLight as Customer, type MemberIdentity, type CustomerDetail, type ActivityRecord } from "@/lib/api"
 import { Download } from "lucide-react"
 import { CalendarDatePicker } from "@/components/calendar-date-picker"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { useOrganizations } from "@/hooks/use-organizations"
-import { teaSeatFeeApi, offlineCourseApi } from "@/lib/api"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
 
 const today = new Date().toLocaleDateString("sv-SE")
 
@@ -29,6 +29,8 @@ function EmptyDash() {
 }
 
 export default function DailyReportPage() {
+  const permissions = useEditPermissions()
+  const canViewTransactions = permissions.customer_access.transaction_access === "detail"
   const { organizations } = useOrganizations()
   const organizationName = (id: string) => organizations.find(item => item.id === id)?.name || "-"
   const [detailDate, setDetailDate] = useState(() => {
@@ -43,7 +45,17 @@ export default function DailyReportPage() {
   const [visitCounts, setVisitCounts] = useState<Record<string, number>>({})
   const [visits, setVisits] = useState<VisitRecord[]>([])
   const [loading, setLoading] = useState(false)
-  const [activities, setActivities] = useState<ClassRecord[]>([])
+  const [loadError, setLoadError] = useState("")
+  const [countsError, setCountsError] = useState("")
+  const [loadedDate, setLoadedDate] = useState("")
+  const [financeLoadedDate, setFinanceLoadedDate] = useState("")
+  const [financeLoading, setFinanceLoading] = useState(false)
+  const [financeError, setFinanceError] = useState("")
+  const financeReady = canViewTransactions && financeLoadedDate === detailDate && !financeLoading && !financeError
+  const coreReady = loadedDate === detailDate && !loading && !loadError
+  const reportReady = coreReady && (!canViewTransactions || financeReady)
+  const [reload, setReload] = useState(0)
+  const [activities, setActivities] = useState<DailyReportActivity[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [memberIdentities, setMemberIdentities] = useState<MemberIdentity[]>([])
   const [viewMode, setViewMode] = useState<"detail" | "summary">("summary")
@@ -69,9 +81,10 @@ export default function DailyReportPage() {
   const [financeRows, setFinanceRows] = useState<FinanceRow[]>([])
   const transactionCounts = useMemo(() => {
     const counts: Record<string, number> = {}
+    if (!financeReady) return counts
     financeRows.forEach(row => { counts[row.customer_id] = (counts[row.customer_id] || 0) + 1 })
     return counts
-  }, [financeRows])
+  }, [financeRows, financeReady])
 
   interface DeductionRow {
     id: string
@@ -92,6 +105,14 @@ export default function DailyReportPage() {
   const [detailNickname, setDetailNickname] = useState("")
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState("")
+  const detailSequence = useRef(0)
+  useEffect(() => {
+    detailSequence.current++
+    setDetailOpen(false)
+    return () => { detailSequence.current++ }
+  }, [detailDate])
+  const closeDetail = () => { detailSequence.current++; setDetailOpen(false) }
   const [detailExpanded, setDetailExpanded] = useState<Set<string>>(new Set())
   const [detailOverflow, setDetailOverflow] = useState<Set<string>>(new Set())
 
@@ -123,6 +144,9 @@ export default function DailyReportPage() {
   const [selectedPaymentCustomerId, setSelectedPaymentCustomerId] = useState("")
 
   const openDetail = async (type: "visit" | "invited" | "cancelled" | "activity_all" | "activity_today" | "payment", customerId: string, nickname: string) => {
+    const sequence = ++detailSequence.current
+    setDetailData(null)
+    setDetailError("")
     setDetailType(type)
     if (type === "payment") setSelectedPaymentCustomerId(customerId)
     setDetailNickname(nickname)
@@ -136,15 +160,17 @@ export default function DailyReportPage() {
     }
     try {
       const data = await customerDetailApi.get(customerId, type === "activity_today" ? detailDate : undefined)
+      if (sequence !== detailSequence.current) return
       setDetailData(data)
-    } catch {
-      setDetailData(null)
+    } catch (error) {
+      if (sequence === detailSequence.current) setDetailError(error instanceof Error ? error.message : "详情加载失败，请重试")
     } finally {
-      setDetailLoading(false)
+      if (sequence === detailSequence.current) setDetailLoading(false)
     }
   }
 
   const handleExport = () => {
+    if (!reportReady) return
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     const style = `<style>
       body{font-family:Microsoft YaHei,sans-serif;font-size:12px;color:#1f2329}
@@ -171,7 +197,7 @@ export default function DailyReportPage() {
         <td>${v.arrived_count}次</td>
         <td>${v.activity_count}场</td>
         <td>${todayActivityCountMap[v.customer_id] || 0}场</td>
-        <td>${!hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
+        <td>${!financeReady ? "-" : !hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
         <td class="wrap">${esc(v.needs || "-")}</td>
         <td class="wrap">${esc(v.feedback || v.experience || "-")}</td>
         <td class="wrap">${esc(v.healing_notes || "-")}</td>
@@ -186,7 +212,7 @@ export default function DailyReportPage() {
     html += `<tr class="section"><td colspan="7">当日活动（${activities.length}场）</td></tr>`
     html += `<tr><th>活动名称</th><th>活动类型</th><th>时间</th><th>老师</th><th>老人名单</th><th>新人名单</th><th>参与人数</th></tr>`
     for (const a of activities) {
-      const teacherNames = (a.teacher_ids || []).map(id => customers.find(c => c.id === id)?.nickname || "").filter(Boolean).join("、")
+      const teacherNames = a.teacher_names.join("、")
       const allMemberIds = [...(a.participant_ids || []), ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))]
       const visibleCustomerIds = new Set(customers.map(customer => customer.id))
       const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id) && visibleCustomerIds.has(id))
@@ -211,6 +237,7 @@ export default function DailyReportPage() {
     }
     html += `</table><br>`
     // 第三部分：当日财务报表
+    if (canViewTransactions) {
     html += `<table><colgroup><col width="60"><col width="80"><col width="70"><col width="100"><col width="60"><col width="80"><col width="80"><col width="70"><col width="70"><col width="60"><col width="100"></colgroup>`
     html += `<tr class="section"><td colspan="10">当日财务报表</td></tr>`
     for (const r of financeRows) {
@@ -245,6 +272,7 @@ export default function DailyReportPage() {
       }
       html += `</table>`
     }
+    }
     html += `</body></html>`
     const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -261,6 +289,22 @@ export default function DailyReportPage() {
       setSortDir("asc")
     }
   }
+
+  // 先计算当天活动数，供下面的排序读取，避免切到「今日」排序时读到未初始化变量。
+  const todayActivityCountMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    const visibleCustomerIds = new Set(customers.map(customer => customer.id))
+    for (const a of activities) {
+      const allIds = [
+        ...(a.participant_ids || []),
+        ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
+      ]
+      for (const id of [...new Set(allIds)].filter(id => visibleCustomerIds.has(id))) {
+        map[id] = (map[id] || 0) + 1
+      }
+    }
+    return map
+  }, [activities, customers])
 
   const sortedVisits = useMemo(() => {
     const sorted = [...visits].filter(v => v.nickname).sort((a, b) => {
@@ -284,23 +328,7 @@ export default function DailyReportPage() {
       return dir === "asc" ? (va as number) - (vb as number) : (vb as number) - (va as number)
     })
     return sorted
-  }, [visits, sortField, sortDir, transactionCounts])
-
-  // 计算每个客户当日参与的活动场数
-  const todayActivityCountMap = useMemo(() => {
-    const map: Record<string, number> = {}
-    const visibleCustomerIds = new Set(customers.map(customer => customer.id))
-    for (const a of activities) {
-      const allIds = [
-        ...(a.participant_ids || []),
-        ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
-      ]
-      for (const id of [...new Set(allIds)].filter(id => visibleCustomerIds.has(id))) {
-        map[id] = (map[id] || 0) + 1
-      }
-    }
-    return map
-  }, [activities, customers])
+  }, [visits, sortField, sortDir, transactionCounts, todayActivityCountMap])
 
   const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
@@ -313,51 +341,47 @@ export default function DailyReportPage() {
 
   // 加载日期范围内的到场人数
   useEffect(() => {
+    let current = true
     const endDate = formatDate(addDays(new Date(dateRangeStart), 20))
+    setCountsError("")
     visitApi.counts({ startDate: dateRangeStart, endDate })
-      .then(setVisitCounts)
-      .catch(() => {})
-  }, [dateRangeStart])
-
-  // 加载当日邀约数据
-  useEffect(() => {
-    setLoading(true)
-    visitApi.list(detailDate)
-      .then((data) => setVisits(data))
-      .catch(() => setVisits([]))
-      .finally(() => setLoading(false))
-  }, [detailDate])
-
-  // 加载当日活动、客户、会员身份
-  useEffect(() => {
-    classRecordApi.list(detailDate).then(setActivities).catch(() => setActivities([]))
-  }, [detailDate])
-  useEffect(() => {
-    customerApi.list().then(setCustomers).catch(() => setCustomers([]))
-    memberIdentityApi.list().then(setMemberIdentities).catch(() => setMemberIdentities([]))
-  }, [])
+      .then(data => { if (current) setVisitCounts(data) })
+      .catch(() => { if (current) { setVisitCounts({}); setCountsError("日期到场人数加载失败") } })
+    return () => { current = false }
+  }, [dateRangeStart, reload])
 
   // 加载当日财务数据
   useEffect(() => {
-    const customerMap: Record<string, Customer> = {}
-    for (const c of customers) customerMap[c.id] = c
-
-    Promise.all([
-      membershipCardApi.list().catch(() => []),
-      groupCaseApi.list().catch(() => []),
-      emotionalReleaseApi.list().catch(() => []),
-      ohCardReadingApi.list().catch(() => []),
-      energyKnotApi.list().catch(() => []),
-      internalCourseApi.list().catch(() => []),
-      otherProjectApi.list().catch(() => []),
-      projectDeductionApi.list().catch(() => []),
-      visitApi.list(detailDate).catch(() => []),
-      groupCaseSessionApi.list(detailDate).catch(() => []),
-      emotionalReleaseSessionApi.list(detailDate).catch(() => []),
-      energyKnotSessionApi.list(detailDate).catch(() => []),
-      teaSeatFeeApi.list().catch(() => []),
-      offlineCourseApi.list().catch(() => []),
-    ]).then(([cards, groups, emotions, ohs, energies, courses, others, deductions, todayVisits, gcsSessions, ersSessions, eksSessions, teaFees, offlineCourses]) => {
+    let current = true
+    setLoading(true)
+    setLoadError("")
+    setFinanceError("")
+    setFinanceLoading(canViewTransactions)
+    setFinanceRows([])
+    setDeductionRows([])
+    setHasCardSet(new Set())
+    // 普通报表与交易明细分开提交：交易无权限/失败不阻塞已有权查看的内容。
+    const corePromise = dailyReportApi.read(detailDate)
+    corePromise.then(({ visits: todayVisits, customers, activities, identities, date }) => {
+      if (!current) return
+      setCustomers(customers)
+      setActivities(activities)
+      setVisits(todayVisits)
+      setMemberIdentities(identities)
+      setLoadedDate(date)
+    }).catch(error => {
+      if (current) setLoadError(error instanceof Error ? error.message : "报表加载失败")
+    }).finally(() => { if (current) setLoading(false) })
+    if (!canViewTransactions) return () => { current = false }
+    Promise.all([dailyReportApi.finance(detailDate), corePromise]).then(([finance, { customers, dashboard }]) => {
+      const { sources, sessions, deductions } = finance
+      const cards = sources["membership-cards"], groups = sources["group-cases"], emotions = sources["emotional-releases"]
+      const ohs = sources["oh-card-readings"], energies = sources["energy-knots"], courses = sources["internal-courses"]
+      const others = sources["other-projects"], teaFees = sources["tea-seat-fees"], offlineCourses = sources["offline-courses"]
+      const gcsSessions = sessions.gcs, ersSessions = sessions.ers, eksSessions = sessions.eks
+      if (!current) return
+      const customerMap: Record<string, Customer> = {}
+      for (const c of customers) customerMap[c.id] = c
       // 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
       const manualDeductionMap = new Map<string, { customer_id: string; nickname: string; project_type: string; project_id: string; project_name: string; count: number; remaining_after: number | null }>()
       for (const d of deductions as any[]) {
@@ -380,7 +404,7 @@ export default function DailyReportPage() {
       }
       // 会员卡活动销卡：class_records 所有参与者
       const activityDeductionMap: Record<string, number> = {}
-      for (const a of activities) {
+      for (const a of dashboard.class_records) {
         if (a.is_public_welfare) continue
         const allIds = [
           ...(a.participant_ids || []),
@@ -519,7 +543,6 @@ export default function DailyReportPage() {
       for (const item of others as any[]) addItem(item, "other")
       for (const item of teaFees as any[]) addItem(item, "tea_seat_fee")
       for (const item of offlineCourses as any[]) addItem(item, "offline_course")
-      setFinanceRows(rows)
 
       // 构建当日销卡数据
       // 客户→会员卡映射
@@ -537,7 +560,6 @@ export default function DailyReportPage() {
           cardSet.add(c.customer_id)
         }
       }
-      setHasCardSet(cardSet)
       // 内部课程客户 ID 集合
       const courseCustomerIds = new Set<string>()
       for (const c of courses as any[]) {
@@ -636,12 +658,22 @@ export default function DailyReportPage() {
           })
         }
       }
+      setFinanceRows(rows)
+      setHasCardSet(cardSet)
       setDeductionRows(dRows)
-    })
-  }, [detailDate, customers, activities])
+      setFinanceLoadedDate(detailDate)
+    }).catch(error => {
+      if (current) setFinanceError(error instanceof Error ? error.message : "交易数据加载失败")
+    }).finally(() => { if (current) setFinanceLoading(false) })
+    return () => { current = false }
+  }, [detailDate, reload, canViewTransactions])
 
   return (
     <div className="px-6 pt-4 pb-6 min-w-0 overflow-auto" style={{ height: 'calc(100vh - 48px)' }}>
+      {(loadError || countsError || financeError) && <div role="alert" className="mb-3 text-sm text-red-600">
+        {[loadError, countsError, financeError].filter(Boolean).join("；")}（数据未更新）
+        <button className="ml-3 text-[#3370ff]" onClick={() => setReload(n => n + 1)}>重试</button>
+      </div>}
 
       {/* 顶部：日期选择 */}
       <div className="border-b-[0.5px] border-[#f0f1f2]">
@@ -687,10 +719,11 @@ export default function DailyReportPage() {
       {/* 第一部分：当日客户信息 */}
       <div className="min-w-0 mt-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-[13px] font-medium text-[#1f2329]">当日客户<span className="text-[#8f959e] font-normal">（{sortedVisits.length}人）</span></span>
+          <span className="text-[13px] font-medium text-[#1f2329]">当日客户{coreReady && <span className="text-[#8f959e] font-normal">（{sortedVisits.length}人）</span>}</span>
           <button
-            className="h-6 ml-auto flex items-center gap-0.5 px-2 rounded border border-[#e8eaed] hover:bg-[#f0f0f0] text-[11px] text-[#8f959e]"
+            className="h-6 ml-auto flex items-center gap-0.5 px-2 rounded border border-[#e8eaed] hover:bg-[#f0f0f0] text-[11px] text-[#8f959e] disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleExport}
+            disabled={!reportReady}
           >
             <Download className="h-3 w-3" />
             导出
@@ -703,10 +736,10 @@ export default function DailyReportPage() {
             {viewMode === "detail" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
         </div>
-        {loading ? (
-          <div className="text-[12px] text-[#8f959e] py-8 text-center">加载中...</div>
+        {!coreReady ? (
+          <div className="text-[12px] text-[#8f959e] py-8 text-center">{loadError ? "邀约数据尚未加载成功" : "加载中..."}</div>
         ) : visits.length === 0 ? (
-          <div className="text-[12px] text-[#8f959e] py-8 text-center">当日无邀约记录</div>
+          <div className="text-[12px] text-[#8f959e] py-8 text-center">{loadError ? "邀约数据尚未加载成功" : "当日无邀约记录"}</div>
         ) : (
           <div className="overflow-x-auto scrollbar-visible">
             <table className="text-[11px] w-full" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
@@ -742,7 +775,7 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("visit", v.customer_id, v.nickname)}>{v.arrived_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_all", v.customer_id, v.nickname)}>{v.activity_count}场</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
-                    <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
+                    <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!financeReady ? <EmptyDash /> : !hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || v.experience || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.healing_notes || <span className="text-[#c9cdd4]">-</span>}</td>
@@ -765,8 +798,10 @@ export default function DailyReportPage() {
 
       {/* 第二部分：当日活动列表 */}
       <div className="min-w-0 mt-4">
-        <div className="text-[13px] font-medium text-[#1f2329] mb-3">当日活动<span className="text-[#8f959e] font-normal">（{activities.length}场）</span></div>
-        {activities.length === 0 ? (
+        <div className="text-[13px] font-medium text-[#1f2329] mb-3">当日活动{coreReady && <span className="text-[#8f959e] font-normal">（{activities.length}场）</span>}</div>
+        {!coreReady ? (
+          <div className="text-[12px] text-[#8f959e] py-8 text-center">{loadError ? "活动数据尚未加载成功" : "加载中..."}</div>
+        ) : activities.length === 0 ? (
           <div className="text-[12px] text-[#8f959e] py-8 text-center">当日无活动</div>
         ) : (
           <div className="overflow-x-auto scrollbar-visible">
@@ -784,7 +819,7 @@ export default function DailyReportPage() {
               </thead>
               <tbody>
                 {activities.map((a, i) => {
-                  const teacherNames = (a.teacher_ids || []).map(id => customers.find(c => c.id === id)?.nickname || "").filter(Boolean).join("、")
+                  const teacherNames = a.teacher_names.join("、")
                   const allMemberIds = [
                     ...(a.participant_ids || []),
                     ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
@@ -824,7 +859,9 @@ export default function DailyReportPage() {
       {/* 第三部分：当日财务报表 */}
       <div className="min-w-0 mt-4">
         <div className="text-[13px] font-medium text-[#1f2329] mb-3">当日财务报表</div>
-        {financeRows.length === 0 ? (
+        {!financeReady ? (
+          <div className="text-[12px] text-[#8f959e] py-8 text-center">{!canViewTransactions ? "无交易明细查看权限" : financeError ? "交易数据尚未加载成功" : "加载中..."}</div>
+        ) : financeRows.length === 0 ? (
           <div className="text-[12px] text-[#8f959e] py-8 text-center">当日无财务记录</div>
         ) : (
           <div className="overflow-x-auto scrollbar-visible">
@@ -871,7 +908,9 @@ export default function DailyReportPage() {
       {/* 第四部分：当日销卡 */}
       <div className="min-w-0 mt-4">
         <div className="text-[13px] font-medium text-[#1f2329] mb-3">当日销卡</div>
-        {deductionRows.length === 0 ? (
+        {!financeReady ? (
+          <div className="text-[12px] text-[#8f959e] py-8 text-center">{!canViewTransactions ? "无交易明细查看权限" : financeError ? "销卡数据尚未加载成功" : "加载中..."}</div>
+        ) : deductionRows.length === 0 ? (
           <div className="text-[12px] text-[#8f959e] py-8 text-center">当日无销卡记录</div>
         ) : (
           <div className="overflow-x-auto scrollbar-visible">
@@ -902,7 +941,7 @@ export default function DailyReportPage() {
       </div>
 
       {/* 详情弹窗 */}
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+      <Dialog open={detailOpen} onOpenChange={open => { if (!open) closeDetail() }}>
         <DialogContent className="max-w-[912px] max-h-[70vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="text-[14px]">
@@ -911,6 +950,8 @@ export default function DailyReportPage() {
           </DialogHeader>
           {detailLoading ? (
             <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">加载中...</div>
+          ) : detailError ? (
+            <div role="alert" className="px-4 py-8 text-center text-red-600 text-[12px]">{detailError}</div>
           ) : !detailData && detailType !== "payment" ? (
             <div className="px-4 py-8 text-center text-[#8f959e] text-[12px]">暂无数据</div>
           ) : detailType === "visit" ? (() => {

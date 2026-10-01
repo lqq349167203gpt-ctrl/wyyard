@@ -22,12 +22,12 @@ from app.services import (
     internal_course_service,
     member_identity_service,
     membership_card_service,
-    offline_course_service,
     oh_card_reading_service,
     other_project_service,
     project_deduction_service,
     project_refund_service,
     tea_seat_fee_service,
+    visit_service,
 )
 from app.services.chat_parser import generate_tags, parse_chat_log
 from app.services.excel_parser import parse_excel
@@ -101,14 +101,10 @@ def _build_transaction_counts() -> dict[str, int]:
     """与客户详情交易记录一致：每条交易记一笔，包含零金额及粗门抵扣记录。"""
     from collections import Counter
 
+    from app.services.payment_sources import payment_record_groups
+
     counts = Counter()
-    for records in (
-        membership_card_service.list_cards(), group_case_service.list_cases(),
-        emotional_release_service.list_releases(), energy_knot_service.list_knots(),
-        internal_course_service.list_courses(), oh_card_reading_service.list_readings(),
-        offline_course_service.list_courses(), tea_seat_fee_service.list_fees(),
-        other_project_service.list_projects(),
-    ):
+    for records in payment_record_groups():
         counts.update(record.customer_id for record in records)
     counts.update(
         record.customer_id
@@ -134,12 +130,11 @@ def _customer_list_base(customer) -> dict:
     return {key: getattr(customer, key, None) for key in _SLIM_FIELDS}
 
 
-def _build_enriched_items(customers) -> list[dict]:
-    """批量构建客户列表，一次性扫描所有项目，避免 N*7 次全表扫描"""
+def _build_payment_totals() -> dict[str, float]:
+    """保留历史金额口径；仅需要金额的调用方才计算。"""
     from collections import defaultdict
 
     payment_map: dict[str, float] = defaultdict(float)
-    transaction_counts = _build_transaction_counts()
 
     # 会员卡（作废卡仍计入消费总额，退费由 refund 记录扣除）
     for c in membership_card_service.list_cards():
@@ -169,17 +164,27 @@ def _build_enriched_items(customers) -> list[dict]:
     for r in project_refund_service.list_refunds():
         payment_map[r.customer_id] -= r.refund_amount
 
-    remaining_map = membership_card_service.list_current_card_remaining({c.id for c in customers})
+    return payment_map
+
+
+def _build_enriched_items(customers, *, list_view: bool = False, include_payment: bool = False) -> list[dict]:
+    """PC 客户列表不计算未展示的金额和卡次；其他调用方保持原有返回。"""
+    transaction_counts = _build_transaction_counts()
+    payment_map = _build_payment_totals() if not list_view or include_payment else {}
+
+    remaining_map = membership_card_service.list_current_card_remaining({c.id for c in customers}) if not list_view else {}
     visits = customer_visit_summary({c.id for c in customers})
     items = []
     for c in customers:
         data = _customer_list_base(c)
         data["visit_count"] = visits[c.id][0]
         data["activity_count"] = _count_customer_activities(c.id)
-        data["total_payment"] = max(payment_map.get(c.id, 0), 0)
+        if not list_view or include_payment:
+            data["total_payment"] = max(payment_map.get(c.id, 0), 0)
         data["transaction_count"] = transaction_counts.get(c.id, 0)
         data["last_visit_date"] = visits[c.id][1]
-        data["card_remaining"] = remaining_map.get(c.id)
+        if not list_view:
+            data["card_remaining"] = remaining_map.get(c.id)
         items.append(data)
     return items
 
@@ -242,6 +247,7 @@ async def list_customers(
     last_visit_days_max: int | None = Query(None, ge=0),
     sort_by: str | None = Query(None),
     sort_order: str | None = Query(None),
+    list_view: bool = Query(False),
 ):
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
     customers_by_id = {customer.id: customer for customer in customers}
@@ -284,8 +290,9 @@ async def list_customers(
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         items = [item for item in items if item["id"] in matched_customer_ids]
     needs_enrichment_for_sort = sort_by in {"visit_count", "activity_count", "total_payment", "transaction_count", "last_visit_date"}
+    enrichment_options = {"list_view": True, "include_payment": sort_by == "total_payment"} if list_view else {}
     if needs_enrichment_for_sort:
-        items = _build_enriched_items([customers_by_id[item["id"]] for item in items])
+        items = _build_enriched_items([customers_by_id[item["id"]] for item in items], **enrichment_options)
     if last_visit_days_min is not None or last_visit_days_max is not None:
         if not needs_enrichment_for_sort:
             visit_summary = customer_visit_summary({item["id"] for item in items})
@@ -325,7 +332,7 @@ async def list_customers(
     if paginated is not None:
         items = paginated["items"]
     if not needs_enrichment_for_sort:
-        items = _build_enriched_items([customers_by_id[item["id"]] for item in items])
+        items = _build_enriched_items([customers_by_id[item["id"]] for item in items], **enrichment_options)
         for item in items:
             item["customer_tags"] = visible_tags.get(item["id"], [])
 
@@ -372,6 +379,10 @@ async def create_customer(data: CustomerCreate, request: Request):
 async def list_customers_light(request: Request):
     """轻量端点：只返回常用字段，供人员到场/引流记录等页面使用"""
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
+    visit_days: dict[str, set[str]] = {}
+    for visit in visit_service.list_basic_visits({c.id for c in customers}):
+        if visit.arrived:
+            visit_days.setdefault(visit.customer_id, set()).add(visit.visit_date)
     return [
         {
             "id": c.id,
@@ -379,6 +390,7 @@ async def list_customers_light(request: Request):
             "name": c.name or "",
             "gender": c.gender or "",
             "member_type": c.member_type or "",
+            "visit_count": len(visit_days.get(c.id, set())),
             "positions": c.positions or [],
             "created_at": c.created_at.isoformat() if c.created_at else "",
             "traffic_source": c.traffic_source or "",

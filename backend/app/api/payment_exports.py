@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.services import (
@@ -11,11 +11,41 @@ from app.services import (
     payment_export_service,
     position_permission_service,
 )
+from app.utils.pagination import paginate
 from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/payment-exports", tags=["payment-exports"])
 
 ExportRangeType = Literal["day", "month", "year", "custom"]
+
+
+@router.get("/records")
+def list_payment_records(
+    request: Request, page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100),
+    nickname: str = "", closer_name: str = "",
+):
+    """全部类型统一分页；筛选及余量仍沿用各项目的权限和业务计算。"""
+    from app.services.payment_sources import fill_effective_remaining
+
+    customer_access_service.require_transaction_access(request, detail=True)
+    visible_ids = customer_access_service.visible_customer_ids(request, customer_service.list_all_customers())
+    items = []
+    for project_type, _, loader in payment_export_service.PROJECT_SOURCES:
+        for record in loader():
+            if record.customer_id not in visible_ids:
+                continue
+            item = record.model_dump(mode="json")
+            if nickname and nickname.lower() not in (item.get("nickname") or "").lower():
+                continue
+            closer_names = [item.get("closer_name") or "", *(c.get("name") or "" for c in item.get("closers") or [])]
+            if closer_name and not any(closer_name.lower() in name.lower() for name in closer_names):
+                continue
+            items.append({"type": project_type, "record": item})
+    items.sort(key=lambda item: (item["record"].get("deal_date") or "", item["record"].get("created_at") or "", item["record"]["id"]), reverse=True)
+    result = paginate(items, page, page_size)
+    for item in result["items"]:
+        fill_effective_remaining(item["record"], item["type"])
+    return result
 
 
 def _resolve_export_range(

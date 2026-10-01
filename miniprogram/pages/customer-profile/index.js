@@ -1,5 +1,15 @@
 const { customerApi, customerTagApi, communicationRecordApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
+function visitNoteRows(visit, category) {
+  return (visit.visit_notes || [])
+    .filter(note => note.category === category && note.content)
+    .map(note => ({
+      id: note.id,
+      feedbackText: note.feedback_person || note.created_by || '未知',
+      creatorText: note.created_by || '未知',
+      content: note.content,
+    }))
+}
 
 const DETAIL_PAYMENT_PROJECT_TYPES = [
   PAYMENT_PROJECT_TYPES[0],
@@ -219,9 +229,10 @@ Page({
       // 跟进点
       const healingRecords = visitRecords.map(v => {
         const hr = (detail.healing_records || []).find(r => r.date === v.visit_date)
-        const ownVisitNeed = (v.visit_notes || []).find(note => note.category === 'visit_need')
         return Object.assign({}, v, {
-          needs: ownVisitNeed ? ownVisitNeed.content : '',
+          needNotes: visitNoteRows(v, 'visit_need'),
+          infoNotes: visitNoteRows(v, 'customer_info'),
+          followNotes: visitNoteRows(v, 'follow_up'),
           growth_record: (hr && hr.growth_record) || v.healing_notes || '',
         })
       })
@@ -299,7 +310,6 @@ Page({
       (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进', count: healingRecords.length + courseParticipantNotes.length },
       (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: commRecords.length },
       (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
-      (!access || access.detail_tabs.customer_followups) && { key: 'followups', label: '回访', count: activityFollowups.length },
       (!access || access.detail_tabs.card_statistics) && { key: 'purchase', label: '卡次', count: purchaseSummary.length },
       (!access || access.detail_tabs.offline_courses) && { key: 'offline_course', label: '课程', count: offlineCourseRecords.length },
       (!access || access.transaction_access === 'detail') && { key: 'payment', label: '交易', count: paymentRecords.length },

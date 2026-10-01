@@ -9,6 +9,8 @@ import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { customerApi, customerTagApi, followUpStatusApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag, type FollowUpStatusConfig } from "@/lib/api"
 import { CustomerTagField } from "@/components/customer-tag-editor"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
@@ -74,13 +76,13 @@ export default function CustomerFormPage() {
     ...emptyCustomer,
     referral_date: id ? "" : getTodayDate(),
   }))
-  const [customers, setCustomers] = useState<CustomerLight[]>([])
+  const { data: customers, error: directoryError, refresh: refreshDirectory } = useReadResource<CustomerLight[]>(() => customerApi.light(), [])
   const [referrerError, setReferrerError] = useState("")
   const [referrerHandlerError, setReferrerHandlerError] = useState("")
   const [loading, setLoading] = useState(false)
   const [entityId, setEntityId] = useState<string | null>(id || null)
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
-  const [followUpStatuses, setFollowUpStatuses] = useState<FollowUpStatusConfig[]>([])
+  const { data: followUpStatuses, error: statusError, refresh: refreshStatuses } = useReadResource<FollowUpStatusConfig[]>(() => followUpStatusApi.list(), [])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [tagsLoaded, setTagsLoaded] = useState(false)
   const [tagsLoading, setTagsLoading] = useState(true)
@@ -92,12 +94,6 @@ export default function CustomerFormPage() {
   const [copiedContact, setCopiedContact] = useState<"phone" | "wechat" | null>(null)
   const initializedRef = useRef(false)
   const initialTagIdsRef = useRef<string[]>([])
-
-  // 加载客户列表（供搜索输入用）
-  useEffect(() => {
-    customerApi.light(true).then(setCustomers).catch(() => {})
-    followUpStatusApi.list().then(setFollowUpStatuses).catch(() => setFollowUpStatuses([]))
-  }, [])
 
   // 加载草稿或客户数据
   useEffect(() => {
@@ -312,6 +308,8 @@ export default function CustomerFormPage() {
 
       {/* 表单 */}
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 pb-20" {...enterToNext}>
+        <LoadError error={directoryError} onRetry={refreshDirectory} />
+        <LoadError error={statusError} onRetry={refreshStatuses} />
         {/* 基本信息 */}
         <div className="space-y-3">
           <h2 className="text-[13px] font-normal text-[#1f2329]">基本信息</h2>

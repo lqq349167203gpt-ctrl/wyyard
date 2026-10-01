@@ -126,7 +126,7 @@
                 bindtap="onToggleSubtype"
                 data-name="{{item.name}}"
               >
-                <text>{{item.name}}</text>
+                <text>{{item.label || item.name}}</text>
               </view>
             </view>
             <view class="filter-section-empty" wx:if="{{subtypeList.length === 0}}">暂无{{subtypeLabel}}数据</view>
@@ -161,6 +161,10 @@
           <text class="card-status" wx:if="{{item._status}}" style="color: {{item._statusColor}}; background-color: {{item._statusBg}}">{{item._status}}</text>
         </view>
         <view class="card-meta"><text class="card-meta-item">成交归属：{{item._organizationName || '—'}}</text></view>
+        <view class="card-agreement-row">
+          <view class="card-closer">成交人：<text class="{{item._closerNames ? '' : 'card-empty'}}">{{item._closerNames || '—'}}</text></view>
+          <view class="card-agreement">协议签订：<text class="{{item._agreementStatus ? '' : 'card-empty'}}">{{item._agreementStatus || '—'}}</text></view>
+        </view>
         <view class="card-meta" wx:if="{{item._metaPrimary || item._creator}}">
           <text class="card-meta-item" wx:if="{{item._metaPrimary}}">{{item._metaPrimary}}</text>
           <text class="card-meta-separator" wx:if="{{item._metaPrimary && item._creator}}">·</text>

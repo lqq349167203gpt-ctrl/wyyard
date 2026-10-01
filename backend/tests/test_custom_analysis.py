@@ -797,6 +797,12 @@ def test_local_parser_recognizes_common_conditions(monkeypatch):
     assert plan.card_dimension == "traffic_source"
 
 
+def test_invitation_date_labels_keep_their_query_meaning():
+    assert custom_analysis_service._date_field_from_query("发起邀约日期在本月") == "invitation_created_dates"
+    assert custom_analysis_service._date_field_from_query("邀约到店日期在本月") == "invitation_dates"
+    assert custom_analysis_service._date_field_from_query("邀约创建日期在本月") == "invitation_created_dates"
+
+
 def test_metadata_endpoint(client):
     response = client.get("/api/custom-analysis/metadata")
     assert response.status_code == 200
@@ -804,7 +810,7 @@ def test_metadata_endpoint(client):
     assert any(item["value"] == "follow_up_status" for item in metadata["fields"])
     assert any(item["value"] == "payment_dates" and item["label"] == "成交日期" for item in metadata["fields"])
     invitation_date = next(item for item in metadata["fields"] if item["value"] == "invitation_dates")
-    assert invitation_date["label"] == "邀约日期"
+    assert invitation_date["label"] == "邀约到店日期"
     assert invitation_date["group"] == "日期信息"
     assert invitation_date["value_type"] == "date"
     assert "between" in invitation_date["operators"]
@@ -819,7 +825,7 @@ def test_metadata_endpoint(client):
     invitation_created_date = next(
         item for item in metadata["fields"] if item["value"] == "invitation_created_dates"
     )
-    assert invitation_created_date["label"] == "邀约创建日期"
+    assert invitation_created_date["label"] == "发起邀约日期"
     assert invitation_created_date["group"] == "日期信息"
     assert invitation_created_date["value_type"] == "date"
     assert any(
@@ -1209,7 +1215,11 @@ def test_analysis_template_plan_update(client):
     assert created.status_code == 200, created.text
     template_id = created.json()["id"]
     try:
-        next_plan = AnalysisPlan(card_dimension="none", row_display_mode="arrival_visits")
+        columns = ["nickname", "name", "gender", "age", "member_type",
+                   "follow_up_status", "customer_tags", "traffic_source", "referrer",
+                   "referrer_handler", "service_teacher", "referral_date", "created_at",
+                   "invitation_dates", "invitation_created_dates"]
+        next_plan = AnalysisPlan(card_dimension="none", row_display_mode="arrival_visits", columns=columns)
         updated = client.patch(f"/api/custom-analysis/templates/{template_id}", json={"plan": next_plan.model_dump(mode="json")})
         assert updated.status_code == 200, updated.text
         assert updated.json()["plan"]["row_display_mode"] == "arrival_visits"
@@ -1217,6 +1227,10 @@ def test_analysis_template_plan_update(client):
 
         reloaded = next(item for item in client.get("/api/custom-analysis/templates").json() if item["id"] == template_id)
         assert reloaded["plan"]["row_display_mode"] == "arrival_visits"
+        assert reloaded["plan"]["columns"] == columns
+        too_many = {**next_plan.model_dump(mode="json"), "columns": columns + ["first_visit_date"]}
+        rejected = client.post("/api/custom-analysis/execute", json={"plan": too_many})
+        assert rejected.status_code == 422
 
         logs = client.get("/api/analysis-logs?record_type=template").json()["items"]
         assert any(

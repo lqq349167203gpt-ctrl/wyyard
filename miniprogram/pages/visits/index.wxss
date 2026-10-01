@@ -1,6 +1,6 @@
 .page {
   min-height: 100vh;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   padding-bottom: 140rpx;
 }
 
@@ -270,10 +270,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48rpx;
+  min-width: 92rpx;
+  height: 56rpx;
   padding: 0 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #dee0e3;
   border-radius: 8rpx;
-  background-color: #f2f3f5;
+  background-color: #ffffff;
   flex-shrink: 0;
 }
 
@@ -295,17 +298,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48rpx;
+  min-width: 92rpx;
+  height: 56rpx;
   padding: 0 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #dee0e3;
   border-radius: 8rpx;
-  background-color: #eef3ff;
+  background-color: #ffffff;
   flex-shrink: 0;
 }
 
 .time-sort-btn text {
-  color: #3370ff;
+  color: #4e535a;
   font-size: 22rpx;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* 连续名单：与客户首页保持“一组一卡、组内分行” */
@@ -329,7 +335,7 @@
 }
 
 .list-heading-title {
-  color: #646a73;
+  color: #33393f;
   font-size: 24rpx;
   font-weight: 500;
   letter-spacing: 1rpx;
@@ -354,6 +360,7 @@
   margin: 0 24rpx 20rpx;
   border-radius: 24rpx;
   background-color: #ffffff;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .visit-items {
@@ -396,17 +403,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48rpx;
+  min-width: 92rpx;
+  height: 56rpx;
   padding: 0 20rpx;
+  box-sizing: border-box;
+  border: 1rpx solid #dee0e3;
   border-radius: 8rpx;
-  background-color: #f2f3f5;
+  background-color: #ffffff;
   flex-shrink: 0;
 }
 
 .export-btn text {
   font-size: 22rpx;
   color: #4e535a;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* 空状态 */

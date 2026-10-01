@@ -38,11 +38,6 @@
       <text class="menu-label">课程记录</text>
       <text class="menu-arrow">›</text>
     </view>
-    <view class="menu-item" bindtap="onCustomerFollowUpsTap" wx:if="{{canCustomerFollowUps}}">
-      <image class="menu-icon" src="{{icons.commRecords}}" mode="aspectFit" />
-      <text class="menu-label">客户跟进</text>
-      <text class="menu-arrow">›</text>
-    </view>
     <view class="menu-item" bindtap="onPrincipalTap" wx:if="{{canPrincipal}}">
       <image class="menu-icon" src="{{icons.dailyReport}}" mode="aspectFit" />
       <text class="menu-label">组织/俱乐部</text>
@@ -64,11 +59,6 @@
     <view class="menu-item" bindtap="onCustomerTagsTap" wx:if="{{canCustomerTags}}">
       <image class="menu-icon" src="{{icons.customerTags}}" mode="aspectFit" />
       <text class="menu-label">客户标签</text>
-      <text class="menu-arrow">›</text>
-    </view>
-    <view class="menu-item" bindtap="onOrganizationsTap" wx:if="{{canOrganizations}}">
-      <image class="menu-icon" src="{{icons.customAnalysis}}" mode="aspectFit" />
-      <text class="menu-label">组织信息</text>
       <text class="menu-arrow">›</text>
     </view>
   </view>

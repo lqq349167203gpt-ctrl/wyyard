@@ -139,7 +139,6 @@ export default function DetailView({
   }, [])
 
   useEffect(() => {
-    customerApi.clearLightCache()
     customerApi.light().then(setCustomerList).catch(() => {})
     followUpStatusApi.list().then(setFollowUpStatuses).catch(() => setFollowUpStatuses([]))
   }, [])
@@ -1477,7 +1476,7 @@ export default function DetailView({
       {/* 弹窗 */}
       {!isViewOnly && <RecordForm open={formOpen} onOpenChange={setFormOpen} rec={editingRec} cid={c.id} cname={c.nickname||c.name} onSave={saveRec} customers={customerList} saving={saving}/>}
 
-      {canCreatePayment && (
+      {canCreatePayment && paymentEntryOpen && (
         <UnifiedPaymentContent
           formOnly
           externalOpen={paymentEntryOpen}

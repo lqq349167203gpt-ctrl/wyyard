@@ -1,13 +1,13 @@
 <view class="note-card">
   <view class="note-header">
     <text class="note-title">{{title}}</text>
-    <text class="note-count" wx:if="{{personCount && !privateToCreator}}">{{personCount}}人已填写</text>
+    <text class="note-count" wx:if="{{personCount && !privateToCreator}}">{{personCount}}条记录</text>
   </view>
 
   <!-- 我填写的 -->
   <view class="section-label">
-    <text class="section-label-text">我填写的</text>
-    <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新<text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>
+    <text class="section-label-text">我填写的<text wx:if="{{myNote}}"> · {{myNote.feedbackText}}</text></text>
+    <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新 · 创建人：{{myNote.creatorText}}<text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>
   </view>
   <view class="mine-box" bindtap="onAdd">
     <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : (readOnly ? '暂无记录' : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'))}}</text>
@@ -20,8 +20,8 @@
     </view>
     <view class="note-item" wx:for="{{otherNotes}}" wx:key="id">
       <view class="note-meta">
-        <text class="note-creator">{{item.creatorText}}</text>
-        <text class="note-time">{{item.timeText}}</text>
+        <text class="note-creator">{{item.feedbackText}}</text>
+        <view class="note-meta-right"><text class="note-time">{{item.timeText}}</text><text>创建人：{{item.creatorText}}</text></view>
       </view>
       <text class="note-content">{{item.content}}</text>
     </view>
@@ -38,8 +38,15 @@
     <view class="editor-header-actions">
       <text class="previous-toggle" wx:if="{{category === 'visit_need' && customerId}}" bindtap="onToggleVisitPurpose">{{visitPurposeOpen ? '收起到访目的' : '引用到访目的'}}</text>
       <text class="previous-toggle" wx:if="{{category === 'visit_need' && customerId}}" bindtap="onTogglePrevious">{{previousOpen ? '收起上次需求' : '引用上次需求'}}</text>
-      <text class="editor-close" bindtap="onEditorClose">取消</text>
+      <text class="editor-close" bindtap="onEditorClose">关闭</text>
     </view>
+  </view>
+  <scroll-view class="editor-body" scroll-y>
+  <view class="feedback-field">
+    <view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view>
+    <picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange">
+      <view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view>
+    </picker>
   </view>
   <view class="previous-box" wx:if="{{category === 'visit_need' && visitPurposeOpen}}">
     <text class="previous-empty" wx:if="{{visitPurposeLoading}}">正在加载到访目的…</text>
@@ -75,15 +82,18 @@
     class="editor-input"
     value="{{editorValue}}"
     placeholder="{{privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'}}"
-    placeholder-style="color:#c0c4cc"
+    placeholder-style="color:#b7bdc6"
     maxlength="5000"
-    focus="{{editorOpen}}"
+    adjust-position="{{true}}"
+    cursor-spacing="20"
+    fixed="{{true}}"
     bindinput="onEditorInput"
     confirm-type="done"
     bindconfirm="onSubmit"
   />
+  </scroll-view>
   <view class="editor-footer">
     <text class="editor-hint">{{editorValue.length}} / 5000</text>
-    <button class="editor-submit" bindtap="onSubmit" loading="{{saving}}" disabled="{{saving || !editorValue}}">保存</button>
+    <view class="editor-submit {{saving || !editorValue ? 'editor-submit-disabled' : ''}}" bindtap="onSubmit">{{saving ? '保存中' : '保存'}}</view>
   </view>
 </view>

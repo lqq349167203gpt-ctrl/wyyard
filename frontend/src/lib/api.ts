@@ -1,4 +1,5 @@
 import { confirmDialog } from "@/components/confirm-dialog"
+import { clearPendingReads, reusePendingRead } from "@/lib/read-requests"
 
 const API_BASE = ""
 
@@ -53,6 +54,7 @@ export interface PrincipalQuery {
   date_from: string | null
   date_to: string | null
   tab: "overview" | "courses" | "orders" | "conversion"
+  include_overview?: boolean
   product: string
   activity_type: string
   course_subtype: string
@@ -130,6 +132,8 @@ export interface PrincipalBreakdownCustomer {
   visit_interval?: string
   /** 统计区间内到场参与的活动场次 */
   activity_count?: number
+  /** 与 activity_count 同源的课程键，用于活动明细对齐统计口径 */
+  activity_keys?: string[]
   /** 该客户在区间内出现过的邀约人（visit.referrer_handler） */
   inviters?: string[]
   /** 首次到店日期 YYYY-MM-DD（邀约到店列表排序用） */
@@ -163,6 +167,7 @@ export interface PrincipalBreakdownItem {
   customers?: PrincipalBreakdownCustomer[]
 }
 export interface PrincipalBreakdown {
+  record_period?: { from: string; to: string }
   deals?: PrincipalBreakdownItem[]
   buys?: PrincipalBreakdownItem[]
   courses?: { by_type: PrincipalBreakdownItem[]; by_teacher: PrincipalBreakdownItem[] }
@@ -236,7 +241,7 @@ export interface PrincipalRuleFields {
   operators: AnalysisMetadata["operators"]
 }
 export const principalApi = {
-  metadata: () => request<PrincipalMetadata>("/api/principal/metadata"),
+  metadata: (lite = false) => request<PrincipalMetadata>(`/api/principal/metadata${lite ? "?lite=true" : ""}`),
   ruleFields: () => request<PrincipalRuleFields>("/api/principal/rule-fields"),
   query: (query: PrincipalQuery, page: number, page_size: number) => request<PrincipalResult>("/api/principal/query", { method: "POST", body: JSON.stringify({ ...query, page, page_size }) }),
   rules: () => request<SavedConversionRule[]>("/api/principal/rules"),
@@ -265,6 +270,8 @@ function getDeviceId(): string {
 }
 
 export function clearAuthState() {
+  clearPendingReads()
+  clearCustomerLightCache()
   localStorage.removeItem("authToken")
   localStorage.removeItem("isLoggedIn")
   localStorage.removeItem("currentUser")
@@ -318,7 +325,35 @@ function getAuthHeaders(): Record<string, string> {
   return headers
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+// 会影响客户候选项/会员身份的业务资源；只有写操作才失效。
+const CUSTOMER_DIRECTORY_RESOURCES = new Set([
+  "customers", "membership-cards", "group-cases", "emotional-releases", "energy-knots",
+  "internal-courses", "oh-card-readings", "project-refunds", "project-deductions", "visits",
+  "class-records", "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions",
+  "internal-course-sessions",
+])
+
+const SHARED_READ_RESOURCES = new Set([
+  "course-types", "organizations", "spaces", "member-identities", "follow-up-statuses", "customer-tags",
+  "customers", "statistics", "daily-report", "principal", "communication-records", "followup-records", "offline-course-records",
+  "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions",
+  "positions", "accounts", "position-permissions", "membership-cards", "group-cases",
+  "emotional-releases", "energy-knots", "internal-courses", "oh-card-readings", "tea-seat-fees", "offline-courses", "other-projects",
+])
+
+function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const resource = path.split("?")[0].split("/")[2]
+  const method = (options?.method || "GET").toUpperCase()
+  // 有效权限由 refreshAccountPermissions 管理在途复用，保留其强制刷新语义。
+  if (method === "GET" && path.split("?")[0] !== "/api/accounts/me/permissions" && !options?.signal && !options?.headers && SHARED_READ_RESOURCES.has(resource)) {
+    // 页面路径保留独立使用统计归属，完整 URL 保留日期/搜索条件，权限与账号隔离。
+    const key = JSON.stringify([window.location.pathname, customerLightScope(), path])
+    return reusePendingRead(key, () => performRequest<T>(path, options))
+  }
+  return performRequest<T>(path, options)
+}
+
+async function performRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const authHeaders = getAuthHeaders()
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -350,7 +385,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const msg = Array.isArray(detail) ? detail.map((d: any) => cleanValidationMessage(d.msg, JSON.stringify(d))).join("; ") : (detail || `请求失败: ${res.status}`)
     throw new Error(msg)
   }
-  return res.json()
+  const result = await res.json()
+  // 这些写操作会改变客户候选项或会员身份，沿用同一个失效入口。
+  const pathname = path.split("?")[0]
+  const readOnlyPost = pathname === "/api/customers/batch" || pathname === "/api/customers/generate-tags"
+    || pathname === "/api/login-records/heartbeat" || pathname === "/api/principal/query"
+    || pathname === "/api/custom-analysis/execute" || pathname === "/api/custom-analysis/parse" || pathname.endsWith("/export")
+    || pathname.endsWith("/contact-access")
+  if (options?.method && !["GET", "HEAD"].includes(options.method.toUpperCase()) && !readOnlyPost) clearPendingReads()
+  if (options?.method && !["GET", "HEAD"].includes(options.method.toUpperCase())
+    && !readOnlyPost && CUSTOMER_DIRECTORY_RESOURCES.has(pathname.split("/")[2])) {
+    clearCustomerLightCache()
+  }
+  return result
 }
 
 // Agent
@@ -630,6 +677,7 @@ export type CustomerCreate = Omit<Customer, "id" | "created_at" | "updated_at">
 
 export interface CustomerLight {
   id: string
+  visit_count?: number
   gender?: string
   nickname: string
   name: string
@@ -658,19 +706,42 @@ export interface DisabledCustomer {
 let _customerLightCache: CustomerLight[] | null = null
 let _customerLightCachedAt = 0
 let _customerLightPromise: Promise<CustomerLight[]> | null = null
+let _customerLightScope = ""
+let _customerLightRevision = 0
 const CUSTOMER_LIGHT_CACHE_TTL = 30_000
+
+function clearCustomerLightCache() {
+  clearPendingReads()
+  _customerLightCache = null
+  _customerLightCachedAt = 0
+  _customerLightPromise = null
+  _customerLightRevision++
+}
+
+function customerLightScope() {
+  return JSON.stringify(["authToken", "userPermissions", "userEditPermissions"].map(key => localStorage.getItem(key)))
+}
 
 export const customerApi = {
   list: () => request<Customer[]>("/api/customers"),
   light: (forceRefresh = false) => {
+    const scope = customerLightScope()
+    if (forceRefresh || scope !== _customerLightScope) {
+      clearCustomerLightCache()
+      _customerLightScope = scope
+    }
     if (!forceRefresh && _customerLightCache && Date.now() - _customerLightCachedAt < CUSTOMER_LIGHT_CACHE_TTL) {
       return Promise.resolve(_customerLightCache)
     }
     if (!forceRefresh && _customerLightPromise) return _customerLightPromise
+    const revision = _customerLightRevision
     const pending = request<CustomerLight[]>("/api/customers/light")
       .then(data => {
-        _customerLightCache = data
-        _customerLightCachedAt = Date.now()
+        // 写操作、切账号或权限更新后，旧请求不能重新填回已失效的缓存。
+        if (revision === _customerLightRevision && scope === customerLightScope()) {
+          _customerLightCache = data
+          _customerLightCachedAt = Date.now()
+        }
         return data
       })
       .finally(() => {
@@ -694,21 +765,22 @@ export const customerApi = {
     if (filters?.tag_match) params.set("tag_match", filters.tag_match)
     if (filters?.sort_by) params.set("sort_by", filters.sort_by)
     if (filters?.sort_order) params.set("sort_order", filters.sort_order)
+    params.set("list_view", "true")
     return request<PaginatedResponse<Customer>>(`/api/customers?${params.toString()}`)
   },
-  clearLightCache: () => { _customerLightCache = null; _customerLightCachedAt = 0; _customerLightPromise = null },
+  clearLightCache: clearCustomerLightCache,
 	  get: (id: string) => request<Customer>(`/api/customers/${id}`),
   accessContact: (id: string, field: ContactField, action: "view" | "copy") =>
     request<{ field: ContactField; value: string }>(`/api/customers/${id}/contact-access`, {
       method: "POST",
       body: JSON.stringify({ field, action }),
     }),
-  create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
-  update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }).then(r => { _customerLightCache = null; return r }),
-  delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }).then(r => { _customerLightCache = null; return r }),
+  create: (data: Partial<CustomerCreate>) => request<Customer>("/api/customers", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<CustomerCreate>) => request<Customer>(`/api/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/customers/${id}`, { method: "DELETE" }),
   listDisabled: () => request<DisabledCustomer[]>(`/api/customers/disabled`),
-  restore: (id: string) => request<Customer>(`/api/customers/${id}/restore`, { method: "POST" }).then(r => { _customerLightCache = null; return r }),
-  permanentDelete: (id: string) => request<{ message: string }>(`/api/customers/${id}/permanent`, { method: "DELETE" }).then(r => { _customerLightCache = null; _customerLightCachedAt = 0; return r }),
+  restore: (id: string) => request<Customer>(`/api/customers/${id}/restore`, { method: "POST" }),
+  permanentDelete: (id: string) => request<{ message: string }>(`/api/customers/${id}/permanent`, { method: "DELETE" }),
   generateTags: (tags: string) => request<{ tags: string }>("/api/customers/generate-tags", { method: "POST", body: JSON.stringify({ tags }) }),
 }
 
@@ -2321,6 +2393,12 @@ export interface ProjectRefund {
 }
 
 export const projectRefundApi = {
+  statusKeys: (projectIds: string[]) => {
+    if (!projectIds.length) return Promise.resolve<string[]>([])
+    const qs = new URLSearchParams()
+    projectIds.forEach(id => qs.append("project_ids", id))
+    return request<string[]>(`/api/project-refunds/status-keys?${qs}`)
+  },
   listPaginated: (page: number, pageSize: number, params?: Record<string, string>) => {
     const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
@@ -2348,6 +2426,8 @@ export interface PaymentExportParams {
 }
 
 export const paymentExportApi = {
+  records: (page: number, pageSize: number, nickname: string, closerName: string) =>
+    request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
   download: async (params: PaymentExportParams) => {
     const query = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
@@ -3866,13 +3946,27 @@ export interface CommunicationRecordCreate {
 }
 
 export const communicationRecordApi = {
+  listPaginated: (filters: { nickname: string; member_type: string; creator: string }, page: number, pageSize: number) =>
+    request<PaginatedResponse<CommunicationRecord> & { creators: string[] }>(`/api/communication-records?${new URLSearchParams({ ...filters, page: String(page), page_size: String(pageSize) })}`),
   list: (customer_nickname?: string) => request<CommunicationRecord[]>(`/api/communication-records${customer_nickname ? `?customer_nickname=${encodeURIComponent(customer_nickname)}` : ""}`),
   create: (data: CommunicationRecordCreate) => request<CommunicationRecord>("/api/communication-records", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: CommunicationRecordCreate) => request<CommunicationRecord>(`/api/communication-records/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) => request<void>(`/api/communication-records/${id}`, { method: "DELETE" }),
 }
 
+export type DailyReportActivity = Pick<ClassRecord, 'id' | 'date' | 'course_name' | 'course_type' | 'start_time' | 'end_time' | 'teacher_ids' | 'participant_ids' | 'groups' | 'is_public_welfare' | 'membership_deduction_count'> & {
+  source: 'class_record' | 'group_case' | 'emotional_release' | 'energy_knot' | 'internal_course'
+  teacher_names: string[]
+}
+
+export const dailyReportApi = {
+  read: (date: string) => request<{ date: string; visits: VisitRecord[]; customers: CustomerLight[]; activities: DailyReportActivity[]; dashboard: { class_records: ClassRecord[] }; identities: MemberIdentity[] }>(`/api/daily-report?date=${encodeURIComponent(date)}`),
+  finance: (date: string) => request<{ sources: Record<string, Record<string, unknown>[]>; sessions: Record<string, Record<string, unknown>[]>; deductions: Record<string, unknown>[] }>(`/api/daily-report/finance-sources?date=${encodeURIComponent(date)}`),
+}
+
 export const followupRecordApi = {
+  listPaginated: (customerId: string, page: number, pageSize: number) =>
+    request<PaginatedResponse<ActivityFollowup>>(`/api/followup-records?${new URLSearchParams({ customer_id: customerId, page: String(page), page_size: String(pageSize) })}`),
   list: (customerId?: string) => request<{ items: ActivityFollowup[]; total: number }>(`/api/followup-records${customerId ? `?customer_id=${customerId}` : ""}`),
 }
 
@@ -3936,6 +4030,8 @@ export interface OfflineCourseRecordCreate {
 }
 
 export const offlineCourseRecordApi = {
+  listPaginated: (filters: { customer_id: string; course_type: string; teacher: string }, page: number, pageSize: number) =>
+    request<PaginatedResponse<OfflineCourseRecord>>(`/api/offline-course-records?${new URLSearchParams({ ...filters, page: String(page), page_size: String(pageSize) })}`),
   updateType: (id: string, name: string) => request<{ id: string; name: string }>(`/api/offline-course-records/types/${id}`, { method: "PUT", body: JSON.stringify({ name }) }),
   deleteType: (id: string) => request(`/api/offline-course-records/types/${id}`, { method: "DELETE" }),
   types: () => request<{ id: string; name: string }[]>("/api/offline-course-records/types"),

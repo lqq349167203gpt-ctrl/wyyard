@@ -6,7 +6,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { visitApi, visitNoteApi, membershipCardApi, consumptionRecordsApi, type CustomerLight, type MembershipCard, type VisitNote, type VisitRecord } from "@/lib/api"
+import { visitApi, visitNoteApi, consumptionRecordsApi, type CustomerLight, type VisitNote, type VisitRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
@@ -102,15 +102,6 @@ interface BatchInputTableProps {
   onFlushRef?: (flush: () => Promise<void>) => void
 }
 
-function getRemainingCount(cards: MembershipCard[], customerId: string): number | null {
-  const customerCards = cards.filter(c => c.customer_id === customerId)
-  if (!customerCards.length) return null
-  customerCards.sort((a, b) => b.created_at.localeCompare(a.created_at))
-  const card = customerCards[0]
-  if (card.expiry_date && card.expiry_date < new Date().toLocaleDateString("sv-SE")) return 0
-  return card.remaining_count ?? -1
-}
-
 function formatRemaining(count: number | null): string {
   if (count === null) return "-"
   if (count === -999) return "不限"
@@ -141,7 +132,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pendingScrollToBottomRef = useRef(false)
-  const cardsRef = useRef<MembershipCard[]>([])
   useEffect(() => () => {
     dragPreviewRef.current?.remove()
     dragPreviewRef.current = null
@@ -410,15 +400,15 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     )
   }, [rows, onRowsChange])
 
-  // 加载会员卡数据
-  useEffect(() => {
-    membershipCardApi.list().then(cards => { cardsRef.current = cards }).catch(() => {})
-  }, [])
-
   // 加载当日有效交易笔数（包括零金额订单）
   useEffect(() => {
-    consumptionRecordsApi.getDailyCounts(date).then(setDailyTotals).catch(() => {})
-  }, [date])
+    let current = true
+    setDailyTotals({})
+    consumptionRecordsApi.getDailyCounts(date).then(totals => {
+      if (current) setDailyTotals(totals)
+    }).catch(() => {})
+    return () => { current = false }
+  }, [date, refreshKey])
 
   // 加载当日已有记录（仅首次，日期或空间变化时重新加载）
   const initialLoaded = useRef(false)
@@ -508,7 +498,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         })
         // 更新剩余次数
         if (result?.remaining_count !== undefined) {
-          setRows(prev => prev.map(r => r.key === row.key ? { ...r, remaining_count: result.remaining_count ?? null } : r))
+          setRows(prev => prev.map(r => r.key === row.key && r.customer_id === row.customer_id ? { ...r, remaining_count: result.remaining_count ?? null } : r))
         }
       } else {
         // 检查是否已存在该客户的到场记录
@@ -539,6 +529,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
             visit_id: result.id,
             created_by_id: result.created_by_id || currentActorId,
             created_by: result.created_by || currentActorName,
+            remaining_count: r.customer_id === row.customer_id ? result.remaining_count ?? null : r.remaining_count,
           } : r))
           visitNoteApi.list(result.id).then((notes) => {
             setNotesByVisitId((previous) => ({ ...previous, [result.id]: notes }))
@@ -783,8 +774,8 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     if (existingRow) return
 
     const memberType = customer.member_type || ""
-    const remaining = getRemainingCount(cardsRef.current, customer.id)
-    setRows(prev => prev.map(r => r.key === key ? { ...r, nickname: customer.nickname, customer_id: customer.id, member_type: memberType, remaining_count: remaining } : r))
+    // 卡次由保存响应返回，与刷新列表同源；等待时不展示旧客户的余量。
+    setRows(prev => prev.map(r => r.key === key ? { ...r, nickname: customer.nickname, customer_id: customer.id, member_type: memberType, remaining_count: null } : r))
     scheduleSave(key)
   }, [scheduleSave])
 

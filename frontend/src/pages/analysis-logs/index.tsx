@@ -174,7 +174,8 @@ export default function AnalysisLogsPage() {
       page,
       page_size: pageSize,
     })
-    setOperators(response.operators)
+    // 列表之外的筛选选项也必须属于当前查询，避免切换页签后被旧结果覆盖。
+    if (filters === filtersRef.current) setOperators(response.operators)
     return response
   }, [])
 
@@ -186,8 +187,10 @@ export default function AnalysisLogsPage() {
     startIndex,
     endIndex,
     loading,
+    error,
+    refresh,
     goToPage,
-  } = useServerPagination<AnalysisLog>(fetchLogs, { pageSize: PAGE_SIZE })
+  } = useServerPagination<AnalysisLog>(fetchLogs, { pageSize: PAGE_SIZE, queryKey: JSON.stringify([kind, operator, source, recordType, dateFrom, dateTo]) })
 
   const updateFilter = (key: "operator" | "source" | "recordType" | "dateFrom" | "dateTo", value: string) => {
     filtersRef.current = { ...filtersRef.current, [key]: value }
@@ -196,7 +199,6 @@ export default function AnalysisLogsPage() {
     if (key === "recordType") setRecordType(value as "" | "analysis" | "export" | "template")
     if (key === "dateFrom") setDateFrom(value)
     if (key === "dateTo") setDateTo(value)
-    goToPage(1)
   }
 
   const clearFilters = () => {
@@ -206,7 +208,6 @@ export default function AnalysisLogsPage() {
     setDateFrom("")
     setDateTo("")
     filtersRef.current = { ...filtersRef.current, operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" }
-    goToPage(1)
   }
 
   // 两个页签：自定义分析 / 转化分析
@@ -219,7 +220,6 @@ export default function AnalysisLogsPage() {
     setDateFrom("")
     setDateTo("")
     filtersRef.current = { kind: next, operator: "", source: "", recordType: "", dateFrom: "", dateTo: "" }
-    goToPage(1)
   }
 
   return (
@@ -269,7 +269,8 @@ export default function AnalysisLogsPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)]">
-        {loading ? <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div> : paginatedItems.length === 0 ? <div className="py-16 text-center text-sm text-muted-foreground">暂无分析日志</div> : (
+        {error && <div role="alert" className="px-4 py-3 text-sm text-destructive">{error}<button type="button" className="ml-3 text-[#3370ff]" onClick={refresh}>重试</button></div>}
+        {loading ? <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div> : paginatedItems.length === 0 && !error ? <div className="py-16 text-center text-sm text-muted-foreground">暂无分析日志</div> : (
           <Table>
             <TableHeader><TableRow className="hover:bg-transparent"><TableHead className="pl-4">记录时间</TableHead><TableHead>使用者</TableHead><TableHead>使用端</TableHead><TableHead>记录类型</TableHead><TableHead className="w-[38%]">记录内容</TableHead><TableHead className="text-right pr-4">结果 / 模板</TableHead></TableRow></TableHeader>
             <TableBody>{paginatedItems.map(log => <TableRow key={log.id} className="group cursor-pointer" onClick={() => setSelectedLog(log)}><TableCell className="pl-4 text-[12px] text-[#8f959e] tabular-nums">{formatDate(log.created_at)}</TableCell><TableCell className="text-[13px] font-medium text-[#2b2f36]">{log.operator || <span className="text-[#d0d3d6]">-</span>}</TableCell><TableCell className="text-[12px] text-[#4e535a]">{SOURCE_LABELS[log.source] || log.source}</TableCell><TableCell className="text-[12px] text-[#4e535a]">{LOG_TYPE_LABELS[log.log_type]}</TableCell><TableCell><span className="block truncate text-[12px] text-[#4e535a]" title={recordSummary(log)}>{recordSummary(log)}</span></TableCell><TableCell className="max-w-[180px] truncate pr-4 text-right text-[13px] text-[#2b2f36] tabular-nums" title={recordResult(log)}>{recordResult(log)}</TableCell></TableRow>)}</TableBody>

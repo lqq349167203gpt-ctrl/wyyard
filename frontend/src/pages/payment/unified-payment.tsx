@@ -2,8 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, CreditCard, X, Wallet, Heart, Layers, Zap, GraduationCap, Package, Coffee, BookOpen } from "lucide-react"
-import ExcelJS from "exceljs"
-import { sheetToRows } from "@/lib/excel"
+import { loadExcel, sheetToRows } from "@/lib/excel"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -17,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   customerApi, membershipCardApi, groupCaseApi, emotionalReleaseApi,
-  ohCardReadingApi, teaSeatFeeApi, offlineCourseApi, energyKnotApi, internalCourseApi, otherProjectApi, projectRefundApi,
+  ohCardReadingApi, teaSeatFeeApi, offlineCourseApi, energyKnotApi, internalCourseApi, otherProjectApi, projectRefundApi, paymentExportApi,
   type CustomerLight, type MembershipCard, type GroupCase, type EmotionalRelease,
   type OhCardReading, type TeaSeatFee, type OfflineCourse, type EnergyKnot, type InternalCourse, type OtherProject,
 } from "@/lib/api"
@@ -30,6 +29,8 @@ import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { CoarseDoorCardTab } from "@/pages/payment/coarse-door-card-tab"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 
 /* ========== 常量 ========== */
 
@@ -242,8 +243,6 @@ export function UnifiedPaymentContent({
     return "all"
   })
   const [mcTypeFilter, setMcTypeFilter] = useState("all")
-  const mcTypeFilterRef = useRef("all")
-  useEffect(() => { mcTypeFilterRef.current = mcTypeFilter }, [mcTypeFilter])
 
   // 弹窗
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -326,16 +325,17 @@ export function UnifiedPaymentContent({
   // 搜索
   const [searchNickname, setSearchNickname] = useState("")
   const [searchCloserName, setSearchCloserName] = useState("")
-  const appliedNicknameRef = useRef("")
-  const appliedCloserNameRef = useRef("")
 
   // 客户
-  const [customers, setCustomers] = useState<CustomerLight[]>([])
+  const directory = useReadResource<CustomerLight[]>(customerApi.light, [])
+  const customers = directory.data
   const { organizations, hasAnyOrganization, loading: organizationsLoading } = useOrganizations()
   const [noOrgDialogOpen, setNoOrgDialogOpen] = useState(false)
   const [noAssignmentDialogOpen, setNoAssignmentDialogOpen] = useState(false)
 
   const [refundedKeys, setRefundedKeys] = useState(new Set<string>())
+  const [refundStatusLoading, setRefundStatusLoading] = useState(false)
+  const [refundStatusError, setRefundStatusError] = useState(false)
 
   const courseTeachers = useMemo(() =>
     customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER))
@@ -345,72 +345,58 @@ export function UnifiedPaymentContent({
   // 分页数据获取
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
     const params: any = {}
-    if (appliedNicknameRef.current) params.nickname = appliedNicknameRef.current
-    if (appliedCloserNameRef.current) params.closer_name = appliedCloserNameRef.current
+    if (searchNickname) params.nickname = searchNickname
+    if (searchCloserName) params.closer_name = searchCloserName
     const hasParams = Object.keys(params).length > 0
     const p = hasParams ? params : undefined
 
     if (activeType !== "all") {
       const pp = { ...p }
-      if (activeType === "membership_card" && mcTypeFilterRef.current !== "all") {
-        pp.card_type = mcTypeFilterRef.current
+      if (activeType === "membership_card" && mcTypeFilter !== "all") {
+        pp.card_type = mcTypeFilter
       }
       const res = await getApi(activeType).listPaginated(page, pageSize, pp)
       return { ...res, items: res.items.map((i: any) => toUnified(i, activeType)) }
     }
 
-    // "全部" 模式：并发请求所有类型（后端 page_size 上限 100）
-    const types = Object.keys(PROJECT_TYPES) as ProjectTypeKey[]
-    const results = await Promise.all(types.map(t => getApi(t).listPaginated(1, 100, p).catch(() => ({ items: [], total: 0 }))))
-    let allItems: UnifiedItem[] = []
-    results.forEach((res, idx) => {
-      allItems = allItems.concat(res.items.map((i: any) => toUnified(i, types[idx])))
-    })
-    allItems.sort((a, b) => (b.deal_date || "").localeCompare(a.deal_date || ""))
-    const total = allItems.length
-    const start = (page - 1) * pageSize
-    return { items: allItems.slice(start, start + pageSize), total, page, page_size: pageSize, total_pages: Math.ceil(total / pageSize) }
-  }, [activeType, mcTypeFilter])
+    const result = await paymentExportApi.records(page, pageSize, searchNickname, searchCloserName)
+    return { ...result, items: result.items.map(item => toUnified(item.record, item.type)) }
+  }, [activeType, mcTypeFilter, searchNickname, searchCloserName])
 
-  const { paginatedItems: rawItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
+  const { paginatedItems: rawItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, error, refresh } = useServerPagination(fetchFn, {
+    enabled: !formOnly,
+    queryKey: JSON.stringify([activeType, mcTypeFilter, searchNickname, searchCloserName]),
+  })
   const paginatedItems = rawItems as unknown as UnifiedItem[]
 
-  // 类型切换或会员卡类型筛选变化时回到第 1 页
-  const previousPaymentFilter = useRef(fetchFn)
   useEffect(() => {
-    if (previousPaymentFilter.current === fetchFn) return
-    previousPaymentFilter.current = fetchFn
-    goToPage(1)
-  }, [fetchFn, goToPage])
-
-  // 加载客户
-  useEffect(() => {
-    customerApi.light().then((data) => {
-      setCustomers(data)
-    }).catch(() => {})
-    // 退费状态与客户选项并行加载，不阻塞付费列表。
-    projectRefundApi.listPaginated(1, 100).then((res: any) => {
-      const refunds = res?.items || res || []
-      const keys = new Set<string>()
-      ;(Array.isArray(refunds) ? refunds : []).forEach((r: any) => keys.add(`${r.project_type}:${r.project_id}`))
-      setRefundedKeys(keys)
-    }).catch(() => {})
-  }, [])
+    let current = true
+    const ids = paginatedItems.filter(item => item.type !== "membership_card").map(item => item.id)
+    setRefundedKeys(new Set())
+    setRefundStatusError(false)
+    setRefundStatusLoading(ids.length > 0)
+    if (ids.length) {
+      projectRefundApi.statusKeys(ids).then(keys => {
+        if (current) setRefundedKeys(new Set(keys))
+      }).catch(() => {
+        if (current) setRefundStatusError(true)
+      }).finally(() => {
+        if (current) setRefundStatusLoading(false)
+      })
+    }
+    return () => { current = false }
+  }, [paginatedItems])
 
   // 搜索
   const handleFilterChange = (field: "nickname" | "closer", value: string) => {
-    if (field === "nickname") { setSearchNickname(value); appliedNicknameRef.current = value }
-    else { setSearchCloserName(value); appliedCloserNameRef.current = value }
-    refresh()
+    if (field === "nickname") setSearchNickname(value)
+    else setSearchCloserName(value)
   }
 
   const handleClearSearch = () => {
     setSearchNickname("")
     setSearchCloserName("")
     setMcTypeFilter("all")
-    appliedNicknameRef.current = ""
-    appliedCloserNameRef.current = ""
-    refresh()
   }
 
   // 会员卡类型选择
@@ -975,6 +961,8 @@ export function UnifiedPaymentContent({
 
   // 下载导入模板（全部类型，每个类型一个 sheet）
   const handleDownloadTemplate = async () => {
+    const ExcelJS = await loadExcel().catch(() => { alert("导出组件加载失败，请重试"); return null })
+    if (!ExcelJS) return
     const wb = new ExcelJS.Workbook()
 
     const typesToExport = filterTypes || (Object.keys(PROJECT_TYPES) as ProjectTypeKey[])
@@ -1190,12 +1178,15 @@ export function UnifiedPaymentContent({
   }
 
   // 构建已有数据的去重 key 集合
-  const buildExistingKeys = async (): Promise<Set<string>> => {
+  const buildExistingKeys = async (types: ProjectTypeKey[]): Promise<Set<string>> => {
     const keys = new Set<string>()
-    const types = Object.keys(PROJECT_TYPES) as ProjectTypeKey[]
     for (const type of types) {
-      try {
-        const res = await getApi(type).listPaginated(1, 100)
+      let page = 1
+      let totalPages = 1
+      do {
+        // 查询任意一页失败即停止导入，不能把“未查到”当作“没有重复”。
+        const res = await getApi(type).listPaginated(page, 100)
+        totalPages = res.total_pages
         for (const item of res.items) {
           let key: string
           switch (type) {
@@ -1214,7 +1205,8 @@ export function UnifiedPaymentContent({
           }
           keys.add(key)
         }
-      } catch { /* ignore */ }
+        page += 1
+      } while (page <= totalPages)
     }
     return keys
   }
@@ -1253,6 +1245,7 @@ export function UnifiedPaymentContent({
 
     try {
       const data = await file.arrayBuffer()
+      const ExcelJS = await loadExcel()
       const wb = new ExcelJS.Workbook()
       await wb.xlsx.load(data)
 
@@ -1294,7 +1287,7 @@ export function UnifiedPaymentContent({
       }
 
       // 第二轮：查重
-      const existingKeys = await buildExistingKeys()
+      const existingKeys = await buildExistingKeys([...new Set(validRows.map(row => row.type))])
       const normalRows = validRows.filter(r => !existingKeys.has(r.dupKey))
       const duplicateRows = validRows.filter(r => existingKeys.has(r.dupKey))
 
@@ -1315,7 +1308,7 @@ export function UnifiedPaymentContent({
         await executeImport(normalRows)
       }
     } catch (err: any) {
-      setImportResult({ success: 0, failed: 0, errors: [`文件解析失败：${err.message}`] })
+      setImportResult({ success: 0, failed: 0, errors: [`导入未完成：${err.message}`] })
     }
   }
 
@@ -1445,6 +1438,7 @@ export function UnifiedPaymentContent({
 
   return (
     <>
+      <LoadError error={directory.error} onRetry={directory.refresh} />
       {/* 搜索栏 + 表格 卡片 */}
       {!formOnly && <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
         {/* 搜索栏 */}
@@ -1515,9 +1509,10 @@ export function UnifiedPaymentContent({
         </div>
 
         {/* 表格 */}
+        {error && <div role="alert" className="px-4 py-3 text-sm text-destructive">{error}<button type="button" className="ml-3 text-[#3370ff]" onClick={refresh}>重试</button></div>}
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : paginatedItems.length === 0 ? (
+        ) : paginatedItems.length === 0 && !error ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无记录</div>
         ) : (
           <>
@@ -1582,6 +1577,8 @@ export function UnifiedPaymentContent({
                     <TableCell className="text-[12px] truncate">
                       {(() => {
                         const today = new Date().toLocaleDateString("sv-SE")
+                        if (item.type !== "membership_card" && refundStatusLoading) return <span className="text-[#8f959e]">状态加载中…</span>
+                        if (item.type !== "membership_card" && refundStatusError) return <button type="button" className="text-destructive" onClick={event => { event.stopPropagation(); refresh() }}>状态加载失败，重试</button>
                         const refunded = item.type === "membership_card"
                           ? item.voided
                           : refundedKeys.has(`${PROJECT_TYPE_TO_REFUND_KEY[item.type]}:${item.id}`)

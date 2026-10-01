@@ -10,6 +10,9 @@ interface PaginatedResponse<T> {
 
 interface UseServerPaginationOptions {
   pageSize?: number
+  enabled?: boolean
+  /** 查询条件的稳定标识；变更时自动请求第一页，旧调用方可继续手动 resetPage。 */
+  queryKey?: string
 }
 
 interface UseServerPaginationReturn<T> {
@@ -27,11 +30,12 @@ interface UseServerPaginationReturn<T> {
 }
 
 export function useServerPagination<T>(
-  fetchFn: (page: number, pageSize: number) => Promise<PaginatedResponse<T>>,
+  fetchFn: (page: number, pageSize: number, isCurrent: () => boolean) => Promise<PaginatedResponse<T>>,
   options: UseServerPaginationOptions = {}
 ): UseServerPaginationReturn<T> {
-  const { pageSize = 10 } = options
-  const [requestedPage, setRequestedPage] = useState(1)
+  const { pageSize = 10, queryKey, enabled = true } = options
+  const [requestPage, setRequestPage] = useState({ key: queryKey, page: 1 })
+  const requestedPage = requestPage.key === queryKey ? requestPage.page : 1
   const [currentPage, setCurrentPage] = useState(1)
   const [items, setItems] = useState<T[]>([])
   const [total, setTotal] = useState(0)
@@ -42,7 +46,6 @@ export function useServerPagination<T>(
   const fetchRef = useRef(fetchFn)
   const requestSequenceRef = useRef(0)
   const requestedPageRef = useRef(1)
-  const currentPageRef = useRef(1)
 
   fetchRef.current = fetchFn
 
@@ -51,15 +54,14 @@ export function useServerPagination<T>(
     setLoading(true)
     setError("")
     try {
-      const res = await fetchRef.current(page, pageSize)
+      const res = await fetchRef.current(page, pageSize, () => requestSequence === requestSequenceRef.current)
       if (requestSequence !== requestSequenceRef.current) return
       setItems(res.items)
       setTotal(res.total)
       setTotalPages(res.total_pages)
       setCurrentPage(res.page)
-      currentPageRef.current = res.page
       requestedPageRef.current = res.page
-      if (res.page !== page) setRequestedPage(res.page)
+      if (res.page !== page) setRequestPage({ key: queryKey, page: res.page })
     } catch (requestError) {
       if (requestSequence !== requestSequenceRef.current) return
       setError(requestError instanceof Error ? requestError.message : "数据加载失败，请稍后重试")
@@ -68,11 +70,20 @@ export function useServerPagination<T>(
         setLoading(false)
       }
     }
-  }, [pageSize])
+  }, [pageSize, queryKey])
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false)
+      return
+    }
+    // 记住当前查询的第一页，避免切回旧条件时恢复之前的页码。
+    setRequestPage(previous => previous.key === queryKey ? previous : { key: queryKey, page: 1 })
+    requestedPageRef.current = requestedPage
     fetchData(requestedPage)
-  }, [requestedPage, fetchData, refreshKey])
+    // 卸载、切换条件或翻页后，旧响应不再改变列表/错误/加载状态。
+    return () => { requestSequenceRef.current++ }
+  }, [requestedPage, fetchData, refreshKey, queryKey, enabled])
 
   const goToPage = useCallback((page: number) => {
     const p = Math.max(1, page)
@@ -82,18 +93,19 @@ export function useServerPagination<T>(
       return
     }
     requestedPageRef.current = p
-    setRequestedPage(p)
-  }, [])
+    setRequestPage({ key: queryKey, page: p })
+  }, [queryKey])
 
   const refresh = useCallback(() => {
     setRefreshKey(k => k + 1)
   }, [])
 
   const resetPage = useCallback(() => {
+    const alreadyRequestedFirst = requestedPageRef.current === 1
     requestedPageRef.current = 1
-    setRequestedPage(1)
-    if (currentPageRef.current === 1) setRefreshKey(k => k + 1)
-  }, [])
+    setRequestPage({ key: queryKey, page: 1 })
+    if (alreadyRequestedFirst) setRefreshKey(k => k + 1)
+  }, [queryKey])
 
   const totalItems = total
   const startIndex = total === 0 ? 0 : (currentPage - 1) * pageSize + 1

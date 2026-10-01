@@ -1,6 +1,7 @@
 const { visitApi, visitNoteApi, spaceApi, customerApi, isOperationCancelled } = require('../../utils/api')
 const { formatDate, formatTime } = require('../../utils/util')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
+const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
 
 Page({
   data: {
@@ -19,6 +20,10 @@ Page({
     visitPurposeError: '',
     feedback: '',
     healingNotes: '',
+    feedbackOptions: [],
+    needFeedbackIndex: 0,
+    infoFeedbackIndex: 0,
+    followFeedbackIndex: 0,
     referrerHandler: '',
     referrerHandlerId: '',
     receptionist: '',
@@ -52,6 +57,26 @@ Page({
     if (options.spaceId) this.setData({ _spaceId: options.spaceId })
     this.loadSpaces()
     this.loadCustomers()
+    this.loadFeedbackPeople()
+  },
+
+  async loadFeedbackPeople() {
+    try {
+      const people = await visitNoteApi.feedbackPeople()
+      const picked = pickerData(people)
+      this.setData({
+        feedbackOptions: picked.options,
+        needFeedbackIndex: picked.index,
+        infoFeedbackIndex: picked.index,
+        followFeedbackIndex: picked.index,
+      })
+    } catch (error) { wx.showToast({ title: '反馈人加载失败', icon: 'none' }) }
+  },
+
+  onFeedbackPersonChange(event) {
+    const field = event.currentTarget.dataset.field
+    const key = { needs: 'needFeedbackIndex', feedback: 'infoFeedbackIndex', healingNotes: 'followFeedbackIndex' }[field]
+    if (key) this.setData({ [key]: Number(event.detail.value) })
   },
 
   onShow() {
@@ -302,7 +327,7 @@ Page({
         visit_date: this.data.date,
         visit_time: this.data.time,
         customer_id: this.data.customerId,
-        needs: this.data.needs,
+        needs: '',
         referrer_handler: this.data.referrerHandler,
         referrer_handler_id: this.data.referrerHandlerId || '',
         receptionist: this.data.receptionist,
@@ -313,11 +338,20 @@ Page({
         arrival_time: this.data.arrivalTime || null,
       })
       const noteRequests = []
+      if ((this.data.needs || '').trim()) {
+        noteRequests.push(visitNoteApi.create({
+          visit_id: visit.id,
+          category: 'visit_need',
+          content: this.data.needs.trim(),
+          ...attributionFromPicker(this.data.feedbackOptions, this.data.needFeedbackIndex),
+        }))
+      }
       if ((this.data.feedback || '').trim()) {
         noteRequests.push(visitNoteApi.create({
           visit_id: visit.id,
           category: 'customer_info',
           content: this.data.feedback.trim(),
+          ...attributionFromPicker(this.data.feedbackOptions, this.data.infoFeedbackIndex),
         }))
       }
       if ((this.data.healingNotes || '').trim()) {
@@ -325,6 +359,7 @@ Page({
           visit_id: visit.id,
           category: 'follow_up',
           content: this.data.healingNotes.trim(),
+          ...attributionFromPicker(this.data.feedbackOptions, this.data.followFeedbackIndex),
         }))
       }
       const noteResults = await Promise.all(noteRequests.map((request) => request.then(() => true).catch(() => false)))

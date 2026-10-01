@@ -8,21 +8,36 @@ from pathlib import Path
 from typing import Any, Dict
 
 import psycopg2
-
-logger = logging.getLogger(__name__)
 import psycopg2.extras
 import psycopg2.pool
 
+from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
-
-from app.config.settings import settings
 
 DB_URL = settings.database_url
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
 pending_writes: ContextVar[list | None] = ContextVar("course_pending_writes", default=None)
+_data_revision = 0
+_revision_lock = threading.Lock()
+_OBSERVATION_FILES = {"sessions.json", "login_records.json", "usage_sessions.json", "operation_logs.json", "system_logs.json", "analysis_logs.json"}
+
+
+def data_revision() -> int:
+    """当前进程已提交业务数据的版本；日志及心跳不改变统计数据。"""
+    with _revision_lock:
+        return _data_revision
+
+
+def _mark_committed(filenames) -> None:
+    global _data_revision
+    if any(filename not in _OBSERVATION_FILES for filename in filenames):
+        with _revision_lock:
+            _data_revision += 1
 
 
 def commit_pending_writes(writes):
@@ -46,6 +61,7 @@ def commit_pending_writes(writes):
                 for key, value in items:
                     cur.execute(f'INSERT INTO "{table}" (id, data) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data', (key, json.dumps(value, ensure_ascii=False)))
         conn.commit()
+        _mark_committed(filename for _, filename, _, _ in writes)
     except Exception:
         conn.rollback()
         raise
@@ -190,6 +206,7 @@ def save_data(filename: str, data: Dict[str, Any]):
                         (key, json.dumps(value, ensure_ascii=False)),
                     )
             conn.commit()
+            _mark_committed([filename])
         finally:
             _put_conn(conn)
 
@@ -211,11 +228,12 @@ def save_item(filename: str, item_id: str, item_data: Dict[str, Any]):
             )
             logger.debug("[SAVE] %s/%s: rowcount=%d", table, item_id, cur.rowcount)
         conn.commit()
+        _mark_committed([filename])
     except Exception as e:
         logger.error("[SAVE_ERROR] %s/%s: %s", table, item_id, e)
         try:
             conn.rollback()
-        except:
+        except Exception:
             pass
         raise
     finally:
@@ -235,5 +253,6 @@ def delete_item(filename: str, item_id: str):
         with conn.cursor() as cur:
             cur.execute(f'DELETE FROM "{table}" WHERE id = %s', (item_id,))
         conn.commit()
+        _mark_committed([filename])
     finally:
         _put_conn(conn)

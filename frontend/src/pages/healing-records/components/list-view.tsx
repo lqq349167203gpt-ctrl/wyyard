@@ -67,7 +67,8 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
     })
   }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, sortField, sortOrder])
 
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, resetPage, startIndex, endIndex, loading, refresh } = useServerPagination(fetchFn)
+  const queryKey = JSON.stringify([filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, sortField, sortOrder])
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, error, refresh } = useServerPagination(fetchFn, { queryKey })
 
   // 外部触发刷新（新增/编辑/删除后）
   const refreshKeyRef = useRef(refreshKey)
@@ -78,20 +79,13 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
     }
   }, [refreshKey, refresh])
 
-  // 筛选和排序统一触发一次重查，首次加载由分页 hook 完成。
-  const previousFetchFn = useRef(fetchFn)
-  useEffect(() => {
-    if (previousFetchFn.current === fetchFn) return
-    previousFetchFn.current = fetchFn
-    resetPage()
-  }, [fetchFn, resetPage])
-
   return (
       <div className="dv-list w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <style>{`.dv-list th, .dv-list td { overflow: hidden; font-size: 13px; }`}</style>
+        {error && <div role="alert" className="px-4 py-3 text-sm text-destructive">{error}<button type="button" className="ml-3 text-[#3370ff]" onClick={refresh}>重试</button></div>}
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">加载中...</div>
-        ) : paginatedItems.length === 0 ? (
+        ) : paginatedItems.length === 0 && !error ? (
           <div className="py-16 text-center text-sm text-muted-foreground">暂无数据</div>
         ) : (
           <Table className="w-full min-w-0" style={{ tableLayout: "fixed" }}>

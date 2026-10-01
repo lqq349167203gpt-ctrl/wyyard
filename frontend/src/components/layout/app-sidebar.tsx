@@ -1,4 +1,6 @@
 import { Link, useLocation } from "react-router-dom"
+import { prefetchRoute } from "@/lib/route-prefetch"
+import { PAGES } from "@/lib/page-registry"
 import { useMemo, useState, useEffect } from "react"
 import {
   IconBasket,
@@ -47,50 +49,43 @@ type SidebarItem = {
   clearTab?: string
 }
 
-const businessItems = [
-  { title: "自定义筛选", icon: IconChartDots, path: "/custom-analysis", permission: "custom-analysis" },
-  { title: "服务老师", icon: IconSparkles, path: "/service-teachers", permission: "service-teacher" },
-  { title: "课程记录", icon: IconSchool, path: "/course-statistics", permission: "course-statistics" },
-  { title: "组织/俱乐部", icon: IconSchool, path: "/principal", permission: "principal" },
-  { title: "每日报表", icon: IconClipboardText, path: "/daily-report", permission: "daily-report" },
-]
-
-const courseItems = [
-  { title: "客户资料", icon: IconUser, path: "/healing-records", permission: "healing-records" },
-  { title: "邀约", icon: IconCalendarEvent, path: "/courses/class-records", permission: "class-records" },
-  { title: "课表", icon: IconCalendar, path: "/courses/daily-activities", permission: "daily-activities" },
-  { title: "落地课程", icon: IconBook, path: "/offline-course-records", permission: "offline-course-records" },
-  { title: "监管", icon: IconAlertTriangle, path: "/supervision", permission: "supervision" },
-]
-
-const communicationItems = [
-  { title: "沟通记录", icon: IconMessageCircle, path: "/communication-records", permission: "communication-records" },
-  { title: "回访记录", icon: IconClipboardText, path: "/followup-records", permission: "followup-records" },
-]
-
-const configItems = [
-  { title: "会员身份", icon: IconShieldCheck, path: "/config/member-identities", permission: "member-identities", clearTab: "tab_member-identities" },
-  { title: "客户标签", icon: IconTags, path: "/config/customer-tags", permission: "customer-tags" },
-  { title: "升单配置", icon: IconTrendingUp, path: "/config/upsell", permission: "upsell-config" },
-  { title: "疗愈老师", icon: IconSparkles, path: "/healing-identities", permission: "healing-identities" },
-  { title: "组织信息", icon: IconUser, path: "/organizations", permission: "organizations" },
-  { title: "空间配置", icon: IconSettings, path: "/courses/spaces", permission: "spaces" },
-]
-
-const accountItems = [
-  { title: "账号管理", icon: IconUser, path: "/positions/management", permission: "position-management", clearTab: "tab_position-management" },
-  { title: "密码修改", icon: IconLock, path: "/change-password", permission: "change-password" },
-  { title: "停用客户", icon: IconUserOff, path: "/disabled-customers", permission: "disabled-customers" },
-]
-
-const systemItems = [
-  { title: "AI 配置", icon: IconStars, path: "/agents", permission: "agents" },
-  { title: "沟通记录", icon: IconMessageCircle, path: "/chat-history", permission: "chat-history" },
-  { title: "系统日志", icon: IconFileText, path: "/system-logs", permission: "system-logs" },
-  { title: "操作日志", icon: IconClipboardText, path: "/operation-logs", permission: "operation-logs" },
-  { title: "使用统计", icon: IconLogin, path: "/login-records", permission: "login-records" },
-  { title: "分析日志", icon: IconChartDots, path: "/analysis-logs", permission: "analysis-logs" },
-]
+const PAGE_ICONS: Record<string, typeof IconBasket> = {
+  "/custom-analysis": IconChartDots,
+  "/service-teachers": IconSparkles,
+  "/course-statistics": IconSchool,
+  "/principal": IconSchool,
+  "/daily-report": IconClipboardText,
+  "/healing-records": IconUser,
+  "/courses/class-records": IconCalendarEvent,
+  "/courses/daily-activities": IconCalendar,
+  "/offline-course-records": IconBook,
+  "/supervision": IconAlertTriangle,
+  "/communication-records": IconMessageCircle,
+  "/followup-records": IconClipboardText,
+  "/config/member-identities": IconShieldCheck,
+  "/config/customer-tags": IconTags,
+  "/config/upsell": IconTrendingUp,
+  "/healing-identities": IconSparkles,
+  "/organizations": IconUser,
+  "/courses/spaces": IconSettings,
+  "/positions/management": IconUser,
+  "/change-password": IconLock,
+  "/disabled-customers": IconUserOff,
+  "/agents": IconStars,
+  "/chat-history": IconMessageCircle,
+  "/system-logs": IconFileText,
+  "/operation-logs": IconClipboardText,
+  "/login-records": IconLogin,
+  "/analysis-logs": IconChartDots,
+  "/payment": IconCreditCard, "/payment-deductions": IconClipboardText, "/payment-refunds": IconFileText,
+}
+const itemsFor = (group: string): SidebarItem[] => PAGES.filter(page => page.group === group).map(page => ({ ...page, icon: PAGE_ICONS[page.path] }))
+const businessItems = itemsFor("data")
+const courseItems = itemsFor("business")
+const communicationItems = itemsFor("communication")
+const configItems = itemsFor("config")
+const accountItems = itemsFor("account")
+const systemItems = itemsFor("system")
 
 function getIsSuperAdmin(): boolean {
   try {
@@ -145,7 +140,7 @@ function MenuGroup({
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
-                      render={<Link to={item.path} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
+                      render={<Link to={item.path} onPointerEnter={() => prefetchRoute(item.path)} onFocus={() => prefetchRoute(item.path)} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
                       isActive={isActive}
                       className={`relative mx-2 h-[34px] w-[calc(100%_-_16px)] gap-2.5 rounded-[8px] px-3 text-[13px] font-normal transition-colors ${isActive ? "bg-[#eaf1ff] text-[#212631] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-[#3370ff] hover:bg-[#eaf1ff] hover:text-[#212631] data-active:bg-[#eaf1ff] data-active:text-[#212631] data-active:hover:bg-[#eaf1ff] data-active:hover:text-[#212631]" : "text-[#212631] hover:bg-[#f0f5ff]"}`}
                     >
@@ -199,7 +194,7 @@ function FixedGroup({
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
-                  render={<Link to={item.path} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
+                  render={<Link to={item.path} onPointerEnter={() => prefetchRoute(item.path)} onFocus={() => prefetchRoute(item.path)} onClick={() => { if (item.clearTab) { localStorage.removeItem(item.clearTab); if (item.clearTab === "tab_position-management") localStorage.removeItem("selectedPositionId") } }} />}
                   isActive={isActive}
                   className={`relative mx-2 h-[34px] w-[calc(100%_-_16px)] gap-2.5 rounded-[8px] px-3 text-[13px] font-normal transition-colors ${isActive ? "bg-[#eaf1ff] text-[#212631] before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-[#3370ff] hover:bg-[#eaf1ff] hover:text-[#212631] data-active:bg-[#eaf1ff] data-active:text-[#212631] data-active:hover:bg-[#eaf1ff] data-active:hover:text-[#212631]" : "text-[#212631] hover:bg-[#f0f5ff]"}`}
                 >
@@ -270,7 +265,7 @@ export function AppSidebar() {
         <FixedGroup label="数据" items={businessItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="业务" items={courseItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <FixedGroup label="沟通" items={communicationItems} permissions={permissions} isSuperAdmin={isSuperAdmin} />
-        <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={[{ title: "付费项目", path: "/payment", permission: "payment", icon: IconCreditCard, clearTab: "tab_payment" }, { title: "销卡/退课", path: "/payment-deductions", permission: "payment-deductions", icon: IconClipboardText }, { title: "退费", path: "/payment-refunds", permission: "payment-refunds", icon: IconFileText }]} />
+        <FixedGroup label="付费" permissions={permissions} isSuperAdmin={isSuperAdmin} items={itemsFor("payment")} />
         <MenuGroup label="信息配置" items={configItems} isOpen={openGroups["信息配置"]} onToggle={() => toggle("信息配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="账号管理" items={accountItems} isOpen={openGroups["账号管理"]} onToggle={() => toggle("账号管理")} permissions={permissions} isSuperAdmin={isSuperAdmin} />
         <MenuGroup label="系统" items={systemItems} isOpen={openGroups["系统配置"]} onToggle={() => toggle("系统配置")} permissions={permissions} isSuperAdmin={isSuperAdmin} />

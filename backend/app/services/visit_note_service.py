@@ -1,14 +1,14 @@
-import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Iterable
 
 from app.models.visit_note import VisitNote, VisitNoteCategory
+from app.services.daily_customer_note_service import note_lock
 from app.services.storage import load_data, save_item
 
 FILENAME = "visit_notes.json"
 _notes: Dict[str, VisitNote] = {}
-_note_lock = threading.RLock()
+_note_lock = note_lock
 
 
 def _load() -> None:
@@ -114,12 +114,14 @@ def list_notes(visit_ids: Iterable[str], ensure_legacy: bool = True) -> list[Vis
     ids = {visit_id for visit_id in visit_ids if visit_id}
     if ensure_legacy:
         ensure_legacy_entries(ids)
+    from app.services import daily_customer_note_service
+
     return sorted(
-        (
+        [
             note
             for note in _notes.values()
             if note.visit_id in ids and not note.is_deleted
-        ),
+        ] + daily_customer_note_service.for_visits(ids),
         key=lambda note: (note.created_at, note.id),
         reverse=True,
     )
@@ -244,6 +246,10 @@ def get_previous_visit_need(
 
 
 def get_note(note_id: str) -> VisitNote | None:
+    if note_id.startswith("course-note|"):
+        from app.services import daily_customer_note_service
+
+        return daily_customer_note_service.resolve_visit_note(note_id)
     note = _notes.get(note_id)
     return note if note and not note.is_deleted else None
 
@@ -266,7 +272,9 @@ def _find_creator_note(
     creator_id: str,
     creator: str,
 ) -> VisitNote | None:
-    for note in _active_notes(visit_id, category):
+    for note in sorted(list_notes([visit_id]), key=lambda n: (n.updated_at, n.id), reverse=True):
+        if note.category != category:
+            continue
         if creator_id and note.created_by_id == creator_id:
             return note
         if not creator_id and not note.created_by_id and creator and note.created_by == creator:
@@ -295,6 +303,8 @@ def create_note(
         now = datetime.now(timezone.utc)
         existing = _find_creator_note(visit_id, category, creator_id, creator)
         if existing:
+            if existing.id.startswith("course-note|"):
+                return update_note(existing.id, normalized, feedback_person_id or None, feedback_person or None)
             existing.content = normalized
             if feedback_person_id or feedback_person:
                 existing.feedback_person_id = feedback_person_id.strip()
@@ -331,6 +341,19 @@ def update_note(
     normalized = content.strip()
     if not normalized:
         raise ValueError("记录内容不能为空")
+    if note_id.startswith("course-note|"):
+        from app.services import activity_participant_note_service
+
+        shared = get_note(note_id)
+        if not shared:
+            return None
+        original = activity_participant_note_service.get_note(note_id.split("|")[-1])
+        activity_participant_note_service.update_note_content(
+            note_id=original.id, content=normalized,
+            actor_id=original.created_by_id, actor_name=original.created_by,
+            feedback_person_id=feedback_person_id, feedback_person=feedback_person,
+        )
+        return get_note(note_id)
     with _note_lock:
         note = get_note(note_id)
         if not note:
@@ -347,6 +370,12 @@ def update_note(
 
 
 def delete_note(note_id: str) -> bool:
+    if note_id.startswith("course-note|"):
+        from app.services import activity_participant_note_service
+
+        if not get_note(note_id):
+            return False
+        return activity_participant_note_service.delete_note(note_id.split("|")[-1])
     with _note_lock:
         note = get_note(note_id)
         if not note:

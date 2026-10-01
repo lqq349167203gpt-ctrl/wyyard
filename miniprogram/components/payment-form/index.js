@@ -260,6 +260,7 @@ Component({
       if (type === 'membership_card') {
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
         rows.push({ label: '会员卡', value: formData.card_type || '-' })
+        if (!['次卡', '体验会员', '粗门次卡'].includes(formData.card_type)) rows.push({ label: '协议签订', value: formData.agreement_status === 'signed' ? '已签' : '未签' })
         amountRow = { label: '费用金额', value: '¥' + formatMoney(formData.price) }
       } else if (type === 'internal_course') {
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
@@ -387,6 +388,7 @@ Component({
         category: d.category ?? '',
         project_name: d.project_name ?? '',
         card_type: d.card_type ?? '',
+        agreement_status: d.agreement_status || '',
         course_type: d.course_type ?? '',
         payment_method: d.payment_method ?? '',
         notes: d.notes ?? '',
@@ -680,6 +682,10 @@ Component({
       })
     },
 
+    onAgreementChange(e) {
+      this.setData({ 'formData.agreement_status': e.currentTarget.dataset.value })
+    },
+
     onDiagnosisTeacherChange(e) {
       const idx = parseInt(e.detail.value)
       const teachers = this.data.diagnosisTeachers
@@ -693,6 +699,8 @@ Component({
       const { formData, selectedCustomer, closers, type, isEdit } = this.data
       const hidePaymentDetails = true
       const payload = Object.assign({}, formData)
+      if (type === 'membership_card') payload.agreement_status = ['次卡', '体验会员', '粗门次卡'].includes(formData.card_type) ? null : (formData.agreement_status || null)
+      else delete payload.agreement_status
       payload.customer_id = selectedCustomer.id
       payload.nickname = selectedCustomer.nickname
       const user = getApp()?.globalData?.currentUser
@@ -807,6 +815,9 @@ Component({
       if (type === 'membership_card' && cardTypeIndex < 0) {
         wx.showToast({ title: '请选择会员卡类型', icon: 'none' })
         return
+      }
+      if (type === 'membership_card' && !['次卡', '体验会员', '粗门次卡'].includes(formData.card_type) && !formData.agreement_status) {
+        wx.showToast({ title: '请选择协议签订状态', icon: 'none' }); return
       }
       if (type === 'internal_course' && courseTypeIndex < 0) {
         wx.showToast({ title: '请选择课程类型', icon: 'none' })

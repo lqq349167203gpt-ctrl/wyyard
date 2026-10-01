@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Users, Zap, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react"
 import {
@@ -10,7 +10,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { customerApi, type Customer } from "@/lib/api"
+import { customerApi, type CustomerLight as Customer } from "@/lib/api"
+import { useReadResource } from "@/hooks/use-read-resource"
+import { LoadError } from "@/components/load-error"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CustomerSearchInput } from "@/components/customer-search-input"
@@ -27,8 +29,7 @@ type PositionKey = typeof HEALING_POSITIONS[number]["key"]
 export default function HealingIdentitiesPage() {
   const enterToNext = useEnterToNext()
   const [activePosition, setActivePosition] = useState<PositionKey>(POSITION_ACHIEVER)
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: customers, loading, error: loadError, refresh: loadCustomers } = useReadResource<Customer[]>(customerApi.light, [])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingMember, setDeletingMember] = useState<Customer | null>(null)
@@ -37,14 +38,6 @@ export default function HealingIdentitiesPage() {
 
   const [selectedNicknames, setSelectedNicknames] = useState<string[]>([])
 
-  const loadCustomers = () => {
-    customerApi.list()
-      .then(setCustomers)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { loadCustomers() }, [])
 
   const currentConfig = HEALING_POSITIONS.find(p => p.key === activePosition)!
   const members = customers.filter(c => c.positions?.includes(activePosition))
@@ -129,6 +122,7 @@ export default function HealingIdentitiesPage() {
 
   return (
     <div className="px-6 pt-12 pb-6 space-y-3">
+      <LoadError error={loadError} onRetry={loadCustomers} />
       {/* 页面头部 */}
       <div className="flex items-center justify-between pb-2">
         <div>

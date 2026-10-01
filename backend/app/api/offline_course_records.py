@@ -9,6 +9,7 @@ from app.models.base import StrictBaseModel
 from app.models.offline_course_record import OfflineCourseRecordCreate
 from app.services import customer_access_service, customer_service, offline_course_record_service
 from app.services.storage import commit_pending_writes, delete_item, load_data, save_item
+from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/offline-course-records", tags=["offline-course-records"])
 
@@ -96,8 +97,18 @@ def log_record(request, action, record, before=None):
 
 
 @router.get("")
-def list_offline_course_records(customer_id: str = Query(None)):
-    return offline_course_record_service.list_records(customer_id)
+def list_offline_course_records(
+    customer_id: str = Query(None), page: int | None = Query(None, ge=1),
+    page_size: int = Query(10, ge=1, le=100), course_type: str = Query(""), teacher: str = Query(""),
+):
+    if page is None:
+        return offline_course_record_service.list_records(customer_id)
+    records = [r for r in offline_course_record_service.list_records() if (
+        (not customer_id or r.customer_id == customer_id or customer_id in r.participant_ids)
+        and (not course_type or r.course_type == course_type)
+        and (not teacher or r.teacher == teacher)
+    )]
+    return paginate(records, page, page_size)
 
 
 @router.post("")

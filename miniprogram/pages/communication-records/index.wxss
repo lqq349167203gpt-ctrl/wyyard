@@ -19,7 +19,7 @@
 }
 
 .record-item:active {
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
 }
 
 .item-body {
@@ -116,7 +116,7 @@
 .page {
   min-height: 100vh;
   padding: 0 0 140rpx;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   display: block;
 }
 

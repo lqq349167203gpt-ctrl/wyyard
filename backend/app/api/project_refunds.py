@@ -9,6 +9,20 @@ from app.utils.record_ownership import get_request_actor
 router = APIRouter(prefix="/api/project-refunds", tags=["project-refunds"])
 
 
+@router.get("/status-keys")
+def refund_status_keys(request: Request, project_ids: list[str] = Query(..., min_length=1, max_length=100)):
+    """仅返回当前页项目的退费标识，不截断历史记录、不暴露金额明细。"""
+    customer_access_service.require_transaction_access(request, detail=True)
+    wanted = set(project_ids)
+    items = [
+        {"customer_id": record.customer_id, "project_type": record.project_type, "project_id": record.project_id}
+        for record in project_refund_service.list_refunds()
+        if record.project_id in wanted
+    ]
+    visible = customer_access_service.filter_record_dicts(request, items)
+    return sorted({f"{item['project_type']}:{item['project_id']}" for item in visible})
+
+
 @router.get("")
 def list_refunds(request: Request, customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100)):
     customer_access_service.require_transaction_access(request, detail=True)

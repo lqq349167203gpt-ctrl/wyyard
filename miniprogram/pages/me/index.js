@@ -18,7 +18,6 @@ Page({
     canCustomerTags: false,
     canCustomAnalysis: false,
     canServiceTeacher: false,
-    canOrganizations: false,
   },
 
   async onShow() {
@@ -41,10 +40,8 @@ Page({
       canCustomAnalysis: app.checkPagePermission('custom-analysis'),
       canServiceTeacher: app.checkPagePermission('service-teacher'),
       canCourseRecords: app.checkPagePermission('course-statistics'),
-      canCustomerFollowUps: app.checkPagePermission('customer-follow-ups'),
       canAuditCheck: app.checkPagePermission('audit-check'),
       canPrincipal: app.checkPagePermission('principal'),
-      canOrganizations: app.checkPagePermission('organizations'),
     })
   },
 
@@ -77,14 +74,8 @@ Page({
   onAuditCheckTap() {
     wx.navigateTo({ url: '/pages/audit-check/index' })
   },
-  onCustomerFollowUpsTap() {
-    wx.navigateTo({ url: '/pages/customer-follow-ups/index' })
-  },
   onPrincipalTap() {
     wx.navigateTo({ url: '/pages/principal/index' })
-  },
-  onOrganizationsTap() {
-    wx.navigateTo({ url: '/pages/organizations/index' })
   },
 
   onLogout() {

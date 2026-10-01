@@ -62,7 +62,7 @@
     </view>
     <view class="form-item last">
       <text class="form-label">目标</text>
-      <textarea class="form-input goal-input" auto-height maxlength="5000" placeholder="请输入目标" placeholder-class="form-input-placeholder" value="{{goal}}" bindinput="onGoalInput" />
+      <textarea class="form-input goal-input" auto-height disable-default-padding maxlength="5000" placeholder="请输入目标" placeholder-class="form-input-placeholder" value="{{goal}}" bindinput="onGoalInput" />
     </view>
   </view>
 
@@ -106,20 +106,23 @@
         </block>
         <text class="previous-need-empty" wx:else>暂无可引用的历史需求</text>
       </view>
+      <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{needFeedbackIndex}}" data-field="needs" bindchange="onFeedbackPersonChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[needFeedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
       <view class="text-preview" bindtap="onOpenEditor" data-field="needs" data-label="来访需求">
         <text class="text-preview-content {{needs ? '' : 'text-preview-placeholder'}}">{{needs || '点击输入来访需求'}}</text>
         <text class="text-preview-count">{{needs.length}} 字</text>
       </view>
     </view>
     <view class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 16rpx;">客户信息</text>
+      <text class="form-label" style="margin-bottom: 8rpx;">客户信息</text>
+      <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{infoFeedbackIndex}}" data-field="feedback" bindchange="onFeedbackPersonChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[infoFeedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
       <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="客户信息">
         <text class="text-preview-content {{feedback ? '' : 'text-preview-placeholder'}}">{{feedback || '点击输入客户信息'}}</text>
         <text class="text-preview-count">{{feedback.length}} 字</text>
       </view>
     </view>
     <view class="form-item column textarea-row last">
-      <text class="form-label" style="margin-bottom: 16rpx;">跟进点</text>
+      <text class="form-label" style="margin-bottom: 8rpx;">跟进点</text>
+      <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{followFeedbackIndex}}" data-field="healingNotes" bindchange="onFeedbackPersonChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[followFeedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
       <view class="text-preview" bindtap="onOpenEditor" data-field="healingNotes" data-label="跟进点">
         <text class="text-preview-content {{healingNotes ? '' : 'text-preview-placeholder'}}">{{healingNotes || '点击输入跟进点'}}</text>
         <text class="text-preview-count">{{healingNotes.length}} 字</text>

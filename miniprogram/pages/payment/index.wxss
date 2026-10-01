@@ -1,6 +1,6 @@
 .page {
   min-height: 100vh;
-  background-color: #f7f8fa;
+  background-color: #f5f6f8;
   padding-bottom: 120rpx;
 }
 
@@ -432,6 +432,7 @@
   border-radius: 28rpx;
   padding: 22rpx 28rpx;
   margin-bottom: 16rpx;
+  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
 }
 
 .card-main {
@@ -776,7 +777,7 @@
 .coarse-toolbar-button { display: flex; align-items: center; justify-content: center; gap: 4rpx; height: 52rpx; padding: 0 16rpx; border-radius: 8rpx; color: #3370ff; font-size: 24rpx; }
 .coarse-toolbar-button:active { background: #f2f5fa; }
 .coarse-toolbar-plus { font-size: 28rpx; line-height: 1; }
-.coarse-record { margin-bottom: 12rpx; padding: 22rpx 24rpx; border-radius: 18rpx; background: #fff; }
+.coarse-record { margin-bottom: 12rpx; padding: 22rpx 24rpx; border-radius: 18rpx; background: #fff; box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04); }
 .coarse-record-main { display: flex; align-items: center; justify-content: space-between; }
 .coarse-record-name { color: #1f2329; font-size: 27rpx; }
 .coarse-record-actions { display: flex; align-items: center; gap: 18rpx; }
@@ -793,3 +794,8 @@
 .payment-entry-title { color: #1f2329; font-size: 30rpx; font-weight: 500; }
 .payment-entry-close { color: #646a73; font-size: 25rpx; }
 .payment-entry-body { min-height: 0; flex: 1; padding-top: 4rpx; box-sizing: border-box; }
+.card-agreement-row { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 10rpx; color: #8f959e; font-size: 22rpx; line-height: 1.5; }
+.card-closer { flex: 1; min-width: 0; word-break: break-all; }
+.card-agreement { flex-shrink: 0; }
+.card-agreement-row text { color: #4e535a; }
+.card-agreement-row .card-empty { color: #d0d3d6; }

@@ -1,96 +1,56 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom"
-import { useMemo } from "react"
+import { lazy, useMemo } from "react"
 import { AppLayout } from "@/components/layout/app-layout"
 import { ConfirmHost } from "@/components/confirm-dialog"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { RouteContent } from "@/components/route-content"
 import LoginPage from "@/pages/login"
+import { PAGE_LOADERS, PATH_PERMISSIONS } from "@/lib/page-registry"
 
 
-import AgentsPage from "@/pages/agents"
-import ChatPage from "@/pages/chat"
+const AgentsPage = lazy(PAGE_LOADERS["/agents"])
+const ChatPage = lazy(() => import("@/pages/chat"))
 
 
 
 
-import PositionsPage from "@/pages/positions"
-import PositionManagementPage from "@/pages/position-management"
-import SpacesPage from "@/pages/spaces"
-import OrganizationsPage from "@/pages/organizations"
-import ClassRecordsPage from "@/pages/class-records"
-import DailyActivitiesPage from "@/pages/daily-activities"
-import PaymentPage from "@/pages/payment"
-import PaymentDeductionsPage from "@/pages/payment-deductions"
-import PaymentRefundsPage from "@/pages/payment-refunds"
-import MemberIdentitiesPage from "@/pages/member-identities"
-import HealingRecordsPage from "@/pages/healing-records"
-import CustomerFormPage from "@/pages/healing-records/customer-form"
+const PositionsPage = lazy(() => import("@/pages/positions"))
+const PositionManagementPage = lazy(PAGE_LOADERS["/positions/management"])
+const SpacesPage = lazy(PAGE_LOADERS["/courses/spaces"])
+const OrganizationsPage = lazy(PAGE_LOADERS["/organizations"])
+const ClassRecordsPage = lazy(PAGE_LOADERS["/courses/class-records"])
+const DailyActivitiesPage = lazy(PAGE_LOADERS["/courses/daily-activities"])
+const PaymentPage = lazy(PAGE_LOADERS["/payment"])
+const PaymentDeductionsPage = lazy(PAGE_LOADERS["/payment-deductions"])
+const PaymentRefundsPage = lazy(PAGE_LOADERS["/payment-refunds"])
+const MemberIdentitiesPage = lazy(PAGE_LOADERS["/config/member-identities"])
+const HealingRecordsPage = lazy(PAGE_LOADERS["/healing-records"])
+const CustomerFormPage = lazy(() => import("@/pages/healing-records/customer-form"))
 
-import OperationLogsPage from "@/pages/operation-logs"
-import SystemLogsPage from "@/pages/system-logs"
-import LoginRecordsPage from "@/pages/login-records"
-import HealingIdentitiesPage from "@/pages/healing-identities"
-import ArrivalFeedbackPage from "@/pages/arrival-feedback"
-import ChangePasswordPage from "@/pages/change-password"
-import DisabledCustomersPage from "@/pages/disabled-customers"
-import ChatHistoryPage from "@/pages/chat-history"
-import ServiceTeachersPage from "@/pages/service-teachers"
-import DailyReportPage from "@/pages/daily-report"
-import SupervisionPage from "@/pages/supervision"
-import CourseStatisticsPage from "@/pages/course-statistics"
-import PrincipalPage from "@/pages/principal"
-import CommunicationRecordsPage from "@/pages/communication-records"
-import FollowupRecordsPage from "@/pages/followup-records"
-import OfflineCourseRecordsPage from "@/pages/offline-course-records"
-import CustomerTagsPage from "@/pages/customer-tags"
-import UpsellConfigPage from "@/pages/upsell-config"
-import CustomAnalysisPage from "@/pages/custom-analysis"
-import AnalysisLogsPage from "@/pages/analysis-logs"
+const OperationLogsPage = lazy(PAGE_LOADERS["/operation-logs"])
+const SystemLogsPage = lazy(PAGE_LOADERS["/system-logs"])
+const LoginRecordsPage = lazy(PAGE_LOADERS["/login-records"])
+const HealingIdentitiesPage = lazy(PAGE_LOADERS["/healing-identities"])
+const ArrivalFeedbackPage = lazy(() => import("@/pages/arrival-feedback"))
+const ChangePasswordPage = lazy(PAGE_LOADERS["/change-password"])
+const DisabledCustomersPage = lazy(PAGE_LOADERS["/disabled-customers"])
+const ChatHistoryPage = lazy(PAGE_LOADERS["/chat-history"])
+const ServiceTeachersPage = lazy(PAGE_LOADERS["/service-teachers"])
+const DailyReportPage = lazy(PAGE_LOADERS["/daily-report"])
+const SupervisionPage = lazy(PAGE_LOADERS["/supervision"])
+const CourseStatisticsPage = lazy(PAGE_LOADERS["/course-statistics"])
+const PrincipalPage = lazy(PAGE_LOADERS["/principal"])
+const CommunicationRecordsPage = lazy(PAGE_LOADERS["/communication-records"])
+const FollowupRecordsPage = lazy(PAGE_LOADERS["/followup-records"])
+const OfflineCourseRecordsPage = lazy(PAGE_LOADERS["/offline-course-records"])
+const CustomerTagsPage = lazy(PAGE_LOADERS["/config/customer-tags"])
+const UpsellConfigPage = lazy(PAGE_LOADERS["/config/upsell"])
+const CustomAnalysisPage = lazy(PAGE_LOADERS["/custom-analysis"])
+const AnalysisLogsPage = lazy(PAGE_LOADERS["/analysis-logs"])
 import { hasPagePermission } from "@/lib/page-permissions"
 import { usePagePermissions } from "@/hooks/use-page-permissions"
 
-const PATH_PERMISSIONS: Record<string, string> = {
 
-
-
-  "/custom-analysis": "custom-analysis",
-  "/analysis-logs": "analysis-logs",
-  "/healing-records": "healing-records",
-  "/healing-records/new": "healing-records",
-  "/healing-records/:id/edit": "healing-records",
-  "/courses/class-records": "class-records",
-  "/courses/daily-activities": "daily-activities",
-  "/payment": "payment",
-  "/payment-deductions": "payment-deductions",
-  "/payment-refunds": "payment-refunds",
-  "/agents": "agents",
-
-
-
-  "/system-logs": "system-logs",
-  "/operation-logs": "operation-logs",
-  "/login-records": "login-records",
-  "/positions/management": "position-management",
-  // 旧“活动配置”地址现已跳转到组织信息，权限也按目标页面校验
-  "/positions/courses": "organizations",
-  "/config/member-identities": "member-identities",
-  "/config/customer-tags": "customer-tags",
-  "/courses/spaces": "spaces",
-  "/organizations": "organizations",
-  "/healing-identities": "healing-identities",
-  "/chat-history": "chat-history",
-  "/service-teachers": "service-teacher",
-  "/course-statistics": "course-statistics",
-  "/supervision": "supervision",
-  "/principal": "principal",
-  "/communication-records": "communication-records",
-  "/followup-records": "followup-records",
-  "/offline-course-records": "offline-course-records",
-  "/daily-report": "daily-report",
-  "/positions/teacher": "position-management",
-  "/agents/:id/chat": "agents",
-  "/change-password": "change-password",
-  "/disabled-customers": "disabled-customers",
-}
 
 function ProtectedRoute() {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true"
@@ -151,7 +111,7 @@ function App() {
     <TooltipProvider>
       <BrowserRouter>
         <ConfirmHost />
-        <Routes>
+        <RouteContent><Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/arrival-feedback/:visitId" element={<ArrivalFeedbackPage />} />
           <Route element={<ProtectedRoute />}>
@@ -211,7 +171,7 @@ function App() {
             </Route>
             <Route path="/tea-guest/*" element={<Navigate to="/" replace />} />
           </Route>
-        </Routes>
+        </Routes></RouteContent>
       </BrowserRouter>
     </TooltipProvider>
   )

@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useState, useRef, useCallback, useMemo } from "react"
 import { CreditCard, Download, Inbox, Pencil, Trash2, Upload, X } from "lucide-react"
 import { useServerPagination } from "@/hooks/use-server-pagination"
+import { LoadError } from "@/components/load-error"
+import { useReadResource } from "@/hooks/use-read-resource"
 import { PaginationBar } from "@/components/pagination-bar"
-import ExcelJS from "exceljs"
-import { sheetToRows } from "@/lib/excel"
+import type ExcelJS from "exceljs"
+import { loadExcel, sheetToRows } from "@/lib/excel"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -64,7 +66,8 @@ type AvailableDeductionItem = {
 }
 
 export function ProjectDeductionTab() {
-  const [customers, setCustomers] = useState<CustomerLight[]>([])
+  const directory = useReadResource<CustomerLight[]>(customerApi.light, [])
+  const customers = directory.data
 
   const nicknameToCustomer = useMemo(() => {
     const map: Record<string, CustomerLight> = {}
@@ -90,7 +93,7 @@ export function ProjectDeductionTab() {
   }, [])
   const {
     paginatedItems: deductions, currentPage, totalPages, totalItems,
-    goToPage, startIndex, endIndex, loading: deductionsLoading, refresh: refreshDeductions,
+    goToPage, resetPage, startIndex, endIndex, loading: deductionsLoading, error, refresh: refreshDeductions,
   } = useServerPagination<ProjectDeduction>(fetchDeductions)
 
   // 弹窗
@@ -103,6 +106,7 @@ export function ProjectDeductionTab() {
   const [deductReason, setDeductReason] = useState("")
   const [deducting, setDeducting] = useState(false)
   const [loadingItems, setLoadingItems] = useState(false)
+  const [itemsError, setItemsError] = useState("")
   const availableItemsRequestRef = useRef(0)
 
   // 编辑弹窗
@@ -128,8 +132,8 @@ export function ProjectDeductionTab() {
   const handleFilterChange = useCallback((value: string) => {
     setSearchNickname(value)
     appliedNicknameRef.current = value
-    refreshDeductions()
-  }, [refreshDeductions])
+    resetPage()
+  }, [resetPage])
 
   const handleTypeChange = useCallback((value: string) => {
     setSearchProjectType(value)
@@ -137,14 +141,14 @@ export function ProjectDeductionTab() {
     // 切换项目类型时重置卡类型
     setSearchCardType("all")
     appliedCardTypeRef.current = ""
-    refreshDeductions()
-  }, [refreshDeductions])
+    resetPage()
+  }, [resetPage])
 
   const handleCardTypeChange = useCallback((value: string) => {
     setSearchCardType(value)
     appliedCardTypeRef.current = value === "all" ? "" : value
-    refreshDeductions()
-  }, [refreshDeductions])
+    resetPage()
+  }, [resetPage])
 
   const handleClearSearch = useCallback(() => {
     setSearchNickname("")
@@ -153,15 +157,9 @@ export function ProjectDeductionTab() {
     appliedNicknameRef.current = ""
     appliedProjectTypeRef.current = ""
     appliedCardTypeRef.current = ""
-    refreshDeductions()
-  }, [refreshDeductions])
+    resetPage()
+  }, [resetPage])
 
-  // 加载客户列表
-  useEffect(() => {
-    customerApi.light().then((data) => {
-      setCustomers(data)
-    }).catch(() => {})
-  }, [])
 
   // 扣次记录加载由 useServerPagination hook 自动处理
 
@@ -173,8 +171,9 @@ export function ProjectDeductionTab() {
     setSelectedItemKey("")
     setAvailableItems([])
     setLoadingItems(true)
-    const groupedItems = await Promise.all(PROJECT_TYPE_OPTIONS.map(async (option) => {
-      try {
+    setItemsError("")
+    try {
+      const groupedItems = await Promise.all(PROJECT_TYPE_OPTIONS.map(async (option) => {
         const items = await projectDeductionApi.getAvailableItems(c.id, option.value)
         return items
           .filter((item) => item.remaining_count === null || item.remaining_count > 0)
@@ -184,13 +183,13 @@ export function ProjectDeductionTab() {
             project_type_label: option.label,
             selection_key: `${option.value}:${item.id}`,
           }))
-      } catch {
-        return []
-      }
-    }))
-    if (requestId !== availableItemsRequestRef.current) return
-    setAvailableItems(groupedItems.flat())
-    setLoadingItems(false)
+      }))
+      if (requestId === availableItemsRequestRef.current) setAvailableItems(groupedItems.flat())
+    } catch (error) {
+      if (requestId === availableItemsRequestRef.current) setItemsError(error instanceof Error ? error.message : "可扣项目加载失败")
+    } finally {
+      if (requestId === availableItemsRequestRef.current) setLoadingItems(false)
+    }
   }, [])
 
   const handleClearCustomer = useCallback(() => {
@@ -200,6 +199,7 @@ export function ProjectDeductionTab() {
     setSelectedItemKey("")
     setAvailableItems([])
     setLoadingItems(false)
+    setItemsError("")
   }, [])
 
   const selectedItem = availableItems.find(i => i.selection_key === selectedItemKey)
@@ -276,6 +276,8 @@ export function ProjectDeductionTab() {
 
   // 下载导入模板
   const handleDownloadTemplate = async () => {
+    const ExcelJS = await loadExcel().catch(() => { alert("导出组件加载失败，请重试"); return null })
+    if (!ExcelJS) return
     const wb = new ExcelJS.Workbook()
     const headerBorder: Partial<ExcelJS.Borders> = {
       top: { style: "thin", color: { argb: "FFC0C4CC" } },
@@ -408,6 +410,7 @@ export function ProjectDeductionTab() {
 
     try {
       const data = await file.arrayBuffer()
+      const ExcelJS = await loadExcel()
       const wb = new ExcelJS.Workbook()
       await wb.xlsx.load(data)
       let success = 0
@@ -532,6 +535,7 @@ export function ProjectDeductionTab() {
 
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
+      <LoadError error={directory.error} onRetry={directory.refresh} />
       {/* 表格卡：筛选条 + 数据表 */}
       <div className="rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)] overflow-hidden flex flex-col flex-1 min-h-0">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
@@ -584,9 +588,10 @@ export function ProjectDeductionTab() {
             <CreditCard className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 销卡
           </Button>
         </div>
+        {error && <div role="alert" className="px-4 py-3 text-sm text-destructive">{error}<button type="button" className="ml-3 text-[#3370ff]" onClick={refreshDeductions}>重试</button></div>}
         {deductionsLoading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">加载中...</span></div>
-        ) : totalItems === 0 ? (
+        ) : totalItems === 0 && !error ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2"><Inbox className="h-8 w-8 text-[#d0d3d6]" /><span className="text-[12px] text-[#8f959e]">暂无数据</span></div>
         ) : (
           <Table style={{ tableLayout: "fixed" }}>
@@ -705,6 +710,8 @@ export function ProjectDeductionTab() {
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">请先选择用户</div>
               ) : loadingItems ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">正在加载可扣项目...</div>
+              ) : itemsError ? (
+                <LoadError error={itemsError} onRetry={() => { const customer = customers.find(c => c.id === customerId); if (customer) void handleSelectCustomer(customer) }} />
               ) : availableItems.length === 0 ? (
                 <div className="h-8 flex items-center text-[12px] text-[#8f959e]">该用户暂无可扣项目</div>
               ) : (

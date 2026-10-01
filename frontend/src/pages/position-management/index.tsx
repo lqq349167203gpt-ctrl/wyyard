@@ -20,62 +20,10 @@ import type {
   TransactionAccess,
 } from "@/lib/api"
 import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
-import { storePagePermissions } from "@/hooks/use-page-permissions"
-import { storeEditPermissions } from "@/hooks/use-edit-permissions"
+import { refreshAccountPermissions } from "@/hooks/use-edit-permissions"
 import { AccountsContent } from "@/pages/accounts"
 
-const ALL_PAGES = [
-  // 数据
-  { key: "custom-analysis", label: "自定义筛选" },
-  { key: "service-teacher", label: "服务老师" },
-  { key: "course-statistics", label: "课程记录" },
-  { key: "principal", label: "组织/俱乐部" },
-  { key: "daily-report", label: "每日报表" },
-  // 业务
-  { key: "healing-records", label: "客户资料" },
-  { key: "class-records", label: "邀约" },
-  { key: "daily-activities", label: "课表" },
-  { key: "offline-course-records", label: "落地课程" },
-  // 监管是一个菜单入口，三个页签分别授权。
-  { key: "audit-check", label: "信息核对" },
-  { key: "debt-records", label: "欠卡记录" },
-  { key: "agreement-signings", label: "协议签订" },
-  // 沟通
-  { key: "communication-records", label: "沟通记录" },
-  { key: "followup-records", label: "回访记录" },
-  // 付费
-  { key: "payment", label: "付费项目" },
-  { key: "payment-deductions", label: "销卡/退课" },
-  { key: "payment-refunds", label: "退费" },
-  // 信息配置
-  { key: "member-identities", label: "会员身份" },
-  { key: "customer-tags", label: "客户标签" },
-  { key: "upsell-config", label: "升单配置" },
-  { key: "healing-identities", label: "疗愈老师" },
-  { key: "organizations", label: "组织信息" },
-  { key: "spaces", label: "空间配置" },
-  // 账号管理
-  { key: "position-management", label: "账号管理" },
-  { key: "change-password", label: "密码修改" },
-  { key: "disabled-customers", label: "停用客户" },
-  // 系统配置
-  { key: "agents", label: "AI 配置" },
-  { key: "chat-history", label: "沟通记录" },
-  { key: "system-logs", label: "系统日志" },
-  { key: "operation-logs", label: "操作日志" },
-  { key: "login-records", label: "使用统计" },
-  { key: "analysis-logs", label: "分析日志" },
-]
-
-const PERMISSION_GROUPS = [
-  { label: "数据", keys: ["custom-analysis", "service-teacher", "course-statistics", "principal", "daily-report"] },
-  { label: "业务", keys: ["healing-records", "class-records", "daily-activities", "offline-course-records", "audit-check", "debt-records", "agreement-signings"] },
-  { label: "沟通", keys: ["communication-records", "followup-records"] },
-  { label: "付费", keys: ["payment", "payment-deductions", "payment-refunds"] },
-  { label: "信息配置", keys: ["member-identities", "customer-tags", "upsell-config", "healing-identities", "organizations", "spaces"] },
-  { label: "账号管理", keys: ["position-management", "change-password", "disabled-customers"] },
-  { label: "系统", keys: ["agents", "chat-history", "system-logs", "operation-logs", "login-records", "analysis-logs"] },
-]
+import { PAGE_PERMISSIONS as ALL_PAGES, PERMISSION_GROUPS } from "@/lib/page-registry"
 
 const SUPERVISION_TAB_KEYS = ["audit-check", "debt-records", "agreement-signings"]
 
@@ -175,6 +123,8 @@ export default function PositionManagementPage() {
   const [permissions, setPermissions] = useState<Record<string, string[]>>({})
   const [editPermissions, setEditPermissions] = useState<Record<string, PositionEditPermissions>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+  const loadSequence = useRef(0)
 
   // 左侧选中
   const [selectedPositionId, setSelectedPositionId] = useState<string | null>(() => {
@@ -215,13 +165,17 @@ export default function PositionManagementPage() {
   const draggingPositionIdRef = useRef<string | null>(null)
 
   const loadData = async () => {
+    const sequence = ++loadSequence.current
+    setLoading(true)
+    setLoadError("")
     try {
       const [p, a, perm, editPerm] = await Promise.all([
-        positionApi.list().then(p => { setPositions(p); return p }),
-        accountApi.list().then(a => { setAccounts(a); return a }),
+        positionApi.list(),
+        accountApi.list(),
         positionPermissionApi.getAll(),
         positionPermissionApi.getEditPermissions(),
       ])
+      if (sequence !== loadSequence.current) return
       setPositions(p)
       setSelectedPositionId(current => current && p.some(position => position.id === current)
         ? current
@@ -229,12 +183,14 @@ export default function PositionManagementPage() {
       setAccounts(a)
       setPermissions(perm)
       setEditPermissions(editPerm)
-    } catch {} finally {
-      setLoading(false)
+    } catch (error) {
+      if (sequence === loadSequence.current) setLoadError(error instanceof Error ? error.message : "账号及权限加载失败")
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false)
     }
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadData(); return () => { loadSequence.current++ } }, [])
 
   // 持久化选中角色
   useEffect(() => {
@@ -467,11 +423,8 @@ export default function PositionManagementPage() {
         formEditPermissions
       )
       try {
-        const currentRole = JSON.parse(localStorage.getItem("currentUser") || "{}").role
-        if (currentRole === selectedPosition.name) {
-          storePagePermissions(formPermissions)
-          storeEditPermissions(formEditPermissions)
-        }
+        // 保存的是某一角色，当前账号应重新读取所有角色合并后的权限。
+        await refreshAccountPermissions(true)
       } catch {}
       setSavedPermissionSnapshot(permissionSnapshot(formPermissions, formEditPermissions))
       setSaveMessage("已保存")
@@ -627,9 +580,11 @@ export default function PositionManagementPage() {
         </div>
       </div>
 
-      {activeTab === "accounts" && <AccountsContent embedded sharedAccounts={accounts} sharedPositions={positions} onAccountsChange={setAccounts} />}
+      {loadError && <div role="alert" className="px-4 py-3 text-[12px] text-destructive">{loadError}<button className="ml-3 text-[#3370ff]" onClick={loadData}>重试</button></div>}
+      {loading && <div className="py-8 text-center text-[12px] text-[#8f959e]">加载中…</div>}
+      {!loading && !loadError && activeTab === "accounts" && <AccountsContent embedded sharedAccounts={accounts} sharedPositions={positions} onAccountsChange={setAccounts} />}
 
-      {activeTab === "roles" && (
+      {!loading && !loadError && activeTab === "roles" && (
         <div className="flex gap-3" style={{ height: "calc(100vh - 180px)" }}>
           {/* 左侧角色列表 */}
           <div className="flex w-[232px] shrink-0 flex-col overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">

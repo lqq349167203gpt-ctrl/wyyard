@@ -33,17 +33,11 @@
 
   <!-- 到店状态允许现场其他员工协作修改 -->
   <view class="form-card arrival-card">
-    <view class="form-item switch-row {{arrived ? '' : 'last'}}">
+    <view class="form-item switch-row last">
       <text class="form-label">到店</text>
       <view style="flex: 1; display: flex; justify-content: flex-end;">
         <switch checked="{{arrived}}" disabled="{{viewOnly || verified}}" bindchange="onArrivedChange" color="#3370ff" />
       </view>
-    </view>
-    <view class="form-item last" wx:if="{{arrived}}">
-      <text class="form-label">到达时间</text>
-      <picker class="form-picker" disabled="{{viewOnly || verified}}" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
-        <view class="picker-display">{{arrivalTime || '选择时间'}}</view>
-      </picker>
     </view>
   </view>
 
@@ -72,7 +66,7 @@
     </view>
     <view class="form-item last">
       <text class="form-label">目标</text>
-      <textarea class="form-input goal-input" auto-height maxlength="5000" disabled="{{viewOnly || verified}}" placeholder="{{viewOnly || verified ? '-' : '请输入目标'}}" placeholder-class="form-input-placeholder" value="{{goal}}" bindinput="onGoalInput" />
+      <textarea class="form-input goal-input" auto-height disable-default-padding maxlength="5000" disabled="{{viewOnly || verified}}" placeholder="{{viewOnly || verified ? '-' : '请输入目标'}}" placeholder-class="form-input-placeholder" value="{{goal}}" bindinput="onGoalInput" />
     </view>
   </view>
 

@@ -268,6 +268,13 @@
     <view class="pf-closer-total" wx:if="{{!hidePaymentDetails && closers.length > 0}}">
       <text>总金额: {{closerTotal}} 元</text>
     </view>
+    <view class="pf-row" wx:if="{{type === 'membership_card' && formData.card_type && formData.card_type !== '次卡' && formData.card_type !== '体验会员' && formData.card_type !== '粗门次卡'}}">
+      <text class="pf-label">协议签订</text>
+      <view class="pf-agreement-options">
+        <view class="pf-agreement-option {{formData.agreement_status === 'unsigned' ? 'selected' : ''}}" data-value="unsigned" bindtap="onAgreementChange">未签</view>
+        <view class="pf-agreement-option {{formData.agreement_status === 'signed' ? 'selected' : ''}}" data-value="signed" bindtap="onAgreementChange">已签</view>
+      </view>
+    </view>
     <view class="pf-row" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">支付方式</text>
       <picker class="pf-picker" mode="selector" range="{{paymentMethods}}" range-key="label" value="{{paymentMethodIndex}}" bindchange="onPaymentMethodChange">

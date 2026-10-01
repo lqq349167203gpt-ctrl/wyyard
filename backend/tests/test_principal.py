@@ -351,6 +351,30 @@ def test_overview_referrals_use_all_customers_for_all_referral_organization(monk
     assert club["summary"]["引流人数"] == 3
 
 
+def test_overview_activity_details_share_counted_keys_and_effective_period(monkeypatch):
+    request = NS(state=NS(user_id="acc", user_role="超级管理员"))
+    orgs = [NS(id="a", name="小院", member_ids=[], referrer_ids=[], referrer_mode="all")]
+    customer = NS(id="c1", nickname="客户一", name="", referrer="", referral_date="2026-01-05", member_type="")
+    permissions = {"customer_access": {"transaction_access": "detail"}}
+    events = [
+        {**event("a1", "2026-01-06", kind="attendance"), "course_key": "class:1"},
+        {**event("a2", "2026-01-07", kind="attendance"), "course_key": "gcs:2"},
+        {**event("old", "2025-12-31", kind="attendance"), "course_key": "class:old"},
+        {**event("future", "9999-01-01", kind="attendance"), "course_key": "class:future"},
+    ]
+    monkeypatch.setattr(service, "collect_data", lambda _: (orgs, permissions, events, []))
+    monkeypatch.setattr(service, "scope", lambda _: (orgs, {customer.id: customer}, permissions))
+    monkeypatch.setattr(service.customer_service, "list_customers", lambda: [customer])
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda _: [])
+    result = service.analyze(request, PrincipalQuery(tab="overview", date_from=date(2026, 1, 1), date_to=date(9999, 1, 1)))
+    entry = result["breakdown"]["traffic"][0]["customers"][0]
+    assert entry["activity_keys"] == ["class:1", "gcs:2"]
+    assert entry["activity_count"] == len(entry["activity_keys"])
+    assert result["breakdown"]["record_period"] == {
+        "from": "2026-01-01", "to": datetime.now(service.ZoneInfo("Asia/Shanghai")).date().isoformat(),
+    }
+
+
 def test_overview_initiated_invites_group_by_inviter_with_record_details(monkeypatch):
     """发起邀约按邀约人汇总，人次由取消、未到场、已到场三种互斥状态组成。"""
     def customer(cid, nickname, referrer=""):
@@ -581,6 +605,37 @@ def test_analyze_filters_orders_and_hides_internal_fields(monkeypatch):
     # 金额与内部关联字段不出 API；客户 id 要带上，前端靠它打开客户详情
     assert all("price" not in r and "organization_id" not in r and "course_key" not in r for r in result["items"])
     assert all(r["customer_id"] for r in result["items"])
+
+
+@pytest.mark.parametrize("list_view", ["order", "customer"])
+@pytest.mark.parametrize("picks", [[], ["deals:membership"]])
+def test_orders_with_overview_matches_separate_queries(monkeypatch, list_view, picks):
+    """一次读取同时返回原成交列表和概况卡片，不能改变两者口径。"""
+    from copy import deepcopy
+
+    request = NS(state=NS(user_id="test", user_role="超级管理员"))
+    orgs = [NS(id="a", name="A", member_ids=[], referrer_ids=[], referrer_mode="all")]
+    permissions = {"customer_access": {"transaction_access": "detail"}}
+    events = [event("p1", "2026-01-02"), event("p2", "2026-01-03", product="group_case")]
+    calls = []
+
+    def collect(_):
+        calls.append(1)
+        return orgs, permissions, deepcopy(events), []
+
+    monkeypatch.setattr(service, "collect_data", collect)
+    monkeypatch.setattr(service, "scope", lambda _: (orgs, {}, permissions))
+    monkeypatch.setattr(service.customer_service, "list_customers", lambda: [])
+    query = PrincipalQuery(tab="orders", date_from=date(2026, 1, 1), list_view=list_view, breakdown=picks)
+    orders = service.analyze(request, query)
+    overview = service.analyze(request, query.model_copy(update={"tab": "overview"}))
+    calls.clear()
+    combined = service.analyze(request, query.model_copy(update={"include_overview": True}))
+    assert len(calls) == 1
+    assert combined["summary"] == overview["summary"]
+    assert combined["breakdown"] == overview["breakdown"]
+    for key in ("items", "columns", "total", "list_summary", "page", "total_pages"):
+        assert combined[key] == orders[key]
 
 
 def test_rules_persist_and_soft_delete(client):

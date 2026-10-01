@@ -47,7 +47,7 @@
   </view>
 
   <!-- 列表 -->
-  <view class="list-area" wx:if="{{!loading && filtered.length > 0}}">
+  <view class="list-area" wx:if="{{filtered.length > 0}}">
     <view
       class="record-item"
       wx:for="{{filtered}}"
@@ -72,12 +72,13 @@
   </view>
 
   <!-- 加载中 -->
-  <view class="loading" wx:if="{{loading}}">
+  <view class="loading" wx:if="{{loading || loadingMore}}">
     <text>加载中...</text>
   </view>
 
   <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{!loading && filtered.length === 0}}">
+  <view class="loading" wx:if="{{error}}" bindtap="retryList"><text>{{error}} · 点击重试</text></view>
+  <view class="empty-state" wx:if="{{!loading && !error && filtered.length === 0}}">
     <text class="empty-text">暂无记录</text>
   </view>
 
