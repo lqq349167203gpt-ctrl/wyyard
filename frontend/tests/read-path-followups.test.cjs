@@ -32,6 +32,18 @@ function deferred() {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve))
 
+test('核对锁定与预览时课程老师只读，解锁后保持原编辑权限', () => {
+  for (const [locked, previewRows, allowed, expected] of [
+    [true, undefined, true, false], [false, [], true, false],
+    [false, undefined, false, false], [false, undefined, true, true],
+  ]) {
+    const canEdit = callback('pages/daily-activities/activity-batch-table.tsx', 'canEditTeachers', {
+      locked, previewRows, canEditRow: () => allowed,
+    })
+    assert.equal(canEdit({ id: 'course' }), expected)
+  }
+})
+
 function reportEffect(date, pending, commits, errors) {
   const bindings = { dailyReportApi: {
     read: () => pending.promise.then(() => ({ date, visits: [], customers: [], activities: [], dashboard: { class_records: [] }, identities: [] })),

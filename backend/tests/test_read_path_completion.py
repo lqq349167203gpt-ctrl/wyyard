@@ -157,6 +157,28 @@ def test_analysis_pages_reuse_result_without_mutating_cached_data(analysis_cache
     assert cache.query_result(request(), PrincipalQuery(page=9, page_size=10))["page"] == 3
 
 
+def test_analysis_cached_page_only_copies_visible_feedback(analysis_cache, monkeypatch):
+    copied = []
+
+    class Feedback:
+        def __init__(self, index):
+            self.index = index
+
+        def __deepcopy__(self, memo):
+            copied.append(self.index)
+            return Feedback(self.index)
+
+    monkeypatch.setattr(cache.principal_service, "analyze", lambda *_args, **_kwargs: {
+        "items": [{"id": str(i), "feedback": Feedback(i)} for i in range(50)],
+        "total": 50, "summary": {"count": 50},
+    })
+    cache.query_result(request(), PrincipalQuery(page_size=10))
+    copied.clear()
+    result = cache.query_result(request(), PrincipalQuery(page=2, page_size=10))
+    assert copied == list(range(10, 20))
+    assert result["summary"]["count"] == 50 and result["total"] == 50
+
+
 def test_analysis_cache_isolates_accounts_permissions_and_writes(analysis_cache):
     version, permissions, calls = analysis_cache
     query = PrincipalQuery()

@@ -382,7 +382,10 @@ export function ActivityBatchTable({
     if (editPermissions.activity_participants === "view") return false
     return editPermissions.activity_participants === "all" || isOwnRow(row)
   }, [currentUser.role, editPermissions.activity_participants, isOwnRow])
-  const canEditTeachers = canEditRow
+  // 老师多选器使用独立浮层，不能只依靠表格内的置灰样式拦截。
+  const canEditTeachers = useCallback((row: ActivityRow) => (
+    !locked && !previewRows && canEditRow(row)
+  ), [locked, previewRows, canEditRow])
   const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
     field === "participant_ids"
       ? canEditParticipants(row)

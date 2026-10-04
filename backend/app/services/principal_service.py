@@ -470,6 +470,39 @@ def course_participant_rows(courses, organizations, participant_scope="", custom
     return rows
 
 
+def _teacher_feedback(notes, teacher_id, teacher_names):
+    """同一天同客户的老师反馈只整理一次，供该老师当天多堂课复用。"""
+    categories = ("visit_need", "customer_info", "follow_up")
+    content = {key: [] for key in categories}
+    creators = {key: [] for key in categories}
+    entries = {key: [] for key in categories}
+    for note in notes:
+        matches = (note.feedback_person_id == teacher_id if note.feedback_person_id
+                   else (note.feedback_person or note.created_by) in teacher_names)
+        if not matches or note.category not in content:
+            continue
+        text = note.content.strip()
+        content[note.category].append(text)
+        creator = (getattr(note, "created_by", "") or "").strip()
+        timestamp = getattr(note, "updated_at", None) or getattr(note, "created_at", None)
+        entries[note.category].append({
+            "content": text,
+            "author": (getattr(note, "feedback_person", "") or creator).strip(),
+            "at": timestamp.isoformat() if timestamp else "",
+            "created_by": creator,
+        })
+        if creator and creator not in creators[note.category]:
+            creators[note.category].append(creator)
+    content = {key: "\n".join(values) for key, values in content.items()}
+    has_info, has_point = bool(content["customer_info"]), bool(content["follow_up"])
+    return {
+        **content,
+        **{f"{key}_creators": "、".join(names) for key, names in creators.items()},
+        **{f"{key}_entries": values for key, values in entries.items()},
+        "follow_up_status": "已填写" if has_info and has_point else "待补充" if has_info or has_point else "未填写",
+    }
+
+
 def teacher_follow_up_rows(courses, customers):
     """每堂课每位老师对应案主和参与者，按反馈人归属匹配当日邀约备注。"""
     pairs = {(cid, course["date"]) for course in courses
@@ -487,6 +520,8 @@ def teacher_follow_up_rows(courses, customers):
         notes_by_person[(cid, day)].append(note)
 
     rows = []
+    # 仅本次读取内复用，不跨账号或请求缓存隐私内容，不改变按反馈人匹配的规则。
+    feedback_by_person_teacher = {}
     for course in courses:
         for teacher_id in course.get("teacher_ids") or []:
             teacher = customers.get(teacher_id)
@@ -500,31 +535,12 @@ def teacher_follow_up_rows(courses, customers):
             people.extend((cid, customer_name, "参与者") for cid, customer_name in course.get("participant_names") or []
                           if cid not in owner_ids)
             for cid, customer_name, role in people:
-                category_content = {"visit_need": [], "customer_info": [], "follow_up": []}
-                category_creators = {"visit_need": [], "customer_info": [], "follow_up": []}
-                category_entries = {"visit_need": [], "customer_info": [], "follow_up": []}
-                for note in notes_by_person.get((cid, course["date"]), []):
-                    if note.feedback_person_id:
-                        matches = note.feedback_person_id == teacher_id
-                    else:
-                        matches = (note.feedback_person or note.created_by) in teacher_names
-                    if matches and note.category in category_content:
-                        note_content = note.content.strip()
-                        category_content[note.category].append(note_content)
-                        creator = (getattr(note, "created_by", "") or "").strip()
-                        timestamp = getattr(note, "updated_at", None) or getattr(note, "created_at", None)
-                        category_entries[note.category].append({
-                            "content": note_content,
-                            "author": (getattr(note, "feedback_person", "") or creator).strip(),
-                            "at": timestamp.isoformat() if timestamp else "",
-                            "created_by": creator,
-                        })
-                        if creator and creator not in category_creators[note.category]:
-                            category_creators[note.category].append(creator)
-                content = {key: "\n".join(values) for key, values in category_content.items()}
-                has_info = bool(content["customer_info"])
-                has_point = bool(content["follow_up"])
-                status = "已填写" if has_info and has_point else "待补充" if has_info or has_point else "未填写"
+                feedback_key = (cid, course["date"], teacher_id)
+                if feedback_key not in feedback_by_person_teacher:
+                    feedback_by_person_teacher[feedback_key] = _teacher_feedback(
+                        notes_by_person.get((cid, course["date"]), []), teacher_id, teacher_names,
+                    )
+                content = feedback_by_person_teacher[feedback_key]
                 rows.append({
                     "id": f'{course["id"]}:teacher:{teacher_id}:participant:{cid}',
                     "course_id": course["id"], "customer_id": cid,
@@ -533,12 +549,7 @@ def teacher_follow_up_rows(courses, customers):
                     "course_subtype": course.get("course_subtype", ""), "customer": customer_name,
                     "participant_role": role,
                     "organization": course["organization"],
-                    "visit_need": content["visit_need"],
-                    "customer_info": content["customer_info"],
-                    "follow_up": content["follow_up"],
-                    **{f"{key}_creators": "、".join(names) for key, names in category_creators.items()},
-                    **{f"{key}_entries": entries for key, entries in category_entries.items()},
-                    "follow_up_status": status,
+                    **content,
                     "details": [f'课程｜{course["name"]}', f'老师｜{teacher_name}', f'身份｜{role}',
                                 f'来访需求｜{content["visit_need"] or "—"}',
                                 f'客户信息｜{content["customer_info"] or "—"}',

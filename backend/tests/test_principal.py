@@ -101,6 +101,40 @@ def test_teacher_follow_up_totals_count_all_rows_before_paging():
     assert totals[0]["teachers"][1]["total"] == 1
 
 
+def test_teacher_feedback_reuses_same_day_without_merging_courses_or_teachers(monkeypatch):
+    template = {"date": "2026-01-02", "name": "读书会", "organization": "小院",
+                "teacher_ids": ["t1", "t2"], "participant_ids": ["c1"],
+                "participant_names": [("c1", "小明")]}
+    courses = [{**template, "id": f"class:{i}"} for i in range(3)]
+    courses.append({**template, "id": "class:next", "date": "2026-01-03"})
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda ids: [
+        NS(id="v1", customer_id="c1", visit_date="2026-01-02", cancelled=False),
+    ])
+    monkeypatch.setattr(service.visit_note_service, "list_notes", lambda ids, ensure_legacy=False: [
+        NS(visit_id="v1", category="customer_info", content="旧记录", feedback_person_id="",
+           feedback_person="", created_by="老师甲"),
+        NS(visit_id="v1", category="follow_up", content="跟进计划", feedback_person_id="t2",
+           feedback_person="老师甲", created_by="录入者"),
+    ])
+    calls, original = [], service._teacher_feedback
+
+    def feedback(notes, teacher_id, teacher_names):
+        calls.append(teacher_id)
+        return original(notes, teacher_id, teacher_names)
+
+    monkeypatch.setattr(service, "_teacher_feedback", feedback)
+    rows = service.teacher_follow_up_rows(courses, {
+        "t1": NS(nickname="老师甲", name="甲"), "t2": NS(nickname="老师乙", name="乙"),
+    })
+    assert len(rows) == 8 and len(calls) == 4
+    assert rows[0]["customer_info"] == "旧记录" and rows[0]["follow_up"] == ""
+    assert rows[1]["customer_info"] == "" and rows[1]["follow_up"] == "跟进计划"
+    assert rows[-1]["follow_up"] == rows[-1]["customer_info"] == ""
+    totals = service._teacher_follow_up_totals(rows)
+    assert totals[0]["teachers"][0]["total"] == 3
+    assert totals[0]["teachers"][0]["info"] == 3
+
+
 def test_course_owner_can_open_own_course_profile_without_broad_customer_scope(monkeypatch):
     from app.middleware import jwt_auth
 

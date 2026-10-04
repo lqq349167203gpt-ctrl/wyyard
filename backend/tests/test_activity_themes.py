@@ -135,6 +135,14 @@ def test_schedule_lock_blocks_business_writes_but_allows_theme_updates(client):
 
     update = client.patch(f"/api/class-records/{record_id}", json={"activity_name": "不应保存"})
     assert update.status_code == 423
+    # 老师选择器的独立浮层也不能绕过核对锁；与复盘一起提交同样拦截。
+    for changes in ({"teacher_ids": ["teacher-lock-test"]},
+                    {"teacher_ids": ["teacher-lock-test"], "course_review": "补复盘"}):
+        teacher_update = client.patch(f"/api/class-records/{record_id}", json=changes)
+        assert teacher_update.status_code == 423
+    from app.services import class_record_service
+
+    assert class_record_service.get_record(record_id).teacher_ids == []
     # 课程复盘不受核对锁限制：课后补复盘要能保存
     review = client.patch(f"/api/class-records/{record_id}", json={"course_review": "课后复盘：效果不错"})
     assert review.status_code == 200

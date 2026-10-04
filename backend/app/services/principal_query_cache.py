@@ -45,9 +45,9 @@ def query_result(request, query):
                 _entries.move_to_end(key)
                 while len(_entries) > _MAX_ENTRIES:
                     _entries.popitem(last=False)
-    result = deepcopy(result)
     pages = max(1, ceil(result["total"] / query.page_size))
     page = min(query.page, pages)
-    result["items"] = result["items"][(page - 1) * query.page_size:page * query.page_size]
+    # 先切当前页再隔离返回值，不为20条明细复制整段历史反馈正文。
+    result = deepcopy({**result, "items": result["items"][(page - 1) * query.page_size:page * query.page_size]})
     result.update(page=page, page_size=query.page_size, total_pages=pages)
     return result
