@@ -21,6 +21,8 @@ CACHE_MODULES = (
     "energy_knot_session_service", "internal_course_session_service", "visit_service",
     "membership_card_service", "project_deduction_service", "customer_service", "client_notification_service",
 )
+# POST 查询/导出没有课程写入，不能等候课程事务或心跳请求持有的写锁。
+READ_ONLY_POST_PATHS = {"/api/principal/query", "/api/principal/export"}
 
 
 def eligible_courses(customer_id):
@@ -37,6 +39,8 @@ class CourseDeductionConsistencyMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope.get("method") not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return await self.app(scope, receive, send)
+        if scope.get("method") == "POST" and scope.get("path") in READ_ONLY_POST_PATHS:
             return await self.app(scope, receive, send)
         async with self.lock:
             path = scope.get("path", "")

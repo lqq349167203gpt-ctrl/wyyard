@@ -7,7 +7,13 @@ from app.api.service_teacher_customers import _xlsx_response
 from app.middleware.jwt_auth import require_page_permission
 from app.models.operation_log import OperationLogCreate
 from app.models.principal import CONDITION_FIELD_ORDER, CONDITION_FIELDS, ConversionRule, PrincipalQuery
-from app.services import operation_log_service, principal_mobile_service, principal_query_cache, principal_service
+from app.services import (
+    operation_log_service,
+    principal_mobile_service,
+    principal_query_cache,
+    principal_response_service,
+    principal_service,
+)
 from app.services.storage import load_data, load_item, save_item
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
@@ -195,9 +201,7 @@ def export(data: PrincipalQuery, request: Request):
         ]
         # 从同一权限过滤后的引流列表取数据，忽略客户端传入的无权访问或已失效 ID。
         selected = principal_mobile_service.selected_customers(result.get("breakdown", {}), data.breakdown)
-        selected = principal_mobile_service.traffic_quick_filter(selected, data.mobile_quick_filter)
-        if data.sort_by:
-            selected.sort(key=lambda item: str(item.get(data.sort_by) or ""), reverse=data.sort_order == "desc")
+        selected = principal_mobile_service.traffic_quick_filter(selected, data.detail_quick_filter or data.mobile_quick_filter)
         customers = {customer["id"]: customer for customer in selected}
         ids = data.export_customer_ids if data.export_customer_ids is not None else list(customers)
         items = []
@@ -206,6 +210,7 @@ def export(data: PrincipalQuery, request: Request):
                 continue
             customer = customers[customer_id]
             items.append({**customer, "tags": "、".join(customer.get("tags") or []), "details": []})
+        items = principal_response_service.sort_rows(items, data.sort_by, data.sort_order)
         result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
                   "items": items, "total": len(items)}
     elif data.export_view == "invite_arrivals":
@@ -241,7 +246,7 @@ def export(data: PrincipalQuery, request: Request):
         elif data.export_customer_ids is None:
             items.sort(key=lambda item: str(item.get("arrive_date") or ""), reverse=True)
         if data.sort_by:
-            items.sort(key=lambda item: str(item.get(data.sort_by) or ""), reverse=data.sort_order == "desc")
+            items = principal_response_service.sort_rows(items, data.sort_by, data.sort_order)
         result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
                   "items": items, "total": len(items)}
     elif data.export_view == "invite_initiated":
@@ -271,7 +276,7 @@ def export(data: PrincipalQuery, request: Request):
             for record in group.get("records", []):
                 items.append({**record, "tags": "、".join(record.get("tags") or []), "details": []})
         if data.sort_by:
-            items.sort(key=lambda item: str(item.get(data.sort_by) or ""), reverse=data.sort_order == "desc")
+            items = principal_response_service.sort_rows(items, data.sort_by, data.sort_order)
         result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
                   "items": items, "total": len(items)}
     columns = result["columns"]

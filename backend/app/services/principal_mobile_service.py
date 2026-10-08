@@ -59,6 +59,8 @@ def traffic_quick_filter(rows: list[dict], quick: str) -> list[dict]:
             keep = int(row.get("deals") or 0) > 0
         elif quick.startswith("product:"):
             keep = any(product.get("key") == quick[8:] for product in row.get("products") or [])
+        elif quick.startswith("subtype:"):
+            keep = any(subtype.get("key") == quick[8:] for subtype in row.get("subtypes") or [])
         else:
             field = {"initiated": "initiated_count", "invite": "invite_count", "cancel": "cancel_count",
                      "no_show": "no_show_count", "arrive": "arrive_count"}.get(quick)
@@ -74,11 +76,10 @@ def _small_customer(row: dict) -> dict:
             if key not in {"products", "subtypes", "upsell_levels", "arrival_records", "inviters"}}
 
 
-def mobile_result(result: dict, query) -> dict:
-    """沿用同一次分析所得全量统计，按手机当前板块裁剪网络响应。"""
-    breakdown = result.get("breakdown") or {}
-    picks = query.breakdown or []
-    customers = selected_customers(breakdown, picks)
+def overview_metrics(breakdown: dict, picks: list[str], customers=None) -> dict:
+    """两端卡片共用汇总，不要求浏览器下载客户全集来计算。"""
+    if customers is None:
+        customers = selected_customers(breakdown, picks)
     inviters = breakdown.get("invite_inviters") or []
     products = Counter()
     levels = Counter()
@@ -107,6 +108,15 @@ def mobile_result(result: dict, query) -> dict:
     }
     mobile["invite_total"] = sum(mobile["invite"][key]["times"] for key in ("cancel_count", "no_show_count", "arrive_count"))
     mobile["invite_people"] = sum(int(row.get("invite_count") or 0) > 0 for row in customers)
+    mobile["invite"]["invited_count"] = {
+        "times": mobile["invite_total"],
+        "people": sum(any(int(row.get(key) or 0) > 0 for key in ("cancel_count", "no_show_count", "arrive_count")) for row in customers),
+    }
+    return mobile
+
+
+def compact_breakdown(breakdown: dict) -> dict:
+    """筛选项只含名称与汇总，客户和逐次邀约记录仅由明细接口返回。"""
     compact_traffic = []
     for group in breakdown.get("traffic") or []:
         group_customers = group.get("customers") or []
@@ -118,9 +128,20 @@ def mobile_result(result: dict, query) -> dict:
             "consumer_count": len(consumers),
             "upsell_count": sum(bool(row.get("is_upsell")) for row in consumers),
         })
-    compact_breakdown = {**breakdown, "traffic": compact_traffic,
+    return {**breakdown, "traffic": compact_traffic,
                          "invite_inviters": [{key: value for key, value in item.items() if key != "records"}
-                                             for item in inviters]}
+                                             for item in breakdown.get("invite_inviters") or []]}
+
+
+def mobile_result(result: dict, query) -> dict:
+    """沿用同一次分析所得全量统计，按手机当前板块裁剪网络响应。"""
+    breakdown = result.get("breakdown") or {}
+    picks = query.breakdown or []
+    customers = selected_customers(breakdown, picks)
+    mobile = overview_metrics(breakdown, picks, customers)
+    selected_inviters = {pick.partition(":")[2] for pick in picks if pick.startswith("inviter:")}
+    chosen_inviters = [item for item in breakdown.get("invite_inviters") or []
+                      if not selected_inviters or item["key"] in selected_inviters]
     group = query.mobile_group
     if group == "traffic":
         rows = traffic_quick_filter(customers, query.mobile_quick_filter)
@@ -155,5 +176,5 @@ def mobile_result(result: dict, query) -> dict:
         start = (query.page - 1) * query.page_size
         mobile["detail_records"] = records[start:start + query.page_size]
         mobile["detail_total"] = len(records)
-    return {**result, "breakdown": compact_breakdown, "items": rows, "total": total,
+    return {**result, "breakdown": compact_breakdown(breakdown), "items": rows, "total": total,
             "page": query.page, "mobile": mobile}

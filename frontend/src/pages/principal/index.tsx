@@ -28,6 +28,7 @@ const INITIAL_RULE: ConversionRule = {
   organization_id: "", date_from: "", date_to: "",
 }
 type InviteInitiatedRecord = NonNullable<NonNullable<PrincipalBreakdown["invite_inviters"]>[number]["records"]>[number]
+type OverviewCustomerRow = PrincipalBreakdownCustomer & { referrer: string; arrival_id?: string }
 const TABS = [{ key: "overview", label: "经营概况" }, { key: "conversion", label: "转化分析" }] as const
 // 转化分析上次用过的条件：换页面/刷新后还能接着用
 const CONVERSION_DRAFT_KEY = "principal:conversion-draft"
@@ -662,12 +663,10 @@ export default function PrincipalPage() {
   // 交易列表口径：每笔交易一行 / 同一人只显示一行
   const [listView, setListView] = useState<"order" | "customer">("order")
   const [inviteArriveView, setInviteArriveView] = useState<"customer" | "date">("customer")
-  const [inviteArrivePage, setInviteArrivePage] = useState(1)
   // 经营概况：三张卡一次展开一组；二级项目勾选后筛选下面的列表
   // 默认选中第一张卡（成交量），点它可以收起
   const [overviewGroup, setOverviewGroup] = useState<"deals" | "courses" | "traffic" | "invite" | "">("traffic")
   const [breakdownPicks, setBreakdownPicks] = useState<string[]>([])
-  const [trafficPage, setTrafficPage] = useState(1)
   // 引流客户列表：除昵称外都支持点击表头排序（本地排序，不影响分页口径）
   const [trafficSortBy, setTrafficSortBy] = useState("")
   const [trafficSortOrder, setTrafficSortOrder] = useState<"asc" | "desc">("asc")
@@ -735,7 +734,7 @@ export default function PrincipalPage() {
   // 引流客户列表：默认单行截断，展开后整列换行显示全文
   const [expandTrafficCells, setExpandTrafficCells] = useState(false)
   // 发起邀约按邀约人汇总，明细用弹窗打开，避免行内展开撑满页面。
-  const [inviteDetail, setInviteDetail] = useState<{ key: string; label: string; records: InviteInitiatedRecord[] } | null>(null)
+  const [inviteDetail, setInviteDetail] = useState<{ key: string; label: string } | null>(null)
   const [inviteDetailSort, setInviteDetailSort] = useState<{ field: string; order: "asc" | "desc" }>({ field: "date", order: "desc" })
   const [expandInviteDetail, setExpandInviteDetail] = useState(false)
   // 引流人数：会员身份默认只显示前 3 类，展开后铺成两列小表
@@ -781,11 +780,14 @@ export default function PrincipalPage() {
     }
     return values
   }
-  // 二级勾选交给后端筛（否则只筛当前一页，翻页就对不上）；引流人组的客户列表在前端筛
+  // 汇总和明细共用后端筛选；引流人只影响汇总投影，不重复计算底层分析。
   const serverPicks = breakdownPicks.filter(value => !value.startsWith("traffic:"))
-  const resultKey = JSON.stringify([query, listTab, serverPicks, listView, sortBy, sortOrder])
+  const resultKey = JSON.stringify([query, listTab, breakdownPicks, listView, sortBy, sortOrder])
   // 点「查询」时置 true：这一次请求要写进分析日志
   const logAnalysisRef = useRef(false)
+  const listQuery = { ...query, tab: listTab, include_overview: listTab !== query.tab,
+    breakdown: serverPicks, list_view: listView, sort_by: sortBy, sort_order: sortOrder,
+    compact_overview: true, detail_picks: breakdownPicks }
   const pagination = useServerPagination<PrincipalRow>(async (page, size) => {
     const current = ++version.current
     // 条件没填完就别发请求：本地给出和自定义筛选一致的说法
@@ -793,7 +795,6 @@ export default function PrincipalPage() {
       const blank = blankConditionMessage()
       if (blank) throw new Error(blank)
     }
-    const listQuery = { ...query, tab: listTab, include_overview: listTab !== query.tab, breakdown: serverPicks, list_view: listView, sort_by: sortBy, sort_order: sortOrder }
     // 只有使用者主动点「查询」这一次才让后端记分析日志（切 tab、翻页不记）
     const logAnalysis = logAnalysisRef.current
     logAnalysisRef.current = false
@@ -814,6 +815,24 @@ export default function PrincipalPage() {
     }
     return resolved
   }, { pageSize: PAGE_SIZE })
+  const quickFilterKey = trafficQuickFilter
+    ? [trafficQuickFilter.kind, trafficQuickFilter.value].filter(Boolean).join(":") : ""
+  const detailQuery = { ...listQuery, detail_picks: breakdownPicks,
+    detail_sort_by: trafficSortBy, detail_sort_order: trafficSortOrder }
+  const trafficDetails = useServerPagination<OverviewCustomerRow>((page, size) =>
+    principalApi.details({ ...detailQuery, overview_detail: "traffic", detail_quick_filter: quickFilterKey }, page, size),
+  { pageSize: PAGE_SIZE, queryKey: JSON.stringify([resultKey, breakdownPicks, trafficSortBy, trafficSortOrder, quickFilterKey]),
+    enabled: query.tab === "overview" && overviewGroup === "traffic" })
+  const arrivalDetails = useServerPagination<OverviewCustomerRow>((page, size) =>
+    principalApi.details({ ...detailQuery, overview_detail: "invite_arrivals", arrival_view: inviteArriveView }, page, size),
+  { pageSize: PAGE_SIZE, queryKey: JSON.stringify([resultKey, breakdownPicks, trafficSortBy, trafficSortOrder, inviteArriveView]),
+    enabled: query.tab === "overview" && overviewGroup === "invite" && query.invite_view !== "initiated" })
+  const inviteDetails = useServerPagination<InviteInitiatedRecord>((page, size) =>
+    principalApi.details({ ...listQuery, overview_detail: "invite_initiated", overview_detail_key: inviteDetail!.key,
+      detail_sort_by: inviteDetailSort.field, detail_sort_order: inviteDetailSort.order }, page, size),
+  { pageSize: PAGE_SIZE, queryKey: JSON.stringify([resultKey, inviteDetail?.key, inviteDetailSort]), enabled: !!inviteDetail })
+  const setTrafficPage = trafficDetails.goToPage
+  const setInviteArrivePage = arrivalDetails.goToPage
   const hasCurrentResult = !!result && resultTab === query.tab && resultQueryKey === resultKey
   useEffect(() => {
     if (fullMetadataLoaded.current) return
@@ -861,7 +880,7 @@ export default function PrincipalPage() {
     pagination.resetPage()
   }, [query, listTab, pagination.resetPage])
   // 勾选/取消二级项目、切换「每笔交易 / 同一人」后重新取数（后端筛，翻页后口径仍然一致）
-  const picksKey = `${serverPicks.join(",")}|${listView}|${sortBy}|${sortOrder}`
+  const picksKey = `${breakdownPicks.join(",")}|${listView}|${sortBy}|${sortOrder}`
   const previousPicksRef = useRef(picksKey)
   useEffect(() => {
     if (previousPicksRef.current === picksKey) return
@@ -1077,9 +1096,10 @@ export default function PrincipalPage() {
     if (!hasCurrentResult || pagination.loading || pagination.error) return
     setBusy(true); setError("")
     try { const blob = await principalApi.download({ ...query, tab: listTab, list_view: listView, breakdown: serverPicks,
-      ...(showTrafficList ? { export_view: "traffic" as const, export_customer_ids: sortedTrafficCustomers.map(customer => customer.id).filter((id): id is string => !!id) } : {}),
+      ...(showTrafficList ? { export_view: "traffic" as const, sort_by: trafficSortBy, sort_order: trafficSortOrder,
+        breakdown: breakdownPicks, detail_quick_filter: quickFilterKey } : {}),
       ...(showInviteArriveList ? { export_view: "invite_arrivals" as const, arrival_view: inviteArriveView,
-        export_customer_ids: [...new Set(inviteArriveRows.map(customer => customer.id).filter((id): id is string => !!id))],
+        breakdown: breakdownPicks, sort_by: trafficSortBy, sort_order: trafficSortOrder,
         export_columns: visibleInviteColumns.map(column => column.key) } : {}),
     }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = showTrafficList ? "引流客户.xlsx" : showInviteArriveList ? "邀约到店.xlsx" : "组织俱乐部.xlsx"; link.click(); URL.revokeObjectURL(url) }
     catch (e) { setError(e instanceof Error ? e.message : "导出失败") } finally { setBusy(false) }
@@ -1093,6 +1113,7 @@ export default function PrincipalPage() {
         tab: "overview",
         invite_view: "initiated",
         export_view: "invite_initiated",
+        sort_by: inviteDetailSort.field, sort_order: inviteDetailSort.order,
         export_columns: ["date", "visit_date", ...visibleInviteDetailColumns.map(column => column.key), "status_label"],
         breakdown: [
           ...serverPicks.filter(value => !value.startsWith("inviter:")),
@@ -1123,18 +1144,9 @@ export default function PrincipalPage() {
         : query.course_view === "participant" ? "参与者" : query.course_view === "teacher_follow_up" ? "老师跟进" : "课程记录"
 
   // 展开面板：每个维度一个下拉，选项在菜单里（带数量），一行单选
-  const referralConversionText = (customers: PrincipalBreakdownCustomer[]) => {
-    const consumers = customers.filter(customer => customer.deals > 0)
-    const firstLevelKey = breakdown?.traffic_upsell_levels?.[0]?.key
-    const trialOnlyCount = firstLevelKey
-      ? customers.filter(customer => {
-        const levelKeys = (customer.upsell_levels ?? []).map(level => level.key)
-        return levelKeys.length === 1 && levelKeys[0] === firstLevelKey
-      }).length
-      : 0
-    const upsellCount = consumers.filter(customer => customer.is_upsell).length
+  const referralConversionText = (item: NonNullable<PrincipalBreakdown["traffic"]>[number]) => {
     const rate = (count: number, total: number) => total > 0 ? `${Math.round(count * 1000 / total) / 10}%` : "0%"
-    return `（体验卡 ${rate(trialOnlyCount, customers.length)} · 升单 ${rate(upsellCount, consumers.length)}）`
+    return `（体验卡 ${rate(item.trial_count ?? 0, item.count)} · 升单 ${rate(item.upsell_count ?? 0, item.consumer_count ?? 0)}）`
   }
   const panelSelects: { label: string; prefix: string; placeholder: string; multi?: boolean; items: { value: string; label: string; text: string; note?: string; compactText?: boolean; muted?: boolean }[] }[] = []
   if (overviewGroup === "deals") {
@@ -1199,7 +1211,7 @@ export default function PrincipalPage() {
         value: `traffic:${item.key}`,
         label: item.label,
         text: `引流 ${item.count} 人`,
-        note: referralConversionText(item.customers ?? []),
+        note: referralConversionText(item),
         compactText: true,
         muted: item.key === "未配置",
       }))),
@@ -1246,82 +1258,24 @@ export default function PrincipalPage() {
       },
     )
   }
-  // 引流人组：每个引流人带来客户的成交量 + 每个付费项目的成交数
-  const pickedTraffic = picksOf("traffic:")
-  // 引流客户列表：引流人 + 跟进阶段 + 流量来源 + 客户标签一起筛
-  const trafficCustomers = (breakdown?.traffic ?? [])
-    .flatMap(item => (item.customers ?? []).map(customer => ({ ...customer, referrer: item.label })))
-    .filter(customer => {
-      const identity = picksOf("identity:")
-      if (identity.length && !identity.includes(customer.identity ?? "")) return false
-      const stage = picksOf("stage:")
-      if (stage.length && !stage.includes(customer.follow_up_status ?? "")) return false
-      const source = picksOf("source:")
-      if (source.length && !source.includes(customer.traffic_source ?? "")) return false
-      const tags = picksOf("tag:")
-      if (tags.length && !tags.some(tag => (customer.tags ?? []).includes(tag))) return false
-      const upsellSituations = picksOf("upsell:")
-      if (upsellSituations.length) {
-        const levelKeys = (customer.upsell_levels ?? []).map(level => level.key)
-        const currentLevelKey = levelKeys.at(-1)
-        if (!currentLevelKey || !upsellSituations.includes(currentLevelKey)) return false
-      }
-      const inviters = picksOf("inviter:")
-      if (inviters.length && !inviters.some(name => (customer.inviters ?? []).includes(name))) return false
-      return pickedTraffic.length === 0 || pickedTraffic.includes(customer.referrer)
-    })
-  const trafficProductCounts = new Map<string, { key: string; label: string; count: number }>()
-  for (const customer of trafficCustomers) {
-    for (const product of customer.products ?? []) {
-      const current = trafficProductCounts.get(product.key)
-      trafficProductCounts.set(product.key, { key: product.key, label: product.label, count: (current?.count ?? 0) + product.count })
-    }
-  }
-  // 汇总条跟着「筛选后这一批明细」走（后端按当前勾选算好 list_summary），几个数之间互相影响
+  // 两端复用后端汇总，浏览器不再持有整批客户及重复计算统计。
+  const overviewMetrics = result?.overview_metrics
   const listScope = result?.list_summary
-  // 引流人数：成交构成（客户成交按付费项目拆）+ 会员卡子类；会员身份人数在筛选下拉里看
-  const trafficDealTotal = trafficCustomers.reduce((sum, customer) => sum + (customer.deals ?? 0), 0)
-  // 邀约 / 取消邀约 / 到店：次按记录累加；人数按同一人去重
-  const trafficVisitStats = trafficCustomers.reduce((totals, customer) => {
-    const initiated = customer.initiated_count ?? 0
-    const invite = customer.invite_count ?? 0
-    const cancel = customer.cancel_count ?? 0
-    const noShow = customer.no_show_count ?? Math.max(0, invite - (customer.arrive_count ?? 0))
-    const arrive = customer.arrive_count ?? 0
-    const invited = cancel + noShow + arrive
-    return {
-      initiatedCount: totals.initiatedCount + initiated,
-      invitedCount: totals.invitedCount + invited,
-      cancelledCount: totals.cancelledCount + cancel,
-      noShowCount: totals.noShowCount + noShow,
-      arrivedCount: totals.arrivedCount + arrive,
-      initiatedPeople: totals.initiatedPeople + (initiated > 0 ? 1 : 0),
-      invitedPeople: totals.invitedPeople + (invited > 0 ? 1 : 0),
-      cancelledPeople: totals.cancelledPeople + (cancel > 0 ? 1 : 0),
-      noShowPeople: totals.noShowPeople + (noShow > 0 ? 1 : 0),
-      arrivedPeople: totals.arrivedPeople + (arrive > 0 ? 1 : 0),
-    }
-  }, {
-    initiatedCount: 0, invitedCount: 0, cancelledCount: 0, noShowCount: 0, arrivedCount: 0,
-    initiatedPeople: 0, invitedPeople: 0, cancelledPeople: 0, noShowPeople: 0, arrivedPeople: 0,
-  })
+  const trafficDealTotal = overviewMetrics?.traffic_deals ?? 0
+  const visitMetric = (field: string) => overviewMetrics?.invite[field] ?? { times: 0, people: 0 }
+  const trafficVisitStats = {
+    invitedCount: visitMetric("invited_count").times, invitedPeople: visitMetric("invited_count").people,
+    cancelledCount: visitMetric("cancel_count").times, cancelledPeople: visitMetric("cancel_count").people,
+    noShowCount: visitMetric("no_show_count").times, noShowPeople: visitMetric("no_show_count").people,
+    arrivedCount: visitMetric("arrive_count").times, arrivedPeople: visitMetric("arrive_count").people,
+  }
   // 发起邀约按邀约记录的创建日期统计，与按预计到访日期统计的“邀约到店”分开。
   const inviteInitiatorRows = useMemo(() => {
     const selected = new Set(picksOf("inviter:"))
     return (breakdown?.invite_inviters ?? []).filter(item => !selected.size || selected.has(item.key))
   }, [breakdown?.invite_inviters, breakdownPicks])
   const inviteInitiatedTotal = inviteInitiatorRows.reduce((sum, item) => sum + item.initiated_count, 0)
-  const inviteInitiatedPeople = new Set(
-    inviteInitiatorRows.flatMap(item => (item.records ?? []).map(record => record.customer_id).filter(Boolean)),
-  ).size
-  // 开发热更新或旧页面缓存可能保留新增 visit_date 之前的结果；刷新后同步替换已打开弹窗的数据。
-  useEffect(() => {
-    if (!inviteDetail) return
-    const latest = (breakdown?.invite_inviters ?? []).find(item => item.key === inviteDetail.key)
-    if (latest?.records && latest.records !== inviteDetail.records) {
-      setInviteDetail(current => current ? { ...current, records: latest.records ?? [] } : current)
-    }
-  }, [breakdown?.invite_inviters, inviteDetail?.key])
+  const inviteInitiatedPeople = overviewMetrics?.initiated_people ?? 0
   // 邀约到店按所选日期内的次统计，三种状态互斥且合计等于总次。
   const overviewCards = [
     { id: "traffic", group: "traffic" as const, title: "引流人数（效果）", value: `${result?.summary["引流人数"] ?? "—"}`, unit: "人",
@@ -1334,13 +1288,13 @@ export default function PrincipalPage() {
     { id: "deals", group: "deals" as const, title: "成交量", value: `${result?.summary["交易笔数"] ?? "—"}`, unit: "笔",
       sub: `会员卡 ${(breakdown?.deals ?? []).filter(item => item.key === "membership").reduce((sum, item) => sum + item.count, 0)} 笔 · 其他 ${(breakdown?.deals ?? []).filter(item => item.key !== "membership").reduce((sum, item) => sum + item.count, 0)} 笔`, help: null },
   ]
-  const productTotals = [...trafficProductCounts.values()].sort((a, b) => b.count - a.count)
+  const productTotals = overviewMetrics?.traffic_products ?? []
   const scopeNumber = (key: string, fallback: string | number | undefined) => listScope?.[key] ?? fallback ?? "—"
   const panelMetrics: {
     label: string; text: string; hint?: string; help?: ReactNode
     /** 数字下面的补充说明 */
     sub?: ReactNode
-    /** 引流客户列表：按有无对应记录筛（本地筛） */
+    /** 引流客户列表：按有无对应记录筛，列表和导出共用后端规则 */
     filter?: TrafficQuickFilter
     /** 二级维度筛（走后端 breakdown picks，例如 buy:升单） */
     pick?: string
@@ -1404,77 +1358,16 @@ export default function PrincipalPage() {
   const showInviteListTabs = query.tab === "overview" && overviewGroup === "invite"
   const showInviteArriveList = showInviteListTabs && (query.invite_view || "arrive") === "arrive"
   const showInviteInitiatedList = showInviteListTabs && query.invite_view === "initiated"
-  const sortedInviteDetailRecords = useMemo(() => {
-    const rows = [...(inviteDetail?.records ?? [])]
-    const statusOrder: Record<string, number> = { cancelled: 0, no_show: 1, arrived: 2 }
-    const valueOf = (record: (typeof rows)[number]) => {
-      if (inviteDetailSort.field === "status_label") return statusOrder[record.status] ?? 99
-      if (inviteDetailSort.field === "date") return record.date
-      if (inviteDetailSort.field === "name") return record.name
-      const value = record[inviteDetailSort.field as keyof InviteInitiatedRecord]
-      return Array.isArray(value) ? value.join("、") : value ?? ""
-    }
-    const direction = inviteDetailSort.order === "asc" ? 1 : -1
-    return rows.sort((left, right) => {
-      const leftValue = valueOf(left)
-      const rightValue = valueOf(right)
-      const compared = typeof leftValue === "number" && typeof rightValue === "number"
-        ? leftValue - rightValue
-        : String(leftValue).localeCompare(String(rightValue), "zh-CN")
-      return compared * direction || right.date.localeCompare(left.date)
-    })
-  }, [inviteDetail, inviteDetailSort])
+  const sortedInviteDetailRecords = inviteDetails.paginatedItems
   const toggleInviteDetailSort = (field: string) => {
     setInviteDetailSort(current => current.field === field
       ? { field, order: current.order === "asc" ? "desc" : "asc" }
       : { field, order: field === "date" ? "desc" : "asc" })
   }
-  // 邀约到店列表：按首次到店日期排序，每人一行；支持表头点击排序
-  const inviteArriveRows = useMemo(() => {
-    const customers = trafficCustomers.filter(customer => (customer.arrive_count ?? 0) > 0 || customer.arrive_date)
-    const rows = inviteArriveView === "date"
-      ? customers.flatMap(customer => (customer.arrival_records ?? []).map(arrival => ({ ...customer, ...arrival, id: customer.id, arrival_id: arrival.id })))
-      : customers
-    const dir = trafficSortOrder === "asc" ? 1 : -1
-    if (!trafficSortBy) {
-      return rows.slice().sort((a, b) => (b.arrive_date || "").localeCompare(a.arrive_date || "") || a.name.localeCompare(b.name, "zh-CN"))
-    }
-    const valueOf = (customer: (typeof trafficCustomers)[number]): string | number => {
-      switch (trafficSortBy) {
-        case "name": return customer.name
-        case "identity": return customer.identity ?? ""
-        case "referrer": return customer.referrer ?? ""
-        case "referrer_handler": return customer.referrer_handler ?? ""
-        case "follow_up_status": return customer.follow_up_status ?? ""
-        case "traffic_source": return customer.traffic_source ?? ""
-        case "tags": return (customer.tags ?? []).join("、")
-        case "deals": return customer.deals ?? 0
-        case "invite_count": return customer.invite_count ?? 0
-        case "cancel_count": return customer.cancel_count ?? 0
-        case "no_show_count": return customer.no_show_count ?? 0
-        case "arrive_count": return customer.arrive_count ?? 0
-        case "activity_count": return customer.activity_count ?? 0
-        case "visit_interval": return customer.visit_interval ?? ""
-        case "same_day_deals": return customer.same_day_deals ?? 0
-        case "arrive_inviter": return customer.arrive_inviter ?? ""
-        case "visit_purpose": return customer.visit_purpose ?? ""
-        case "trauma_history": return customer.trauma_history ?? ""
-        case "current_block": return customer.current_block ?? ""
-        case "work_info": return customer.work_info ?? ""
-        case "other_info": return customer.other_info ?? ""
-        default: return customer.arrive_date ?? ""
-      }
-    }
-    return rows.slice().sort((a, b) => {
-      const av = valueOf(a)
-      const bv = valueOf(b)
-      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir
-      return String(av).localeCompare(String(bv), "zh-CN") * dir
-    })
-  }, [trafficCustomers, inviteArriveView, trafficSortBy, trafficSortOrder])
-  const inviteArrivePageCount = Math.max(1, Math.ceil(inviteArriveRows.length / PAGE_SIZE))
-  const inviteArriveCurrentPage = Math.min(inviteArrivePage, inviteArrivePageCount)
-  const inviteArrivePageRows = inviteArriveRows.slice((inviteArriveCurrentPage - 1) * PAGE_SIZE, inviteArriveCurrentPage * PAGE_SIZE)
+  // 到店明细按整批排序，接口仅返回当前页。
+  const inviteArrivePageCount = arrivalDetails.totalPages
+  const inviteArriveCurrentPage = arrivalDetails.currentPage
+  const inviteArrivePageRows = arrivalDetails.paginatedItems
   // 当前生效的筛选（课程数 / 成交量）：显示在列表标题右边，逐个可取消
   const activeFilterChips = useMemo(() => {
     if (showTrafficList) return []
@@ -1515,23 +1408,6 @@ export default function PrincipalPage() {
     if (trafficSortBy === field) setTrafficSortOrder(order => (order === "asc" ? "desc" : "asc"))
     else { setTrafficSortBy(field); setTrafficSortOrder("asc") }
   }
-  const trafficQuickFiltered = useMemo(() => {
-    if (!trafficQuickFilter) return trafficCustomers
-    return trafficCustomers.filter(customer => {
-      if (["initiated", "invite", "cancel", "no_show", "arrive"].includes(trafficQuickFilter.kind) && customer.referrer === "未配置") return false
-      switch (trafficQuickFilter.kind) {
-        case "initiated": return (customer.initiated_count ?? (customer.invite_count ?? 0) + (customer.cancel_count ?? 0)) > 0
-        case "invite": return (customer.invite_count ?? 0) > 0
-        case "cancel": return (customer.cancel_count ?? 0) > 0
-        case "no_show": return (customer.no_show_count ?? Math.max(0, (customer.invite_count ?? 0) - (customer.arrive_count ?? 0))) > 0
-        case "arrive": return (customer.arrive_count ?? 0) > 0
-        case "deals": return (customer.deals ?? 0) > 0
-        case "product": return (customer.products ?? []).some(item => item.key === trafficQuickFilter.value)
-        case "subtype": return (customer.subtypes ?? []).some(item => item.key === trafficQuickFilter.value)
-        default: return true
-      }
-    })
-  }, [trafficCustomers, trafficQuickFilter])
   const toggleTrafficQuickFilter = (next: TrafficQuickFilter) => {
     setTrafficPage(1)
     const active = trafficQuickFilter?.kind === next.kind && (trafficQuickFilter?.value ?? "") === (next.value ?? "")
@@ -1572,45 +1448,9 @@ export default function PrincipalPage() {
     const text = String(value ?? "")
     return text && text !== "-" ? text : <span className="text-[#c9cdd4]">-</span>
   }
-  const trafficSortValue = (customer: PrincipalBreakdownCustomer & { referrer?: string }, field: string): string | number => {
-    switch (field) {
-      case "referrer": return customer.referrer ?? ""
-      case "referrer_handler": return customer.referrer_handler ?? ""
-      case "referral_date": return customer.referral_date ?? ""
-      case "identity": return customer.identity ?? ""
-      case "follow_up_status": return customer.follow_up_status ?? ""
-      case "traffic_source": return customer.traffic_source ?? ""
-      case "tags": return (customer.tags ?? []).join("、")
-      case "visit_purpose": return customer.visit_purpose ?? ""
-      case "trauma_history": return customer.trauma_history ?? ""
-      case "current_block": return customer.current_block ?? ""
-      case "work_info": return customer.work_info ?? ""
-      case "other_info": return customer.other_info ?? ""
-      case "visit_interval": {
-        const days = Number.parseInt(customer.visit_interval ?? "", 10)
-        return Number.isNaN(days) ? -1 : days
-      }
-      case "deals": return customer.deals ?? 0
-      case "invite_count": return customer.invite_count ?? 0
-      case "cancel_count": return customer.cancel_count ?? 0
-      case "arrive_count": return customer.arrive_count ?? 0
-      case "activity_count": return customer.activity_count ?? 0
-      default: return ""
-    }
-  }
-  const sortedTrafficCustomers = useMemo(() => {
-    if (!trafficSortBy) return trafficQuickFiltered
-    const direction = trafficSortOrder === "asc" ? 1 : -1
-    return [...trafficQuickFiltered].sort((a, b) => {
-      const left = trafficSortValue(a, trafficSortBy)
-      const right = trafficSortValue(b, trafficSortBy)
-      if (typeof left === "number" && typeof right === "number") return (left - right) * direction
-      return String(left).localeCompare(String(right), "zh-CN") * direction
-    })
-  }, [trafficQuickFiltered, trafficSortBy, trafficSortOrder])
-  const trafficPageCount = Math.max(1, Math.ceil(sortedTrafficCustomers.length / PAGE_SIZE))
-  const trafficCurrentPage = Math.min(trafficPage, trafficPageCount)
-  const trafficRows = sortedTrafficCustomers.slice((trafficCurrentPage - 1) * PAGE_SIZE, trafficCurrentPage * PAGE_SIZE)
+  const trafficPageCount = trafficDetails.totalPages
+  const trafficCurrentPage = trafficDetails.currentPage
+  const trafficRows = trafficDetails.paginatedItems
   const TrafficSortArrow = ({ field }: { field: string }) => (
     <span className="inline-flex flex-col">
       <span className={`text-[8px] leading-[8px] ${trafficSortBy === field && trafficSortOrder === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span>
@@ -1630,7 +1470,7 @@ export default function PrincipalPage() {
     </TableHead>
   )
   // 引流客户列表：每一列的内容（列可隐藏/排序，所以统一用 key 渲染）
-  const renderTrafficCell = (key: string, customer: (typeof trafficCustomers)[number]) => {
+  const renderTrafficCell = (key: string, customer: OverviewCustomerRow) => {
     // 缩略时单行截断，展开时整列换行显示全文
     const textCls = expandTrafficCells ? "block max-w-full whitespace-normal break-words" : "block max-w-full truncate"
     const muted = (value?: string) => (value && value !== "未配置" ? <span className={textCls} title={value}>{value}</span> : <EmptyValue />)
@@ -2152,7 +1992,7 @@ export default function PrincipalPage() {
                   </p>
                 )}
               </div>
-              {overviewGroup === "traffic" && trafficCustomers.length > 0 && (
+              {overviewGroup === "traffic" && (overviewMetrics?.traffic_count ?? 0) > 0 && (
                 <div className="border-t border-[#f5f6f7]">
                   <div className="flex items-baseline gap-1 px-4 py-2.5">
                     <span className="shrink-0 text-[12px] text-[#8f959e]">成交总计</span>
@@ -2310,7 +2150,7 @@ export default function PrincipalPage() {
               <span className="shrink-0 text-[12px] text-[#8f959e]">
                 {showInviteInitiatedList
                   ? `共 ${inviteInitiatorRows.length} 位邀约人 · ${inviteInitiatedTotal} 人次`
-                  : `共 ${showInviteArriveList ? inviteArriveRows.length : showTrafficList ? trafficQuickFiltered.length : pagination.totalItems} 条`}
+                  : `共 ${showInviteArriveList ? arrivalDetails.totalItems : showTrafficList ? trafficDetails.totalItems : pagination.totalItems} 条`}
               </span>
             )}
             {pagination.loading && <span className="shrink-0 text-[11px] text-[#b0b5bb]">查询中…</span>}
@@ -2462,11 +2302,7 @@ export default function PrincipalPage() {
                           onClick={() => {
                             setInviteDetailSort({ field: "date", order: "desc" })
                             setExpandInviteDetail(false)
-                            const records = item.records ?? []
-                            setInviteDetail({ key: item.key, label: item.label, records })
-                            if (records.some(record => !Object.prototype.hasOwnProperty.call(record, "visit_date"))) {
-                              pagination.refresh()
-                            }
+                            setInviteDetail({ key: item.key, label: item.label })
                           }}
                           className="text-[12px] text-[#3370ff] hover:text-[#245be8]"
                         >
@@ -2595,15 +2431,16 @@ export default function PrincipalPage() {
                 </TableBody>
               </Table>
             </div>
-            {!inviteArriveRows.length && (
+            {arrivalDetails.error && <div className="py-4 text-center text-sm text-destructive">{arrivalDetails.error}</div>}
+            {!arrivalDetails.totalItems && !arrivalDetails.loading && !arrivalDetails.error && (
               <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无到店记录</div>
             )}
             <PaginationBar
               currentPage={inviteArriveCurrentPage}
               totalPages={inviteArrivePageCount}
-              totalItems={inviteArriveRows.length}
-              startIndex={inviteArriveRows.length ? (inviteArriveCurrentPage - 1) * PAGE_SIZE + 1 : 0}
-              endIndex={Math.min(inviteArriveCurrentPage * PAGE_SIZE, inviteArriveRows.length)}
+              totalItems={arrivalDetails.totalItems}
+              startIndex={arrivalDetails.startIndex}
+              endIndex={arrivalDetails.endIndex}
               onPageChange={setInviteArrivePage}
             />
           </>
@@ -2641,13 +2478,14 @@ export default function PrincipalPage() {
                 </TableBody>
               </Table>
             </div>
-            {!trafficCustomers.length && <div className="py-16 text-center text-sm text-muted-foreground">暂无符合条件的数据</div>}
+            {trafficDetails.error && <div className="py-4 text-center text-sm text-destructive">{trafficDetails.error}</div>}
+            {!trafficDetails.totalItems && !trafficDetails.loading && !trafficDetails.error && <div className="py-16 text-center text-sm text-muted-foreground">暂无符合条件的数据</div>}
             <PaginationBar
               currentPage={trafficCurrentPage}
               totalPages={trafficPageCount}
-              totalItems={trafficCustomers.length}
-              startIndex={(trafficCurrentPage - 1) * PAGE_SIZE + 1}
-              endIndex={Math.min(trafficCurrentPage * PAGE_SIZE, trafficCustomers.length)}
+              totalItems={trafficDetails.totalItems}
+              startIndex={trafficDetails.startIndex}
+              endIndex={trafficDetails.endIndex}
               onPageChange={setTrafficPage}
             />
           </>
@@ -2788,7 +2626,7 @@ export default function PrincipalPage() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <DialogTitle className="text-[16px] font-medium leading-5 text-[#1f2329]">邀约明细 · <span className={inviteDetail?.label === "未配置" ? "text-[#a8adb5]" : ""}>{inviteDetail?.label || ""}</span></DialogTitle>
-              <p className="mt-1 text-[12.5px] leading-5 text-[#858b94]">共 {(inviteDetail?.records ?? []).length} 条记录 · 按邀约创建日期统计</p>
+              <p className="mt-1 text-[12.5px] leading-5 text-[#858b94]">共 {inviteDetails.totalItems} 条记录 · 按邀约创建日期统计</p>
             </div>
             <div className="flex shrink-0 items-end gap-2">
               <ColumnSettings
@@ -2801,7 +2639,7 @@ export default function PrincipalPage() {
               <button
                 type="button"
                 onClick={downloadInviteDetail}
-                disabled={busy || !(inviteDetail?.records ?? []).length}
+                disabled={busy || !inviteDetails.totalItems}
                 className="flex h-7 shrink-0 items-center gap-1 rounded-[5px] border border-[#dfe2e6] bg-white px-3 text-[12.5px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50"
               >
                 <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
@@ -2867,11 +2705,15 @@ export default function PrincipalPage() {
               ))}
             </TableBody>
           </Table>
-          {!(inviteDetail?.records ?? []).length && (
-            <div className="py-14 text-center text-[13px] text-muted-foreground">暂无明细</div>
+          {inviteDetails.error && <div className="py-4 text-center text-sm text-destructive">{inviteDetails.error}</div>}
+          {!inviteDetails.totalItems && !inviteDetails.error && (
+            <div className="py-14 text-center text-[13px] text-muted-foreground">{inviteDetails.loading ? "加载中…" : "暂无明细"}</div>
           )}
           </div>
         </div>
+        <PaginationBar currentPage={inviteDetails.currentPage} totalPages={inviteDetails.totalPages}
+          totalItems={inviteDetails.totalItems} startIndex={inviteDetails.startIndex}
+          endIndex={inviteDetails.endIndex} onPageChange={inviteDetails.goToPage} />
       </DialogContent>
     </Dialog>
 

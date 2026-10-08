@@ -110,6 +110,14 @@ class PrincipalQuery(StrictBaseModel):
     export_customer_ids: list[str] | None = Field(default=None, max_length=50000)
     export_columns: list[str] | None = Field(default=None, max_length=32)
     arrival_view: Literal["customer", "date"] = "customer"
+    # PC 按需明细：旧端不传时保留完整响应；汇总与明细共用同一分析结果。
+    compact_overview: bool = False
+    overview_detail: Literal["", "traffic", "invite_arrivals", "invite_initiated"] = ""
+    overview_detail_key: str = Field(default="", max_length=80)
+    detail_picks: list[str] = Field(default_factory=list, max_length=16)
+    detail_quick_filter: str = Field(default="", max_length=80)
+    detail_sort_by: str = Field(default="", max_length=40)
+    detail_sort_order: Literal["asc", "desc"] = "asc"
     # 只有使用者主动点「查询」时才记分析日志；切 tab、翻页这类自动请求不记，避免刷屏
     log_analysis: bool = False
     # 交易列表的展示口径：order＝每笔交易一行；customer＝同一人只显示一行（合并）
@@ -120,7 +128,7 @@ class PrincipalQuery(StrictBaseModel):
     rule: ConversionRule = Field(default_factory=ConversionRule)
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=1000)
-    # 管理端小程序按当前经营板块分批取列表；PC 仍沿用完整 breakdown。
+    # 管理端小程序按当前经营板块分批取列表；未传裁剪参数的旧客户端保留完整响应。
     mobile_group: Literal["", "traffic", "invite_arrive", "invite_initiated", "courses", "deals"] = ""
     mobile_quick_filter: str = Field(default="", max_length=80)
     mobile_detail_key: str = Field(default="", max_length=120)
@@ -129,4 +137,6 @@ class PrincipalQuery(StrictBaseModel):
     def validate_range(self):
         if self.date_from and self.date_to and self.date_from > self.date_to:
             raise ValueError("开始日期不能晚于结束日期")
+        if self.overview_detail and (self.tab != "overview" or self.mobile_group):
+            raise ValueError("按需明细仅用于经营概况，请勿混用小程序列表参数")
         return self

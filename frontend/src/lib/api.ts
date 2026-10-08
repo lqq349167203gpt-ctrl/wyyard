@@ -50,6 +50,13 @@ export interface PrincipalQuery {
   export_customer_ids?: string[]
   export_columns?: string[]
   arrival_view?: "customer" | "date"
+  compact_overview?: boolean
+  overview_detail?: "" | "traffic" | "invite_arrivals" | "invite_initiated"
+  overview_detail_key?: string
+  detail_picks?: string[]
+  detail_quick_filter?: string
+  detail_sort_by?: string
+  detail_sort_order?: "asc" | "desc"
   organization_id: string
   date_from: string | null
   date_to: string | null
@@ -165,6 +172,9 @@ export interface PrincipalBreakdownItem {
   subtypes?: PrincipalBreakdownItem[]
   products?: PrincipalBreakdownItem[]
   customers?: PrincipalBreakdownCustomer[]
+  trial_count?: number
+  consumer_count?: number
+  upsell_count?: number
 }
 export interface PrincipalBreakdown {
   record_period?: { from: string; to: string }
@@ -228,6 +238,14 @@ export interface PrincipalBreakdown {
   traffic_profile_fields?: string[]
 }
 export interface PrincipalResult extends PaginatedResponse<PrincipalRow> {
+  overview_metrics?: {
+    traffic_count: number
+    traffic_deals: number
+    traffic_products: PrincipalBreakdownItem[]
+    invite: Record<string, { times: number; people: number }>
+    initiated_times: number
+    initiated_people: number
+  }
   summary: Record<string, string | number>
   /** 明细列表这一批的口径（已应用二级勾选）：成交量 / 成交人数 / 付费项目 */
   list_summary?: Record<string, number>
@@ -244,6 +262,12 @@ export const principalApi = {
   metadata: (lite = false) => request<PrincipalMetadata>(`/api/principal/metadata${lite ? "?lite=true" : ""}`),
   ruleFields: () => request<PrincipalRuleFields>("/api/principal/rule-fields"),
   query: (query: PrincipalQuery, page: number, page_size: number) => request<PrincipalResult>("/api/principal/query", { method: "POST", body: JSON.stringify({ ...query, page, page_size }) }),
+  details: async <T,>(query: PrincipalQuery, page: number, page_size: number) => {
+    const result = await request<{ overview_detail: PaginatedResponse<T> }>("/api/principal/query", {
+      method: "POST", body: JSON.stringify({ ...query, page, page_size }),
+    })
+    return result.overview_detail
+  },
   rules: () => request<SavedConversionRule[]>("/api/principal/rules"),
   saveRule: (rule: ConversionRule, id?: string) => request<SavedConversionRule>(`/api/principal/rules${id ? "/" + id : ""}`, { method: id ? "PATCH" : "POST", body: JSON.stringify(rule) }),
   deleteRule: (id: string) => request<{ success: boolean }>(`/api/principal/rules/${id}`, { method: "DELETE" }),
