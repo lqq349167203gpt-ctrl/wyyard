@@ -384,7 +384,7 @@ Page({
       .filter(Boolean)
     const rest = columns.filter(c => c !== titleColumn && c !== dateColumn && ordered.indexOf(c) < 0)
     // 新人/老人名单也是长文本：不放进标签，跟客户档案一样单独一行完整显示（不再提示「见明细」）
-    const LONG_FIELDS = ['new_names', 'old_names', 'visit_need', 'customer_info', 'follow_up']
+    const LONG_FIELDS = ['new_names', 'old_names', 'coarse_names', 'absent_names', 'visit_need', 'customer_info', 'follow_up']
     // 分三类展示：分类值（身份/阶段/来源/标签/类型/老师…）做成小标签，
     // 数字单独一行带短前缀（到店 3 次 / 课时 1），没值的不显示，长文本进明细弹窗
     // 会员身份挪到昵称右边单独显示，其余分类值都带上自己的标题前缀，避免看不出是什么
@@ -397,10 +397,15 @@ Page({
         if (empty) return null
         // 客户档案类字段单独成块、不加底色，排在数字行下面、日期上面，层级更清楚
         if (PROFILE_COLUMN_LABELS[c.key] || LONG_FIELDS.indexOf(c.key) >= 0) {
-          return { kind: 'profile', label: c.label, value: raw }
+          const peopleKey = { new_names: 'new_people', old_names: 'old_people', coarse_names: 'coarse_people', absent_names: 'absent_people' }[c.key]
+          return { kind: 'profile', label: c.label, value: raw, people: peopleKey ? row[peopleKey] || [] : [] }
         }
         const numeric = NUMBER_KEYS.has(c.key) || /^-?\d+(\.\d+)?$/.test(raw)
-        if (numeric) return { kind: 'number', label, value: raw }
+        if (numeric) return {
+          kind: 'number', label,
+          value: group === 'courses' && c.key === 'same_day_deals' ? `${raw} 笔` : raw,
+          empty: group === 'courses' && c.key === 'same_day_deals' && Number(raw) === 0,
+        }
         if (c.key === IDENTITY_KEY) return { kind: 'identity', label: '', value: raw }
         return { kind: 'category', label, value: raw }
       })

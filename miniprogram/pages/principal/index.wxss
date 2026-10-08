@@ -342,6 +342,7 @@
 .record-numbers { display: flex; flex-wrap: wrap; align-items: center; gap: 4rpx 14rpx; margin-top: 10rpx; }
 .record-number { font-size: 21rpx; line-height: 1.5; color: #2b2f36; }
 .record-number-label { margin-right: 6rpx; color: #9aa1a9; }
+.record-number .teacher-empty-dash { vertical-align: middle; }
 .record-numbers .record-number + .record-number::before { content: "·"; margin-right: 14rpx; color: #d0d3d6; }
 /* 客户档案类字段：不加底色，一行一条，位于数字和日期之间 */
 .record-profiles { margin-top: 12rpx; }

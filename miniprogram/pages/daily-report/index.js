@@ -428,10 +428,13 @@ Page({
       const uniqueIds = [...new Set(allIds)].filter(id => !teacherIds.includes(id) && customerMap[id])
       const oldMembers = []
       const newMembers = []
+      const absentMembers = []
+      const arrivedIds = new Set(r.arrived_participant_ids || [])
       uniqueIds.forEach(id => {
         const c = customerMap[id]
         if (!c || !c.nickname) return
-        if (identityTypeMap[c.member_type] === '新人') newMembers.push(c.nickname)
+        if (!arrivedIds.has(id)) absentMembers.push(c.nickname)
+        else if (identityTypeMap[c.member_type] === '新人') newMembers.push(c.nickname)
         else oldMembers.push(c.nickname)
       })
       return {
@@ -442,11 +445,13 @@ Page({
         typeText: type + (isWelfare ? ' · 公益' : ''),
         timeText: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
         teacherText: (r.teacher_names || []).join('、'),
-        count: uniqueIds.length,
+        count: uniqueIds.filter(id => arrivedIds.has(id)).length,
         oldCount: oldMembers.length,
         newCount: newMembers.length,
         oldText: oldMembers.join('、'),
         newText: newMembers.join('、'),
+        absentText: absentMembers.join('、'),
+        coarseText: (r.coarse_customers || []).map(person => person.nickname).join('、'),
         allIds: uniqueIds,
         open: false,
         membershipDeductionCount: r.membership_deduction_count || 1,

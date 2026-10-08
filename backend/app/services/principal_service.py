@@ -169,7 +169,6 @@ def collect_data(request, *, metadata_only=False):
         _course_activity_teacher_ids,
         _course_owner_details,
         _course_participant_ids,
-        _course_participant_roles,
     )
 
     organizations, customers, permissions = scope(request)
@@ -185,10 +184,9 @@ def collect_data(request, *, metadata_only=False):
     def customer_name(cid):
         return (customers[cid].nickname or customers[cid].name or "未命名") if cid in customers else ""
     today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
-    arrived_cache = defaultdict(set)
-    for visit in visit_service._visits.values():
-        if visit.arrived and not visit.is_deleted:
-            arrived_cache[visit.visit_date].add(visit.customer_id)
+    arrived_cache = visit_service.get_arrived_customer_ids_by_date()
+    coarse_customers = (project_deduction_service.coarse_customer_ids_by_activity()
+                        if not metadata_only and permissions["customer_access"]["transaction_access"] != "none" else {})
     for kind, label, loader in COURSE_ACTIVITY_TYPES:
         for activity in loader():
             day = valid_day(activity.date)
@@ -221,25 +219,32 @@ def collect_data(request, *, metadata_only=False):
                     energy_owner_ids = {o.get("id", "") for o in owners if isinstance(o, dict)}
                     owner_ids.extend(energy_owner_ids)
                     participants -= energy_owner_ids
-            participants -= set(getattr(activity, "withdrawn_participant_ids", []) or [])
-            participants &= set(customers) & arrived_cache[day]
+            roster_ids = participants & set(customers)
+            participants = roster_ids & arrived_cache.get(day, set())
             name = _course_activity_name(kind, label, activity)
             key = f"{kind}:{activity.id}"
             if not metadata_only:
                 details = _course_owner_details(kind, activity, customers, set(customers))
-                service_participant_ids = sorted(set(_course_participant_roles(kind, activity)) & set(customers))
+                service_participant_ids = sorted(participants)
+                service_owner_ids = sorted(set(owner_ids) & set(customers) & arrived_cache.get(day, set()))
+                coarse_people = [{"id": cid, "name": customer_name(cid)}
+                                 for cid in sorted(coarse_customers.get((kind, activity.id), set()) & set(customers))]
                 row = {
                     "id": key, "date": day, "name": name, "type": label, "organization_id": org_id,
                     "organization": org_names[org_id], "teachers": "、".join(filter(None, (customer_name(t) for t in sorted(teachers)))),
                     "teacher_ids": sorted(teachers),
                     "hours": _course_activity_hours(kind, activity),
                     "owner": details["owner_name"], "parts": details["body_part_count"] if kind == "eks" else "",
-                    "owner_count": details["owner_count"],
+                    "owner_count": len(service_owner_ids),
                     "owner_ids": sorted(set(owner_ids) & set(customers)),
+                    "service_owner_ids": service_owner_ids,
                     "service_participant_count": len(service_participant_ids),
                     "service_participant_ids": service_participant_ids,
                     "participants": len(participants), "participant_ids": sorted(participants),
                     "participant_names": [(cid, customer_name(cid)) for cid in sorted(participants)],
+                    "roster_names": [(cid, customer_name(cid)) for cid in sorted(roster_ids)],
+                    "coarse_people": coarse_people,
+                    "coarse_names": "、".join(person["name"] for person in coarse_people),
                     "activity_type": kind,
                     "course_subtype": getattr(activity, "course_type", "") or "",
                     "details": ["到场｜" + customer_name(cid) for cid in sorted(participants)],
@@ -302,7 +307,7 @@ def _service_visit_totals(courses):
     """服务人次跨课累计；人数按可见客户 ID 去重，案主与参与者可重叠。"""
     owners = sum(course.get("owner_count", 0) for course in courses)
     participants = sum(course.get("service_participant_count", 0) for course in courses)
-    owner_ids = {cid for course in courses for cid in course.get("owner_ids", []) if cid}
+    owner_ids = {cid for course in courses for cid in course.get("service_owner_ids", course.get("owner_ids", [])) if cid}
     participant_ids = {cid for course in courses for cid in course.get("service_participant_ids", []) if cid}
     return {
         "服务人次": owners + participants,
@@ -560,7 +565,7 @@ def teacher_follow_up_rows(courses, customers):
 
 def _public_rows(rows, columns, *, teacher_feedback=False):
     fields = ["id", "customer_id", "course_id", "product", "subtype", "repeat_times",
-              "new_people", "old_people", "details", *[key for key, _ in columns]]
+              "new_people", "old_people", "absent_people", "coarse_people", "order_count", "details", *[key for key, _ in columns]]
     if teacher_feedback:
         fields.extend(["type", "course_subtype", "participant_role", "teacher_id", *[f"{category}_{suffix}" for category in ("visit_need", "customer_info", "follow_up")
                                 for suffix in ("creators", "entries")]])
@@ -688,13 +693,16 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         course["new_count"] = sum(first_arrival.get(cid) == course["date"] for cid in ids)
         course["old_count"] = len(ids) - course["new_count"]
         # 新人/老人名单：与课程记录页一致，按可见课程历史的首次到场日划分
-        new_names = [name for cid, name in course.get("participant_names") or [] if first_arrival.get(cid) == course["date"]]
-        old_names = [name for cid, name in course.get("participant_names") or [] if first_arrival.get(cid) != course["date"]]
+        roster_names = course.get("roster_names", course.get("participant_names")) or []
+        new_names = [name for cid, name in roster_names if cid in ids and first_arrival.get(cid) == course["date"]]
+        old_names = [name for cid, name in roster_names if cid in ids and first_arrival.get(cid) != course["date"]]
         # 名单里的名字要能点开客户详情，所以额外给出 id
-        course["new_people"] = [{"id": cid, "name": name} for cid, name in course.get("participant_names") or []
-                                if first_arrival.get(cid) == course["date"] and name]
-        course["old_people"] = [{"id": cid, "name": name} for cid, name in course.get("participant_names") or []
-                                if first_arrival.get(cid) != course["date"] and name]
+        course["new_people"] = [{"id": cid, "name": name} for cid, name in roster_names
+                                if cid in ids and first_arrival.get(cid) == course["date"] and name]
+        course["old_people"] = [{"id": cid, "name": name} for cid, name in roster_names
+                                if cid in ids and first_arrival.get(cid) != course["date"] and name]
+        course["absent_people"] = [{"id": cid, "name": name} for cid, name in roster_names if cid not in ids and name]
+        course["absent_names"] = "、".join(person["name"] for person in course["absent_people"])
         course["new_names"] = "、".join(n for n in new_names if n)
         course["old_names"] = "、".join(n for n in old_names if n)
         # 关联成交只算强关联：明确选了这门课的成交（不把到场客户以后的任意成交算进来，避免误导）
@@ -1155,8 +1163,8 @@ def analyze(request, query: PrincipalQuery, *, export=False):
             rows = [row for row in rows if (row.get("related_deals") or 0) > 0]
         # 新人/老人名单放在最右侧，方便一眼看完课程本身的数据
         columns = [("date", "课程日期"), ("name", "课程"), ("type", "活动类型"), ("teachers", "课程老师"), ("owner", "案主"),
-                   ("hours", "课时数"), ("participants", "到场人数"), ("same_day_deals", "课程当日成交"), ("order_count", "关联成交"),
-                   ("new_names", "新人名单"), ("old_names", "老人名单")]
+                   ("hours", "课时数"), ("participants", "到场人数"), ("same_day_deals", "当日成交"),
+                   ("new_names", "新人名单"), ("old_names", "老人名单"), ("coarse_names", "粗门客户"), ("absent_names", "未到店")]
     # 经营概况展开面板勾选的二级项目：只筛明细列表，卡片与二级拆分保持整批口径
     rows = apply_breakdown_picks(rows, query.breakdown)
     # 明细列表这一批的口径（勾了维度就是筛完之后的），给面板底部的汇总条用

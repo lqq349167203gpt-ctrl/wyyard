@@ -1,6 +1,71 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+
+
+def test_coarse_customer_index_uses_active_direct_course_links(monkeypatch):
+    from app.services import project_deduction_service as service
+
+    def deduction(customer_id="c1", **changes):
+        fields = dict(customer_id=customer_id, project_type="membership-cards", project_name="粗门次卡",
+                      source_activity_type="class", source_activity_id="course-1",
+                      is_deleted=False, cancelled=False)
+        return SimpleNamespace(**(fields | changes))
+
+    records = [deduction(), deduction(), deduction("c2"),
+               deduction("c3", source_activity_type="gcs"),
+               deduction("cancelled", cancelled=True), deduction("deleted", is_deleted=True),
+               deduction("other", project_name="60次卡"), deduction("unlinked", source_activity_id=""),
+               deduction("wrong-product", project_type="other-projects")]
+    monkeypatch.setattr(service, "_deductions", {str(i): record for i, record in enumerate(records)})
+    monkeypatch.setattr(service, "_fill_current_remaining", lambda _: pytest.fail("只读名单不得计算余额"))
+    assert service.coarse_customer_ids_by_activity() == {
+        ("class", "course-1"): {"c1", "c2"}, ("gcs", "course-1"): {"c3"},
+    }
+
+
+@pytest.mark.parametrize("access,mobile_view", [("detail", ""), ("summary", "courses"), ("none", "")])
+def test_course_coarse_customers_respect_course_and_customer_permissions(monkeypatch, access, mobile_view):
+    from starlette.requests import Request
+
+    from app.api import statistics
+
+    activities = {"class": [_activity(id="same-id"), _activity(id="other-id")],
+                  "gcs": [_activity(id="same-id")]}
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", tuple(
+        (kind, kind, lambda kind=kind, **_: activities[kind]) for kind in activities
+    ))
+    customers = [SimpleNamespace(id=cid, nickname=name, name="", member_type="", positions=[])
+                 for cid, name in [("teacher-1", "老师"), ("c1", "小甲"), ("c2", "小乙"), ("secret", "不可见")]]
+    monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: customers)
+    monkeypatch.setattr(statistics.organization_service, "list_organizations", lambda: [])
+    monkeypatch.setattr(statistics.course_service, "list_courses", lambda: [])
+    monkeypatch.setattr(statistics.course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(statistics.member_identity_service, "list_identities", lambda: [])
+    monkeypatch.setattr(statistics, "_course_participant_ids", lambda *_: {"c1", "c2"})
+    monkeypatch.setattr(statistics, "_course_customer_daily_context", lambda *_: ({}, {}, {}))
+    monkeypatch.setattr(statistics, "_payment_record_groups", lambda: [])
+    monkeypatch.setattr(statistics, "get_request_roles", lambda _: ["测试角色"])
+    monkeypatch.setattr(statistics.position_edit_permission_service, "get_permissions", lambda _: {"course_records": "all"})
+    monkeypatch.setattr(statistics.customer_access_service, "transaction_access", lambda _: access)
+    monkeypatch.setattr(statistics.customer_access_service, "visible_customer_ids", lambda *_: {"teacher-1", "c1", "c2"})
+    seen = []
+
+    def coarse_index():
+        seen.append(True)
+        return {("class", "same-id"): {"c1", "secret"}, ("gcs", "same-id"): {"c2"}}
+
+    monkeypatch.setattr(statistics.project_deduction_service, "coarse_customer_ids_by_activity", coarse_index)
+    request = Request({"type": "http", "path": "/api/statistics/courses", "headers": []})
+    result = statistics.get_course_statistics(date_from="2026-08-01", date_to="2026-08-31",
+        organization_id=None, activity_type="all", teacher_id=None, mobile_view=mobile_view, request=request)
+    by_id = {course["id"]: course for course in result["courses"]}
+    assert by_id["class:same-id"]["coarse_customers"] == ([{"id": "c1", "nickname": "小甲"}] if access != "none" else [])
+    assert by_id["gcs:same-id"]["coarse_customers"] == ([{"id": "c2", "nickname": "小乙"}] if access != "none" else [])
+    assert by_id["class:other-id"]["coarse_customers"] == []
+    assert len(seen) == (0 if access == "none" else 1)
+
 
 def _activity(**overrides):
     data = {
@@ -21,9 +86,70 @@ def _activity(**overrides):
         "start_time": "10:00",
         "end_time": "12:00",
         "groups": [],
+        "withdrawn_participant_ids": [],
     }
     data.update(overrides)
     return SimpleNamespace(**data)
+
+
+@pytest.mark.parametrize("mobile_view", ["", "courses", "reviews", "participants_source"])
+def test_course_attendance_counts_exclude_absent_but_keep_roster(monkeypatch, mobile_view):
+    from app.api import statistics
+
+    roster = ["arrived", "leader", "absent", "missing", "deleted", "other-day"]
+    salon = _activity(participant_ids=roster + ["withdrawn", "teacher-1"],
+                      withdrawn_participant_ids=["withdrawn"], course_type="测试沙龙",
+                      course_review="复盘", groups=[SimpleNamespace(leader_id="leader", deputy_id="", member_ids=[])])
+    sessions = {kind: [_activity(id=kind, participant_ids=["arrived", "absent"],
+                                 owner_id="owner-present" if kind == "gcs" else "owner-absent",
+                                 course_review="复盘", description="[]")]
+                for kind in ("gcs", "ers", "eks")}
+    activities = {"class": [salon], **sessions}
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", tuple(
+        (kind, kind, lambda kind=kind, **_: activities[kind]) for kind in activities
+    ))
+    customers = [SimpleNamespace(id=cid, nickname=cid, name="", positions=["课程老师"] if cid == "teacher-1" else [],
+                                member_type="体验会员" if cid in {"arrived", "absent"} else "正式会员")
+                 for cid in roster + ["teacher-1", "withdrawn", "owner-present", "owner-absent"]]
+    monkeypatch.setattr(statistics.customer_service, "list_customers", lambda: customers)
+    monkeypatch.setattr(statistics.organization_service, "list_organizations", lambda: [])
+    monkeypatch.setattr(statistics.course_service, "list_courses", lambda: [])
+    monkeypatch.setattr(statistics.course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(statistics.member_identity_service, "list_identities", lambda: [
+        SimpleNamespace(name="体验会员", type="新人"), SimpleNamespace(name="正式会员", type="老人")])
+    monkeypatch.setattr(statistics, "_course_customer_daily_context", lambda *_: ({}, {}, {}))
+    monkeypatch.setattr(statistics, "_payment_record_groups", lambda: [])
+    # 重复已到店邀约不能重复计数；已删邀约和其他日期的到店不能计入本堂课。
+    visits = [SimpleNamespace(customer_id=cid, visit_date="2026-08-01", arrived=True, is_deleted=False)
+              for cid in ("arrived", "arrived", "leader", "owner-present", "withdrawn")]
+    visits += [SimpleNamespace(customer_id="absent", visit_date="2026-08-01", arrived=False, is_deleted=False),
+               SimpleNamespace(customer_id="deleted", visit_date="2026-08-01", arrived=True, is_deleted=True),
+               SimpleNamespace(customer_id="other-day", visit_date="2026-08-02", arrived=True, is_deleted=False)]
+    monkeypatch.setattr(statistics.visit_service, "_visits", {str(i): visit for i, visit in enumerate(visits)})
+    result = statistics.get_course_statistics(date_from="2026-08-01", date_to="2026-08-02",
+        activity_type="all", organization_id=None, teacher_id=None, mobile_view=mobile_view)
+    salon_row = next(course for course in result["courses"] if course["activity_type"] == "class")
+    assert (salon_row["participant_count"], salon_row["new_count"], salon_row["old_count"]) == (2, 1, 1)
+    assert {p["id"] for p in salon_row["participants"]} == set(roster)
+    assert {p["id"] for p in salon_row["participants"] if p["arrived"]} == {"arrived", "leader"}
+    totals = {s["type"]: s for s in result["statistics"]}
+    assert sum(s["participant_count"] for s in totals.values()) == 5
+    assert totals["gcs"]["owner_count"] == 1
+    assert totals["ers"]["owner_count"] == totals["eks"]["owner_count"] == 0
+    if mobile_view in {"", "participants_source"}:
+        assert {course["activity_type"]: course["owner_count"] for course in result["courses"]} == {
+            "class": 0, "gcs": 1, "ers": 0, "eks": 0,
+        }
+    if not mobile_view:
+        assert result["trend"][0]["participant_count"] == 5
+        assert result["teacher_statistics"][0]["participant_count"] == 5
+    if mobile_view in {"", "participants_source"}:
+        owners = {course["activity_type"]: course["owner_participants"] for course in result["courses"]}
+        assert owners["gcs"][0]["arrived"] is True
+        assert owners["ers"][0]["arrived"] is False
+    subtype_result = statistics.get_course_statistics(date_from="2026-08-01", date_to="2026-08-02",
+        activity_type="class", organization_id=None, teacher_id=None, mobile_view=mobile_view)
+    assert subtype_result["subtype_statistics"][0]["participant_count"] == 2
 
 
 def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
@@ -136,6 +262,10 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         )],
     )
     monkeypatch.setattr(statistics, "_payment_record_groups", lambda: [[teacher_payment]])
+    monkeypatch.setattr(statistics.visit_service, "list_basic_visits", lambda: [
+        SimpleNamespace(visit_date="2026-08-01", customer_id=customer_id, arrived=True)
+        for customer_id in ("participant-1", "leader-1")
+    ])
 
     result = statistics.get_course_statistics(
         date_from="2026-08-01",
@@ -205,6 +335,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         "member_type": "体验会员",
         "identity_group": "新人",
         "participation_role": "参与者",
+        "arrived": True,
         "daily_need": "放松减压",
         # 「参与者」页签用：当天的邀约备注（这条假数据里没有邀约 id 和备注）
         "daily_visit_id": "",

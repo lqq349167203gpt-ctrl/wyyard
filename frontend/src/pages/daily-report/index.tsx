@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { CourseRosterNames, type CourseRosterPerson } from "@/components/course-roster-names"
 
 const today = new Date().toLocaleDateString("sv-SE")
 
@@ -26,6 +27,20 @@ function rowTextClass(expanded: boolean): string {
 
 function EmptyDash() {
   return <span className="text-[#c9cdd4]">-</span>
+}
+
+function reportRoster(activity: DailyReportActivity, customers: Customer[], identities: MemberIdentity[]) {
+  const customerMap = new Map(customers.map(customer => [customer.id, customer]))
+  const identityMap = new Map(identities.map(identity => [identity.name, identity.type]))
+  const arrived = new Set(activity.arrived_participant_ids || [])
+  const people = { old: [] as CourseRosterPerson[], new: [] as CourseRosterPerson[], absent: [] as CourseRosterPerson[] }
+  for (const id of activity.participant_ids || []) {
+    const customer = customerMap.get(id)
+    if (!customer || activity.teacher_ids?.includes(id)) continue
+    const group = !arrived.has(id) ? "absent" : identityMap.get(customer.member_type) === "新人" ? "new" : "old"
+    people[group].push({ id, name: customer.nickname, arrived: arrived.has(id) })
+  }
+  return people
 }
 
 export default function DailyReportPage() {
@@ -208,31 +223,24 @@ export default function DailyReportPage() {
     }
     html += `</table><br>`
     // 第二部分：当日活动
-    html += `<table><colgroup><col width="180"><col width="80"><col width="100"><col width="80"><col width="150"><col width="150"><col width="60"></colgroup>`
-    html += `<tr class="section"><td colspan="7">当日活动（${activities.length}场）</td></tr>`
-    html += `<tr><th>活动名称</th><th>活动类型</th><th>时间</th><th>老师</th><th>老人名单</th><th>新人名单</th><th>参与人数</th></tr>`
+    html += `<table><colgroup><col width="180"><col width="80"><col width="100"><col width="80"><col width="60"><col width="150"><col width="150"><col width="120"><col width="120"></colgroup>`
+    html += `<tr class="section"><td colspan="9">当日活动（${activities.length}场）</td></tr>`
+    html += `<tr><th>活动名称</th><th>活动类型</th><th>时间</th><th>老师</th><th>参与人数</th><th>新人名单</th><th>老人名单</th><th>粗门客户</th><th>未到店</th></tr>`
     for (const a of activities) {
       const teacherNames = a.teacher_names.join("、")
-      const allMemberIds = [...(a.participant_ids || []), ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean))]
-      const visibleCustomerIds = new Set(customers.map(customer => customer.id))
-      const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id) && visibleCustomerIds.has(id))
-      const identityTypeMap: Record<string, string> = {}
-      for (const identity of memberIdentities) { if (identity.type && identity.name) identityTypeMap[identity.name] = identity.type }
-      const oldMembers: string[] = [], newMembers: string[] = []
-      for (const id of uniqueIds) {
-        const name = customers.find(c => c.id === id)?.nickname || ""
-        const memberType = customers.find(c => c.id === id)?.member_type || ""
-        if (identityTypeMap[memberType] === "新人") newMembers.push(name); else oldMembers.push(name)
-      }
+      const roster = reportRoster(a, customers, memberIdentities)
+      const names = (people: CourseRosterPerson[]) => people.map(person => esc(person.name)).join("、") || "-"
       const time = a.start_time && a.end_time ? `${a.start_time}-${a.end_time}` : a.start_time || ""
       html += `<tr>
         <td>${esc(a.course_name)}</td>
         <td>${esc(a.course_type || "-")}</td>
         <td>${esc(time || "-")}</td>
         <td>${esc(teacherNames || "-")}</td>
-        <td>${esc(oldMembers.join("、") || "-")}</td>
-        <td>${esc(newMembers.join("、") || "-")}</td>
-        <td>${uniqueIds.length}人</td>
+        <td>${a.participant_count}人</td>
+        <td>${names(roster.new)}</td>
+        <td>${names(roster.old)}</td>
+        <td>${esc((a.coarse_customers || []).map(person => person.nickname).join("、") || "-")}</td>
+        <td>${names(roster.absent)}</td>
       </tr>`
     }
     html += `</table><br>`
@@ -812,41 +820,28 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-left font-normal w-[70px] border-b-[0.5px] border-[#e8eaed]">活动类型</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[100px] border-b-[0.5px] border-[#e8eaed]">时间</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[90px] border-b-[0.5px] border-[#e8eaed]">老师</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">老人名单</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">新人名单</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">参与人数</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">新人名单</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">老人名单</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">粗门客户</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">未到店</th>
                 </tr>
               </thead>
               <tbody>
                 {activities.map((a, i) => {
                   const teacherNames = a.teacher_names.join("、")
-                  const allMemberIds = [
-                    ...(a.participant_ids || []),
-                    ...(a.groups || []).flatMap(g => [g.leader_id, g.deputy_id, ...g.member_ids].filter(Boolean)),
-                  ]
-                  const visibleCustomerIds = new Set(customers.map(customer => customer.id))
-                  const uniqueIds = [...new Set(allMemberIds)].filter(id => !a.teacher_ids?.includes(id) && visibleCustomerIds.has(id))
-                  const identityTypeMap: Record<string, string> = {}
-                  for (const identity of memberIdentities) {
-                    if (identity.type && identity.name) identityTypeMap[identity.name] = identity.type
-                  }
-                  const oldMembers: string[] = []
-                  const newMembers: string[] = []
-                  for (const id of uniqueIds) {
-                    const name = customers.find(c => c.id === id)?.nickname || ""
-                    const memberType = customers.find(c => c.id === id)?.member_type || ""
-                    if (identityTypeMap[memberType] === "新人") newMembers.push(name)
-                    else oldMembers.push(name)
-                  }
+                  const roster = reportRoster(a, customers, memberIdentities)
                   return (
                     <tr key={a.id} className={i % 2 === 0 ? "bg-white hover:bg-[#f7f8fa]" : "bg-[#fcfcfd] hover:bg-[#f0f1f3]"}>
                       <td className="px-[5px] py-2 text-[#1f2329] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{a.course_name}</td>
                       <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{a.course_type || <span className="text-[#c9cdd4]">-</span>}</td>
                       <td className="px-[5px] py-2 text-[#4e535a] text-center border-b-[0.5px] border-[#e8eaed]">{a.start_time && a.end_time ? `${a.start_time}-${a.end_time}` : a.start_time || "-"}</td>
                       <td className="px-[5px] py-2 text-[#4e535a] truncate border-b-[0.5px] border-[#e8eaed]">{teacherNames || <span className="text-[#c9cdd4]">-</span>}</td>
-                      <td className="px-[5px] py-2 text-[#4e535a] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{oldMembers.length > 0 ? oldMembers.join("、") : <span className="text-[#c9cdd4]">-</span>}</td>
-                      <td className="px-[5px] py-2 text-[#4e535a] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{newMembers.length > 0 ? newMembers.join("、") : <span className="text-[#c9cdd4]">-</span>}</td>
-                      <td className="px-[5px] py-2 text-[#4e535a] text-center border-b-[0.5px] border-[#e8eaed]">{uniqueIds.length}人</td>
+                      <td className="px-[5px] py-2 text-[#4e535a] text-center border-b-[0.5px] border-[#e8eaed]">{a.participant_count}人</td>
+                      <td className="px-[5px] py-2 text-[#4e535a] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{roster.new.length ? <CourseRosterNames people={roster.new} /> : <EmptyDash />}</td>
+                      <td className="px-[5px] py-2 text-[#4e535a] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{roster.old.length ? <CourseRosterNames people={roster.old} /> : <EmptyDash />}</td>
+                      <td className="px-[5px] py-2 text-[#4e535a] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{(a.coarse_customers || []).map(person => person.nickname).join("、") || <EmptyDash />}</td>
+                      <td className="px-[5px] py-2 text-[#4e535a] whitespace-normal break-words border-b-[0.5px] border-[#e8eaed]">{roster.absent.length ? <CourseRosterNames people={roster.absent} /> : <EmptyDash />}</td>
                     </tr>
                   )
                 })}

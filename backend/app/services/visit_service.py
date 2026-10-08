@@ -70,13 +70,19 @@ def customer_visit_summary(customer_ids: set[str]) -> dict[str, tuple[int, str]]
     return {cid: (len(dates.get(cid, set())), latest.get(cid, "")) for cid in customer_ids}
 
 
+def get_arrived_customer_ids_by_date(date_from: str = "", date_to: str = "") -> dict[str, set[str]]:
+    """课程统计和扣卡共用的到店口径：未删除且已到店，同日同人去重。"""
+    by_date: dict[str, set[str]] = {}
+    for visit in list_basic_visits():
+        if not visit.arrived or (date_from and visit.visit_date < date_from) or (date_to and visit.visit_date > date_to):
+            continue
+        by_date.setdefault(visit.visit_date, set()).add(visit.customer_id)
+    return by_date
+
+
 def get_arrived_customer_ids(date_from: str, date_to: str) -> set[str]:
     """获取日期范围内实际到店的客户 ID，按客户去重。"""
-    return {
-        v.customer_id
-        for v in _visits.values()
-        if not v.is_deleted and v.arrived and date_from <= v.visit_date <= date_to
-    }
+    return set().union(*get_arrived_customer_ids_by_date(date_from, date_to).values())
 
 
 def get_invited_customer_ids(date: str) -> set[str]:

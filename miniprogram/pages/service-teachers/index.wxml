@@ -143,12 +143,17 @@
           <view class="teacher-line" wx:if="{{item.activity_type === 'gcs' || item.activity_type === 'ers' || item.activity_type === 'eks'}}"><text class="detail-label">案主</text><text class="detail-value">{{item.owner_name || '—'}}</text></view>
           <view class="name-line">
             <text class="detail-label">新人<text wx:if="{{item.new_count > 0}}"> {{item.new_count}}</text></text>
-            <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
             <text class="empty-dash" wx:else>—</text>
           </view>
           <view class="name-line">
             <text class="detail-label">老人<text wx:if="{{item.old_count > 0}}"> {{item.old_count}}</text></text>
-            <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
+          <view class="name-line">
+            <text class="detail-label">未到店</text>
+            <view class="name-list" wx:if="{{item.absentNames.length}}"><text class="person-name" wx:for="{{item.absentNames}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
             <text class="empty-dash" wx:else>—</text>
           </view>
           <view class="review-block">
@@ -221,12 +226,22 @@
           <view class="teacher-line" wx:if="{{item.activity_type === 'eks'}}"><text class="detail-label">部位数</text><text class="detail-value">{{item.body_part_count}}</text></view>
           <view class="name-line">
             <text class="detail-label">新人<text wx:if="{{item.new_count > 0}}"> {{item.new_count}}</text></text>
-            <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <view class="name-list" wx:if="{{item.newNames.length}}"><text class="person-name" wx:for="{{item.newNames}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
             <text class="empty-dash" wx:else>—</text>
           </view>
           <view class="name-line">
             <text class="detail-label">老人<text wx:if="{{item.old_count > 0}}"> {{item.old_count}}</text></text>
-            <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="*this" wx:for-item="name">{{name}}</text></view>
+            <view class="name-list" wx:if="{{item.oldNames.length}}"><text class="person-name" wx:for="{{item.oldNames}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
+          <view class="name-line">
+            <text class="detail-label">粗门客户</text>
+            <view class="name-list" wx:if="{{item.coarse_customers.length}}"><text class="person-name" wx:for="{{item.coarse_customers}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
+            <text class="empty-dash" wx:else>—</text>
+          </view>
+          <view class="name-line">
+            <text class="detail-label">未到店</text>
+            <view class="name-list" wx:if="{{item.absentNames.length}}"><text class="person-name" wx:for="{{item.absentNames}}" wx:key="id" wx:for-item="person">{{person.nickname}}</text></view>
             <text class="empty-dash" wx:else>—</text>
           </view>
         </view>

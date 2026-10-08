@@ -19,6 +19,7 @@ from app.services import (
     customer_access_service,
     member_identity_service,
     project_deduction_service,
+    visit_service,
 )
 from app.services.payment_sources import PAYMENT_TYPES, fill_effective_remaining, list_payment_records
 from app.utils.request_roles import get_request_roles
@@ -26,18 +27,21 @@ from app.utils.request_roles import get_request_roles
 router = APIRouter(prefix="/api/daily-report", tags=["daily-report"], dependencies=[Depends(require_page_permission("daily-report"))])
 
 
-def report_activities(course_data):
+def report_activities(course_data, arrived_by_date=None, coarse_customers=None):
     """五类课程统一成报表展示字段；来源保留，避免与销卡来源混用。"""
     types = (
-        ("class_records", "class_record", "沙龙活动"),
-        ("gcs_sessions", "group_case", "觉醒游戏"),
-        ("ers_sessions", "emotional_release", "情绪释放"),
-        ("eks_sessions", "energy_knot", "能量结"),
-        ("ics_sessions", "internal_course", "内部课程"),
+        ("class_records", "class_record", "class", "沙龙活动"),
+        ("gcs_sessions", "group_case", "gcs", "觉醒游戏"),
+        ("ers_sessions", "emotional_release", "ers", "情绪释放"),
+        ("eks_sessions", "energy_knot", "eks", "能量结"),
+        ("ics_sessions", "internal_course", "ics", "内部课程"),
     )
     activities = []
-    for key, source, label in types:
+    for key, source, kind, label in types:
         for record in course_data[key]:
+            roster = {item["id"]: item for item in record.get("participants", [])
+                      if not item.get("withdrawn") and item["id"] not in record.get("teacher_ids", [])}
+            arrived_ids = set(roster) & (arrived_by_date or {}).get(record.get("date", ""), set())
             activities.append({
                 **record,
                 "id": f"{source}_{record['id']}",
@@ -45,7 +49,11 @@ def report_activities(course_data):
                 "course_name": record.get("activity_name") or record.get("course_name") or record.get("name") or label,
                 "course_type": record.get("course_type") or label,
                 "is_public_welfare": bool(record.get("is_public_welfare")),
-                "participant_ids": [item["id"] for item in record.get("participants", []) if not item.get("withdrawn")],
+                "participant_ids": list(roster),
+                "arrived_participant_ids": sorted(arrived_ids),
+                "participant_count": len(arrived_ids),
+                "coarse_customers": [{"id": cid, "nickname": roster[cid].get("nickname", "")}
+                                     for cid in sorted((coarse_customers or {}).get((kind, record["id"]), set()) & set(roster))],
                 # participants 已包含组长、组员且应用客户范围，不重复展开原始 groups。
                 "groups": [],
             })
@@ -65,11 +73,15 @@ async def read_report(request: Request, date: date, mobile: bool = False, space_
         class_records.read_day_courses, date=day, space_id=space_id, request=request, include_note_counts=False,
     )
     result["date"] = day
-    result["activities"] = report_activities(course_data)
+    access = customer_access_service.transaction_access(get_request_roles(request))
+    result["activities"] = report_activities(
+        course_data, visit_service.get_arrived_customer_ids_by_date(day, day),
+        project_deduction_service.coarse_customer_ids_by_activity() if access in {"summary", "detail"} else {},
+    )
     # 原始课程只供现有销卡算法使用；展示使用统一的 activities。
     result["dashboard"] = course_data
     if mobile:
-        result["transaction_access"] = customer_access_service.transaction_access(get_request_roles(request))
+        result["transaction_access"] = access
     return result
 
 

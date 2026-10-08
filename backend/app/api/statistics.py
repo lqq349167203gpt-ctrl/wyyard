@@ -29,6 +29,7 @@ from app.services import (
     organization_service,
     other_project_service,
     position_edit_permission_service,
+    project_deduction_service,
     visit_note_service,
     visit_service,
 )
@@ -1587,6 +1588,7 @@ def _course_participant_ids(activity_type: str, activity) -> set[str]:
         return set(class_record_service._get_group_member_ids(activity))
 
     participant_ids = set(getattr(activity, "participant_ids", []) or [])
+    participant_ids -= set(getattr(activity, "withdrawn_participant_ids", []) or [])
     participant_ids -= set(getattr(activity, "teacher_ids", []) or [])
     for field in ("owner_id", "host_id", "achiever_id"):
         special_id = getattr(activity, field, "")
@@ -2009,6 +2011,16 @@ def get_course_statistics(
         if request
         else set(customer_map)
     )
+    # 名单保留已排课人员，人数只统计实际到店；基础邀约一次扫描，避免逐课程补查。
+    arrived_by_date = visit_service.get_arrived_customer_ids_by_date(date_from, date_to)
+
+    def arrived_participant_ids(type_key, activity):
+        return (
+            _course_participant_ids(type_key, activity)
+            & visible_customer_ids
+            & arrived_by_date.get(activity.date, set())
+        )
+
     role = get_request_roles(request) if request else ["超级管理员"]
     # 角色限定“与本人相关”时，只返回本人（账号归属人）作为老师/成就君的课程。
     restricted_teacher_ids: set[str] | None = None
@@ -2017,6 +2029,12 @@ def get_course_statistics(
     transaction_access = customer_access_service.transaction_access(role)
     can_view_payment = transaction_access in {"summary", "detail"} and not mobile_view
     can_view_payment_details = transaction_access == "detail" and not mobile_view
+    # 课程日期与抵扣录入日期可以不同，按课程的直接关联取名单；只读取一次。
+    coarse_customers_by_activity = (
+        project_deduction_service.coarse_customer_ids_by_activity()
+        if transaction_access in {"summary", "detail"}
+        else {}
+    )
     identity_groups = {
         identity.name: identity.type
         for identity in member_identity_service.list_identities()
@@ -2126,9 +2144,7 @@ def get_course_statistics(
         subtype_totals[subtype_name]["course_count"] += 1
         subtype_totals[subtype_name]["class_hours"] += activity_hours
         subtype_totals[subtype_name]["participant_count"] += len(
-            _course_participant_ids(subtype_activity_type, activity).intersection(
-                visible_customer_ids
-            )
+            arrived_participant_ids(subtype_activity_type, activity)
         )
     payment_groups = _payment_record_groups() if can_view_payment else []
     daily_payments, daily_needs, daily_notes = (
@@ -2165,16 +2181,15 @@ def get_course_statistics(
                 if participant_id in visible_customer_ids
             }
             participant_ids = set(participant_roles)
-            activity_participants = len(participant_ids)
+            arrived_ids = arrived_by_date.get(activity.date, set())
+            activity_participants = len(participant_ids & arrived_ids)
             class_hours += activity_hours
             participant_count += activity_participants
-            owner_count += len([
-                name for name in (
-                    _course_owner_details(type_key, activity, customer_map, visible_customer_ids)
-                    .get("owner_name", "")
-                    .split("、")
-                ) if name
-            ])
+            activity_owner_count = len({
+                owner.get("id") or getattr(activity, "owner_id", "")
+                for owner in _course_owner_records(type_key, activity)
+            } & visible_customer_ids & arrived_ids)
+            owner_count += activity_owner_count
             filtered_participants_by_date[activity.date].update(participant_ids)
             period_key = _course_period_key(activity.date, granularity)
             trend_grouped[period_key]["course_count"] += 1
@@ -2200,6 +2215,7 @@ def get_course_statistics(
                     "member_type": member_type,
                     "identity_group": identity_group,
                     "participation_role": participant_roles[participant_id],
+                    "arrived": participant_id in arrived_ids,
                 }
                 if not mobile_listing:
                     participant_row.update({
@@ -2251,24 +2267,34 @@ def get_course_statistics(
                 "course_review": getattr(activity, "course_review", "") or "",
                 "teachers": teacher_names,
                 **_course_owner_details(type_key, activity, customer_map, visible_customer_ids),
+                "owner_count": activity_owner_count,
                 "participant_count": activity_participants,
                 "new_count": sum(
-                    item["identity_group"] == "新人"
+                    item["identity_group"] == "新人" and item["arrived"]
                     for item in participant_details
                 ),
                 "old_count": sum(
-                    item["identity_group"] != "新人"
+                    item["identity_group"] != "新人" and item["arrived"]
                     for item in participant_details
                 ),
-                "owner_participants": [] if mobile_listing else _course_owner_participants(
-                    type_key,
-                    activity,
-                    customer_map,
-                    visible_customer_ids,
-                    identity_groups,
-                    daily_needs,
-                    daily_notes,
-                ),
+                "coarse_customers": sorted([
+                    {"id": customer_id,
+                     "nickname": customer_map[customer_id].nickname or customer_map[customer_id].name or customer_id}
+                    for customer_id in coarse_customers_by_activity.get((type_key, activity.id), set())
+                    if customer_id in visible_customer_ids and customer_id in customer_map
+                ], key=lambda item: (item["nickname"], item["id"])),
+                "owner_participants": [] if mobile_listing else [
+                    {**owner, "arrived": owner["id"] in arrived_ids}
+                    for owner in _course_owner_participants(
+                        type_key,
+                        activity,
+                        customer_map,
+                        visible_customer_ids,
+                        identity_groups,
+                        daily_needs,
+                        daily_notes,
+                    )
+                ],
                 "daily_transaction_amount": (
                     round(
                         sum(
@@ -2325,9 +2351,7 @@ def get_course_statistics(
         for activity in selected_activities_by_type[type_key]:
             activity_hours = _course_activity_hours(type_key, activity)
             activity_participant_count = len(
-                _course_participant_ids(type_key, activity).intersection(
-                    visible_customer_ids
-                )
+                arrived_participant_ids(type_key, activity)
             )
             for activity_teacher_id in _course_activity_teacher_ids(activity):
                 if activity_teacher_id not in teacher_statistics:
@@ -2416,7 +2440,7 @@ def get_course_statistics(
             key: course[key] for key in (
                 "id", "activity_type", "activity_type_label", "course_subtype", "name", "date",
                 "start_time", "end_time", "class_hours", "course_review", "teachers", "owner_name",
-                "body_part_count", "participant_count", "new_count", "old_count", "participants",
+                "body_part_count", "participant_count", "new_count", "old_count", "coarse_customers", "participants",
             )
         } for course in selected[(page - 1) * page_size:page * page_size]]
         response["trend"] = []

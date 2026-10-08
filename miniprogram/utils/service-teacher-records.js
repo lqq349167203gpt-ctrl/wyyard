@@ -84,9 +84,9 @@ function daysSince(value) {
 
 function participantNames(course, group) {
   return (course.participants || [])
-    .filter(item => group === 'new' ? item.identity_group === '新人' : item.identity_group !== '新人')
-    .map(item => item.nickname)
-    .filter(Boolean)
+    .filter(item => group === 'absent' ? item.arrived === false : item.arrived && (group === 'new' ? item.identity_group === '新人' : item.identity_group !== '新人'))
+    .filter(item => item.nickname)
+    .map(item => ({ id: item.id, nickname: item.nickname, arrived: item.arrived }))
 }
 
 function safeFilename(value) {
@@ -243,7 +243,7 @@ module.exports = function createRecordsPage(mode) { return {
       const totals = (result.statistics || []).reduce((summary, item) => ({
         courseCount: summary.courseCount + Number(item.course_count || 0),
         classHours: summary.classHours + Number(item.class_hours || 0),
-        participantCount: summary.participantCount + Number(item.participant_count || 0),
+        participantCount: summary.participantCount + Number(item.participant_count || 0) + Number(item.owner_count || 0),
       }), { courseCount: 0, classHours: 0, participantCount: 0 })
       const activityTypes = [{ value: 'all', label: '全部课程' }].concat(result.activity_types || COURSE_TYPES.slice(1))
       const records = (result.courses || []).map(course => {
@@ -258,6 +258,7 @@ module.exports = function createRecordsPage(mode) { return {
             : (course.activity_type_label || ''),
           newNames: participantNames(course, 'new'),
           oldNames: participantNames(course, 'old'),
+          absentNames: participantNames(course, 'absent'),
         }
       })
       const listKey = this.data.courseViewTab === 'reviews' ? 'reviewRecords' : 'courseRecords'
@@ -452,7 +453,7 @@ module.exports = function createRecordsPage(mode) { return {
     return {
       ...group,
       dateText: parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : (group.course_date || ''),
-      participantCount: participants.length,
+      participantCount: participants.filter(item => item.arrived).length,
       activityTypeText: activityTypeLabel === '沙龙活动'
         ? courseSubtype
         : activityTypeLabel,

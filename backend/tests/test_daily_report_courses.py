@@ -76,3 +76,18 @@ def test_report_activity_name_prefers_entered_name_and_sorts_by_time():
     })
     assert [row["course_name"] for row in result] == ["游戏", "实际名称"]
     assert result[0]["id"] != result[1]["id"]
+
+
+def test_report_keeps_absent_roster_but_counts_only_arrived_and_links_coarse_by_source():
+    people = [{"id": "arrived", "nickname": "到店客户"}, {"id": "absent", "nickname": "未到店客户"},
+              {"id": "withdrawn", "nickname": "退课客户", "withdrawn": True},
+              {"id": "teacher", "nickname": "老师"}]
+    record = {"id": "same", "date": "2026-09-10", "participants": people, "teacher_ids": ["teacher"]}
+    sources = {"class_records": [record], "gcs_sessions": [record],
+               "ers_sessions": [], "eks_sessions": [], "ics_sessions": []}
+    result = daily_report.report_activities(sources, {"2026-09-10": {"arrived", "withdrawn"}},
+                                           {("class", "same"): {"arrived", "hidden"}})
+    assert all(row["participant_ids"] == ["arrived", "absent"] for row in result)
+    assert all(row["arrived_participant_ids"] == ["arrived"] and row["participant_count"] == 1 for row in result)
+    assert result[0]["coarse_customers"] == [{"id": "arrived", "nickname": "到店客户"}]
+    assert result[1]["coarse_customers"] == []

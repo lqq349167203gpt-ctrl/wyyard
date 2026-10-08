@@ -4,6 +4,32 @@ from types import SimpleNamespace
 from app.services import service_teacher_customer_service
 
 
+def test_course_export_includes_coarse_customers_after_existing_names(monkeypatch):
+    from starlette.requests import Request
+
+    from app.api import service_teacher_customers as api
+    from app.api import statistics
+
+    course = dict(date="2026-08-01", start_time="10:00", end_time="12:00", name="测试课程",
+                  activity_type_label="沙龙活动", class_hours=2, teachers=["老师"], owner_name="",
+                  body_part_count=None, participant_count=2,
+                  participants=[{"nickname": "小新", "identity_group": "新人", "arrived": True},
+                                {"nickname": "小老", "identity_group": "老人", "arrived": False}],
+                  coarse_customers=[{"id": "c1", "nickname": "小新"}])
+    monkeypatch.setattr(statistics, "get_course_statistics", lambda **_: {
+        "courses": [course], "date_from": "2026-08-01", "date_to": "2026-08-31",
+    })
+    audit = []
+    monkeypatch.setattr(api, "record_service_teacher_action", lambda *args, **kwargs: audit.append(kwargs))
+    monkeypatch.setattr(api, "_xlsx_response", lambda _sheet, headers, rows, _filename: (headers, rows))
+    request = Request({"type": "http", "path": "/api/service-teacher-customers/export-courses", "headers": []})
+    headers, rows = api.export_courses(request, service_teacher="老师", teacher_id="t1",
+        date_from="2026-08-01", date_to="2026-08-31", all_dates=False, activity_type="class")
+    assert headers[-4:] == ["新人名单", "老人名单", "粗门客户", "未到店"]
+    assert rows[0][-4:] == ["小新", "-", "小新", "小老"]
+    assert audit == [{"export": True}]
+
+
 def test_payment_log_uses_settlement_label_without_changing_course_labels(monkeypatch):
     from app.middleware.operation_logging import build_log_content
     from app.services import organization_service
@@ -282,6 +308,7 @@ def test_course_participants_split_notes_by_author(monkeypatch):
         "participants": [{
             "id": "cust1",
             "nickname": "小安",
+            "arrived": True,
             "member_type": "普通会员",
             "identity_group": "新人",
             "daily_need": "潘潘：想了解课程\n沁桐：想改善睡眠",
@@ -331,6 +358,7 @@ def test_course_participants_only_loads_notes_for_requested_page(monkeypatch):
             "participants": [{
                 "id": f"customer-{index}", "nickname": f"客户{index}",
                 "member_type": "", "identity_group": "老人",
+                "arrived": index != 2,
                 "daily_visit_id": f"visit-{index}",
             }],
         }
@@ -351,11 +379,12 @@ def test_course_participants_only_loads_notes_for_requested_page(monkeypatch):
         activity_type="all", keyword="", member_type="", identity_group="",
         page=2, page_size=1,
     )
-    assert result["total"] == 3
-    assert result["total_participants"] == 3
-    assert [group["course_id"] for group in result["items"]] == ["class:2"]
-    assert seen_visits == ["visit-2"]
-    assert result["items"][0]["participants"][0]["visit_need"] == "需求2"
+    assert result["total"] == 2
+    assert result["total_participants"] == 2
+    assert [group["course_id"] for group in result["items"]] == ["class:1"]
+    assert seen_visits == ["visit-1"]
+    assert result["items"][0]["participants"][0]["visit_need"] == "需求1"
+    assert result["items"][0]["participants"][0]["arrived"] is True
 
 
 def test_available_teachers_includes_current_account_owner():

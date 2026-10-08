@@ -249,12 +249,7 @@ def filter_arrived_customer_ids(date: str, customer_ids: set) -> set:
     """只保留当日已确认到场的客户，活动名单本身不再触发扣卡。"""
     from app.services import visit_service
 
-    arrived_ids = {
-        visit.customer_id
-        for visit in visit_service.list_visits(date=date)
-        if visit.arrived and not visit.is_deleted
-    }
-    return set(customer_ids) & arrived_ids
+    return set(customer_ids) & visit_service.get_arrived_customer_ids(date, date)
 
 
 def void_card(card_id: str) -> Optional[MembershipCard]:

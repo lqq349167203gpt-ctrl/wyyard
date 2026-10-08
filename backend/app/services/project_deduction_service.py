@@ -49,6 +49,20 @@ def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] =
     return results
 
 
+def coarse_customer_ids_by_activity() -> dict[tuple[str, str], set[str]]:
+    """按课程整理有效粗门抵扣客户，不计算余额、不改写扣卡记录。"""
+    grouped: dict[tuple[str, str], set[str]] = {}
+    for deduction in _deductions.values():
+        if (deduction.is_deleted or deduction.cancelled
+                or deduction.project_type != "membership-cards"
+                or deduction.project_name != COARSE_DOOR_CARD_TYPE
+                or not deduction.source_activity_type or not deduction.source_activity_id):
+            continue
+        key = (deduction.source_activity_type, deduction.source_activity_id)
+        grouped.setdefault(key, set()).add(deduction.customer_id)
+    return grouped
+
+
 def _fill_current_remaining(deductions: List[ProjectDeduction]):
     """仅为没有历史快照的老记录补值，已有快照不随当前余额变化。"""
     from app.services import membership_card_service
@@ -473,9 +487,11 @@ def _activity_rows(customer_id: str) -> list[dict]:
         emotional_release_session_service,
         group_case_session_service,
         organization_service,
+        visit_service,
     )
 
     rows: list[dict] = []
+    arrived_by_date = visit_service.get_arrived_customer_ids_by_date()
 
     organizations = organization_service.list_organizations()
     organization_ids = {organization.id for organization in organizations}
@@ -532,10 +548,7 @@ def _activity_rows(customer_id: str) -> list[dict]:
         deduction_count = membership_card_service.get_activity_deduction_count(record)
         if deduction_count <= 0:
             return
-        if customer_id not in membership_card_service.filter_arrived_customer_ids(
-            record.date,
-            {customer_id},
-        ):
+        if customer_id not in arrived_by_date.get(record.date, set()):
             return
         rows.append({
             "record_type": record_type,

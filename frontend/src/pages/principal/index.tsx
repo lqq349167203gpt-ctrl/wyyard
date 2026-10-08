@@ -72,8 +72,10 @@ const COLUMN_WIDTH: Record<string, string> = {
   hours: "w-[7%]",
   owner: "w-[4.25%]",
   participants: "w-[8%]",
-  new_names: "w-[13.5%]",
-  old_names: "w-[13.5%]",
+  new_names: "w-[12%]",
+  old_names: "w-[12%]",
+  coarse_names: "w-[9%]",
+  absent_names: "w-[9%]",
   same_day_deals: "w-[9.5%]",
   order_count: "w-[7.5%]",
   customer: "w-[14%]",
@@ -389,7 +391,7 @@ function ColumnSettings({ config, onChange, onReset = defaultTrafficColumns, res
   )
 }
 // 这些列内容是名单或自由文本，点排序意义不大，表头不显示箭头（课程名可以按拼音排）
-const UNSORTABLE_COLUMNS = new Set(["owner", "parts", "new_names", "old_names"])
+const UNSORTABLE_COLUMNS = new Set(["owner", "parts", "new_names", "old_names", "coarse_names", "absent_names"])
 
 // 统计卡片里的空值（后端为没有分母的比率返回「—」）统一显示成一条很浅的短横线
 const isEmptyMetric = (value: unknown) => value === "" || value === "-" || value === "—" || value === "–"
@@ -1499,6 +1501,9 @@ export default function PrincipalPage() {
   const columnWidthClass = (key: string) => (participantTableView ? "" : (COLUMN_WIDTH[key] ?? ""))
   const columnWidthStyle = (key: string, label: string) => {
     const min = headerMinWidth(key, label)
+    if (key === "same_day_deals" && (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses"))) {
+      return { width: "calc(9.5% - 10px)", minWidth: min }
+    }
     if (!participantTableView) return { minWidth: min }
     return { width: Math.max(PARTICIPANT_COLUMN_WIDTH[key] ?? 0, min), minWidth: min }
   }
@@ -2735,13 +2740,13 @@ export default function PrincipalPage() {
                           >
                             {String(row[c.key] ?? "")}
                           </button>
-                        ) : (c.key === "new_names" || c.key === "old_names") && (row[c.key === "new_names" ? "new_people" : "old_people"] as { id?: string; name?: string }[] | undefined)?.length ? (
+                        ) : (["new_names", "old_names", "coarse_names", "absent_names"].includes(c.key)) && (row[c.key === "new_names" ? "new_people" : c.key === "old_names" ? "old_people" : c.key === "coarse_names" ? "coarse_people" : "absent_people"] as { id?: string; name?: string }[] | undefined)?.length ? (
                           // 名单里的每个名字都能点开客户详情
                           <span className={`text-[#2b2f36] ${expandNames ? "whitespace-normal break-words" : "block truncate"}`}>
-                            {(row[c.key === "new_names" ? "new_people" : "old_people"] as { id?: string; name?: string }[]).map((person, index) => (
+                            {(row[c.key === "new_names" ? "new_people" : c.key === "old_names" ? "old_people" : c.key === "coarse_names" ? "coarse_people" : "absent_people"] as { id?: string; name?: string }[]).map((person, index) => (
                               <span key={`${person.id || person.name}-${index}`}>
                                 {index > 0 && "、"}
-                                {person.id ? (
+                                {person.id && c.key !== "absent_names" ? (
                                   <button
                                     type="button"
                                     onClick={() => { setDetailCourseId(String(row.course_id || row.id || "")); setDetailCustomerId(String(person.id)) }}
@@ -2758,6 +2763,8 @@ export default function PrincipalPage() {
                             <span>{String(row[c.key] ?? "")}</span>
                             <span className="shrink-0 text-[11px] text-[#8f959e]">第 {row.repeat_times} 次</span>
                           </span>
+                        ) : c.key === "same_day_deals" && (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses")) ? (
+                          Number(row[c.key]) > 0 ? `${Number(row[c.key])} 笔` : <EmptyValue />
                         ) : String(row[c.key] ?? "") || <EmptyValue />}
                       </TableCell>
                       )

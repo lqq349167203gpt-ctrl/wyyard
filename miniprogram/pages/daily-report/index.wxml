@@ -105,7 +105,7 @@
   <!-- ================= 活动 ================= -->
   <view class="r-body" wx:if="{{activeTab === 'activities'}}">
     <block wx:if="{{!loading && !error}}">
-      <view class="section-note">点击卡片展开老人 / 新人名单</view>
+      <view class="section-note">点击卡片展开新人 / 老人名单</view>
       <view
         class="act-card {{item.open ? 'open' : ''}}"
         wx:for="{{activities}}"
@@ -116,16 +116,18 @@
         <view class="act-l1">
           <text class="act-name">{{item.name}}</text>
           <text class="act-tag {{item.isWelfare ? 'grey' : ''}}">{{item.typeText}}</text>
-          <text class="act-num">{{item.count}} 人</text>
         </view>
         <view class="act-l2">
           <text wx:if="{{item.timeText}}">{{item.timeText}}</text>
           <text wx:if="{{item.teacherText}}">{{item.teacherText}}</text>
-          <text>老人 {{item.oldCount}} / 新人 {{item.newCount}}</text>
+          <text>新人 {{item.newCount}} / 老人 {{item.oldCount}}</text>
         </view>
         <view class="act-detail">
-          <view class="d-row"><text class="d-label">老人</text><text class="d-val">{{item.oldText || ''}}<text class="dash" wx:if="{{!item.oldText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">参与人数</text><text class="d-val">{{item.count}} 人</text></view>
           <view class="d-row"><text class="d-label">新人</text><text class="d-val">{{item.newText || ''}}<text class="dash" wx:if="{{!item.newText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">老人</text><text class="d-val">{{item.oldText || ''}}<text class="dash" wx:if="{{!item.oldText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">粗门客户</text><text class="d-val">{{item.coarseText || ''}}<text class="dash" wx:if="{{!item.coarseText}}">-</text></text></view>
+          <view class="d-row"><text class="d-label">未到店</text><text class="d-val">{{item.absentText || ''}}<text class="dash" wx:if="{{!item.absentText}}">-</text></text></view>
         </view>
       </view>
       <view class="empty-state" wx:if="{{activities.length === 0}}">

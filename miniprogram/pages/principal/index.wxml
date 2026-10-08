@@ -292,13 +292,14 @@
         </view>
         <!-- 数字单独一行，带短前缀 -->
         <view class="record-numbers" wx:if="{{item.rowNumbers.length}}">
-          <text class="record-number" wx:for="{{item.rowNumbers}}" wx:key="label"><text class="record-number-label">{{item.label}}</text>{{item.value}}</text>
+          <text class="record-number" wx:for="{{item.rowNumbers}}" wx:key="label"><text class="record-number-label">{{item.label}}</text><text class="teacher-empty-dash" wx:if="{{item.empty}}">—</text><text wx:else>{{item.value}}</text></text>
         </view>
         <!-- 客户档案类字段：单独成块、不加底色，放在数字下面、日期上面 -->
         <view class="record-profiles" wx:if="{{item.rowProfiles.length}}">
           <view class="record-profile" wx:for="{{item.rowProfiles}}" wx:key="label">
             <text class="record-profile-label">{{item.label}}</text>
-            <text class="record-profile-value {{expandCells ? 'expanded' : ''}}">{{item.value}}</text>
+            <text class="record-profile-value {{expandCells ? 'expanded' : ''}}" wx:if="{{item.people.length}}"><block wx:for="{{item.people}}" wx:key="id" wx:for-item="person" wx:for-index="personIndex">{{personIndex ? '、' : ''}}{{person.name}}</block></text>
+            <text class="record-profile-value {{expandCells ? 'expanded' : ''}}" wx:else>{{item.value}}</text>
           </view>
         </view>
         <text class="record-right" wx:if="{{item.rowRight}}">{{item.rowRight}}</text>

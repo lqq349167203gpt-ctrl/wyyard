@@ -234,6 +234,8 @@ def list_course_participants(
     for course in result["courses"]:
         course_rows = {}
         for participant in course["participants"]:
+            if not participant.get("arrived", False):
+                continue
             course_rows[participant["id"]] = {
                 "id": f"{course['id']}:{participant['id']}",
                 "course_id": course["id"],
@@ -251,9 +253,12 @@ def list_course_participants(
                 "follow_up": participant.get("daily_follow_up", ""),
                 "visit_id": participant.get("daily_visit_id", ""),
                 "participant_role": participant.get("participation_role", "参与者"),
+                "arrived": participant.get("arrived", False),
             }
         # 案主也要出现在本堂课名单里；若案主同时在参与者名单中，只保留一行并标记其主要身份。
         for owner in course.get("owner_participants", []):
+            if not owner.get("arrived", False):
+                continue
             owner_id = owner["id"]
             if owner_id in course_rows:
                 course_rows[owner_id]["participant_role"] = "案主"
@@ -275,6 +280,7 @@ def list_course_participants(
                 "follow_up": owner.get("daily_follow_up", ""),
                 "visit_id": owner.get("daily_visit_id", ""),
                 "participant_role": "案主",
+                "arrived": owner.get("arrived", False),
             }
         rows.extend(course_rows.values())
     rows.sort(key=lambda item: (item["course_date"], item["nickname"]), reverse=True)
@@ -307,7 +313,7 @@ def list_course_participants(
     for row in rows:
         rows_by_course[row["course_id"]].append(row)
     selected_courses = [course for course in result["courses"] if rows_by_course[course["id"]]]
-    total_participants = sum(len(members) for members in rows_by_course.values())
+    total_participants = sum(row["arrived"] for row in rows)
     total_pages = max(1, (len(selected_courses) + page_size - 1) // page_size)
     current = min(page, total_pages)
     page_courses = selected_courses[(current - 1) * page_size: current * page_size]
@@ -398,12 +404,12 @@ def export_courses(
         newcomers = "、".join(
             participant["nickname"]
             for participant in course["participants"]
-            if participant["identity_group"] == "新人"
+            if participant["identity_group"] == "新人" and participant.get("arrived", False)
         ) or "-"
         existing = "、".join(
             participant["nickname"]
             for participant in course["participants"]
-            if participant["identity_group"] != "新人"
+            if participant["identity_group"] != "新人" and participant.get("arrived", False)
         ) or "-"
         course_time = course["start_time"]
         if course["end_time"]:
@@ -420,9 +426,11 @@ def export_courses(
             course["participant_count"],
             newcomers,
             existing,
+            "、".join(customer["nickname"] for customer in course.get("coarse_customers", [])) or "-",
+            "、".join(person["nickname"] for person in course["participants"] if not person.get("arrived", False)) or "-",
         ])
     record_service_teacher_action(request, f"导出课程记录：服务老师 {teacher}；{result['date_from']} 至 {result['date_to']}；共{len(rows)}场", export=True)
-    headers = ["上课日期", "上课时间", "课程", "课程类型", "课时", "老师/成就君", "案主", "部位数", "参与人数", "新人名单", "老人名单"]
+    headers = ["上课日期", "上课时间", "课程", "课程类型", "课时", "老师/成就君", "案主", "部位数", "参与人数", "新人名单", "老人名单", "粗门客户", "未到店"]
     hidden_columns = {6, 7} if activity_type in {"class", "ics"} else {7} if activity_type in {"gcs", "ers"} else set()
     headers = [label for index, label in enumerate(headers) if index not in hidden_columns]
     rows = [[value for index, value in enumerate(row) if index not in hidden_columns] for row in rows]

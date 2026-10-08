@@ -859,7 +859,9 @@ def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monk
     assert courses[0]["hours"] == 0
     assert courses[0]["participant_ids"] == ["c1"]
     assert courses[0]["owner_count"] == 0
-    assert courses[0]["service_participant_count"] == 2  # 与课程记录口径一致，包含未标记到店的 c3
+    assert courses[0]["service_participant_count"] == 1  # 未到店的 c3 保留名单，但不计服务人次。
+    assert courses[0]["roster_names"] == [("c1", "c1"), ("c3", "c3")]
+    assert all(item["owner_count"] == 1 for item in courses[1:])
     assert {item["activity_type"]: item["owner_ids"] for item in courses[1:]} == {
         "gcs": ["c2"], "ers": ["c2"], "eks": ["c2", "c3"],
     }
@@ -953,6 +955,8 @@ def test_course_participants_pagination_export_and_course_scope(monkeypatch):
     query.course_view = "course"
     original = service.analyze(NS(), query)
     assert original["total"] == 1
+    assert "order_count" not in {column["key"] for column in original["columns"]}
+    assert "order_count" in original["items"][0]  # 仅隐藏列表列，不删除关联成交数据。
     assert original["items"][0]["participants"] == 2
     assert original["list_summary"]["服务人次"] == 3
     assert original["list_summary"]["服务案主人次"] == 1

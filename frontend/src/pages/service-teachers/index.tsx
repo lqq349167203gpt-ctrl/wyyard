@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Download } from "lucide-react"
+import { CourseRosterNames } from "@/components/course-roster-names"
 import { loadExcel } from "@/lib/excel"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -126,14 +127,25 @@ function formatCourseTime(course: CourseRow): string {
   return `${course.start_time}${course.end_time ? `~${course.end_time}` : ""}`
 }
 
-function courseParticipantNames(course: CourseRow, group: "new" | "old"): string {
+function courseParticipantNames(course: CourseRow, group: "new" | "old" | "absent"): string {
   return course.participants
-    .filter(participant => group === "new"
+    .filter(participant => group === "absent" ? participant.arrived === false : participant.arrived && (group === "new"
       ? participant.identity_group === "新人"
-      : participant.identity_group !== "新人")
+      : participant.identity_group !== "新人"))
     .map(participant => participant.nickname)
     .filter(Boolean)
     .join("、")
+}
+
+function courseCoarseCustomerNames(course: CourseRow): string {
+  return (course.coarse_customers || []).map(customer => customer.nickname).filter(Boolean).join("、")
+}
+
+function CourseNames({ course, group }: { course: CourseRow; group: "new" | "old" | "absent" }) {
+  const people = course.participants
+    .filter(person => group === "absent" ? person.arrived === false : person.arrived && (group === "new" ? person.identity_group === "新人" : person.identity_group !== "新人"))
+    .map(person => ({ id: person.id, name: person.nickname, arrived: person.arrived }))
+  return <CourseRosterNames people={people} />
 }
 
 function EmptyDash() {
@@ -244,6 +256,9 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [courseActivityType, setCourseActivityType] = useState("all")
   const showCourseOwner = !["class", "ics"].includes(courseActivityType)
   const showCourseBodyParts = courseActivityType === "all" || courseActivityType === "eks"
+  // 名单四列分配剩余宽度；课程缩短50px后，向新人/老人名单各分配25px。
+  const courseFixedWidth = 691 + (showCourseOwner ? 60 : 0) + (showCourseBodyParts ? 68 : 0)
+  const courseNameListWidth = `calc(25% - ${courseFixedWidth / 4 - 25}px)`
   const [courseData, setCourseData] = useState<CourseStatistics | null>(null)
   const [courseLoading, setCourseLoading] = useState(false)
   const [courseError, setCourseError] = useState("")
@@ -561,6 +576,8 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         { header: "参与人数", key: "participantCount", width: 12 },
         { header: "新人名单", key: "newNames", width: 32 },
         { header: "老人名单", key: "oldNames", width: 32 },
+        { header: "粗门客户", key: "coarseNames", width: 32 },
+        { header: "未到店", key: "absentNames", width: 32 },
       ]
       courseRows.forEach(course => worksheet.addRow({
         date: course.date || "-",
@@ -574,6 +591,8 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         participantCount: course.participant_count,
         newNames: courseParticipantNames(course, "new") || "-",
         oldNames: courseParticipantNames(course, "old") || "-",
+        coarseNames: courseCoarseCustomerNames(course) || "-",
+        absentNames: courseParticipantNames(course, "absent") || "-",
       }))
       worksheet.getRow(1).eachCell(cell => {
         cell.font = { bold: true, color: { argb: "FF4E535A" } }
@@ -994,7 +1013,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                         <span className="min-w-0 truncate text-[12.5px] font-medium text-[#2b2f36]">
                           {group.course_date || ""} · {group.course_name || "未命名课程"}
                         </span>
-                        <span className="shrink-0 text-[11px] text-[#9aa1a9]">{group.participants.length} 人</span>
+                        <span className="shrink-0 text-[11px] text-[#9aa1a9]">{group.participants.filter(row => row.arrived).length} 人</span>
                       </div>
                       <table className="w-full table-fixed border-collapse">
                         <colgroup>{PARTICIPANT_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
@@ -1069,6 +1088,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                     <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
                     <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">新人名单</TableHead>
                     <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">老人名单</TableHead>
+                    <TableHead className="h-9 w-[100px] px-3 text-[11px] font-normal">未到店</TableHead>
                     <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">复盘内容</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1103,13 +1123,18 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                       {showCourseOwner && <TableCell className={`${cellBase} text-[12px] text-[#8f959e]`}>{course.owner_name || <EmptyDash />}</TableCell>}
                       <TableCell className={`${cellBase} text-right text-[12px] tabular-nums text-[#8f959e]`}>{course.participant_count}人</TableCell>
                       <TableCell className={`${cellBase} overflow-hidden text-[12px]`}>
-                        <span data-clamp className={`block ${wrapText} text-[#8f959e]`} title={newNames || undefined}>
-                          {newNames || <EmptyDash />}
+                        <span data-clamp className={`block ${wrapText} text-[#4e535a]`} title={newNames || undefined}>
+                          {newNames ? <CourseNames course={course} group="new" /> : <EmptyDash />}
                         </span>
                       </TableCell>
                       <TableCell className={`${cellBase} overflow-hidden text-[12px]`}>
-                        <span data-clamp className={`block ${wrapText} text-[#8f959e]`} title={oldNames || undefined}>
-                          {oldNames || <EmptyDash />}
+                        <span data-clamp className={`block ${wrapText} text-[#4e535a]`} title={oldNames || undefined}>
+                          {oldNames ? <CourseNames course={course} group="old" /> : <EmptyDash />}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`${cellBase} ${rowExpanded ? "align-top" : ""} pr-4 text-[12px] text-[#4e535a]`}>
+                        <span data-clamp className={`block ${wrapText}`} title={courseParticipantNames(course, "absent") || undefined}>
+                          {courseParticipantNames(course, "absent") || <EmptyDash />}
                         </span>
                       </TableCell>
                       <TableCell className={`${cellBase} ${rowExpanded ? "align-top" : ""} pr-4 text-[12px] text-[#4e535a]`}>
@@ -1133,21 +1158,24 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
                   <TableHead className="h-9 w-[92px] px-3 pl-4 text-[11px] font-normal">上课日期</TableHead>
                   <TableHead className="h-9 w-[105px] px-3 text-[11px] font-normal">上课时间</TableHead>
-                  <TableHead className="h-9 w-[200px] px-3 text-[11px] font-normal">课程</TableHead>
+                  <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">课程</TableHead>
                   <TableHead className="h-9 w-[80px] px-3 text-[11px] font-normal">课程类型</TableHead>
                   <TableHead className="h-9 w-[56px] px-3 text-right text-[11px] font-normal">课时</TableHead>
                   <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
                   {showCourseOwner && <TableHead className="h-9 w-[60px] px-3 text-[11px] font-normal">案主</TableHead>}
                   {showCourseBodyParts && <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">部位数</TableHead>}
                   <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
-                  <TableHead className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
-                  <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">老人名单</TableHead>
+                  <TableHead style={{ width: courseNameListWidth }} className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
+                  <TableHead style={{ width: courseNameListWidth }} className="h-9 px-3 text-[11px] font-normal">老人名单</TableHead>
+                  <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">粗门客户</TableHead>
+                  <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">未到店</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {coursePagination.paginatedItems.map(course => {
                   const newNames = courseParticipantNames(course, "new")
                   const oldNames = courseParticipantNames(course, "old")
+                  const coarseNames = courseCoarseCustomerNames(course)
                   return (
                   <TableRow key={course.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
                     <TableCell className="h-11 px-3 py-0 pl-4 text-[12px] tabular-nums text-[#8f959e]">{course.date || <EmptyDash />}</TableCell>
@@ -1168,8 +1196,10 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                     {showCourseOwner && <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.owner_name || <EmptyDash />}</TableCell>}
                     {showCourseBodyParts && <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.body_part_count ?? <EmptyDash />}</TableCell>}
                     <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.participant_count}人</TableCell>
-                    <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{newNames || <EmptyDash />}</TableCell>
-                    <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{oldNames || <EmptyDash />}</TableCell>
+                    <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{newNames ? <CourseNames course={course} group="new" /> : <EmptyDash />}</TableCell>
+                    <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{oldNames ? <CourseNames course={course} group="old" /> : <EmptyDash />}</TableCell>
+                    <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{coarseNames || <EmptyDash />}</TableCell>
+                    <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{courseParticipantNames(course, "absent") || <EmptyDash />}</TableCell>
                   </TableRow>
                   )
                 })}

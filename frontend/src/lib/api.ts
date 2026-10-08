@@ -850,6 +850,7 @@ export interface CourseParticipantRow {
   follow_up_entries?: CourseParticipantNoteEntry[]
   visit_id: string
   participant_role?: string
+  arrived?: boolean
   /** 同一门课（同名课程）在当前筛选范围内的参与次数 */
   same_course_count: number
 }
@@ -3563,6 +3564,7 @@ export interface CourseStatistics {
     participant_count: number
     new_count: number
     old_count: number
+    coarse_customers?: Array<{ id: string; nickname: string }>
     daily_transaction_amount: number | null
     participants: Array<{
       id: string
@@ -3570,6 +3572,7 @@ export interface CourseStatistics {
       member_type: string
       identity_group: "新人" | "老人" | string
       participation_role: string
+      arrived?: boolean
       daily_need: string
       daily_transaction_amount: number | null
       closers: string
@@ -3955,6 +3958,9 @@ export const communicationRecordApi = {
 }
 
 export type DailyReportActivity = Pick<ClassRecord, 'id' | 'date' | 'course_name' | 'course_type' | 'start_time' | 'end_time' | 'teacher_ids' | 'participant_ids' | 'groups' | 'is_public_welfare' | 'membership_deduction_count'> & {
+  arrived_participant_ids: string[]
+  participant_count: number
+  coarse_customers: Array<{ id: string; nickname: string }>
   source: 'class_record' | 'group_case' | 'emotional_release' | 'energy_knot' | 'internal_course'
   teacher_names: string[]
 }
