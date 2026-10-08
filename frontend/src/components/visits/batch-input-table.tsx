@@ -931,7 +931,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       disabled={row.cancelled || isViewOnly || verified}
                       placeholder="-"
                       hideChevron
-                      className="[&_button]:border-[0.5px] [&_button]:text-[12px]"
+                      buttonClassName="border-[0.5px] border-[#e8eaed]"
                       textColor={row.is_leader ? undefined : "text-[#c9cdd4]"}
                     />
                   </td>
