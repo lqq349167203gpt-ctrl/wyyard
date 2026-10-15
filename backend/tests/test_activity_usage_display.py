@@ -31,3 +31,31 @@ def test_activity_summary_uses_actual_usage(monkeypatch, usage, debt, expected, 
     row = customer_detail._build_activities("customer", {record.date})[0]
     assert row["deduction_summary"] == expected
     assert row["membership_deduction_count"] == count
+
+
+@pytest.mark.parametrize("kind,service_name,label", [
+    ("gcs", "group_case_session_service", "觉醒游戏"),
+    ("ers", "emotional_release_session_service", "情绪释放"),
+    ("eks", "energy_knot_session_service", "能量结"),
+    ("ics", "internal_course_session_service", "内部课程"),
+])
+@pytest.mark.parametrize("custom_name", ["实际填写的课程名称", ""])
+def test_activity_name_matches_course_records(monkeypatch, kind, service_name, label, custom_name):
+    record = SimpleNamespace(
+        id="record", date="2026-09-10", teacher_ids=[], participant_ids=["customer"],
+        withdrawn_participant_ids=[], owner_id="owner", owner_name="不应作为活动名称的案主",
+        host_id="", host_name="", achiever_id="", name=custom_name,
+        course_name=custom_name if kind == "ics" else "", course_type="",
+        description='[{"name":"不应作为活动名称的部位"}]',
+    )
+    monkeypatch.setattr(customer_detail.class_record_service, "list_records", lambda: [])
+    for name in ("group_case_session_service", "emotional_release_session_service",
+                 "energy_knot_session_service", "internal_course_session_service"):
+        monkeypatch.setattr(getattr(customer_detail, name), "list_sessions", lambda: [])
+    monkeypatch.setattr(getattr(customer_detail, service_name), "list_sessions", lambda: [record])
+    monkeypatch.setattr(customer_detail.membership_card_service, "list_activity_usage_records", lambda _: [])
+    monkeypatch.setattr(customer_detail.membership_card_service, "list_debt_activity_usage_records", lambda _: [])
+    row = customer_detail._build_activities("customer", {record.date})[0]
+    assert row["name"] == (custom_name or label)
+    exported = customer_detail.customer_activity_export_service.activity_rows([row], [], {}, {})
+    assert exported[0][1] == row["name"]

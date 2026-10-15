@@ -717,6 +717,8 @@ def _build_activities(
     date_filter: set[str] | None = None,
 ) -> list:
     """合并客户参与的活动，可按活动日期过滤；不按客户端发布状态过滤。"""
+    from app.api.statistics import _course_activity_name
+
     # 未指定到达日期时，从到访记录自动计算
     if arrived_dates is None:
         arrived_dates = {
@@ -794,7 +796,7 @@ def _build_activities(
                 "date": r.date,
                 "start_time": getattr(r, 'start_time', '') or '',
                 "end_time": getattr(r, 'end_time', '') or '',
-                "name": r.activity_name or r.course_name,
+                "name": _course_activity_name("class", "沙龙活动", r),
                 "course_type": r.course_type or "",
                 "role": role,
                 "host": host,
@@ -814,7 +816,7 @@ def _build_activities(
 
     # 觉醒游戏（必须实际到店）
     for s in group_case_session_service.list_sessions():
-        gc_name = f"觉醒游戏【{s.owner_name}】" if s.owner_name else "觉醒游戏"
+        gc_name = _course_activity_name("gcs", "觉醒游戏", s)
         teacher_names = [customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]
         host = ", ".join(teacher_names) if teacher_names else (s.host_name or "")
         role = _resolve_activity_role(
@@ -855,7 +857,7 @@ def _build_activities(
 
     # 情绪释放（必须实际到店）
     for s in emotional_release_session_service.list_sessions():
-        er_name = f"情绪释放【{s.owner_name}】" if s.owner_name else "情绪释放"
+        er_name = _course_activity_name("ers", "情绪释放", s)
         teacher_names = [customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids]
         host = ", ".join(teacher_names) if teacher_names else (s.host_name or "")
         role = _resolve_activity_role(
@@ -896,8 +898,7 @@ def _build_activities(
 
     # 能量结（必须实际到店）
     for s in energy_knot_session_service.list_sessions():
-        ek_names = _parse_ek_names(s.description)
-        ek_name = f"能量结【{ek_names}】" if ek_names else "能量结"
+        ek_name = _course_activity_name("eks", "能量结", s)
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         role = _resolve_activity_role(
             customer_id,
@@ -950,7 +951,7 @@ def _build_activities(
                 "date": s.date,
                 "start_time": getattr(s, 'start_time', '') or '',
                 "end_time": getattr(s, 'end_time', '') or '',
-                "name": s.course_name,
+                "name": _course_activity_name("ics", "内部课程", s),
                 "course_type": s.course_type or "",
                 "role": role,
                 "host": host,
