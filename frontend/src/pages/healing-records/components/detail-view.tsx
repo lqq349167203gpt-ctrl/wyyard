@@ -10,7 +10,7 @@ import { uploadApi, customerApi, customerTagApi, followUpStatusApi, healingRecor
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { X, Upload, Copy, Edit, Eye, Inbox, Plus, Trash2 } from "lucide-react"
+import { X, Upload, Copy, Edit, Eye, Inbox, Plus, Trash2, Download } from "lucide-react"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { UnifiedPaymentContent } from "@/pages/payment/unified-payment"
@@ -93,6 +93,27 @@ export default function DetailView({
   const [searchValue, setSearchValue] = useState("")
   const [detail, setDetail] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const exportActivities = async () => {
+    if (!detail || exporting) return
+    const customer = detail.customer
+    setExporting(true)
+    try {
+      const blob = await customerDetailApi.exportActivities(customer.id, principalParticipant, principalCourse)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${(customer.nickname || customer.name || "客户").replace(/[\\/:*?"<>|]/g, "_")}-活动与卡池记录.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "导出失败，请重试")
+    } finally {
+      setExporting(false)
+    }
+  }
   const [formOpen, setFormOpen] = useState(false)
   const [editingRec, setEditingRec] = useState<HealingRec | null>(null)
   const [activeTab, setActiveTab] = useState<"" | "activities" | "healing" | "communication" | "followups" | "payment" | "purchase" | "offline_course">(defaultTab)
@@ -684,6 +705,14 @@ export default function DetailView({
                     <Plus className="h-3.5 w-3.5" />
                     新增
                   </button>
+                </div>
+              )}
+              {(!access || (access.detail_tabs.activities && access.detail_tabs.card_statistics)) && (
+                <div className="flex shrink-0 items-center pl-2">
+                  <Button variant="ghost" size="sm" className="h-7 gap-1 px-2.5 text-[12px] font-normal" disabled={exporting} onClick={exportActivities}>
+                    <Download className="h-3.5 w-3.5" />
+                    {exporting ? "导出中…" : "导出"}
+                  </Button>
                 </div>
               )}
             </div>

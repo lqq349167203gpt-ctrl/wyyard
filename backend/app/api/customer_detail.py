@@ -5,14 +5,18 @@
 import json
 from datetime import datetime
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
+from app.models.operation_log import OperationLogCreate
 from app.services import (
     activity_followup_service,
     activity_participant_note_service,
     class_record_service,
     customer_access_service,
+    customer_activity_export_service,
     customer_contact_service,
     customer_service,
     emotional_release_service,
@@ -28,15 +32,51 @@ from app.services import (
     offline_course_record_service,
     offline_course_service,
     oh_card_reading_service,
+    operation_log_service,
     other_project_service,
     project_deduction_service,
     tea_seat_fee_service,
     visit_note_service,
     visit_service,
 )
+from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/customer-detail", tags=["customer-detail"])
+
+
+@router.get("/{customer_id}/activity-export")
+def export_customer_activities(customer_id: str, request: Request, principal_participant: bool = False, principal_course: str = ""):
+    """导出权限与当前详情入口一致；不接受客户端传入活动或余额。"""
+    detail = get_customer_detail(customer_id, request, principal_participant=principal_participant,
+                                 principal_course=principal_course, section="activities")
+    permissions = detail["customer"].get("customer_access_permissions")
+    if permissions is not None and not all(permissions.get("detail_tabs", {}).get(key) for key in ("activities", "card_statistics")):
+        raise HTTPException(status_code=403, detail="导出需要活动记录和卡次统计的查看权限")
+    from app.api.statistics import COURSE_ACTIVITY_TYPES, _course_activity_hours
+
+    summary = _build_purchase_summary(customer_id)
+    usage = (membership_card_service.list_activity_usage_records(customer_id)
+             + membership_card_service.list_debt_activity_usage_records(customer_id))
+    cards = {card.id: card for card in membership_card_service.list_cards() if card.customer_id == customer_id}
+    activity_keys = {activity["activity_key"] for activity in detail["activities"]}
+    hours = {f"{kind}:{activity.id}": _course_activity_hours(kind, activity)
+             for kind, _, loader in COURSE_ACTIVITY_TYPES for activity in loader()
+             if f"{kind}:{activity.id}" in activity_keys}
+    rows = customer_activity_export_service.activity_rows(detail["activities"], usage, cards, hours)
+    name = detail["customer"].get("nickname") or detail["customer"].get("name") or "客户"
+    output = customer_activity_export_service.workbook_bytes(
+        name, customer_activity_export_service.pool_rows(summary), rows,
+        customer_activity_export_service.participation_rows(detail["activities"]),
+    )
+    operation_log_service.create_log(OperationLogCreate(section="客户资料", content=f"导出客户“{name}”的活动与卡池记录：{len(rows)}场，含完整卡次统计、活动类型及身份次数汇总、活动后余额及累计已上课数"), extra={
+        "operator": getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", ""),
+        "operator_role": "、".join(get_request_roles(request)), "source": get_client_source(request),
+        "method": "EXPORT", "path": request.url.path, "entity_id": customer_id, "ip": get_client_ip(request),
+    })
+    request.state.skip_operation_log = True
+    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename=customer_activities.xlsx; filename*=UTF-8''{quote(name + '-活动与卡池记录.xlsx')}"})
 
 ACTIVITY_SUMMARY_TYPES = (
     ("class", "沙龙活动"),

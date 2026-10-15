@@ -2755,6 +2755,14 @@ export interface CustomerDetail {
 }
 
 export const customerDetailApi = {
+  exportActivities: async (customerId: string, principalParticipant = false, principalCourse = "") => {
+    const params = new URLSearchParams(principalParticipant ? { principal_participant: "true", principal_course: principalCourse } : {})
+    const res = await fetch(`${API_BASE}/api/customer-detail/${encodeURIComponent(customerId)}/activity-export?${params}`, { headers: getAuthHeaders() })
+    applyNewToken(res)
+    if (res.status === 401) handle401()
+    if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.detail || "导出失败") }
+    return res.blob()
+  },
   get: (customerId: string, date?: string, principalParticipant = false, principalCourse = "") => request<CustomerDetail>(`/api/customer-detail/${customerId}?${new URLSearchParams({ ...(date ? { date } : {}), ...(principalParticipant ? { principal_participant: "true", principal_course: principalCourse } : {}) })}`),
 }
 
