@@ -1,7 +1,7 @@
 import type { AnalysisCondition, AnalysisMetadata, AnalysisOperator } from "@/lib/api"
 
 /** 与自定义筛选保持一致：这些操作符不需要填值 */
-export const VALUELESS_OPERATORS = new Set<AnalysisOperator>(["is_empty", "is_not_empty"])
+export const VALUELESS_OPERATORS = new Set<AnalysisOperator>(["is_empty", "is_not_empty", "is_weekday", "is_weekend"])
 
 export type AnalysisFieldDefinition = AnalysisMetadata["fields"][number]
 // 平铺 + 分组小标题：不再用二级菜单（悬停容易丢），一条列表点一下就能选

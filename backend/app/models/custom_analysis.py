@@ -68,10 +68,13 @@ AnalysisOperator = Literal[
     "between",
     "is_empty",
     "is_not_empty",
+    "is_weekday",
+    "is_weekend",
 ]
 
 CardDimension = Literal[
     "none",
+    "invitation_day_type",
     "gender",
     "follow_up_status",
     "member_type",
@@ -120,6 +123,9 @@ INHERITABLE_DATE_FIELDS = {
     "latest_payment_date",
 }
 
+DAY_TYPE_OPERATORS = {"is_weekday", "is_weekend"}
+VALUELESS_OPERATORS = {"is_empty", "is_not_empty", *DAY_TYPE_OPERATORS}
+
 
 class AnalysisCondition(StrictBaseModel):
     field: AnalysisField
@@ -135,7 +141,9 @@ class AnalysisCondition(StrictBaseModel):
             self.operator = "between"
             self.value = None
             return self
-        if self.operator in {"is_empty", "is_not_empty"}:
+        if self.operator in DAY_TYPE_OPERATORS and self.field not in INHERITABLE_DATE_FIELDS:
+            raise ValueError("工作日和双休日筛选仅支持日期字段")
+        if self.operator in VALUELESS_OPERATORS:
             self.value = None
         elif self.operator == "between":
             if not isinstance(self.value, list) or len(self.value) != 2:
@@ -231,6 +239,9 @@ class AnalysisPlan(StrictBaseModel):
             raise ValueError("开始日期不能晚于结束日期")
         if self.analysis_mode == "comparison" and len(self.comparison_groups) < 2:
             raise ValueError("方案对比至少需要两个对比组")
+        # 旧模板也走同一规则：不兼容的拆分指标回到不拆分，避免载入失败。
+        if self.card_dimension == "invitation_day_type" and self.card_metric not in {"arrived_customers", "arrival_visits"}:
+            self.card_dimension = "none"
         return self
 
 

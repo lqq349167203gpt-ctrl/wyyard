@@ -88,7 +88,7 @@ const MAX_LIST_COLUMNS = 15
 const OVERVIEW_TAB = { key: 'overview', label: '经营概况' }
 const CONVERSION_TAB = { key: 'conversion', label: '转化分析' }
 // 与自定义筛选同一套：这两个规则不用填筛选值
-const VALUELESS_OPERATORS = { is_empty: true, is_not_empty: true }
+const VALUELESS_OPERATORS = { is_empty: true, is_not_empty: true, is_weekday: true, is_weekend: true }
 const CONDITION_MAX = 8
 
 /**

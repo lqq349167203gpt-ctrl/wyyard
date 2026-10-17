@@ -9,6 +9,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { VALUELESS_OPERATORS } from "@/lib/analysis-conditions"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import DetailView from "@/pages/healing-records/components/detail-view"
 import {
@@ -24,7 +25,6 @@ import {
   type AnalysisTemplate,
 } from "@/lib/api"
 
-const VALUELESS_OPERATORS = new Set<AnalysisOperator>(["is_empty", "is_not_empty"])
 const ROW_DISPLAY_OPTIONS: Array<{ value: AnalysisRowDisplayMode; label: string }> = [
   { value: "unique_customers", label: "每人显示一次" },
   { value: "arrival_visits", label: "按实际到场人次展开" },
@@ -113,8 +113,17 @@ function createComparisonGroup(name: string, source?: AnalysisPlan["comparison_g
 
 const EmptyLine = () => <span className="inline-block h-[2px] w-[4px] rounded-full bg-[#e5e8eb] align-middle" />
 
+function supportsInvitationDaySplit(metric: AnalysisMetric): boolean {
+  return metric === "arrived_customers" || metric === "arrival_visits"
+}
+
+function normalizeCardDimension(dimension: AnalysisPlan["card_dimension"], metric: AnalysisMetric): AnalysisPlan["card_dimension"] {
+  return dimension === "invitation_day_type" && !supportsInvitationDaySplit(metric) ? "none" : dimension
+}
+
 function clonePlan(plan: AnalysisPlan, allowedColumns?: Set<AnalysisField>): AnalysisPlan {
   const metrics = plan.metrics.filter(metric => metric !== "created_customers")
+  const cardMetric = plan.card_metric === "created_customers" ? "total_customers" : plan.card_metric
   const columns = allowedColumns
     ? plan.columns.filter(field => allowedColumns.has(field))
     : [...plan.columns]
@@ -135,7 +144,8 @@ function clonePlan(plan: AnalysisPlan, allowedColumns?: Set<AnalysisField>): Ana
       })),
     })),
     metrics: metrics.length ? metrics : ["total_customers"],
-    card_metric: plan.card_metric === "created_customers" ? "total_customers" : plan.card_metric,
+    card_metric: cardMetric,
+    card_dimension: normalizeCardDimension(plan.card_dimension, cardMetric),
     row_display_mode: plan.row_display_mode === "activity_participations"
       ? "unique_customers"
       : plan.row_display_mode ?? "unique_customers",
@@ -646,7 +656,11 @@ export default function CustomAnalysisPage() {
     const allMetrics = metadata?.metrics ?? []
     return metadata?.dimension_metrics ?? allMetrics.filter(item => item.value !== "payment_amount")
   }, [metadata])
-  const splitHint = plan.card_dimension === "purchased_projects"
+  const cardDimensionOptions = (metadata?.card_dimensions ?? []).filter(item =>
+    item.value !== "invitation_day_type" || supportsInvitationDaySplit(plan.card_metric))
+  const splitHint = plan.card_dimension === "invitation_day_type"
+    ? "按邀约到店日期归组，同一客户可计入两组"
+    : plan.card_dimension === "purchased_projects"
     ? plan.card_metric === "payment_amount" || plan.card_metric === "payment_orders"
       ? "每笔成交只归入对应项目，各项目合计与总数一致"
       : "同一客户购买多个项目时会分别计入对应分组"
@@ -810,7 +824,7 @@ export default function CustomAnalysisPage() {
                 return <button key={metric.value} type="button" onClick={() => toggleMetric(metric.value)} className={`flex h-7 items-center gap-1.5 rounded-[4px] border px-2.5 text-[12px] ${selected ? "border-[#b9cdf8] bg-[#f7faff] text-[#2b2f36]" : "border-[#e5e7ea] bg-white text-[#646a73] hover:bg-[#f7f8fa]"}`}><span className={`flex h-3 w-3 items-center justify-center rounded-[2px] border text-[9px] ${selected ? "border-[#3370ff] bg-[#3370ff] text-white" : "border-[#c9cdd4]"}`}>{selected ? "✓" : ""}</span>{metric.label}</button>
               })}
             </div>
-            {plan.analysis_mode === "single" && <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={cardMetricOptions} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={metadata?.card_dimensions ?? []} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">{splitHint}</span></div>}
+            {plan.analysis_mode === "single" && <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#79838f]"><span>拆分指标</span><SelectDropdown value={plan.card_metric} options={cardMetricOptions} onChange={value => setPlan(current => ({ ...current, card_metric: value as AnalysisMetric, card_dimension: normalizeCardDimension(current.card_dimension, value as AnalysisMetric) }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="ml-1">拆分维度</span><SelectDropdown value={plan.card_dimension} options={cardDimensionOptions} onChange={value => setPlan(current => ({ ...current, card_dimension: value as AnalysisPlan["card_dimension"] }))} size="sm" className="w-[130px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" /><span className="text-[11px] text-[#b7bdc6]">{splitHint}</span></div>}
             {plan.analysis_mode === "comparison" && <div className="mt-2 text-[11px] text-[#8f959e]">所有对比组共用以上统计指标，便于横向比较。</div>}
           </div>
 

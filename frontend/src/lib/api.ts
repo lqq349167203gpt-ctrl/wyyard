@@ -3706,8 +3706,8 @@ export type AnalysisField =
   | "work_info"
   | "other_info"
 
-export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty"
-export type AnalysisCardDimension = "none" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
+export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty" | "is_weekday" | "is_weekend"
+export type AnalysisCardDimension = "none" | "invitation_day_type" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
 export type AnalysisMetric = "total_customers" | "created_customers" | "referred_customers" | "invited_customers" | "arrived_customers" | "arrival_visits" | "activity_customers" | "activity_participations" | "converted_customers" | "payment_orders" | "payment_amount"
 export type AnalysisRowDisplayMode = "unique_customers" | "arrival_visits" | "activity_participations"
 

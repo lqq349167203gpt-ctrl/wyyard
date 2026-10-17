@@ -248,6 +248,7 @@
           <view class="picker-value">{{dimensionOptions[dimensionIndex].label}}<view class="picker-chevron"></view></view>
         </view>
       </view>
+      <text class="shared-metric-hint" wx:if="{{plan.analysis_mode === 'single' && plan.card_dimension === 'invitation_day_type'}}">按邀约到店日期归组，同一客户可计入两组。</text>
       <text class="shared-metric-hint" wx:if="{{plan.analysis_mode === 'comparison'}}">以上指标会同时用于所有对比组。</text>
     </view>
 

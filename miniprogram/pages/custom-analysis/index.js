@@ -1,7 +1,7 @@
 const { customAnalysisApi } = require('../../utils/api')
 const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
 
-const VALUELESS_OPERATORS = ['is_empty', 'is_not_empty']
+const VALUELESS_OPERATORS = ['is_empty', 'is_not_empty', 'is_weekday', 'is_weekend']
 const CUSTOM_ANALYSIS_DRAFT_PREFIX = 'custom-analysis:last-state:v1'
 
 function draftStorageKey() {
@@ -370,7 +370,10 @@ Page({
     const dimensionMetricOptions = (metadata.dimension_metrics
       || metricSource.filter(item => item.value !== 'payment_amount')).slice()
     const dimensionMetricIndex = Math.max(0, dimensionMetricOptions.findIndex(item => item.value === cardMetric))
-    const dimensionOptions = metadata.card_dimensions || []
+    const supportsDaySplit = cardMetric === 'arrived_customers' || cardMetric === 'arrival_visits'
+    if (plan.card_dimension === 'invitation_day_type' && !supportsDaySplit) plan.card_dimension = 'none'
+    const dimensionOptions = (metadata.card_dimensions || [])
+      .filter(item => item.value !== 'invitation_day_type' || supportsDaySplit)
     const dimensionIndex = Math.max(0, dimensionOptions.findIndex(item => item.value === plan.card_dimension))
     const rowDisplayIndex = Math.max(0, this.data.rowDisplayOptions.findIndex(item => item.value === plan.row_display_mode))
     const selectedColumns = plan.columns.map(value => {

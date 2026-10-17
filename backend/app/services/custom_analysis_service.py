@@ -14,7 +14,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from app.config.settings import settings
-from app.models.custom_analysis import AnalysisCondition, AnalysisPlan
+from app.models.custom_analysis import DAY_TYPE_OPERATORS, VALUELESS_OPERATORS, AnalysisCondition, AnalysisPlan
 from app.services import (
     class_record_service,
     communication_record_service,
@@ -198,10 +198,13 @@ OPERATOR_LABELS = {
     "between": "介于",
     "is_empty": "未填写",
     "is_not_empty": "已填写",
+    "is_weekday": "是工作日（周一至周五）",
+    "is_weekend": "是双休日（周六、周日）",
 }
 
 CARD_DIMENSION_LABELS = {
     "none": "只显示总人数",
+    "invitation_day_type": "工作日 / 双休日",
     "gender": "性别",
     "follow_up_status": "跟进阶段",
     "member_type": "会员身份",
@@ -230,7 +233,7 @@ NUMERIC_FIELDS = {
     "payment_amount_period",
 }
 
-DIMENSION_ORDERS = {}
+DIMENSION_ORDERS = {"invitation_day_type": ["工作日", "双休日"]}
 
 DEFAULT_COLUMNS = [
     "nickname",
@@ -667,6 +670,17 @@ def _matches(
         return _is_empty(actual)
     if operator == "is_not_empty":
         return not _is_empty(actual)
+    if operator in DAY_TYPE_OPERATORS:
+        # 多日期字段任意一条符合即可；邀约/交易继续沿用原事件级匹配，避免跨记录串条件。
+        values = actual if isinstance(actual, list) else [actual]
+        for value in values:
+            try:
+                weekend = date.fromisoformat(str(value)[:10]).weekday() >= 5
+            except (ValueError, TypeError):
+                continue
+            if weekend == (operator == "is_weekend"):
+                return True
+        return False
 
     if condition.field in MULTI_DATE_FIELDS:
         actual_dates = [str(value) for value in (actual or []) if value]
@@ -1038,6 +1052,29 @@ def _expand_display_rows(rows: list[dict[str, Any]], row_display_mode: str) -> l
     return expanded_rows
 
 
+def _invitation_day_type_values(rows: list[dict[str, Any]], plan: AnalysisPlan) -> dict[str, int | float]:
+    """按当前周期邀约到店日期归组，复用邀约事件口径，不能整行重复累加人次。"""
+    invitation_conditions = [condition for condition in plan.conditions if condition.field in INVITATION_EVENT_FIELDS]
+    result = {}
+    for label, operator in (("工作日", "is_weekday"), ("双休日", "is_weekend")):
+        condition = AnalysisCondition(field="invitation_dates", operator=operator)
+        bucket_plan = plan.model_copy(update={"conditions": [condition], "condition_logic": "all"})
+        bucket_rows = []
+        for row in rows:
+            events = _matching_invitation_events(row, plan, invitation_conditions or [condition])
+            events = [event for event in events
+                      if _in_range(str(event.get("visit_date") or ""), plan.date_from, plan.date_to)
+                      and _matches(event, condition)]
+            if not events:
+                continue
+            # 原条件先匹配同一条邀约，再截取日期；两组不修改原查询的列表与总数。
+            bucket_rows.extend(_scope_invitation_metrics([{
+                **row, "_invitation_events_period": events, "_invitation_events_all": events,
+            }], bucket_plan))
+        result[label] = _metric_values(bucket_rows)[plan.card_metric]
+    return result
+
+
 def _build_cards(rows: list[dict[str, Any]], plan: AnalysisPlan) -> list[dict[str, Any]]:
     metric_values = _metric_values(rows)
     cards = []
@@ -1056,13 +1093,15 @@ def _build_cards(rows: list[dict[str, Any]], plan: AnalysisPlan) -> list[dict[st
     if plan.card_dimension == "none":
         return cards
 
-    if plan.card_dimension == "purchased_projects" and plan.card_metric in {"payment_amount", "payment_orders"}:
+    if plan.card_dimension == "invitation_day_type":
+        dimension_values = _invitation_day_type_values(rows, plan)
+    elif plan.card_dimension == "purchased_projects" and plan.card_metric in {"payment_amount", "payment_orders"}:
         map_field = (
             "_payment_amounts_by_project_period"
             if plan.card_metric == "payment_amount"
             else "_payment_orders_by_project_period"
         )
-        dimension_values: dict[str, int | float] = defaultdict(float)
+        dimension_values = defaultdict(float)
         for row in rows:
             for project, value in (row.get(map_field) or {}).items():
                 dimension_values[str(project or "未配置")] += value
@@ -1236,7 +1275,7 @@ def _is_blank_condition(condition: AnalysisCondition) -> bool:
     if condition.inherit_period:
         return False
     # 「未填写 / 已填写」本来就不需要填值，不能当成没填完丢掉
-    if condition.operator in {"is_empty", "is_not_empty"}:
+    if condition.operator in VALUELESS_OPERATORS:
         return False
     value = condition.value
     if value is None or value == "":
@@ -1667,7 +1706,7 @@ def metadata(
                 options = []
             elif field_name in DATE_FIELDS:
                 value_type = "date"
-                operators = ["eq", "ne", "gt", "gte", "lt", "lte", "between", "is_empty", "is_not_empty"]
+                operators = ["eq", "ne", "gt", "gte", "lt", "lte", "between", "is_weekday", "is_weekend", "is_empty", "is_not_empty"]
                 options = []
             elif field_name in LIST_FIELDS:
                 value_type = "multi_select"

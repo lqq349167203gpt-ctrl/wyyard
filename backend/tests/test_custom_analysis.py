@@ -803,10 +803,125 @@ def test_invitation_date_labels_keep_their_query_meaning():
     assert custom_analysis_service._date_field_from_query("邀约创建日期在本月") == "invitation_created_dates"
 
 
+@pytest.mark.parametrize("actual,operator,expected", [
+    ("2026-08-07", "is_weekday", True),
+    ("2026-08-08", "is_weekday", False),
+    ("2026-08-09", "is_weekend", True),
+    ("2026-08-10", "is_weekend", False),
+    ("2026-08-08", "is_weekend", True),
+    ("", "is_weekend", False),
+    (None, "is_weekday", False),
+    ("错误日期", "is_weekend", False),
+])
+def test_day_type_date_conditions(actual, operator, expected):
+    condition = AnalysisCondition(field="referral_date", operator=operator, value="旧的输入值")
+    assert condition.value is None
+    assert not custom_analysis_service._is_blank_condition(condition)
+    assert custom_analysis_service.matches_condition({"referral_date": actual}, condition) is expected
+
+
+def test_day_type_supports_multiple_dates_without_treating_empty_as_weekday():
+    condition = AnalysisCondition(field="invitation_dates", operator="is_weekend")
+    assert custom_analysis_service.matches_condition({"invitation_dates": ["2026-08-07", "2026-08-08"]}, condition)
+    assert not custom_analysis_service.matches_condition({"invitation_dates": []}, condition)
+    with pytest.raises(ValueError, match="仅支持日期字段"):
+        AnalysisCondition(field="visit_count", operator="is_weekday")
+
+
+def test_weekend_invitation_conditions_match_same_event_and_scope_metrics(monkeypatch):
+    events = [
+        {"invitation_dates": ["2026-08-07"], "visit_date": "2026-08-07", "inviter_names": ["小王"], "arrived": True, "cancelled": False},
+        {"invitation_dates": ["2026-08-08"], "visit_date": "2026-08-08", "inviter_names": ["小李"], "arrived": True, "cancelled": False},
+        {"invitation_dates": ["2026-08-09"], "visit_date": "2026-08-09", "inviter_names": ["小李"], "arrived": True, "cancelled": False},
+    ]
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: [
+        _row("c1", invitation_dates=["2026-08-07", "2026-08-08", "2026-08-09"], _invitation_events_period=events),
+    ])
+    plan = AnalysisPlan(conditions=[AnalysisCondition(field="invitation_dates", operator="is_weekend")],
+                        metrics=["invitation_visits", "arrival_visits"], card_dimension="none")
+    result = custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)
+    assert result["total"] == 1
+    assert {card["key"]: card["count"] for card in result["cards"]} == {"invitation_visits": 2, "arrival_visits": 2}
+    assert result["items"][0]["invitation_dates"] == ["2026-08-08", "2026-08-09"]
+    plan.conditions.append(AnalysisCondition(field="inviter_names", operator="eq", value="小王"))
+    assert custom_analysis_service.execute_plan(plan, "actor", page=1, page_size=20)["total"] == 0
+
+
+def test_day_type_template_and_log_labels(client):
+    plan = AnalysisPlan(conditions=[AnalysisCondition(field="referral_date", operator="is_weekend")],
+                        card_dimension="invitation_day_type", card_metric="arrived_customers")
+    response = client.post("/api/custom-analysis/templates", json={
+        "name": "双休日日期筛选", "description": "只统计周六周日", "scope": "private", "plan": plan.model_dump(mode="json"),
+    })
+    assert response.status_code == 200, response.text
+    template_id = response.json()["id"]
+    try:
+        saved = next(item for item in client.get("/api/custom-analysis/templates").json() if item["id"] == template_id)
+        assert saved["plan"]["conditions"][0] == {"field": "referral_date", "operator": "is_weekend", "value": None, "inherit_period": False}
+        assert saved["plan"]["card_dimension"] == "invitation_day_type"
+        assert custom_analysis_api._plan_snapshot(plan, {"total": 0})["拆分维度"] == "工作日 / 双休日"
+        assert custom_analysis_api._condition_snapshot(plan.conditions[0])["规则"] == "是双休日（周六、周日）"
+    finally:
+        client.delete(f"/api/custom-analysis/templates/{template_id}")
+
+
+def _day_split_rows():
+    def event(day, inviter="小王", cancelled=False):
+        return {"visit_date": day, "invitation_dates": [day], "inviter_names": [inviter],
+                "arrived": not cancelled, "cancelled": cancelled}
+    return [
+        _row("c1", invitation_dates=["2026-08-07", "2026-08-08", "2026-08-09"],
+             _invitation_events_period=[event("2026-08-07"), event("2026-08-08", "小李"), event("2026-08-09", cancelled=True)]),
+        _row("c2", invitation_dates=["2026-08-08"], _invitation_events_period=[event("2026-08-08")]),
+        _row("c3"),
+    ]
+
+
+@pytest.mark.parametrize("metric,expected", [
+    ("arrived_customers", [1, 2]),
+    ("arrival_visits", [1, 2]),
+])
+def test_invitation_day_split_uses_matching_events_without_changing_list(monkeypatch, metric, expected):
+    rows = _day_split_rows()
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: rows)
+    plan = AnalysisPlan(card_dimension="invitation_day_type", card_metric=metric,
+                        date_from="2026-08-07", date_to="2026-08-09")
+    result = custom_analysis_service.execute_plan(plan, "actor", 1, 20)
+    cards = [card for card in result["cards"] if card["key"].startswith("dimension-")]
+    assert [card["title"] for card in cards] == ["工作日", "双休日"]
+    assert [card["count"] for card in cards] == expected
+    assert result["total"] == 3  # 没有邀约的客户仍在原查询中，但不强行归入任一日期组。
+    assert rows[0]["invitation_dates"] == ["2026-08-07", "2026-08-08", "2026-08-09"]
+
+
+def test_invitation_day_split_keeps_inviter_and_period_on_same_record(monkeypatch):
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: _day_split_rows())
+    plan = AnalysisPlan(card_dimension="invitation_day_type", card_metric="arrival_visits",
+                        date_from="2026-08-08", date_to="2026-08-09",
+                        conditions=[AnalysisCondition(field="inviter_names", operator="eq", value="小王")])
+    result = custom_analysis_service.execute_plan(plan, "actor", 1, 20)
+    cards = [card for card in result["cards"] if card["key"].startswith("dimension-")]
+    assert [card["count"] for card in cards] == [0, 1]
+
+
+def test_invitation_day_split_keeps_both_empty_cards(monkeypatch):
+    monkeypatch.setattr(custom_analysis_service, "build_customer_dataset", lambda *_args: [])
+    result = custom_analysis_service.execute_plan(AnalysisPlan(card_dimension="invitation_day_type", card_metric="arrival_visits"), "actor", 1, 20)
+    assert [(card["title"], card["count"]) for card in result["cards"] if card["key"].startswith("dimension-")] == [("工作日", 0), ("双休日", 0)]
+
+
+@pytest.mark.parametrize("metric", ["total_customers", "invited_customers", "invitation_visits", "cancelled_visits", "activity_participations", "payment_orders"])
+def test_invitation_day_split_resets_incompatible_metrics(metric):
+    plan = AnalysisPlan.model_validate({"card_dimension": "invitation_day_type", "card_metric": metric})
+    assert plan.card_dimension == "none"
+    assert plan.card_metric == metric
+
+
 def test_metadata_endpoint(client):
     response = client.get("/api/custom-analysis/metadata")
     assert response.status_code == 200
     metadata = response.json()
+    assert {"value": "invitation_day_type", "label": "工作日 / 双休日"} in metadata["card_dimensions"]
     assert any(item["value"] == "follow_up_status" for item in metadata["fields"])
     assert any(item["value"] == "payment_dates" and item["label"] == "成交日期" for item in metadata["fields"])
     invitation_date = next(item for item in metadata["fields"] if item["value"] == "invitation_dates")
@@ -814,6 +929,9 @@ def test_metadata_endpoint(client):
     assert invitation_date["group"] == "日期信息"
     assert invitation_date["value_type"] == "date"
     assert "between" in invitation_date["operators"]
+    for field in metadata["fields"]:
+        assert ("is_weekend" in field["operators"]) == (field["value_type"] == "date")
+        assert ("is_weekday" in field["operators"]) == (field["value_type"] == "date")
     arrival_visits = next(item for item in metadata["metrics"] if item["value"] == "arrival_visits")
     assert arrival_visits["label"] == "实际到场人次"
     assert arrival_visits["unit"] == "人次"
