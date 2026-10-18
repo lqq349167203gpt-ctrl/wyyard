@@ -4,6 +4,7 @@ from app.models.base import StrictBaseModel
 from app.models.payment_course import PaymentCourseFields
 from app.models.project_deduction import ProjectDeductionCreate
 from app.services import customer_access_service, customer_service, project_deduction_service
+from app.utils.customer_record_search import filter_customer_records
 from app.utils.pagination import paginate
 from app.utils.payment_list import (
     coarse_door_scope_filter_options,
@@ -127,9 +128,7 @@ def list_deductions(request: Request, customer_id: str | None = Query(None), nic
     scope_options = None
     if request.query_params.get("include_filter_options") == "true":
         scope_options = coarse_door_scope_filter_options(items) if coarse_door else scope_filter_options(items)
-    if nickname:
-        keyword = nickname.lower()
-        items = [item for item in items if keyword in (item.get("nickname") or "").lower()]
+    items = filter_customer_records(items, nickname)
     organization_id = str(request.query_params.get("organization_id") or "").strip()
     deal_course_key = str(request.query_params.get("deal_course_key") or "").strip()
     if organization_id or deal_course_key:

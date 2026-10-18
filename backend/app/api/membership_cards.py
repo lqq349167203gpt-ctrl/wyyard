@@ -19,9 +19,6 @@ def list_cards(request: Request, page: int | None = Query(None, ge=1), page_size
     if customer_ids:
         allowed = set(customer_ids.split(","))
         items_dict = [i for i in items_dict if i.get("customer_id") in allowed]
-    if nickname:
-        kw = nickname.lower()
-        items_dict = [i for i in items_dict if kw in (i.get("nickname") or "").lower()]
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
@@ -30,7 +27,7 @@ def list_cards(request: Request, page: int | None = Query(None, ge=1), page_size
     def decorate(item):
         card_id = item.get("id", "")
         item["effective_remaining"] = membership_card_service.get_card_effective_remaining(card_id)
-    return payment_list_response(request, items_dict, page, page_size, subtype_field='card_type', decorate=decorate)
+    return payment_list_response(request, items_dict, page, page_size, nickname=nickname, subtype_field='card_type', decorate=decorate)
 
 
 @router.get("/search-customers")

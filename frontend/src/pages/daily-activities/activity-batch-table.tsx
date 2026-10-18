@@ -1479,14 +1479,15 @@ export function ActivityBatchTable({
 
   const hasEks = rows.some(r => r.record_type === "eks")
   const hasOwnerType = rows.some(r => r.record_type !== "class" && r.record_type !== "ics")
-  const tableMinWidth = hasOwnerType ? 1651 : 1495
-  const fixedColumnWidth = 1105 + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
+  const showDescription = false // 简介暂时隐藏，保留原数据及编辑逻辑，恢复时无需迁移。
+  const tableMinWidth = (hasOwnerType ? 1651 : 1495) - (showDescription ? 0 : 160)
+  const fixedColumnWidth = 945 + (showDescription ? 160 : 0) + (hasOwnerType ? 86 : 0) + (hasEks ? 40 : 0)
   const participantColumnWidth = (tableMinWidth - fixedColumnWidth) / 2
   const columnWidths = [
     24, 46, 122, 80, 126,
     ...(hasOwnerType ? [86] : []),
     ...(hasEks ? [40] : []),
-    57, 62, 80, 160, 180, participantColumnWidth, participantColumnWidth, 76, 40, 52,
+    57, 62, 80, ...(showDescription ? [160] : []), 180, participantColumnWidth, participantColumnWidth, 76, 40, 52,
   ]
 
   const handleTableScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -1633,7 +1634,7 @@ export function ActivityBatchTable({
               <th className="px-1 py-2 text-left font-normal">方式</th>
               <th className="px-1 py-2 text-center font-normal">扣卡次数</th>
               <th className="px-1 py-2 text-left font-normal">老师</th>
-              <th className="px-1 py-2 text-left font-normal">简介</th>
+              {showDescription && <th className="px-1 py-2 text-left font-normal">简介</th>}
               <th className="px-1 py-2 text-left font-normal">课程复盘</th>
               <th className="px-1 py-2 text-left font-normal">老人</th>
               <th className="px-1 py-2 text-left font-normal">新人</th>
@@ -1759,7 +1760,7 @@ export function ActivityBatchTable({
                         options={typeOptions}
                         onChange={(v) => handleTypeChange(row.key, v)}
                         disabled={isLocked || rowStatus[row.key] === "saving"}
-                        className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
+                        buttonClassName="!border-[0.5px] !h-7 !text-[12px]"
                         hideChevron
                         dropdownWidth={110}
                       />
@@ -2008,7 +2009,7 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 活动简介 */}
-                  <td
+                  {showDescription && <td
                     className={`px-1 py-0.5 align-top ${isCellChanged(row.key, "description") ? "bg-[#f5eeff] rounded" : ""}`}
                     style={{ verticalAlign: "top" }}
                   >
@@ -2031,7 +2032,7 @@ export function ActivityBatchTable({
                         </span>
                       </button>
                     )}
-                  </td>
+                  </td>}
 
                   {/* 课程复盘 */}
                   <td

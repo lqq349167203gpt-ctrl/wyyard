@@ -22,15 +22,12 @@ def list_projects(request: Request, page: int | None = Query(None, ge=1), page_s
     if customer_ids:
         allowed = set(customer_ids.split(","))
         items = [i for i in items if i.get("customer_id") in allowed]
-    if nickname:
-        kw = nickname.lower()
-        items = [i for i in items if kw in (i.get("nickname") or "").lower()]
     if closer_name:
         kw = closer_name.lower()
         items = [i for i in items if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
     def decorate(item):
         item['remaining_count'] = other_project_service.get_effective_remaining(item['id'])
-    return payment_list_response(request, items, page, page_size, subtype_field='project_name', decorate=decorate)
+    return payment_list_response(request, items, page, page_size, nickname=nickname, subtype_field='project_name', decorate=decorate)
 
 
 @router.get("/search-customers")

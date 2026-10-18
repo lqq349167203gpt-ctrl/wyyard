@@ -11,6 +11,7 @@ from app.services import (
     payment_export_service,
     position_permission_service,
 )
+from app.utils.customer_record_search import customer_record_matcher
 from app.utils.pagination import paginate
 from app.utils.request_roles import get_request_roles
 
@@ -39,13 +40,14 @@ def list_payment_records(
 
     customer_access_service.require_transaction_access(request, detail=True)
     visible_ids = customer_access_service.visible_customer_ids(request, customer_service.list_all_customers())
+    matches_customer = customer_record_matcher(nickname)
     items = []
     for project_type, _, loader in payment_export_service.PROJECT_SOURCES:
         for record in loader():
             if record.customer_id not in visible_ids:
                 continue
             item = record.model_dump(mode="json")
-            if nickname and nickname.lower() not in (item.get("nickname") or "").lower():
+            if not matches_customer(item):
                 continue
             closer_names = [item.get("closer_name") or "", *(c.get("name") or "" for c in item.get("closers") or [])]
             if closer_name and not any(closer_name.lower() in name.lower() for name in closer_names):

@@ -1,0 +1,12 @@
+<import src="./note-feedback-meta.wxml" />
+<template name="participant-note-field">
+  <view class="p-field-body">
+    <view class="p-field-value p-note-value" wx:if="{{mine.length}}"><template is="note-feedback-records" data="{{entries: mine}}" /></view>
+    <view class="p-field-input" wx:else>点击填写</view>
+    <view class="p-note-others" wx:if="{{others.length || (!hasEntries && fallback)}}">
+      <text class="p-note-others-title">别人填写的</text>
+      <template is="note-feedback-records" wx:if="{{others.length}}" data="{{entries: others}}" />
+      <text class="p-field-value" wx:else>{{fallback}}</text>
+    </view>
+  </view>
+</template>

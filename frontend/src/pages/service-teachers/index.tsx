@@ -6,6 +6,7 @@ import { loadExcel } from "@/lib/excel"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { CustomerSearchInput } from "@/components/customer-search-input"
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import {
@@ -24,6 +25,7 @@ import {
   statisticsApi,
   customerFollowUpApi,
   type CourseParticipantNoteEntry,
+  type CustomerFollowUpNote, type CustomerTag, type NextFollowUpPlan, type FollowUpPerson,
   type CourseParticipantGroup,
   type CourseParticipantRow,
   type CourseStatistics,
@@ -79,6 +81,21 @@ function currentOwner(): string {
   } catch {
     return ""
   }
+}
+
+function isOwnParticipantNote(entry: CourseParticipantNoteEntry): boolean {
+  try {
+    const user = JSON.parse(localStorage.getItem("currentUser") || "{}")
+    return entry.created_by_id ? entry.created_by_id === user.id
+      : Boolean(entry.created_by && [user.owner, user.username].includes(entry.created_by))
+  } catch { return false }
+}
+
+function applySavedParticipantNote(row: CourseParticipantRow, field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback", note: CustomerFollowUpNote): CourseParticipantRow {
+  const entries = (row[`${field}_entries`] || []).filter(entry => entry.id ? entry.id !== note.id : !isOwnParticipantNote(entry))
+  if (!note.deleted) entries.unshift({ ...note, author: note.feedback_person || note.created_by,
+    content: [(note.need_tags || []).map(tag => tag.name).join("、"), note.content].filter(Boolean).join("\n"), at: note.updated_at })
+  return { ...row, [`${field}_entries`]: entries, [field]: entries.map(entry => entry.content).join("\n") }
 }
 
 function formatDateTime(value: string): string {
@@ -288,10 +305,15 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback"
   } | null>(null)
   const [participantDraft, setParticipantDraft] = useState("")
+  const [participantPlan, setParticipantPlan] = useState<NextFollowUpPlan>({})
+  const [participantFollowUpPeople, setParticipantFollowUpPeople] = useState<FollowUpPerson[]>([])
+  const [participantNeedTags, setParticipantNeedTags] = useState<CustomerTag[]>([])
+  const [participantNeedTagIds, setParticipantNeedTagIds] = useState<string[]>([])
   const [participantMyNoteId, setParticipantMyNoteId] = useState("")
   const [participantFeedbackPeople, setParticipantFeedbackPeople] = useState<FeedbackPersonOption[]>([])
   const [participantFeedbackPerson, setParticipantFeedbackPerson] = useState("")
   const [participantEditorLoading, setParticipantEditorLoading] = useState(false)
+  const participantEditorSequence = useRef(0)
   const [participantEditorError, setParticipantEditorError] = useState("")
   const [participantEditorReadFailed, setParticipantEditorReadFailed] = useState(false)
   const [participantSaving, setParticipantSaving] = useState(false)
@@ -452,9 +474,12 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   }, [participantKeyword])
 
   const openParticipantEditor = async (row: CourseParticipantRow, field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback") => {
+    const sequence = ++participantEditorSequence.current
     setParticipantEditing({ row, field })
     setParticipantMyNoteId("")
     setParticipantDraft("")
+    setParticipantNeedTagIds([])
+    setParticipantPlan({})
     setParticipantEditorError("")
     setParticipantEditorReadFailed(false)
     setParticipantEditorLoading(true)
@@ -468,16 +493,32 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       return
     }
     try {
-      const [mineResult, peopleResult] = await Promise.allSettled([
+      const [mineResult, peopleResult, planPeopleResult, tagsResult] = await Promise.allSettled([
         customerFollowUpApi.myNote(row.visit_id, field),
         customerFollowUpApi.feedbackPeople(),
+        field === "follow_up" ? customerFollowUpApi.followUpPeople() : Promise.resolve([]),
+        field === "visit_need" ? customerFollowUpApi.needTags() : Promise.resolve([]),
       ])
+      if (sequence !== participantEditorSequence.current) return
       if (mineResult.status !== "fulfilled") {
         setParticipantEditorError("读取已有记录失败，请关闭后重试")
         setParticipantEditorReadFailed(true)
         return
       }
       const mine = mineResult.value
+      if (planPeopleResult.status !== "fulfilled" || tagsResult.status !== "fulfilled") {
+        setParticipantEditorError("读取标签或跟进选项失败，请关闭后重试")
+        setParticipantEditorReadFailed(true)
+        return
+      }
+      setParticipantFollowUpPeople(planPeopleResult.value)
+      const tags = tagsResult.value
+      for (const tag of mine?.need_tags || []) if (!tags.some(item => item.id === tag.id)) tags.push({ ...tag } as CustomerTag)
+      setParticipantNeedTags(tags)
+      setParticipantNeedTagIds((mine?.need_tags || []).map(tag => tag.id))
+      setParticipantPlan({ next_follow_up_person_id: mine?.next_follow_up_person_id || "",
+        next_follow_up_person: mine ? mine.next_follow_up_person || "" : currentName,
+        next_follow_up_date: mine?.next_follow_up_date || "" })
       const people = peopleResult.status === "fulfilled"
         ? peopleResult.value
         : { current_person: { customer_id: "", name: currentName }, options: currentName ? [{ customer_id: "", name: currentName }] : [] }
@@ -491,24 +532,29 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       setParticipantFeedbackPeople(options)
       setParticipantFeedbackPerson(selected.name ? feedbackPersonValue(selected) : "")
     } finally {
-      setParticipantEditorLoading(false)
+      if (sequence === participantEditorSequence.current) setParticipantEditorLoading(false)
     }
   }
 
   const saveParticipantNote = async () => {
     if (!participantEditing || participantEditorLoading || participantEditorReadFailed) return
     const content = participantDraft.trim()
-    if (!content) return
     const person = participantFeedbackPeople.find(option => feedbackPersonValue(option) === participantFeedbackPerson)
     const attribution = person ? { id: person.customer_id, name: person.name } : undefined
     setParticipantSaving(true)
     setParticipantEditorError("")
     try {
       const { row, field } = participantEditing
-      if (participantMyNoteId) await customerFollowUpApi.update(participantMyNoteId, content, attribution)
-      else await customerFollowUpApi.create(row.visit_id, field, content, attribution)
+      const extra = field === "follow_up" ? participantPlan : field === "visit_need" ? { need_tag_ids: participantNeedTagIds } : undefined
+      let saved: CustomerFollowUpNote | undefined
+      if (participantMyNoteId) saved = await customerFollowUpApi.update(participantMyNoteId, content, attribution, extra)
+      else if (content || (field === "visit_need" && participantNeedTagIds.length)) saved = await customerFollowUpApi.create(row.visit_id, field, content, attribution, extra)
+      if (saved) {
+        const note = saved
+        setParticipantGroups(groups => groups.map(group => ({ ...group,
+          participants: group.participants.map(item => item.visit_id === row.visit_id ? applySavedParticipantNote(item, field, note) : item) })))
+      }
       setParticipantEditing(null)
-      loadParticipants(participantPage)
     } catch (error) {
       setParticipantEditorError(error instanceof Error ? error.message : "保存失败，请重试")
     } finally {
@@ -1034,16 +1080,18 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
                               {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).map(field => {
                                 const entries = row[`${field}_entries`] || []
+                                const mine = entries.filter(isOwnParticipantNote)
+                                const others = entries.filter(entry => !isOwnParticipantNote(entry))
                                 return (
                                   <td key={field} className="px-3 py-2.5">
-                                    {(entries.length > 0 || row[field]) ? (
+                                    {mine.length > 0 ? (
                                       <button
                                         type="button"
                                         onClick={() => openParticipantEditor(row, field)}
                                         className="group block w-full text-left"
                                         title="点击填写自己的内容"
                                       >
-                                        <ParticipantNoteLines entries={entries} fallback={row[field] || ""} />
+                                        <ParticipantNoteLines entries={mine} fallback="" />
                                       </button>
                                     ) : (
                                       <button
@@ -1052,6 +1100,10 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                                         className="flex h-7 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[11px] leading-none text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
                                       >点击填写</button>
                                     )}
+                                    {(others.length > 0 || (!entries.length && row[field])) && <div className="mt-2 border-t border-[#f0f0f0] pt-2">
+                                      <div className="mb-1 text-[11px] text-[#a8b0ba]">别人填写的</div>
+                                      <ParticipantNoteLines entries={others} fallback={!entries.length ? row[field] || "" : ""} />
+                                    </div>}
                                   </td>
                                 )
                               })}
@@ -1407,17 +1459,14 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             <p className="text-[12px] text-[#8f959e]">
               {participantEditing?.row.course_date} · {participantEditing?.row.nickname} · {participantEditing?.row.course_name}
             </p>
-            {participantEditing && (participantEditing.row[participantEditing.field] || (participantEditing.row[`${participantEditing.field}_entries`] || []).length > 0) && (
-              <div className="max-h-[220px] overflow-y-auto rounded-[4px] bg-[#f7f8fa] px-3 py-2">
-                <div className="mb-1 text-[11px] text-[#8f959e]">别人填写的</div>
-                <ParticipantNoteLines
-                  entries={participantEditing.row[`${participantEditing.field}_entries`] || []}
-                  fallback={participantEditing.row[participantEditing.field] || ""}
-                  expanded
-                />
-              </div>
-            )}
             <div>
+              {participantEditing?.field === "visit_need" && <div className="mb-3 flex flex-wrap gap-2">
+                {participantNeedTags.length ? participantNeedTags.map(tag => <button key={tag.id} type="button"
+                  disabled={participantEditorLoading || participantEditorReadFailed}
+                  onClick={() => setParticipantNeedTagIds(ids => ids.includes(tag.id) ? ids.filter(id => id !== tag.id) : [...ids, tag.id])}
+                  className={`rounded-[4px] border px-2 py-1 text-[12px] ${participantNeedTagIds.includes(tag.id) ? "border-[#b9cdf8] bg-[#f0f5ff] text-[#3370ff]" : "border-[#e1e4e7] text-[#646a73]"}`}>{tag.name}</button>)
+                  : <span className="text-[11px] text-[#a8b0ba]">暂无公共来访需求标签，可在客户标签中配置</span>}
+              </div>}
               <div className="mb-1 text-[11px] text-[#8f959e]">我填写的内容</div>
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-[12px] text-[#646a73]">反馈人</span>
@@ -1432,12 +1481,29 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 placeholder={participantEditing?.field === "customer_info" ? "填写深度需求..." : participantEditing?.field === "follow_up" ? "填写跟进点..." : participantEditing?.field === "customer_feedback" ? "填写客户反馈..." : "填写来访需求..."}
                 className="w-full rounded-[4px] border-[0.5px] border-[#e1e4e7] px-3 py-2 text-[12.5px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#b0b5bb] focus:border-[#b9cdf8]"
               />
+              {participantEditing?.field === "follow_up" && <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2"><span className="w-[84px] text-[12px] text-[#646a73]">下次跟进人</span>
+                  <CustomerSearchInput customers={participantFollowUpPeople} value={participantPlan.next_follow_up_person || ""} selectionOnly
+                    onChange={value => { if (!value) setParticipantPlan(plan => ({ ...plan, next_follow_up_person_id: "", next_follow_up_person: "" })) }}
+                    onSelectItem={person => setParticipantPlan(plan => ({ ...plan, next_follow_up_person_id: person.id, next_follow_up_person: person.nickname }))} />
+                </div>
+                <div className="flex items-center gap-2"><span className="w-[84px] text-[12px] text-[#646a73]">下次跟进时间</span>
+                  <Input type="date" value={participantPlan.next_follow_up_date || ""} onChange={event => setParticipantPlan(plan => ({ ...plan, next_follow_up_date: event.target.value }))} className="h-8 w-[180px] text-[12px]" />
+                  {participantPlan.next_follow_up_date && <button type="button" onClick={() => setParticipantPlan(plan => ({ ...plan, next_follow_up_date: "" }))} className="text-[11px] text-[#8f959e]">清空</button>}
+                </div>
+              </div>}
               {participantEditorError && <p className="mt-1 text-[11px] text-[#c4506a]">{participantEditorError}</p>}
             </div>
+            {participantEditing && (participantEditing.row[`${participantEditing.field}_entries`] || []).some(entry => !isOwnParticipantNote(entry)) && (
+              <div className="max-h-[220px] overflow-y-auto rounded-[4px] bg-[#f7f8fa] px-3 py-2">
+                <div className="mb-1 text-[11px] text-[#8f959e]">别人填写的</div>
+                <ParticipantNoteLines entries={(participantEditing.row[`${participantEditing.field}_entries`] || []).filter(entry => !isOwnParticipantNote(entry))} fallback="" expanded />
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-2 border-t-[0.5px] border-[#f0f0f0] px-5 py-2.5">
             <Button variant="outline" size="sm" onClick={() => setParticipantEditing(null)} disabled={participantSaving} className="h-8 w-[88px] rounded-[4px] border-[0.5px] border-[#e1e4e7] bg-white text-[12px] font-normal text-[#646a73] shadow-none hover:bg-[#f7f8fa]">取消</Button>
-            <Button size="sm" onClick={saveParticipantNote} disabled={participantSaving || participantEditorLoading || participantEditorReadFailed || !participantDraft.trim()} className="h-8 w-[104px] rounded-[4px] border border-[#3370ff] bg-[#3370ff] text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{participantSaving ? "保存中" : "保存"}</Button>
+            <Button size="sm" onClick={saveParticipantNote} disabled={participantSaving || participantEditorLoading || participantEditorReadFailed} className="h-8 w-[104px] rounded-[4px] border border-[#3370ff] bg-[#3370ff] text-[12px] font-normal text-white shadow-none hover:border-[#285dcc] hover:bg-[#285dcc]">{participantSaving ? "保存中" : "保存"}</Button>
           </div>
         </DialogContent>
       </Dialog>

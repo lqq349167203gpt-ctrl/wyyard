@@ -4,7 +4,7 @@ from collections import Counter
 
 from fastapi import HTTPException, Request
 
-from app.services import customer_service
+from app.utils.customer_record_search import filter_customer_records
 from app.utils.pagination import paginate
 
 
@@ -89,7 +89,8 @@ def matches_payment_scope(item: dict, organization_id: str = '', deal_course_key
     return matches(item.get('organization_id'), organization_id) and matches(item.get('deal_course_key'), deal_course_key)
 
 
-def payment_list_response(request: Request, items: list[dict], page, page_size, *, subtype_field='', decorate=None):
+def payment_list_response(request: Request, items: list[dict], page, page_size, *, subtype_field='', decorate=None, nickname=None):
+    items = filter_customer_records(items, nickname)
     params = getattr(request, 'query_params', {})
     creators = _selection(params, 'creator_names')
     subtypes = _selection(params, 'subtypes')
@@ -107,13 +108,11 @@ def payment_list_response(request: Request, items: list[dict], page, page_size, 
             **scope_filter_options(items),
         }
     keyword = params.get('keyword', '').strip().casefold()
-    names = {c.id: (c.name or '').casefold() for c in customer_service.list_customers()} if keyword else {}
+    items = filter_customer_records(items, keyword)
     selected = [item for item in items
                 if (not creators or str(item.get('created_by') or '').strip() in creators)
                 and (not subtypes or (subtype_field and str(item.get(subtype_field) or '').strip() in subtypes))
-                and matches_payment_scope(item, organization_id, deal_course_key)
-                and (not keyword or keyword in str(item.get('nickname') or '').casefold()
-                     or keyword in names.get(item.get('customer_id'), ''))]
+                and matches_payment_scope(item, organization_id, deal_course_key)]
     # 先按成交日期统一排序，再分页，避免补录旧单排在近期成交前面。
     selected.sort(key=lambda item: (
         str(item.get('deal_date') or ''),

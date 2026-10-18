@@ -18,15 +18,12 @@ def list_knots(request: Request, page: int | None = Query(None, ge=1), page_size
     if customer_ids:
         allowed = set(customer_ids.split(","))
         items_dict = [i for i in items_dict if i.get("customer_id") in allowed]
-    if nickname:
-        kw = nickname.lower()
-        items_dict = [i for i in items_dict if kw in (i.get("nickname") or "").lower()]
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
     def decorate(item):
         item["effective_remaining"] = energy_knot_session_service.get_purchase_remaining(item.get("id", ""))
-    return payment_list_response(request, items_dict, page, page_size, decorate=decorate)
+    return payment_list_response(request, items_dict, page, page_size, nickname=nickname, decorate=decorate)
 
 
 @router.get("/search-customers")

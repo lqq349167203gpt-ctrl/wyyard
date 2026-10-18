@@ -137,7 +137,7 @@
   </view>
 
   <!-- 活动简介 -->
-  <view class="form-card">
+  <view class="form-card" wx:if="{{false}}">
     <view class="form-card-title detail-section-title">活动简介</view>
     <view class="form-item column last" style="padding-top: 14rpx;">
       <textarea wx:if="{{!readOnly}}" class="form-textarea" style="height: 160rpx;" placeholder="输入活动简介..." placeholder-class="form-textarea-placeholder" value="{{description}}" bindinput="onDescriptionInput" />

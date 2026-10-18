@@ -1,2 +1,3 @@
 <import src="../../templates/note-feedback-meta.wxml" />
+<import src="../../templates/participant-note-field.wxml" />
 <include src="../service-teachers/index.wxml" />

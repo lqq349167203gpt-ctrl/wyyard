@@ -160,6 +160,8 @@ def note_entry(note) -> dict:
     creator = getattr(note, "created_by", "") or "历史记录"
     timestamp = getattr(note, "updated_at", None) or getattr(note, "created_at", None)
     entry = {
+        "id": getattr(note, "id", ""),
+        "created_by_id": getattr(note, "created_by_id", "") or "",
         "author": getattr(note, "feedback_person", "") or creator,
         "created_by": creator,
         "content": display_content(note),

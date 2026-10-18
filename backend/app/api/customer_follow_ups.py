@@ -9,8 +9,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import Field
 
-from app.api.visit_notes import _feedback_people, _resolve_feedback_person
-from app.models.base import StrictBaseModel
+from app.api.visit_notes import _feedback_people, _follow_up_plan, _resolve_feedback_person, _response, follow_up_people
+from app.models.visit_note import VisitNoteCreate, VisitNoteUpdate
 from app.services import (
     customer_access_service,
     customer_service,
@@ -44,18 +44,13 @@ CATEGORIES = ("visit_need", "customer_info", "follow_up", "customer_feedback")
 CATEGORY_LABELS = {"visit_need": "来访需求", "customer_info": "深度需求", "follow_up": "跟进点", "customer_feedback": "客户反馈"}
 
 
-class CustomerFollowUpUpdate(StrictBaseModel):
-    content: str = Field(min_length=1, max_length=5000)
-    feedback_person_id: str | None = None
-    feedback_person: str | None = None
+class CustomerFollowUpUpdate(VisitNoteUpdate):
+    """与邀约共用字段与校验，避免新标签、跟进安排漏接入口。"""
 
 
-class CustomerFollowUpCreate(StrictBaseModel):
+class CustomerFollowUpCreate(VisitNoteCreate):
     visit_id: str = Field(min_length=1, max_length=100)
     category: Literal["visit_need", "customer_info", "follow_up", "customer_feedback"]
-    content: str = Field(min_length=1, max_length=5000)
-    feedback_person_id: str = ""
-    feedback_person: str = ""
 
 
 def _actor(request: Request) -> tuple[str, str, str]:
@@ -64,6 +59,11 @@ def _actor(request: Request) -> tuple[str, str, str]:
         getattr(request.state, "user_owner", "") or "",
         getattr(request.state, "user_name", "") or "",
     )
+
+
+def _require_category_access(request: Request, category: str):
+    if category == "visit_need" and not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
+        raise HTTPException(403, "没有来访需求的查看权限")
 
 
 def _build_rows(notes: list, actor: tuple[str, str, str]) -> list[dict]:
@@ -152,20 +152,17 @@ def get_my_follow_up_note(request: Request, visit_id: str = Query(..., min_lengt
     """课程记录的「参与者」页签编辑时用：拿我自己在这一天这一类填过的那一条。"""
     if category not in CATEGORIES:
         raise HTTPException(status_code=400, detail="未知的记录类型")
+    _require_category_access(request, category)
+    visit = visit_service.get_visit_without_metrics(visit_id)
+    if not visit:
+        raise HTTPException(404, "邀约记录不存在")
+    customer_access_service.require_customer_scope(request, visit.customer_id)
     account_id, owner_name, username = _actor(request)
     for note in visit_note_service.list_notes([visit_id]):
         if note.category != category:
             continue
         if visit_note_service.can_manage_note(note, account_id, owner_name, username):
-            return {
-                "id": note.id,
-                "content": note.content,
-                "feedback_person_id": note.feedback_person_id,
-                "feedback_person": note.feedback_person or note.created_by,
-                "created_by": note.created_by,
-                "can_edit": True,
-                "updated_at": note.updated_at.isoformat(),
-            }
+            return _response(note, request)
     return None
 
 
@@ -174,8 +171,23 @@ def get_feedback_people_for_follow_ups(request: Request):
     return _feedback_people(request)
 
 
+@router.get("/follow-up-people")
+def get_follow_up_people_for_participants():
+    return follow_up_people()
+
+
+@router.get("/need-tags")
+def get_need_tags_for_participants(request: Request):
+    from app.services import customer_tag_service
+
+    if not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
+        raise HTTPException(403, "没有来访需求的查看权限")
+    return customer_tag_service.list_visible_tags(_actor(request)[0], category="visit_need")
+
+
 @router.post("")
 def create_customer_follow_up(data: CustomerFollowUpCreate, request: Request):
+    _require_category_access(request, data.category)
     """自己那边空着的位置直接补填一条（同一场邀约同一类只有一条）。"""
     account_id, owner_name, username = _actor(request)
     visit = visit_service.get_visit_without_metrics(data.visit_id)
@@ -185,6 +197,7 @@ def create_customer_follow_up(data: CustomerFollowUpCreate, request: Request):
     feedback_person_id = feedback_person = ""
     if data.feedback_person_id or data.feedback_person:
         feedback_person_id, feedback_person = _resolve_feedback_person(request, data.feedback_person_id, data.feedback_person)
+    plan = _follow_up_plan(request, data, data.category)
     try:
         note = visit_note_service.create_note(
             data.visit_id,
@@ -194,6 +207,8 @@ def create_customer_follow_up(data: CustomerFollowUpCreate, request: Request):
             creator=owner_name or username,
             feedback_person_id=feedback_person_id,
             feedback_person=feedback_person,
+            follow_up_plan=plan,
+            need_tag_ids=data.need_tag_ids if "need_tag_ids" in data.model_fields_set else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -204,22 +219,13 @@ def create_customer_follow_up(data: CustomerFollowUpCreate, request: Request):
         "content": (
             f"填写客户跟进·{CATEGORY_LABELS.get(note.category, '')}：客户：{customer_name}｜"
             f"日期：{visit.visit_date or ''}｜反馈人：{note.feedback_person or note.created_by}｜"
-            f"创建人：{note.created_by}｜内容：{note.content}"
+            f"创建人：{note.created_by}｜内容：{visit_note_service.display_content(note)}"
+            + (f"｜下次跟进人：{note.next_follow_up_person}｜跟进时间：{note.next_follow_up_date}" if note.category == "follow_up" else "")
         ),
         "entity_id": note.id,
         "after_data": note.model_dump(mode="json"),
     }
-    return {
-        "id": note.id,
-        "visit_id": note.visit_id,
-        "category": note.category,
-        "content": note.content,
-        "feedback_person_id": note.feedback_person_id,
-        "feedback_person": note.feedback_person or note.created_by,
-        "created_by": note.created_by,
-        "can_edit": True,
-        "updated_at": note.updated_at.isoformat(),
-    }
+    return _response(note, request)
 
 
 @router.patch("/{note_id}")
@@ -231,7 +237,21 @@ def update_customer_follow_up(note_id: str, data: CustomerFollowUpUpdate, reques
         raise HTTPException(status_code=404, detail="记录不存在")
     if not visit_note_service.can_manage_note(note, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能修改自己填写的记录")
+    _require_category_access(request, note.category)
     before = note.model_dump(mode="json")
+    visit = visit_service.get_visit_without_metrics(note.visit_id)
+    if not visit:
+        raise HTTPException(404, "邀约记录不存在")
+    customer_access_service.require_customer_scope(request, visit.customer_id, action="修改客户跟进到")
+    plan = _follow_up_plan(request, data, note.category, note)
+    if not data.content.strip() and not (data.need_tag_ids if data.need_tag_ids is not None else note.need_tags):
+        visit_note_service.delete_note(note.id)
+        request.state.operation_log_context = {
+            "content": f"清空本人填写的客户跟进·{CATEGORY_LABELS.get(note.category, '')}：{before['content']}",
+            "entity_id": note.id, "before_data": before, "after_data": {"is_deleted": True},
+        }
+        return {**_response(note, request), "content": "", "need_tags": [], "deleted": True,
+                "next_follow_up_person_id": "", "next_follow_up_person": "", "next_follow_up_date": ""}
     feedback_person_id = feedback_person = None
     if data.feedback_person_id is not None or data.feedback_person is not None:
         feedback_person_id, feedback_person = _resolve_feedback_person(
@@ -242,6 +262,8 @@ def update_customer_follow_up(note_id: str, data: CustomerFollowUpUpdate, reques
             note_id, data.content,
             feedback_person_id=feedback_person_id,
             feedback_person=feedback_person,
+            follow_up_plan=plan,
+            need_tag_ids=data.need_tag_ids,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -262,19 +284,10 @@ def update_customer_follow_up(note_id: str, data: CustomerFollowUpUpdate, reques
             f"修改客户跟进·{CATEGORY_LABELS.get(updated.category, '')}：客户：{customer_name}｜"
             f"日期：{visit_date}｜反馈人：{person_summary}｜创建人：{updated.created_by}｜"
             f"内容：{content_summary}"
+            + (f"｜下次跟进人：{updated.next_follow_up_person}｜跟进时间：{updated.next_follow_up_date}" if updated.category == "follow_up" else "")
         ),
         "entity_id": updated.id,
         "before_data": before,
         "after_data": updated.model_dump(mode="json"),
     }
-    return {
-        "id": updated.id,
-        "visit_id": updated.visit_id,
-        "category": updated.category,
-        "content": updated.content,
-        "feedback_person_id": updated.feedback_person_id,
-        "feedback_person": updated.feedback_person or updated.created_by,
-        "created_by": updated.created_by,
-        "can_edit": True,
-        "updated_at": updated.updated_at.isoformat(),
-    }
+    return _response(updated, request)

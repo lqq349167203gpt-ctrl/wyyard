@@ -48,7 +48,7 @@ def test_all_payment_types_filter_before_paging_keep_complete_visible_options(mo
     monkeypatch.setattr(getattr(api, service), loader, lambda: rows)
     monkeypatch.setattr(customer_access_service, 'require_transaction_access', lambda *a, **k: None)
     monkeypatch.setattr(customer_access_service, 'filter_record_dicts', lambda req, items: [i for i in items if i['customer_id'] != 'hidden'])
-    monkeypatch.setattr(customer_service, 'list_customers', lambda: [NS(id='c', name='真实姓名')])
+    monkeypatch.setattr(customer_service, 'list_all_customers', lambda: [NS(id='c', name='真实姓名', nickname='昵称')])
     remaining_calls = []
     for name in ['membership_card_service', 'group_case_session_service', 'emotional_release_session_service', 'energy_knot_session_service', 'other_project_service']:
         provider = getattr(api, name, None)

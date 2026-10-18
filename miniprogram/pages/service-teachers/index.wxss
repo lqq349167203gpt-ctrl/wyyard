@@ -1051,6 +1051,12 @@
 .p-field-label { flex-shrink: 0; width: 130rpx; font-size: 23rpx; line-height: 1.5; color: #9aa1a9; }
 .p-field-value { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 23rpx; line-height: 1.5; color: #505963; word-break: break-all; white-space: pre-wrap; }
 .p-field-input { display: block; flex: 1; min-width: 0; padding: 10rpx 10rpx; box-sizing: border-box; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fff; font-size: 23rpx; line-height: 1.5; color: #a0a7af; }
+.p-field-body { flex: 1; min-width: 0; }
+.p-note-others { margin-top: 16rpx; padding-top: 12rpx; border-top: 1rpx solid #f0f0f0; }
+.p-note-others-title { display: block; margin-bottom: 8rpx; color: #a0a7af; font-size: 22rpx; }
+.participant-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 20rpx; }
+.participant-tag { border: 1rpx solid #e1e4e7; border-radius: 8rpx; padding: 8rpx 14rpx; font-size: 24rpx; color: #646a73; }
+.participant-tag.selected { border-color: #b9cdf8; background: #f0f5ff; color: #3370ff; }
 
 /* 参与者页签：填写弹层（和「客户跟进」页同一套） */
 .sheet-mask { position: fixed; inset: 0; z-index: 200; background: rgba(31,35,41,.34); }

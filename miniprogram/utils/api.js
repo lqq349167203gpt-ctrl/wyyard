@@ -1019,6 +1019,8 @@ module.exports = {
   activityParticipantNoteApi,
   // 客户跟进：自己填过的客户信息 / 跟进点
   customerFollowUpApi: {
+    needTags: () => request('/api/customer-follow-ups/need-tags'),
+    followUpPeople: () => request('/api/customer-follow-ups/follow-up-people'),
     feedbackPeople: () => request('/api/customer-follow-ups/feedback-people'),
     myNote: (visitId, category) => request(`/api/customer-follow-ups/my-note?visit_id=${encodeURIComponent(visitId)}&category=${encodeURIComponent(category)}`),
     update: (noteId, content, attribution = {}) => request(`/api/customer-follow-ups/${noteId}`, { method: 'PATCH', data: { content, ...attribution } }),

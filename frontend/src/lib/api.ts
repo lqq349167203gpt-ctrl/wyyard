@@ -862,6 +862,8 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
 // 课程记录的「参与者」页签：一行 = 某场课的一个参与者 + 当天的邀约备注
 /** 备注条目：同一条备注可能是不同人分别填写的，按填写人拆开 */
 export interface CourseParticipantNoteEntry extends NextFollowUpPlan {
+  id?: string
+  created_by_id?: string
   author: string
   created_by?: string
   content: string
@@ -4078,7 +4080,7 @@ export const followupRecordApi = {
 }
 
 // 客户跟进：自己填过的「客户信息 / 跟进点」（数据来自课表的参与人记录）
-export interface CustomerFollowUpNote {
+export interface CustomerFollowUpNote extends NextFollowUpPlan {
   id: string
   content: string
   feedback_person_id: string
@@ -4086,18 +4088,25 @@ export interface CustomerFollowUpNote {
   created_by: string
   can_edit: boolean
   updated_at: string
+  created_by_id?: string
+  need_tags?: Array<{ id: string; name: string }>
+  deleted?: boolean
 }
 
 export const customerFollowUpApi = {
+  needTags: () => request<CustomerTag[]>("/api/customer-follow-ups/need-tags"),
+  followUpPeople: () => request<FollowUpPerson[]>("/api/customer-follow-ups/follow-up-people"),
   feedbackPeople: () => request<FeedbackPeopleResponse>("/api/customer-follow-ups/feedback-people"),
-  update: (noteId: string, content: string, feedbackPerson?: { id: string; name: string }) =>
+  update: (noteId: string, content: string, feedbackPerson?: { id: string; name: string }, extra?: NextFollowUpPlan & { need_tag_ids?: string[] }) =>
     request<CustomerFollowUpNote>(`/api/customer-follow-ups/${noteId}`, { method: "PATCH", body: JSON.stringify({
       content,
+      ...extra,
       ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
     }) }),
-  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up" | "customer_feedback", content: string, feedbackPerson?: { id: string; name: string }) =>
+  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up" | "customer_feedback", content: string, feedbackPerson?: { id: string; name: string }, extra?: NextFollowUpPlan & { need_tag_ids?: string[] }) =>
     request<CustomerFollowUpNote>("/api/customer-follow-ups", { method: "POST", body: JSON.stringify({
       visit_id: visitId, category, content,
+      ...extra,
       ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
     }) }),
   myNote: (visitId: string, category: "visit_need" | "customer_info" | "follow_up" | "customer_feedback") =>
