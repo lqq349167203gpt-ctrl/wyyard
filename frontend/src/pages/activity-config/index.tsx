@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/table"
 import { memberIdentityApi, activityPermissionApi, type MemberIdentity, type ActivityPermissions } from "@/lib/api"
 
-const ACTIVITY_TYPES = ["沙龙活动", "觉醒游戏", "情绪释放", "能量结", "内部课程"] as const
+const ACTIVITY_TYPES = ["沙龙活动", "觉醒游戏", "情绪释放", "能量结", "沙龙技能学习"] as const
 
 export function ActivityConfigContent({ embedded }: { embedded?: boolean } = {}) {
   const [identities, setIdentities] = useState<MemberIdentity[]>([])

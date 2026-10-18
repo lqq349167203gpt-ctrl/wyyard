@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import List, Optional
 
-from app.models.base import SafeBaseModel
+from app.models.payment_course import PaymentCourseFields
 
 
-class InternalCourseBase(SafeBaseModel):
+class InternalCourseBase(PaymentCourseFields):
     customer_id: str
     nickname: str
     course_type: str

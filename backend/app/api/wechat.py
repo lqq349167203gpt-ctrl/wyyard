@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 
 class WechatLoginRequest(StrictBaseModel):
     code: str
+    member_only: bool = False
 
 
 class WechatBindRequest(StrictBaseModel):
@@ -95,12 +96,31 @@ async def wechat_login(data: WechatLoginRequest, request: Request):
     # 查找已绑定的 session
     existing = wechat_service.find_session_by_openid(openid)
     if existing:
+        if data.member_only:
+            from app.services import staff_member_service
+
+            customer_id = getattr(existing, "customer_id", "")
+            customer = (customer_service.get_customer(customer_id) if customer_id
+                        else staff_member_service.resolve_customer(existing.account_id) if existing.account_id else None)
+            if customer and not customer.is_deleted and customer.phone and staff_member_service.customer_for_phone(customer.phone):
+                return _member_login_response(customer)
         account = account_service.get_account(existing.account_id)
         if account and account.enabled:
             resp = _build_login_response(account)
             resp["token"] = _make_jwt_token(account, request)
             resp["bound"] = True
             return resp
+        if getattr(existing, "customer_id", ""):
+            from app.services import staff_member_service
+
+            customer = customer_service.get_customer(existing.customer_id)
+            if customer and not customer.is_deleted and customer.phone and staff_member_service.customer_for_phone(customer.phone):
+                account = staff_member_service.management_account_for(customer)
+                if account:
+                    resp = _build_login_response(account)
+                    resp.update(token=_make_jwt_token(account, request), bound=True)
+                    return resp
+                return _member_login_response(customer)
 
     # 未绑定，返回临时 token
     temp_session = wechat_service.create_session(openid, "")
@@ -170,6 +190,51 @@ async def dev_login(data: DevLoginRequest, request: Request):
 class PhoneLoginRequest(StrictBaseModel):
     code: str  # wx.getPhoneNumber 返回的 code
     avatar_url: str = ""
+
+
+class EntryLoginRequest(StrictBaseModel):
+    code: str
+    login_code: str
+
+
+def _member_login_response(customer):
+    from app.middleware.jwt_auth import create_customer_token
+
+    return {"token": create_customer_token(customer.id, customer.nickname or customer.name),
+            "role": "customer", "bound": True, "permissions": [],
+            "customer": {"id": customer.id, "nickname": customer.nickname or customer.name,
+                         "member_type": customer.member_type}}
+
+
+@router.post("/entry-login")
+async def entry_login(data: EntryLoginRequest, request: Request):
+    """管理小程序的统一手机号入口：管理账号优先，否则进入本人会员视图。"""
+    from app.services import staff_member_service
+
+    try:
+        phone = wechat_service.get_phone_number(data.code, management=True)
+        wx_result = wechat_service.jscode2session(data.login_code)
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+    openid = wx_result.get("openid")
+    if not openid:
+        raise HTTPException(400, "微信登录失败：未获取到 openid")
+    customer = staff_member_service.customer_for_phone(phone)
+    if not customer:
+        raise HTTPException(403, staff_member_service.UNBOUND_MESSAGE)
+    account = staff_member_service.management_account_for(customer)
+    # 同一微信只保留当前经手机号验证的归属，避免旧绑定优先覆盖新身份。
+    session = wechat_service.find_session_by_openid(openid)
+    if not session:
+        session = wechat_service.create_session(openid, account.id if account else "")
+    session.account_id = account.id if account else ""
+    session.customer_id = customer.id
+    wechat_service.save_session(session)
+    if account:
+        resp = _build_login_response(account)
+        resp.update(token=_make_jwt_token(account, request), bound=True)
+        return resp
+    return _member_login_response(customer)
 
 
 @router.post("/phone-login")

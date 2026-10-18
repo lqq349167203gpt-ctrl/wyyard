@@ -40,8 +40,8 @@ router = APIRouter(
     dependencies=[Depends(require_follow_up_access)],
 )
 
-CATEGORIES = ("visit_need", "customer_info", "follow_up")
-CATEGORY_LABELS = {"visit_need": "来访需求", "customer_info": "客户信息", "follow_up": "跟进点"}
+CATEGORIES = ("visit_need", "customer_info", "follow_up", "customer_feedback")
+CATEGORY_LABELS = {"visit_need": "来访需求", "customer_info": "深度需求", "follow_up": "跟进点", "customer_feedback": "客户反馈"}
 
 
 class CustomerFollowUpUpdate(StrictBaseModel):
@@ -52,7 +52,7 @@ class CustomerFollowUpUpdate(StrictBaseModel):
 
 class CustomerFollowUpCreate(StrictBaseModel):
     visit_id: str = Field(min_length=1, max_length=100)
-    category: Literal["visit_need", "customer_info", "follow_up"]
+    category: Literal["visit_need", "customer_info", "follow_up", "customer_feedback"]
     content: str = Field(min_length=1, max_length=5000)
     feedback_person_id: str = ""
     feedback_person: str = ""
@@ -93,6 +93,7 @@ def _build_rows(notes: list, actor: tuple[str, str, str]) -> list[dict]:
                 "visit_need": None,
                 "customer_info": None,
                 "follow_up": None,
+                "customer_feedback": None,
             }
         if note.category in CATEGORIES and row[note.category] is None:
             row[note.category] = {

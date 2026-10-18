@@ -1,12 +1,14 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from app.models.base import SafeBaseModel, StrictBaseModel
+from app.models.base import StrictBaseModel
+from app.models.payment_course import PaymentCourseFields
+from app.utils.payment_types import normalize_card_type
 
 
-class ProjectDeductionBase(SafeBaseModel):
+class ProjectDeductionBase(PaymentCourseFields):
     customer_id: str
     nickname: str
     project_type: str  # membership-cards / group-cases / emotional-releases / oh-card-readings / energy-knots / other-projects
@@ -33,6 +35,12 @@ class ProjectDeductionBase(SafeBaseModel):
     source_organization_name: str = ""
     source_space_id: str = ""
     source_space_name: str = ""
+
+    @model_validator(mode="after")
+    def normalize_card_name(self):
+        if self.project_type == "membership-cards" and self.project_name and self.project_name != "会员卡":
+            self.project_name = normalize_card_type(self.project_name)
+        return self
 
 
 class ProjectDeductionCreate(StrictBaseModel):

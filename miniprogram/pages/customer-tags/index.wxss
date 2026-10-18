@@ -49,6 +49,7 @@
 
 .filter-card {
   display: flex;
+  flex-wrap: wrap;
   gap: 8rpx;
   margin-top: 20rpx;
   padding: 10rpx;

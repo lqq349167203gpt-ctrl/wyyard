@@ -30,7 +30,7 @@ def _is_visible(tag: CustomerTag, actor_id: str) -> bool:
 
 
 def _active_tags() -> list[CustomerTag]:
-    return [tag for tag in _tags.values() if not tag.is_deleted and tag.enabled]
+    return [tag for tag in _tags.values() if not tag.is_deleted and tag.enabled and tag.category == "customer"]
 
 
 def _usage_counts() -> dict[str, int]:
@@ -46,11 +46,24 @@ def _as_response(tag: CustomerTag, usage_counts: dict[str, int] | None = None) -
     return data
 
 
-def list_visible_tags(actor_id: str, include_disabled: bool = False) -> list[dict]:
+def list_visible_tags(actor_id: str, include_disabled: bool = False, category: str = "customer") -> list[dict]:
     counts = _usage_counts()
+    if category == "visit_need":
+        from app.services import visit_note_service, visit_service
+
+        customers_by_tag: dict[str, set[str]] = {}
+        for note in visit_note_service._notes.values():
+            if note.is_deleted or note.category != "visit_need":
+                continue
+            visit = visit_service.get_visit_without_metrics(note.visit_id)
+            if visit and not visit.is_deleted:
+                for tag in note.need_tags:
+                    customers_by_tag.setdefault(tag["id"], set()).add(visit.customer_id)
+        counts.update({tag_id: len(customers) for tag_id, customers in customers_by_tag.items()})
     tags = [
         tag for tag in _tags.values()
         if not tag.is_deleted
+        and tag.category == category
         and _is_visible(tag, actor_id)
         and (include_disabled or tag.enabled)
     ]
@@ -67,14 +80,17 @@ def create_tag(data: CustomerTagCreate, actor_id: str, actor_name: str) -> dict:
     name = data.name.strip()
     if not name:
         raise ValueError("标签名称不能为空")
+    if data.category == "visit_need" and data.scope != "public":
+        raise ValueError("来访需求仅支持公共标签")
     with _lock:
         for tag in _tags.values():
-            if tag.is_deleted or tag.name.casefold() != name.casefold() or tag.scope != data.scope:
+            if tag.is_deleted or tag.category != data.category or tag.name.casefold() != name.casefold() or tag.scope != data.scope:
                 continue
             if data.scope == "public" or tag.created_by_id == actor_id:
                 raise ValueError("标签名称已存在")
         now = datetime.now(timezone.utc)
         tag = CustomerTag(
+            category=data.category,
             id=str(uuid.uuid4())[:12],
             name=name,
             scope=data.scope,
@@ -105,7 +121,7 @@ def update_tag(tag_id: str, data: CustomerTagUpdate, actor_id: str, can_manage_p
             if not name:
                 raise ValueError("标签名称不能为空")
             for other in _tags.values():
-                if other.id == tag_id or other.is_deleted or other.scope != tag.scope:
+                if other.id == tag_id or other.category != tag.category or other.is_deleted or other.scope != tag.scope:
                     continue
                 same_owner = tag.scope == "public" or other.created_by_id == actor_id
                 if same_owner and other.name.casefold() == name.casefold():

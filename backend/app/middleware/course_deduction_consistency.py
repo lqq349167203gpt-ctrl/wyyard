@@ -14,7 +14,7 @@ from app.services import storage
 COURSE_PATHS = (
     "/api/class-records", "/api/group-case-sessions", "/api/emotional-release-sessions",
     "/api/energy-knot-sessions", "/api/internal-course-sessions", "/api/visits",
-    "/api/project-deductions", "/api/activity-withdrawals", "/api/client/activities",
+    "/api/project-deductions", "/api/activity-withdrawals", "/api/client/activities", "/api/activity-checkins",
 )
 CACHE_MODULES = (
     "class_record_service", "group_case_session_service", "emotional_release_session_service",
@@ -22,7 +22,7 @@ CACHE_MODULES = (
     "membership_card_service", "project_deduction_service", "customer_service", "client_notification_service",
 )
 # POST 查询/导出没有课程写入，不能等候课程事务或心跳请求持有的写锁。
-READ_ONLY_POST_PATHS = {"/api/principal/query", "/api/principal/export"}
+READ_ONLY_POST_PATHS = {"/api/principal/query", "/api/principal/export", "/api/activity-checkins/preview"}
 
 
 def eligible_courses(customer_id):
@@ -50,7 +50,7 @@ class CourseDeductionConsistencyMiddleware:
 
             active = [deepcopy(row) for row in deductions.list_deductions()
                       if row.project_name == deductions.COARSE_DOOR_CARD_TYPE and row.source_activity_id]
-            if not active:
+            if not active and path != "/api/activity-checkins/confirm":
                 return await self.app(scope, receive, send)
             before = {cid: eligible_courses(cid) for cid in {row.customer_id for row in active}}
             snapshots = []

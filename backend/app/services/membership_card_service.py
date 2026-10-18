@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from app.models.membership_card import MembershipCard, MembershipCardCreate
 from app.services import customer_service
 from app.services.storage import delete_item, load_data, save_data, save_item
+from app.utils.payment_types import MEMBERSHIP_CARD_TYPES, normalize_card_type
 
 FILENAME = "membership_cards.json"
 
@@ -52,7 +53,7 @@ def update_agreement_status(card_id: str, status: str) -> Optional[MembershipCar
         return card
 
 # 会员卡卡种的先后顺序，与付款页「会员卡」下拉里的顺序一致（列表里没提到的排在后面）
-MEMBERSHIP_CARD_TYPE_ORDER = ("次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "60次卡", "半年卡", "年卡")
+MEMBERSHIP_CARD_TYPE_ORDER = MEMBERSHIP_CARD_TYPES
 DEDUCTIONS_FILE = "membership_deductions.json"
 DEBTS_FILE = "membership_debts.json"
 DEBT_ACTIVITIES_FILE = "membership_debt_activities.json"
@@ -105,7 +106,7 @@ def _migrate_deductions(raw):
                     "card_id": it.get("card_id"),
                     "benefit_type": it.get("benefit_type", ""),
                     "benefit_id": it.get("benefit_id", ""),
-                    "benefit_name": it.get("benefit_name", ""),
+                    "benefit_name": normalize_card_type(it["benefit_name"]) if it.get("benefit_name") and it.get("benefit_type") in {"count_card", "unlimited_card"} else it.get("benefit_name", ""),
                     "remaining_after": it.get("remaining_after"),
                     "deducted_at": it.get("deducted_at"),
                 })
@@ -318,7 +319,7 @@ def get_manual_deductions(customer_id: str) -> int:
 
 
 def _count_raw_activities(customer_id: str) -> int:
-    """统计该用户实际参与的活动总数（原始计数，不考虑卡和内部课程）"""
+    """统计该用户实际参与的活动总数（原始计数，不考虑卡和沙龙技能学习）"""
     from app.services import (
         class_record_service,
         emotional_release_session_service,
@@ -576,8 +577,8 @@ def _rebuild_activity_tracking(
 def get_effective_remaining(customer_id: str) -> Optional[int]:
     """唯一真理：有效剩余 = 总购买 - 销卡 - 活动扣卡
 
-    权益顺序：先使用会员卡；会员卡没有可用次数时，才由内部课程权益覆盖。
-    返回 None 表示当前由不限次会员卡或内部课程权益覆盖。
+    权益顺序：先使用会员卡；会员卡没有可用次数时，才由沙龙技能学习权益覆盖。
+    返回 None 表示当前由不限次会员卡或沙龙技能学习权益覆盖。
     没有可用权益的活动会登记为欠卡，剩余次数允许为负数。
     不再读 card.remaining_count 作为依据，仅用流水相减。
     """
@@ -731,13 +732,16 @@ def create_card(data: MembershipCardCreate) -> MembershipCard:
         _cards[card.id] = card
         _save(card.id)
         customer_id = card.customer_id
-        # 后补会员卡时，按活动日期把内部课程抵扣/欠费记录回填到有效期覆盖的会员卡。
+        # 后补会员卡时，按活动日期把沙龙技能学习抵扣/欠费记录回填到有效期覆盖的会员卡。
         reconcile_customer_card_usage(customer_id)
     _refresh_member_type(customer_id)
     return card
 
 
 def update_card(card_id: str, data: dict) -> Optional[MembershipCard]:
+    data = dict(data)
+    if "card_type" in data:
+        data["card_type"] = normalize_card_type(data["card_type"])
     with _card_lock:
         card = _cards.get(card_id)
         if not card or card.voided:
@@ -822,7 +826,7 @@ def _deduct_one(customer_id: str, usage_date: Optional[str] = None) -> tuple:
     """内部：为指定用户扣除一次会员活动剩余次数。
 
     返回 (success, card_id, benefit_type, benefit_id, benefit_name)：
-      success=True — 已匹配到次数卡、不限次卡或内部课程权益
+      success=True — 已匹配到次数卡、不限次卡或沙龙技能学习权益
       success=False — 无法匹配有效权益，进入欠费或等待未生效卡
     新逻辑：不修改 card.remaining_count 字段，扣减由调用方记流水实现（见 deduct_for_activity）。
     """
@@ -835,7 +839,7 @@ def _deduct_one(customer_id: str, usage_date: Optional[str] = None) -> tuple:
         card_id, benefit_type, benefit_id, benefit_name = card_benefit
         return (True, card_id, benefit_type, benefit_id, benefit_name)
 
-    # 第二优先级：活动当天有效的内部课程权益。
+    # 第二优先级：活动当天有效的沙龙技能学习权益。
     active_course = internal_course_service.get_active_course(customer_id, target_date)
     if active_course:
         return (
@@ -998,7 +1002,7 @@ def _set_record_benefit(record: dict, benefit: tuple) -> None:
 
 
 def _set_record_internal_course(record: dict, course) -> None:
-    """将活动使用记录改记到内部课程权益。"""
+    """将活动使用记录改记到沙龙技能学习权益。"""
     record.update({
         "card_id": None,
         "benefit_type": "internal_course",
@@ -1071,8 +1075,8 @@ def _rebuild_card_remaining_snapshots(card: MembershipCard) -> bool:
 def reconcile_customer_card_usage(customer_id: str) -> bool:
     """按活动日期重排客户权益使用记录。
 
-    会员卡始终优先；卡的有效期不覆盖活动时，才回退到活动当天有效的内部课程权益。
-    后补会员卡后，本函数会把原内部课程抵扣和欠费记录转回会员卡，直到卡次数用完。
+    会员卡始终优先；卡的有效期不覆盖活动时，才回退到活动当天有效的沙龙技能学习权益。
+    后补会员卡后，本函数会把原沙龙技能学习抵扣和欠费记录转回会员卡，直到卡次数用完。
     """
     from app.services import internal_course_service
 

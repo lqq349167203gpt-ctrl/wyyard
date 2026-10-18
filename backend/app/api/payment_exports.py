@@ -19,6 +19,14 @@ router = APIRouter(prefix="/api/payment-exports", tags=["payment-exports"])
 ExportRangeType = Literal["day", "month", "year", "custom"]
 
 
+@router.get("/course-options")
+def payment_course_options(request: Request, date: str):
+    from app.services.payment_course_service import course_options
+
+    customer_access_service.require_transaction_access(request, detail=True)
+    return course_options(date, request)
+
+
 @router.get("/records")
 def list_payment_records(
     request: Request, page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100),
@@ -43,6 +51,9 @@ def list_payment_records(
             items.append({"type": project_type, "record": item})
     items.sort(key=lambda item: (item["record"].get("deal_date") or "", item["record"].get("created_at") or "", item["record"]["id"]), reverse=True)
     result = paginate(items, page, page_size)
+    from app.services.payment_course_service import fill_course_organizations
+
+    fill_course_organizations([item["record"] for item in result["items"]])
     for item in result["items"]:
         fill_effective_remaining(item["record"], item["type"])
     return result

@@ -83,7 +83,7 @@ ACTIVITY_SUMMARY_TYPES = (
     ("gcs", "觉醒游戏"),
     ("ers", "情绪释放"),
     ("eks", "能量结"),
-    ("ics", "内部课程"),
+    ("ics", "沙龙技能学习"),
 )
 
 
@@ -208,7 +208,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             {
                 "id": note.id,
                 "category": note.category,
-                "content": note.content,
+                "content": visit_note_service.display_content(note),
                 "created_by_id": note.created_by_id,
                 "created_by": note.created_by,
                 "created_at": note.created_at,
@@ -278,7 +278,7 @@ def _parse_ek_names(desc) -> str:
 
 
 def _count_internal_course_covered(customer_id: str) -> int:
-    """统计会员卡不可用后，实际由内部课程权益覆盖的活动场次。"""
+    """统计会员卡不可用后，实际由沙龙技能学习权益覆盖的活动场次。"""
     return sum(
         1
         for record in membership_card_service.list_activity_usage_records(customer_id)
@@ -336,7 +336,7 @@ def _build_purchase_summary(customer_id: str) -> list:
     activity_deductions = membership_card_service.get_activity_deductions(customer_id)
     # 无可用会员卡时登记的欠卡次数
     advance_deductions = membership_card_service.get_debt(customer_id)
-    # 内部课程抵扣：活动日期落在内部课程期间内的场次
+    # 沙龙技能学习抵扣：活动日期落在沙龙技能学习期间内的场次
     internal_course_deductions = _count_internal_course_covered(customer_id)
     # 不限次扣卡：通过不限次卡扣除的活动次数（无不限次卡时为0）
     raw_activities = membership_card_service._count_raw_activities(customer_id)
@@ -616,7 +616,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             ],
         })
 
-    # 内部课程
+    # 沙龙技能学习
     ic_courses = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
     for c in ic_courses:
         is_current = (
@@ -624,7 +624,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             and (not c.expiry_date or c.expiry_date >= today)
         )
         summary.append({
-            "type": "内部课程",
+            "type": "沙龙技能学习",
             "name": c.course_type,
             "total_purchased": 1,
             "total_amount": c.price,
@@ -670,7 +670,7 @@ def _build_purchase_summary(customer_id: str) -> list:
         )
         summary.append({
             "type": "线下落地课程",
-            "name": "线下落地课程",
+            "name": r.course_type or "线下落地课程",
             "total_purchased": 1,
             "total_amount": r.amount,
             "used": "-",
@@ -733,7 +733,7 @@ def _build_activities(
         if usage.get("benefit_name") == "粗门次卡":
             label = "粗门扣卡"
         elif usage.get("benefit_type") == "internal_course":
-            label = "内部课程权益使用"
+            label = "沙龙技能学习权益使用"
         counts = usage_labels.setdefault(activity_key, {})
         counts[label] = counts.get(label, 0) + 1
         if usage.get("benefit_name") != "粗门次卡":
@@ -933,7 +933,7 @@ def _build_activities(
                 ),
             })
 
-    # 内部课程（必须实际到店）
+    # 沙龙技能学习（必须实际到店）
     for s in internal_course_session_service.list_sessions():
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         role = _resolve_activity_role(
@@ -947,11 +947,11 @@ def _build_activities(
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
             attended = s.date in arrived_dates and not withdrawn
             activities.append({
-                "type": "内部课程",
+                "type": "沙龙技能学习",
                 "date": s.date,
                 "start_time": getattr(s, 'start_time', '') or '',
                 "end_time": getattr(s, 'end_time', '') or '',
-                "name": _course_activity_name("ics", "内部课程", s),
+                "name": _course_activity_name("ics", "沙龙技能学习", s),
                 "course_type": s.course_type or "",
                 "role": role,
                 "host": host,
@@ -972,7 +972,7 @@ def _build_activities(
         "觉醒游戏": "gcs",
         "情绪释放": "ers",
         "能量结": "eks",
-        "内部课程": "ics",
+        "沙龙技能学习": "ics",
     }
     for activity in activities:
         activity["activity_type"] = activity_type_codes[activity["type"]]
@@ -1120,7 +1120,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "notes": k.notes or "",
         })
 
-    # 内部课程
+    # 沙龙技能学习
     ic = [c for c in internal_course_service.list_courses() if c.customer_id == customer_id]
     for c in ic:
         if date and c.deal_date != date:
@@ -1128,7 +1128,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
         records.append({
             "source_id": c.id,
             "source_created_at": c.created_at.isoformat(),
-            "type": "内部课程",
+            "type": "沙龙技能学习",
             "name": c.course_type,
             "quantity": 1,
             "amount": c.price,
@@ -1150,7 +1150,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_id": r.id,
             "source_created_at": r.created_at.isoformat(),
             "type": "OH卡诊断",
-            "name": "OH卡诊断",
+            "name": r.reading_type or "OH卡诊断",
             "quantity": f"{dd * 0.5}小时",
             "amount": r.amount,
             "deal_date": r.deal_date or "",
@@ -1172,7 +1172,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_id": r.id,
             "source_created_at": r.created_at.isoformat(),
             "type": "线下落地课程",
-            "name": "线下落地课程",
+            "name": r.course_type or "线下落地课程",
             "quantity": f"{r.validity_value} 个月",
             "amount": r.amount,
             "deal_date": r.deal_date or "",

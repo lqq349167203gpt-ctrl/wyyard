@@ -8,6 +8,13 @@
         <view class="pf-value {{formData.deal_date ? '' : 'pf-placeholder'}}">{{formData.deal_date || '选择日期'}}</view>
       </picker>
     </view>
+    <view class="pf-row" wx:if="{{type !== 'coarse_door_card'}}">
+      <text class="pf-label">成交课程</text>
+      <picker class="pf-picker" mode="selector" range="{{dealCourseOptions}}" range-key="name" value="{{dealCourseIndex}}" bindchange="onDealCourseChange" disabled="{{dealCourseLoading || !formData.deal_date}}">
+        <view class="pf-value pf-value-wrap-text">{{dealCourseLoading ? '课程加载中…' : (formData.deal_course_name || '与课程无关')}}</view>
+      </picker>
+    </view>
+    <view wx:if="{{type !== 'coarse_door_card' && dealCourseError}}" class="pf-placeholder" bindtap="onDealCourseRetry">{{dealCourseError}}，点击重试</view>
     <view class="pf-row pf-row-last">
       <text class="pf-label">成交归属</text>
       <picker class="pf-picker" mode="selector" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrgChange" disabled="{{isEdit && type === 'coarse_door_card'}}">
@@ -72,7 +79,8 @@
     </view>
     <view class="pf-row {{hidePaymentDetails ? 'pf-row-last' : ''}}">
       <text class="pf-label">卡内次数（次）</text>
-      <input class="pf-input" type="number" placeholder="留空为不限次" placeholder-class="pf-placeholder" value="{{formData.remaining_count}}" bindinput="onFieldInput" data-field="remaining_count" />
+      <input wx:if="{{formData.card_type !== '定制化' || !cardUnlimited}}" class="pf-input" type="number" placeholder="{{formData.card_type === '定制化' ? '填写次数' : '留空为不限次'}}" placeholder-class="pf-placeholder" value="{{formData.remaining_count}}" bindinput="onFieldInput" data-field="remaining_count" />
+      <view wx:if="{{formData.card_type === '定制化'}}" class="pf-inline"><text class="pf-suffix">不限</text><switch checked="{{cardUnlimited}}" bindchange="onCardUnlimitedChange" color="#3370ff" style="transform:scale(.65);transform-origin:right center" /></view>
     </view>
     <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">
       <text class="pf-label">费用金额（元）</text>
@@ -117,6 +125,10 @@
 
   <!-- OH卡诊断 -->
   <view class="pf-card" wx:if="{{type === 'oh_card_reading'}}">
+    <view class="pf-row">
+      <text class="pf-label">诊断类型</text>
+      <picker class="pf-picker" range="{{ohReadingTypes}}" value="{{ohReadingTypeIndex}}" bindchange="onOhReadingTypeChange"><view class="pf-value {{ohReadingTypeIndex < 0 ? 'pf-placeholder' : ''}}">{{ohReadingTypeIndex >= 0 ? ohReadingTypes[ohReadingTypeIndex] : '选择诊断类型'}}</view></picker>
+    </view>
     <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
@@ -163,6 +175,10 @@
 
   <!-- 线下课程 -->
   <view class="pf-card" wx:if="{{type === 'offline_course'}}">
+    <view class="pf-row">
+      <text class="pf-label">课程类型</text>
+      <picker class="pf-picker" range="{{offlineCourseTypes}}" value="{{offlineCourseTypeIndex}}" bindchange="onOfflineCourseTypeChange"><view class="pf-value {{offlineCourseTypeIndex < 0 ? 'pf-placeholder' : ''}}">{{offlineCourseTypeIndex >= 0 ? offlineCourseTypes[offlineCourseTypeIndex] : '选择课程类型'}}</view></picker>
+    </view>
     <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
       <text class="pf-label">用户</text>
       <view class="pf-value-wrap">
@@ -189,7 +205,7 @@
     </view>
   </view>
 
-  <!-- 内部课程 -->
+  <!-- 沙龙技能学习 -->
   <view class="pf-card" wx:if="{{type === 'internal_course'}}">
     <view class="pf-row" bindtap="onPickerOpen" data-field="customer">
       <text class="pf-label">用户</text>

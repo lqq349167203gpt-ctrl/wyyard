@@ -6,7 +6,7 @@ const {
 } = require('../../utils/api')
 const {
   BADGE_COLORS, ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
-  SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
+  SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES, LEARNING_COURSE_GROUPS,
 } = require('../../utils/activity-constants')
 const { canEditActivityContent, canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 const { disposeReads } = require('../../utils/read-scope')
@@ -45,6 +45,7 @@ Page({
     courses: [],
     courseIndex: -1,
     icsCourses: ICS_COURSE_TYPES,
+    icsCourseGroups: LEARNING_COURSE_GROUPS,
     icsCourseType: '',
     activityModes: ['线下', '线上'],
     activityModeIndex: 0,
@@ -272,13 +273,9 @@ Page({
     this.setData({ date: e.detail.value })
     this.loadDayVisitors(e.detail.value)
   },
-  onStartTimeChange(e) {
+  onTimeRangeChange(e) {
     if (this.data.readOnly) return
-    this.setData({ startTime: e.detail.value })
-  },
-  onEndTimeChange(e) {
-    if (this.data.readOnly) return
-    this.setData({ endTime: e.detail.value })
+    this.setData({ startTime: e.detail.start, endTime: e.detail.end })
   },
 
   onSpaceChange(e) {
@@ -362,7 +359,7 @@ Page({
         unifiedIndex: unifiedIndex >= 0 ? unifiedIndex : 0,
       }))
     } else if (activityType === 'ics' && icsCourseType) {
-      const typeColor = BADGE_COLORS['内部课程'] || '#5ba88a'
+      const typeColor = BADGE_COLORS['沙龙技能学习'] || '#5ba88a'
       const unifiedIndex = this.data.unifiedTypes.findIndex(t => t.isType && t.value === 'ics')
       // 活动名称不随类型调整，保留用户已填写的内容
       this.setData(Object.assign({}, resetFields, {

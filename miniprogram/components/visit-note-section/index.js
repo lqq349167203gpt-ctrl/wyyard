@@ -1,13 +1,10 @@
-const { visitNoteApi, customerApi } = require('../../utils/api')
+const { visitNoteApi, customerApi, customerTagApi } = require('../../utils/api')
 const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
 const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
+const { formatNoteTime } = require('../../utils/note-feedback-meta')
 
-function formatTime(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  const pad = (number) => String(number).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+function formatPlanDate(value) {
+  return String(value || '').replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1/$2')
 }
 
 Component({
@@ -19,6 +16,7 @@ Component({
     title: { type: String, value: '' },
     privateToCreator: { type: Boolean, value: false },
     readOnly: { type: Boolean, value: false },
+    enlargedMeta: { type: Boolean, value: false },
   },
 
   data: {
@@ -27,8 +25,24 @@ Component({
     personCount: 0,      // 已填写人数
     editorOpen: false,
     editorValue: '',
+    needTagOptions: [],
+    needTagIds: [],
+    needTagsLoading: false,
+    needTagsError: '',
     feedbackOptions: [],
     feedbackIndex: 0,
+    nextFollowUpPersonId: '',
+    nextFollowUpPerson: '',
+    nextFollowUpDate: '',
+    nextFollowUpDateText: '',
+    followUpPeople: [],
+    followUpMatches: [],
+    followUpMatchCount: 0,
+    followUpSearch: '',
+    followUpSearchOpen: false,
+    followUpPeopleLoading: false,
+    followUpPeopleError: '',
+    datePickerToday: '',
     saving: false,
     loading: false,
     previousNeed: null,
@@ -47,7 +61,11 @@ Component({
       invalidateRead(this, 'previousNeed')
       invalidateRead(this, 'visitPurpose')
       invalidateRead(this, 'feedbackPeople')
+      invalidateRead(this, 'followUpPeople')
       this.setData({ myNote: null, otherNotes: [], personCount: 0, loading: false, loadError: '', editorOpen: false, editorValue: '', previousNeed: null, previousOpen: false, previousError: '', previousLoading: false, visitPurpose: null, visitPurposeOpen: false, visitPurposeError: '', visitPurposeLoading: false })
+      this.setData({ nextFollowUpPersonId: '', nextFollowUpPerson: '', nextFollowUpDate: '', nextFollowUpDateText: '', followUpPeople: [],
+        followUpMatches: [], followUpMatchCount: 0, followUpSearch: '', followUpSearchOpen: false,
+        followUpPeopleLoading: false, followUpPeopleError: '' })
       if (visitId && category) this.loadNotes()
     },
   },
@@ -55,6 +73,27 @@ Component({
   lifetimes: { detached() { disposeReads(this) } },
 
   methods: {
+    async loadNeedTags() {
+      const visitId = this.properties.visitId
+      const isCurrent = beginRead(this, 'needTags', () => this.properties.visitId === visitId && this.data.editorOpen)
+      this.setData({ needTagsLoading: true, needTagsError: '' })
+      try {
+        const tags = await customerTagApi.list('visit_need')
+        if (!isCurrent()) return
+        const options = (tags || []).concat((this.data.myNote && this.data.myNote.need_tags || [])
+          .filter(tag => !(tags || []).some(item => item.id === tag.id)))
+        this.setData({ needTagOptions: options.map(tag => ({ ...tag, selected: this.data.needTagIds.includes(tag.id) })), needTagsLoading: false })
+      } catch (error) {
+        if (isCurrent()) this.setData({ needTagsLoading: false, needTagsError: error.message || '需求标签加载失败' })
+      }
+    },
+    onToggleNeedTag(e) {
+      if (this.data.saving) return
+      const id = e.currentTarget.dataset.id
+      if (!this.data.needTagOptions.some(tag => tag.id === id)) return
+      const ids = this.data.needTagIds.includes(id) ? this.data.needTagIds.filter(value => value !== id) : this.data.needTagIds.concat(id)
+      this.setData({ needTagIds: ids, needTagOptions: this.data.needTagOptions.map(tag => ({ ...tag, selected: ids.includes(tag.id) })) })
+    },
     async loadNotes() {
       if (!this.properties.visitId) return
       const visitId = this.properties.visitId
@@ -70,7 +109,9 @@ Component({
           .map((note) => {
             const creator = String(note.created_by || '').trim()
             return Object.assign({}, note, {
-              timeText: formatTime(note.created_at),
+              timeText: formatNoteTime(note.updated_at || note.created_at),
+              displayContent: [(note.need_tags || []).map(tag => tag.name).join('、'), note.content].filter(Boolean).join('\n'),
+              followUpDateText: formatPlanDate(note.next_follow_up_date),
               creatorText: creator && creator !== '历史记录' ? creator : '未知',
               feedbackText: String(note.feedback_person || '').trim() || creator || '未知',
             })
@@ -107,9 +148,22 @@ Component({
         wx.showToast({ title: '请先完成记录读取，失败时可点击重试', icon: 'none' })
         return
       }
+      const user = getApp().globalData.currentUser || {}
+      const mine = this.data.myNote
+      const now = new Date()
       this.setData({
         editorOpen: true,
-        editorValue: this.data.myNote ? this.data.myNote.content : '',
+        editorValue: mine ? mine.content : '',
+        needTagIds: (mine && mine.need_tags || []).map(tag => tag.id),
+        needTagOptions: [],
+        needTagsError: '',
+        nextFollowUpPersonId: mine ? mine.next_follow_up_person_id || '' : '',
+        // 已保存的空值必须保持为空；仅首次新建默认当前账号本人。
+        nextFollowUpPerson: mine ? mine.next_follow_up_person || '' : user.owner || user.username || '',
+        nextFollowUpDate: mine ? mine.next_follow_up_date || '' : '',
+        nextFollowUpDateText: formatPlanDate(mine && mine.next_follow_up_date),
+        datePickerToday: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+        followUpSearch: '', followUpSearchOpen: false,
         previousOpen: false,
         previousNeed: null,
         previousError: '',
@@ -118,7 +172,77 @@ Component({
         visitPurposeError: '',
       })
       this.loadFeedbackPeople()
+      if (this.properties.category === 'visit_need') this.loadNeedTags()
+      if (this.properties.category === 'follow_up') this.loadFollowUpPeople()
     },
+
+    async loadFollowUpPeople() {
+      const isCurrent = beginRead(this, 'followUpPeople', () => this.data.editorOpen && this.properties.category === 'follow_up')
+      this.setData({ followUpPeopleLoading: true, followUpPeopleError: '' })
+      try {
+        const people = await visitNoteApi.followUpPeople()
+        if (!isCurrent()) return
+        this.setData({ followUpPeople: people || [] })
+        this.filterFollowUpPeople()
+      } catch (error) {
+        if (isCurrent()) this.setData({ followUpPeopleError: error.message || '人员加载失败，点击重试' })
+      } finally {
+        if (isCurrent()) this.setData({ followUpPeopleLoading: false })
+      }
+    },
+
+    filterFollowUpPeople() {
+      const query = this.data.followUpSearch.trim().toLowerCase()
+      const matches = this.data.followUpPeople.filter(person => !query
+        || (person.nickname || '').toLowerCase().includes(query)
+        || (person.name || '').toLowerCase().includes(query))
+      this.setData({ followUpMatches: matches.slice(0, 50), followUpMatchCount: matches.length })
+    },
+
+    onFollowUpSearchFocus() {
+      this.setData({ followUpSearchOpen: true, followUpSearch: this.data.nextFollowUpPerson })
+      this.filterFollowUpPeople()
+    },
+
+    onFollowUpSearchInput(event) {
+      const value = event.detail.value
+      this.setData({ followUpSearch: value })
+      if (!value.trim()) this.setData({ nextFollowUpPersonId: '', nextFollowUpPerson: '' })
+      this.filterFollowUpPeople()
+    },
+
+    onFollowUpSearchConfirm() {
+      const query = this.data.followUpSearch.trim().toLowerCase()
+      if (!query) return this.onCloseFollowUpSearch()
+      const matches = this.data.followUpPeople.filter(person => (person.nickname || '').toLowerCase() === query
+        || (person.name || '').toLowerCase() === query)
+      if (matches.length !== 1) {
+        wx.showToast({ title: '请从搜索结果中选择人员', icon: 'none' })
+        return
+      }
+      this.selectFollowUpPerson(matches[0])
+    },
+
+    onSelectFollowUpPerson(event) {
+      const person = this.data.followUpPeople.find(person => person.id === event.currentTarget.dataset.id)
+      if (person) this.selectFollowUpPerson(person)
+    },
+
+    selectFollowUpPerson(person) {
+      this.setData({ nextFollowUpPersonId: person.id, nextFollowUpPerson: person.nickname || person.name,
+        followUpSearchOpen: false, followUpSearch: '' })
+    },
+
+    onClearFollowUpPerson() {
+      this.setData({ nextFollowUpPersonId: '', nextFollowUpPerson: '', followUpSearch: '', followUpSearchOpen: false })
+    },
+
+    onCloseFollowUpSearch() {
+      this.setData({ followUpSearchOpen: false, followUpSearch: '' })
+    },
+
+    onFollowUpDateChange(event) { this.setData({ nextFollowUpDate: event.detail.value, nextFollowUpDateText: formatPlanDate(event.detail.value) }) },
+    onClearFollowUpDate() { this.setData({ nextFollowUpDate: '', nextFollowUpDateText: '' }) },
 
     async loadFeedbackPeople() {
       const isCurrent = beginRead(this, 'feedbackPeople', () => this.data.editorOpen)
@@ -225,10 +349,12 @@ Component({
 
     onEditorClose() {
       if (this.data.saving) return
-      ;['previousNeed', 'visitPurpose', 'feedbackPeople'].forEach(key => invalidateRead(this, key))
+      ;['previousNeed', 'visitPurpose', 'feedbackPeople', 'followUpPeople', 'needTags'].forEach(key => invalidateRead(this, key))
       this.setData({
         editorOpen: false,
         editorValue: '',
+        followUpSearchOpen: false,
+        followUpPeopleLoading: false,
         previousOpen: false,
         previousLoading: false,
         visitPurposeLoading: false,
@@ -243,12 +369,31 @@ Component({
     async onSubmit() {
       if (this.properties.readOnly) return
       const content = (this.data.editorValue || '').trim()
-      if (!content || this.data.saving) return
-      const wasEditing = !!this.data.myNote
+      const clearingNeed = this.properties.category === 'visit_need' && this.data.myNote && !content && !this.data.needTagIds.length
+      if ((!content && !(this.properties.category === 'visit_need' && this.data.needTagIds.length) && !clearingNeed) || this.data.saving) return
+      if (this.properties.category === 'follow_up' && this.data.followUpSearchOpen) {
+        const query = this.data.followUpSearch.trim()
+        if (query && query !== this.data.nextFollowUpPerson) {
+          const matches = this.data.followUpPeople.filter(person => person.nickname === query || person.name === query)
+          if (matches.length !== 1) {
+            wx.showToast({ title: '请从搜索结果中选择人员', icon: 'none' })
+            return
+          }
+          this.selectFollowUpPerson(matches[0])
+        }
+      }
       const attribution = attributionFromPicker(this.data.feedbackOptions, this.data.feedbackIndex)
+      if (this.properties.category === 'visit_need') attribution.need_tag_ids = this.data.needTagIds.slice()
+      if (this.properties.category === 'follow_up') Object.assign(attribution, {
+        next_follow_up_person_id: this.data.nextFollowUpPersonId,
+        next_follow_up_person: this.data.nextFollowUpPerson,
+        next_follow_up_date: this.data.nextFollowUpDate,
+      })
       this.setData({ saving: true })
       try {
-        if (this.data.myNote) {
+        if (clearingNeed) {
+          await visitNoteApi.delete(this.data.myNote.id)
+        } else if (this.data.myNote) {
           await visitNoteApi.update(this.data.myNote.id, content, attribution)
         } else {
           await visitNoteApi.create({
@@ -258,7 +403,8 @@ Component({
             ...attribution,
           })
         }
-        this.setData({ editorOpen: false, editorValue: '' })
+        invalidateRead(this, 'followUpPeople')
+        this.setData({ editorOpen: false, editorValue: '', followUpSearchOpen: false, followUpPeopleLoading: false })
         await this.loadNotes()
         wx.showToast({ title: '已保存' })
       } catch (error) {

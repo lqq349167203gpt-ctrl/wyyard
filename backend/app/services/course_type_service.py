@@ -127,7 +127,7 @@ def delete_course_type(name: str) -> bool:
     if _types[names.index(name)].get("category") == "other":
         raise ValueError("系统内置活动不允许删除")
 
-    # 级联检查：是否有活动记录或内部课程仍引用该类型
+    # 级联检查：是否有活动记录或沙龙技能学习仍引用该类型
     from app.services.class_record_service import list_records
     from app.services.internal_course_service import list_courses as list_internal
     from app.services.internal_course_session_service import list_sessions as list_ics
@@ -139,11 +139,11 @@ def delete_course_type(name: str) -> bool:
             break
     for s in list_ics():
         if s.course_type == name:
-            refs.append(f"内部课程活动 {s.id}")
+            refs.append(f"沙龙技能学习活动 {s.id}")
             break
     for c in list_internal():
         if c.course_type == name:
-            refs.append(f"内部课程 {c.id}")
+            refs.append(f"沙龙技能学习 {c.id}")
             break
     if refs:
         raise ValueError(f"该类型仍被引用，无法删除：{'、'.join(refs)}")

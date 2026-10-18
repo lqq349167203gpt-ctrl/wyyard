@@ -103,14 +103,14 @@ def ensure_record_unverified(record) -> None:
 
 
 def ensure_update_allowed(record, data: dict) -> None:
-    """核对后只允许三类协作信息继续写入。"""
+    """核对后只允许协作信息继续写入。"""
     old_space_id = getattr(record, "space_id", "") or ""
     if is_verified(record.visit_date, old_space_id):
-        prohibited = set(data) - {"needs", "feedback", "healing_notes"}
+        prohibited = set(data) - {"needs", "feedback", "healing_notes", "experience"}
         if prohibited:
             raise HTTPException(
                 status_code=423,
-                detail="该邀约已核对，除来访需求、客户信息和跟进点外不能修改",
+                detail="该邀约已核对，除来访需求、深度需求、跟进点和客户反馈外不能修改",
             )
         return
     target_date = str(data.get("visit_date") or record.visit_date)

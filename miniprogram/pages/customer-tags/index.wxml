@@ -9,8 +9,8 @@
   <block wx:else>
     <view class="header-card">
       <view class="header-copy">
-        <text class="header-title">{{scopeFilter === 'follow-up' ? '跟进状态配置' : '客户标签'}}</text>
-        <text class="header-hint">{{scopeFilter === 'follow-up' ? '配置客户跟进状态及必填描述' : '公共标签团队共享，我的标签仅自己可见'}}</text>
+        <text class="header-title">{{scopeFilter === 'follow-up' ? '跟进状态配置' : (scopeFilter === 'visit_need' ? '来访需求配置' : '客户标签')}}</text>
+        <text class="header-hint">{{scopeFilter === 'follow-up' ? '配置客户跟进状态及必填描述' : (scopeFilter === 'visit_need' ? '公共来访需求，供邀约时多选使用' : '公共标签团队共享，我的标签仅自己可见')}}</text>
       </view>
       <button class="create-button" bindtap="onCreate">新建{{scopeFilter === 'follow-up' ? '状态' : '标签'}}</button>
     </view>
@@ -20,6 +20,7 @@
       <view class="filter-item {{scopeFilter === 'public' ? 'active' : ''}}" data-scope="public" bindtap="onFilterChange">公共标签</view>
       <view class="filter-item {{scopeFilter === 'private' ? 'active' : ''}}" data-scope="private" bindtap="onFilterChange">我的标签</view>
       <view class="filter-item {{scopeFilter === 'follow-up' ? 'active' : ''}}" data-scope="follow-up" bindtap="onFilterChange">跟进状态</view>
+      <view class="filter-item {{scopeFilter === 'visit_need' ? 'active' : ''}}" data-scope="visit_need" bindtap="onFilterChange">来访需求</view>
     </view>
 
     <view class="tag-list" wx:if="{{!loading && !loadError && filteredTags.length}}">
@@ -70,7 +71,7 @@
         <text class="form-label">{{scopeFilter === 'follow-up' ? '状态名称' : '标签名称'}}</text>
         <input class="form-input" maxlength="30" placeholder="{{scopeFilter === 'follow-up' ? '例如：重点跟进' : '例如：高意向、亲子需求'}}" value="{{formName}}" bindinput="onNameInput" />
       </view>
-      <view class="form-group" wx:if="{{scopeFilter !== 'follow-up' && !editingId}}">
+      <view class="form-group" wx:if="{{scopeFilter !== 'follow-up' && scopeFilter !== 'visit_need' && !editingId}}">
         <text class="form-label">可见范围</text>
         <view class="scope-options">
           <view class="scope-option {{formScope === 'public' ? 'active' : ''}}" data-scope="public" bindtap="onScopeChange">

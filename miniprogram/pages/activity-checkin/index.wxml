@@ -1,0 +1,17 @@
+<view class="checkin-page">
+  <view class="intro"><view class="title">活动核销</view><text class="muted">扫描会员出示的活动二维码，核对信息后确认到店。</text></view>
+  <button class="scan-button" bindtap="onScan" loading="{{loading}}" disabled="{{loading}}">扫描活动二维码</button>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{info}}" class="record">
+    <view class="nickname">{{info.nickname}}</view>
+    <view class="field"><text>活动日期</text><text>{{info.date}}</text></view>
+    <view class="field"><text>活动名称</text><text>{{info.name}}</text></view>
+    <view class="field"><text>活动类型</text><text>{{info.type}}</text></view>
+    <view class="field"><text>参与身份</text><text>{{info.role}}</text></view>
+    <view wx:if="{{done}}" class="result">该活动已核销，无需重复操作</view>
+    <block wx:else>
+      <view class="note">{{info.arrived ? '该客户当天已到店，本次核销不会重复扣卡。' : '确认后将标记当天邀约已到店，沿用现有活动扣卡规则。'}}</view>
+      <button class="confirm-button" bindtap="onConfirm" loading="{{loading}}" disabled="{{loading}}">确认核销</button>
+    </block>
+  </view>
+</view>

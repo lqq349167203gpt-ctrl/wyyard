@@ -52,7 +52,7 @@ TYPE_MAP = {
         "model_name": "EnergyKnotSessionCreate",
     },
     "ics": {
-        "label": "内部课程",
+        "label": "沙龙技能学习",
         "service": internal_course_session_service,
         "model_module": "app.models.internal_course_session",
         "model_name": "InternalCourseSessionCreate",
@@ -143,12 +143,12 @@ def _find_all_activities(date: str, space_id: str = ""):
             "owner_name": r.owner_name,
         })
 
-    # 内部课程
+    # 沙龙技能学习
     for r in internal_course_session_service.list_sessions(date=date):
         if sid and r.space_id and r.space_id != sid:
             continue
         results.append({
-            "type": "ics", "type_label": "内部课程",
+            "type": "ics", "type_label": "沙龙技能学习",
             "id": r.id, "name": r.course_name,
             "start_time": r.start_time, "end_time": r.end_time,
             "teacher_ids": r.teacher_ids, "participant_ids": r.participant_ids,
@@ -298,7 +298,7 @@ def create_activity(
     """创建一个新的活动。注意：必须先确认活动类型和老师才能创建，不要自己猜测类型。
 
     Args:
-        activity_type: 一级分类，可选值：class(沙龙), gcs(觉醒游戏), ers(情绪释放), eks(能量结), ics(内部课程)
+        activity_type: 一级分类，可选值：class(沙龙), gcs(觉醒游戏), ers(情绪释放), eks(能量结), ics(沙龙技能学习)
         name: 活动名称（如"颂钵"、"读书会"）
         course_type: 具体子类型名称（如"颂钵"、"读书会"、"疗愈师课程"），class 和 ics 类型必须填
         start_time: 开始时间，格式 HH:MM（如"14:00"），必须提供
@@ -440,8 +440,8 @@ def create_activity(
                     space_id=space_id, space_name=space_name,
                 )
             )
-            _log_activity(f"新增内部课程 {name}", method="POST")
-            return json.dumps({"ok": True, "action": "create", "type": "内部课程", "name": name, "id": record.id}, ensure_ascii=False)
+            _log_activity(f"新增沙龙技能学习 {name}", method="POST")
+            return json.dumps({"ok": True, "action": "create", "type": "沙龙技能学习", "name": name, "id": record.id}, ensure_ascii=False)
 
     except Exception as e:
         return json.dumps({"ok": False, "reason": "create_error", "error": str(e)[:200]}, ensure_ascii=False)

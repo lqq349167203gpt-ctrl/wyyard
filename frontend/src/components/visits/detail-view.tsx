@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { visitApi, customerApi, accountApi, visitHistoryApi, type VisitRecord, type CustomerLight, type CustomerCreate, type VisitHistoryRecord } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { CUSTOMER_INCOME_FIELDS } from "@/lib/customer-income"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell, type VisitRowSummary } from "./batch-input-table"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
@@ -192,6 +193,8 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
   const [historyEntries, setHistoryEntries] = useState<VisitHistoryEntry[]>([])
   const [cloudHistory, setCloudHistory] = useState<VisitHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState("")
   const [previewEntry, setPreviewEntry] = useState<VisitHistoryEntry | null>(null)
   const [previewRows, setPreviewRows] = useState<any[] | undefined>(undefined)
   const [previewChangedKeys, setPreviewChangedKeys] = useState<number[]>([])
@@ -271,10 +274,26 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
   }, [flushCloudSave])
 
-  // 从云端加载历史记录
+  // 切换日期／空间后清掉旧历史，不能把前一天的版本用于当天恢复。
   useEffect(() => {
+    setCloudHistory([])
+    setHistoryEntries([])
+    setHistoryPanelOpen(false)
+    setPreviewEntry(null)
+    setPreviewRows(undefined)
+    setPreviewChangedKeys([])
+    setHistoryError("")
+  }, [selectedDate, spaceId])
+
+  // 历史快照仅在展开面板时读取，首屏不下载整份历史正文。
+  useEffect(() => {
+    if (!historyPanelOpen) return
+    let current = true
+    setHistoryLoading(true)
+    setHistoryError("")
     visitHistoryApi.list(selectedDate, spaceId || undefined)
       .then(records => {
+        if (!current) return
         const entries: VisitHistoryEntry[] = records.map(r => ({
           id: r.id,
           timestamp: new Date(r.created_at).getTime(),
@@ -286,8 +305,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         }))
         setCloudHistory(entries)
       })
-      .catch(() => {})
-  }, [selectedDate, spaceId])
+      .catch(error => { if (current) setHistoryError(error instanceof Error ? error.message : "历史记录加载失败") })
+      .finally(() => { if (current) setHistoryLoading(false) })
+    return () => { current = false }
+  }, [historyPanelOpen, selectedDate, spaceId])
 
   // 合并本地 + 云端历史（按行数据内容去重）
   const mergedHistory = useMemo(() => {
@@ -352,11 +373,6 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     }
     return diffCells
   }, [previewEntry, mergedHistory])
-
-  // 组件挂载时刷新表格数据
-  useEffect(() => {
-    setTableRefreshKey(k => k + 1)
-  }, [])
 
   // 如果 localStorage 中没有 owner，从账号列表获取当前用户的归属人
   useEffect(() => {
@@ -798,7 +814,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
-            {mergedHistory.length === 0 ? (
+            {historyLoading && <div className="py-2 text-center text-[12px] text-[#8f959e]">历史记录加载中…</div>}
+            {historyError && <div role="alert" className="py-2 text-[12px] text-destructive">{historyError}，请关闭面板后重试</div>}
+            {mergedHistory.length === 0 && !historyLoading && !historyError ? (
               <div className="text-[12px] text-[#8f959e] text-center py-8">暂无历史记录</div>
             ) : (
               (() => {
@@ -1023,6 +1041,10 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
                   />
                   <Input rounded="[2px]" value={customerForm.work_description || ""} onChange={(e) => setCustomerForm({ ...customerForm, work_description: e.target.value })} placeholder="描述工作内容..." className="flex-1" />
                 </div>
+                {CUSTOMER_INCOME_FIELDS.map(field => <div key={field.key} className="contents">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right pt-2.5">{field.label}</span>
+                  <SelectDropdown value={customerForm[field.key] || ""} options={field.values.map(value => ({ value, label: value }))} placeholder="请选择" clearable onChange={value => setCustomerForm({ ...customerForm, [field.key]: value })} />
+                </div>)}
               </div>
               <div className="grid grid-cols-[70px_1fr] items-start gap-x-3 gap-y-3">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">创伤经历</span>

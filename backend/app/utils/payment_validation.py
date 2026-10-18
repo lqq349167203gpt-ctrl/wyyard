@@ -31,6 +31,9 @@ def _money(value, label: str) -> Decimal:
 
 def ensure_payment_closer_total(data, amount_field: str, existing=None, request=None) -> None:
     """保留金额格式校验；新录入流程已取消成交人金额合计校验。"""
+    from app.services.payment_course_service import normalize_course
+
+    normalize_course(data, existing, request)
     if request is not None:
         source = str(request.headers.get("x-client-type", "") or "").lower()
         if source not in {"pc", "miniprogram"}:

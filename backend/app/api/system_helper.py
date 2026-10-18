@@ -74,7 +74,7 @@ PERMISSION_PAGE_MAP = {
     "emotional-releases": ("情绪释放", "/payment"),
     "oh-card-readings": ("OH卡诊断", "/payment"),
     "energy-knots": ("能量结", "/payment"),
-    "internal-courses": ("内部课程", "/payment"),
+    "internal-courses": ("沙龙技能学习", "/payment"),
     "tea-seat-fees": ("茶位费", "/payment"),
     "offline-courses": ("线下落地课程", "/payment"),
     "other-projects": ("其他项目", "/payment"),

@@ -558,6 +558,7 @@
   white-space: pre-wrap;
 }
 .visit-note-entry + .visit-note-entry { margin-top: 10rpx; }
+.attribution-action { margin-left: 8rpx; color: #c0c4cc; font-weight: 400; }
 .visit-note-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 14rpx; color: #8f959e; font-size: 22rpx; }
 .visit-note-meta text:last-child { flex-shrink: 0; text-align: right; }
 .visit-note-content { display: block; white-space: pre-wrap; }

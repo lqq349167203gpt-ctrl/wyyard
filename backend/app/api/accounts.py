@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request as StarletteRequest
 
 from app.middleware.jwt_auth import create_access_token, decode_token, require_page_permission
@@ -35,6 +37,23 @@ class AdminResetPasswordRequest(StrictBaseModel):
 
 
 # ===== 账号 =====
+
+@router.get("/me/member-data")
+def my_member_data(request: StarletteRequest, section: Literal["home", "cards", "transactions", "activities", "checkins"] = "cards",
+                   page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
+    from app.services import staff_member_service
+
+    return staff_member_service.read_member_data(getattr(request.state, "user_id", ""), section, page, page_size)
+
+
+@router.get("/me/checkin-code")
+def my_checkin_code(request: StarletteRequest, activity_key: str):
+    from app.services import activity_checkin_service, staff_member_service
+
+    customer = staff_member_service.resolve_customer(request.state.user_id)
+    if customer is None:
+        raise HTTPException(403, staff_member_service.UNBOUND_MESSAGE)
+    return activity_checkin_service.create_code(customer.id, activity_key)
 
 @router.get("/me/permissions")
 async def my_permissions(request: StarletteRequest):
@@ -90,7 +109,7 @@ ALL_PAGE_KEYS = [
     # 业务
     "healing-records", "class-records-visitors", "class-records-activities",
     "class-records-arrival", "class-records", "daily-activities",
-    "audit-check", "agreement-signings",
+    "audit-check", "agreement-signings", "activity-checkin",
     "communication-records", "followup-records", "offline-course-records", "offline-course-types",
     # 付费
     "payment-deductions", "payment-refunds", "debt-records",

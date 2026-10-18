@@ -5,8 +5,6 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace as NS
 
 import pytest
-from fastapi import HTTPException
-
 from app.api import (
     communication_records,
     customers,
@@ -21,6 +19,7 @@ from app.models.principal import PrincipalQuery
 from app.services import principal_query_cache as cache
 from app.services import storage
 from app.services.payment_sources import PAYMENT_TYPES
+from fastapi import HTTPException
 
 
 def request(user_id="a"):
@@ -127,6 +126,40 @@ def test_daily_finance_preserves_relevant_history_and_excludes_other_customers(m
     result = daily_report.read_finance_sources(request(), date(2026, 9, 1))
     assert [r["id"] for r in result["sources"][PAYMENT_TYPES[0]]] == ["history", "today"]
     assert result["deductions"][0]["id"] == "old-deduction"
+
+
+@pytest.mark.parametrize("mobile", [False, True])
+@pytest.mark.parametrize("kind,module_name,model_name,day", [
+    ("gcs", "group_case_session", "GroupCaseSession", "2026-10-02"),
+    ("ers", "emotional_release_session", "EmotionalReleaseSession", "2026-10-09"),
+    ("eks", "energy_knot_session", "EnergyKnotSession", "2026-10-14"),
+])
+def test_daily_finance_accepts_owner_session_models(client, monkeypatch, mobile, kind, module_name, model_name, day):
+    from importlib import import_module
+
+    from app.services import customer_service, visit_service
+
+    session_class = getattr(import_module(f"app.models.{module_name}"), model_name)
+    now = datetime.now(timezone.utc)
+    session = session_class(id="session", date=day, owner_id="owner", owner_name="案主",
+                            participant_ids=["participant"], created_at=now, updated_at=now)
+    monkeypatch.setattr(daily_report.customer_access_service, "require_transaction_access", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(daily_report.customer_access_service, "visible_customer_ids", lambda *_: {"owner", "participant", "unrelated"})
+    monkeypatch.setattr(customer_service, "list_customers", lambda: [])
+    monkeypatch.setattr(visit_service, "list_visits", lambda _: [])
+    monkeypatch.setattr(daily_report.class_record_service, "list_records", lambda _: [])
+    for key, module in (("gcs", daily_report.group_case_sessions), ("ers", daily_report.emotional_release_sessions),
+                        ("eks", daily_report.energy_knot_sessions)):
+        rows = [session] if key == kind else []
+        monkeypatch.setattr(module, "list_sessions", lambda rows=rows, **_: rows)
+    payments = [model(id=cid, customer_id=cid, deal_date="2025-01-01") for cid in ("owner", "participant", "unrelated", "hidden")]
+    monkeypatch.setattr(daily_report, "list_payment_records", lambda key: payments if key == PAYMENT_TYPES[0] else [])
+    monkeypatch.setattr(daily_report.project_deduction_service, "list_deductions", lambda **_: [])
+    response = client.get("/api/daily-report/finance-sources", params={"date": day, "mobile": mobile})
+    assert response.status_code == 200
+    result = response.json()
+    assert result["sessions"][kind][0] == session.model_dump(mode="json")
+    assert [row["customer_id"] for row in result["sources"][PAYMENT_TYPES[0]]] == ["owner", "participant"]
 
 
 @pytest.fixture

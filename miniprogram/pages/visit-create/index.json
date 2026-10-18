@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "新增邀约",
-  "usingComponents": {}
+  "usingComponents": {
+    "time-picker": "/components/time-picker/index"
+  }
 }

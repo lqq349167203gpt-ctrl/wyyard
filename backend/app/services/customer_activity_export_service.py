@@ -72,7 +72,7 @@ def pool_rows(summary: list[dict], today: str | None = None) -> list[list]:
         if manual:
             notes.append(f"销卡{manual}次")
         if first.get("internal_course_deductions"):
-            notes.append(f"内部课程抵扣{first['internal_course_deductions']}次")
+            notes.append(f"沙龙技能学习抵扣{first['internal_course_deductions']}次")
         rows.append(["会员卡扣卡说明", " · ".join(notes)])
         for item in sorted(members, key=cmp_to_key(compare)):
             remaining, total = item.get("remaining", 0), item.get("total_purchased", 0)
@@ -86,19 +86,19 @@ def pool_rows(summary: list[dict], today: str | None = None) -> list[list]:
         purchases = sorted(item.get("purchases", []), key=cmp_to_key(compare))
         if purchases:
             for purchase in purchases:
-                label = purchase.get("name") if item["type"] in {"内部课程", "其他项目"} else f"购买 {purchase['purchase_count']} 次"
+                label = purchase.get("name") if item["type"] in {"沙龙技能学习", "其他项目"} else f"购买 {purchase['purchase_count']} 次"
                 if item["type"] == "其他项目":
                     label = f"{label or ''} · {item.get('activity_mode') or '线下'}"
                 remaining = purchase.get("remaining")
                 if not isinstance(remaining, (int, float)):
                     remaining = purchase["purchase_count"]
-                balance = "不限" if item["type"] == "内部课程" else f"剩余{remaining}次 / 总{purchase['purchase_count']}次"
+                balance = "不限" if item["type"] == "沙龙技能学习" else f"剩余{remaining}次 / 总{purchase['purchase_count']}次"
                 detail(label, purchase, balance)
         else:
             label = item.get("name")
             if item["type"] == "其他项目":
                 label = f"{label or ''} · {item.get('activity_mode') or '线下'}"
-            if item["type"] == "内部课程" or item.get("remaining") == "不限":
+            if item["type"] == "沙龙技能学习" or item.get("remaining") == "不限":
                 balance = "不限"
             elif item["type"] == "线下落地课程":
                 balance = f"{item.get('validity_value') or 1}个月"
@@ -111,7 +111,7 @@ def pool_rows(summary: list[dict], today: str | None = None) -> list[list]:
 
 def participation_rows(activities: list[dict]) -> list[list]:
     """同一份完整活动清单分别按活动类型和身份统计，实际参与口径与详情页一致。"""
-    types = {key: [0, 0, 0, 0] for key in ("沙龙活动", "觉醒游戏", "情绪释放", "能量结", "内部课程")}
+    types = {key: [0, 0, 0, 0] for key in ("沙龙活动", "觉醒游戏", "情绪释放", "能量结", "沙龙技能学习")}
     roles = {key: [0, 0, 0, 0] for key in ("参与者", "案主", "老师", "成就君")}
     for item in activities:
         kind = "沙龙活动" if item.get("activity_type") == "class" else item.get("type") or "未分类"

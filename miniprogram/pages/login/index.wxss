@@ -195,6 +195,10 @@
   background-color: #8fb0ff;
 }
 
+.phone-button { font-size: 30rpx; font-weight: 500; letter-spacing: 2rpx; margin-top: 2vh; }
+.phone-button::after { border: none; }
+.phone-tip { display: block; text-align: center; margin-top: 24rpx; font-size: 22rpx; color: #a8b1bd; }
+
 /* 错误信息 */
 .error-msg {
   width: 100%;

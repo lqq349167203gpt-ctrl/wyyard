@@ -1,6 +1,15 @@
 const { visitApi, customerApi, dailyReportApi, spaceApi, organizationApi } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { readScheduleDate, writeScheduleDate } = require('../../utils/schedule-date')
+const { noteRecordText, followUpPlanText } = require('../../utils/note-feedback-meta')
+
+function followUpEntries(visit) {
+  return (visit.visit_notes || []).filter(note => note.category === 'follow_up')
+}
+
+function reportFollowUpText(visit) {
+  return noteRecordText(followUpEntries(visit), visit.healing_notes, true)
+}
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -57,6 +66,11 @@ function formatMoney(n) {
     if (count % 3 === 0 && i > 0) out = ',' + out
   }
   return out
+}
+
+function ohCardReadingName(item) {
+  const duration = item.diagnosis_duration ? (item.diagnosis_duration * 0.5) + '小时' : ''
+  return [item.reading_type, duration].filter(Boolean).join(' · ')
 }
 
 // 估算文本显示宽度：CJK 记 1，其他字符记 0.55（按 22rpx 字号折算）
@@ -378,8 +392,10 @@ Page({
         todayActCount: todayActMap[v.customer_id] || 0,
         remainingText: !this._paymentData ? '—' : !hasCard ? '未办卡' : (remaining == null || remaining === -999 ? '不限' : remaining + '次'),
         needText: v.needs || '',
-        infoText: v.feedback || v.experience || '',
-        followText: v.healing_notes || '',
+        infoText: v.feedback || '',
+        feedbackText: v.experience || '',
+        followText: reportFollowUpText(v),
+        followEntries: followUpEntries(v).map(note => ({ ...note, author: note.feedback_person || note.created_by || '未知', nextFollowUpText: followUpPlanText(note) })),
         refText: v.referrer || '',
         refHandlerText: v.referrer_handler || '',
         visitTimeText: v.arrival_time || v.visit_time || '',
@@ -502,7 +518,7 @@ Page({
           break
         case 'oh_card_reading':
           itemType = 'OH卡诊断'
-          itemName = (item.diagnosis_duration ? (item.diagnosis_duration * 0.5) + '小时' : '')
+          itemName = ohCardReadingName(item)
           amount = item.amount || 0
           break
         case 'energy_knot':
@@ -511,7 +527,7 @@ Page({
           purchaseCount = item.purchase_count || 0
           break
         case 'internal_course':
-          itemType = '内部课程'
+          itemType = '沙龙技能学习'
           itemName = item.course_type || ''
           amount = item.price || 0
           break
@@ -770,15 +786,15 @@ Page({
     const headerMap = {
       visit: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
-        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
+        { text: '深度需求', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '客户反馈', cls: 'c6' },
       ],
       invited: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
-        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
+        { text: '深度需求', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '客户反馈', cls: 'c6' },
       ],
       cancelled: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
-        { text: '客户信息', cls: 'c4' }, { text: '跟进点', cls: 'c5' },
+        { text: '深度需求', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '客户反馈', cls: 'c6' },
       ],
       activity_today: [
         { text: '日期', cls: 'a-c1' }, { text: '类型', cls: 'a-c2' }, { text: '活动名称', cls: 'a-c3' },
@@ -821,8 +837,9 @@ Page({
                 { text: v.visit_date || '', cls: 'c1', cancelled: type === 'invited' && !!v.cancelled, unarrived: type === 'invited' && !v.arrived && !v.cancelled },
                 { text: v.referrer_handler || '', cls: 'c2' },
                 { text: v.needs || '', cls: 'c3' },
-                { text: v.feedback || v.experience || '', cls: 'c4' },
-                { text: v.healing_notes || '', cls: 'c5' },
+                { text: v.feedback || '', cls: 'c4' },
+                { text: reportFollowUpText(v), cls: 'c5' },
+                { text: v.experience || '', cls: 'c6' },
               ]
               return { rowClass: 'detail-row', expanded: false, overflow: rowOverflow(cols), cols }
             })
@@ -870,11 +887,11 @@ Page({
         case 'emotional_release':
           c1 = '情绪释放'; c2 = '情绪释放'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
         case 'oh_card_reading':
-          c1 = 'OH卡诊断'; c2 = item.diagnosis_duration ? (item.diagnosis_duration * 0.5) + '小时' : 'OH卡诊断'; quantity = ''; amount = item.amount || 0; break
+          c1 = 'OH卡诊断'; c2 = ohCardReadingName(item) || 'OH卡诊断'; quantity = ''; amount = item.amount || 0; break
         case 'energy_knot':
           c1 = '能量结'; c2 = '能量结'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
         case 'internal_course':
-          c1 = '内部课程'; c2 = item.course_type || ''; quantity = 1; amount = item.price || 0; break
+          c1 = '沙龙技能学习'; c2 = item.course_type || ''; quantity = 1; amount = item.price || 0; break
         case 'tea_seat_fee':
           c1 = '茶位费'; quantity = item.quantity; break
         case 'offline_course':

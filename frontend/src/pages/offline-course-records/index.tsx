@@ -149,8 +149,8 @@ export default function OfflineCourseRecordsPage() {
         .offline-course-participants > span { font-size: 12px; }
       `}</style>
       <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">落地课程</span>
-        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">记录每次线下落地课程的内容与结果</span>
+        <span className="text-[15px] font-bold text-[#212631] whitespace-nowrap">技能训练课程</span>
+        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">记录每次技能训练课程的内容与结果</span>
       </div>
       <div className="flex flex-1 min-h-0 min-w-0 gap-3">
         <aside className="w-[168px] shrink-0 rounded-xl bg-white flex flex-col overflow-hidden border border-[#e8eaed]">
@@ -334,7 +334,7 @@ export default function OfflineCourseRecordsPage() {
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setForm({ customer_id: "", customer_nickname: "", participant_ids: [], participant_names: [], course_type: "", course_name: "", record_date: new Date().toLocaleDateString("sv-SE"), teacher: "", content: "", result: "" }) }}>
         <DialogContent className="w-[520px] max-w-[90vw] p-0 gap-0" initialFocus={false}>
           <div className="px-5 py-3 border-b border-[#f0f0f0]">
-            <h3 className="text-[12px] font-normal">新增落地课程记录</h3>
+            <h3 className="text-[12px] font-normal">新增技能训练课程记录</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -411,7 +411,7 @@ export default function OfflineCourseRecordsPage() {
       <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null) }}>
         <DialogContent className="w-[520px] max-w-[90vw] p-0 gap-0" initialFocus={false}>
           <div className="px-5 py-3 border-b border-[#f0f0f0]">
-            <h3 className="text-[12px] font-normal">编辑落地课程记录</h3>
+            <h3 className="text-[12px] font-normal">编辑技能训练课程记录</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
@@ -491,11 +491,11 @@ export default function OfflineCourseRecordsPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
         <DialogContent className="w-[360px] max-w-[90vw] p-0 gap-0">
           <div className="px-5 py-3 border-b border-[#f0f0f0]">
-            <h3 className="text-[14px] font-normal">删除落地课程记录</h3>
+            <h3 className="text-[14px] font-normal">删除技能训练课程记录</h3>
           </div>
           <div className="px-5 py-4">
             <p className="text-[12px] text-[#212631]">
-              确定要删除「<span className="font-medium">{deleteTarget?.course_type || deleteTarget?.record_date || "本条"}</span>」的落地课程记录吗？删除后不可恢复。
+              确定要删除「<span className="font-medium">{deleteTarget?.course_type || deleteTarget?.record_date || "本条"}</span>」的技能训练课程记录吗？删除后不可恢复。
             </p>
           </div>
           <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">

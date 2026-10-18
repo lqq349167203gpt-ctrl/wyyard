@@ -8,6 +8,7 @@ import DetailView from "@/pages/healing-records/components/detail-view"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { CourseRosterNames, type CourseRosterPerson } from "@/components/course-roster-names"
+import { followUpPlanText, NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
 
 const today = new Date().toLocaleDateString("sv-SE")
 
@@ -27,6 +28,23 @@ function rowTextClass(expanded: boolean): string {
 
 function EmptyDash() {
   return <span className="text-[#c9cdd4]">-</span>
+}
+
+function reportFollowUpText(visit: VisitRecord): string {
+  const notes = (visit.visit_notes || []).filter(note => note.category === "follow_up")
+  return notes.length ? notes.map(note => [
+    `反馈：${note.feedback_person || note.created_by || "未知"}${followUpPlanText(note) ? `　下次跟进：${followUpPlanText(note)}` : ""}`,
+    note.content,
+  ].filter(Boolean).join("\n")).join("\n") : visit.healing_notes || ""
+}
+
+function ReportFollowUp({ visit }: { visit: VisitRecord }) {
+  const notes = (visit.visit_notes || []).filter(note => note.category === "follow_up")
+  if (!notes.length) return visit.healing_notes || <EmptyDash />
+  return <span className="block space-y-1">{notes.map(note => <span className="block" key={note.id}>
+    <NoteFeedbackMeta author={note.feedback_person || note.created_by} plan={note} inline />
+    <span className="block">{note.content}</span>
+  </span>)}</span>
 }
 
 function reportRoster(activity: DailyReportActivity, customers: Customer[], identities: MemberIdentity[]) {
@@ -199,8 +217,8 @@ export default function DailyReportPage() {
     let html = `<html><head><meta charset="utf-8">${style}</head><body>`
     // 第一部分：当日客户
     html += `<table><colgroup><col width="60"><col width="50"><col width="80"><col width="60"><col width="50"><col width="50"><col width="50"><col width="50"><col width="50"><col width="60"><col width="120"><col width="120"><col width="100"><col width="100"><col width="70"><col width="50"><col width="40"></colgroup>`
-    html += `<tr class="section"><td colspan="16">当日客户（${sortedVisits.length}人）</td></tr>`
-    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>来访需求</th><th>客户信息</th><th>跟进点</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
+    html += `<tr class="section"><td colspan="17">当日客户（${sortedVisits.length}人）</td></tr>`
+    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>来访需求</th><th>深度需求</th><th>跟进点</th><th>客户反馈</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
     for (const v of sortedVisits) {
       html += `<tr>
         <td>${esc(v.referrer || "-")}</td>
@@ -214,8 +232,9 @@ export default function DailyReportPage() {
         <td>${todayActivityCountMap[v.customer_id] || 0}场</td>
         <td>${!financeReady ? "-" : !hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
         <td class="wrap">${esc(v.needs || "-")}</td>
-        <td class="wrap">${esc(v.feedback || v.experience || "-")}</td>
-        <td class="wrap">${esc(v.healing_notes || "-")}</td>
+        <td class="wrap">${esc(v.feedback || "-")}</td>
+        <td class="wrap">${esc(reportFollowUpText(v) || "-")}</td>
+        <td class="wrap">${esc(v.experience || "-")}</td>
         <td>${(transactionCounts[v.customer_id] || 0) > 0 ? transactionCounts[v.customer_id] + "笔" : "-"}</td>
         <td>${esc(v.referrer_handler || "-")}</td>
         <td>${v.arrived ? "✓" : "✗"}</td>
@@ -491,7 +510,7 @@ export default function DailyReportPage() {
             break
           case "oh_card_reading":
             itemType = "OH卡诊断"
-            itemName = "-"
+            itemName = item.reading_type || "-"
             amount = item.amount || 0
             purchaseCount = item.diagnosis_duration ? `${item.diagnosis_duration * 0.5}小时` : null
             effectiveDate = ""
@@ -504,7 +523,7 @@ export default function DailyReportPage() {
             purchaseCount = item.purchase_count || 0
             break
           case "internal_course":
-            itemType = "内部课程"
+            itemType = "沙龙技能学习"
             itemName = item.course_type || ""
             amount = item.price || 0
             break
@@ -520,7 +539,7 @@ export default function DailyReportPage() {
             break
           case "offline_course":
             itemType = "线下落地课程"
-            itemName = item.course_name || ""
+            itemName = item.course_type || item.course_name || ""
             break
         }
         const closerNames = (item.closers || []).map((c: any) => c.name).filter(Boolean).join("、")
@@ -562,13 +581,13 @@ export default function DailyReportPage() {
           cardSet.add(c.customer_id)
         }
       }
-      // 有内部课程（含疗愈师卡）的客户也算有卡
+      // 有沙龙技能学习（含疗愈师卡）的客户也算有卡
       for (const c of courses as any[]) {
         if (!c.is_deleted && !c.voided && (!c.expiry_date || c.expiry_date >= detailDate)) {
           cardSet.add(c.customer_id)
         }
       }
-      // 内部课程客户 ID 集合
+      // 沙龙技能学习客户 ID 集合
       const courseCustomerIds = new Set<string>()
       for (const c of courses as any[]) {
         if (!c.is_deleted && !c.voided && (!c.expiry_date || c.expiry_date >= detailDate)) {
@@ -724,7 +743,7 @@ export default function DailyReportPage() {
         </div>
       </div>
 
-      {/* 第一部分：当日客户信息 */}
+      {/* 第一部分：当日深度需求 */}
       <div className="min-w-0 mt-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[13px] font-medium text-[#1f2329]">当日客户{coreReady && <span className="text-[#8f959e] font-normal">（{sortedVisits.length}人）</span>}</span>
@@ -764,8 +783,9 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("today_activity")}><span className="inline-flex items-center gap-0">今日<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "today_activity" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "today_activity" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[57px] border-b-[0.5px] border-[#e8eaed]">剩余次数</th>
                   <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">来访需求</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户信息</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">深度需求</th>
                   <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">跟进点</th>
+                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户反馈</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[74px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("daily_amount")}><span className="inline-flex items-center gap-0">今日成交<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "daily_amount" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "daily_amount" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="pl-[5px] pr-0 py-2 text-left font-normal w-[36px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("referrer_handler")}><span className="inline-flex items-center gap-0">邀约<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "referrer_handler" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "referrer_handler" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="pl-0 pr-[5px] py-2 text-center font-normal w-[56px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("arrived")}><span className="inline-flex items-center gap-0">到场<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "arrived" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "arrived" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
@@ -785,8 +805,9 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
                     <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!financeReady ? <EmptyDash /> : !hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
                     <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || v.experience || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.healing_notes || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}><ReportFollowUp visit={v} /></td>
+                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.experience || <EmptyDash />}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => (transactionCounts[v.customer_id] || 0) > 0 && openDetail("payment", v.customer_id, v.nickname)}>{(transactionCounts[v.customer_id] || 0) > 0 ? `${transactionCounts[v.customer_id]}笔` : <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[5px] pr-[1px] py-2 text-[#6b7178] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer_handler || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[1px] pr-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">
@@ -959,8 +980,9 @@ export default function DailyReportPage() {
                   <span className="w-32 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
                   <span className="w-24 shrink-0">来访需求</span>
-                  <span className="flex-1">客户信息</span>
+                  <span className="flex-1">深度需求</span>
                   <span className="w-24 shrink-0">跟进点</span>
+                  <span className="w-24 shrink-0">客户反馈</span>
                   <span className="w-11 shrink-0" />
                 </div>
                 {records.map(v => {
@@ -971,8 +993,9 @@ export default function DailyReportPage() {
                       <span className="w-32 shrink-0">{v.visit_date}</span>
                       <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
                       <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || v.experience || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.healing_notes || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}><ReportFollowUp visit={v} /></span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.experience || <EmptyDash />}</span>
                       {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
                     </div>
                   )
@@ -989,8 +1012,9 @@ export default function DailyReportPage() {
                   <span className="w-40 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
                   <span className="w-24 shrink-0">来访需求</span>
-                  <span className="flex-1">客户信息</span>
+                  <span className="flex-1">深度需求</span>
                   <span className="w-24 shrink-0">跟进点</span>
+                  <span className="w-24 shrink-0">客户反馈</span>
                   <span className="w-11 shrink-0" />
                 </div>
                 {records.map(v => {
@@ -1001,8 +1025,9 @@ export default function DailyReportPage() {
                       <span className="w-40 shrink-0">{v.visit_date}{v.cancelled ? <span className="ml-1 text-[#c4506a]">（已取消）</span> : !v.arrived ? <span className="ml-1 text-[#a0a4ab]">（未参与）</span> : null}</span>
                       <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
                       <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || v.experience || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.healing_notes || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}><ReportFollowUp visit={v} /></span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.experience || <EmptyDash />}</span>
                       {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
                     </div>
                   )
@@ -1019,8 +1044,9 @@ export default function DailyReportPage() {
                   <span className="w-40 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
                   <span className="w-24 shrink-0">来访需求</span>
-                  <span className="flex-1">客户信息</span>
+                  <span className="flex-1">深度需求</span>
                   <span className="w-24 shrink-0">跟进点</span>
+                  <span className="w-24 shrink-0">客户反馈</span>
                   <span className="w-11 shrink-0" />
                 </div>
                 {records.map(v => {
@@ -1031,8 +1057,9 @@ export default function DailyReportPage() {
                       <span className="w-40 shrink-0">{v.visit_date}</span>
                       <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
                       <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || v.experience || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.healing_notes || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || <EmptyDash />}</span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}><ReportFollowUp visit={v} /></span>
+                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.experience || <EmptyDash />}</span>
                       {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
                     </div>
                   )

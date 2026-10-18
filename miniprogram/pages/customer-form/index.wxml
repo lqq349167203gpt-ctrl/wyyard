@@ -73,6 +73,12 @@
         <view class="picker-display {{follow_up_status ? '' : 'placeholder'}}">{{follow_up_status || '选择状态'}}</view>
       </picker>
     </view>
+    <view class="form-item">
+      <text class="form-label">客户质量</text>
+      <picker class="form-picker" mode="selector" range="{{['正常', '忽视']}}" value="{{customer_quality === '忽视' ? 1 : 0}}" bindchange="onQualityChange">
+        <view class="picker-display">{{customer_quality}}</view>
+      </picker>
+    </view>
     <view class="form-item" bindtap="onTagPickerOpen">
       <text class="form-label">客户标签</text>
       <view class="tag-field-value">
@@ -161,6 +167,14 @@
       <text class="form-label">工作描述</text>
       <input class="form-input" placeholder="描述工作内容" placeholder-class="form-input-placeholder" value="{{work_description}}" bindinput="onInput" data-field="work_description" />
     </view>
+    <block wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.work_info}}">
+      <view class="form-item" wx:for="{{incomeFields}}" wx:key="key">
+        <text class="form-label">{{item.label}}</text>
+        <picker class="form-picker" mode="selector" range="{{item.options}}" value="{{incomeIndices[item.key] || 0}}" bindchange="onIncomeChange" data-field="{{item.key}}">
+          <view class="picker-display {{incomeValues[item.key] ? '' : 'placeholder'}}">{{incomeValues[item.key] || '请选择'}}</view>
+        </picker>
+      </view>
+    </block>
     <view class="form-item column last" wx:if="{{!isEdit || customerAccessPermissions.sensitive_fields.trauma_history}}">
       <text class="form-label" style="margin-bottom: 16rpx;">创伤经历</text>
       <view class="text-preview" bindtap="onOpenEditor" data-field="basic_info" data-label="创伤经历">

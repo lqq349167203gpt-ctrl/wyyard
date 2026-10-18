@@ -96,7 +96,7 @@ class PrincipalQuery(StrictBaseModel):
     participant_scope: Literal["", "internal", "external"] = ""
     # 邀约二级列表：arrive＝邀约到店口径；initiated＝发起口径（列内容后续再定）
     invite_view: Literal["arrive", "initiated"] = "arrive"
-    order_filter: Literal["", "first", "repeat", "cross"] = ""
+    order_filter: Literal["", "first", "repeat", "cross", "experience", "conversion", "upsell", "repurchase"] = ""
     # 课程列表：只看当日有成交 / 有关联成交的课程（经营概况里点数字筛选）
     course_deal: Literal["", "same_day", "related"] = ""
     status: Literal["", "converted", "unconverted", "observing"] = ""

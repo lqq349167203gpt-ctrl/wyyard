@@ -1,3 +1,4 @@
+@import "../../templates/note-feedback-meta.wxss";
 .page {
   min-height: 100vh;
   box-sizing: border-box;
@@ -1065,6 +1066,7 @@
 .reference-entry { padding: 8rpx 0; border-bottom: 1rpx solid #eceef0; }
 .reference-entry:last-child { border-bottom: 0; }
 .reference-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; font-size: 24rpx; }
+.attribution-action { margin-left: 8rpx; color: #c0c4cc; font-weight: 400; }
 .reference-author { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8f959e; }
 .reference-right { display: flex; flex-shrink: 0; align-items: center; gap: 12rpx; max-width: 70%; color: #8f959e; text-align: right; }
 .reference-right text:first-child { flex-shrink: 0; }
@@ -1199,3 +1201,6 @@
 }
 .course-participants-page .p-field { margin-top: 20rpx; }
 .course-participants-page .p-head + .p-field { margin-top: 20rpx; }
+.course-participants-page .p-note-value { display: block; overflow: visible; }
+.p-note-value .note-feedback-content { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.p-note-value .note-feedback-entry + .note-feedback-entry { padding-top: 12rpx; border-top: 2rpx solid #eceef0; }

@@ -1,5 +1,5 @@
-const { authApi, organizationApi } = require('../../utils/api')
-const { DEV, BASE_URL } = require('../../utils/config')
+const { authApi, organizationApi, saveLoginState } = require('../../utils/api')
+const { DEV } = require('../../utils/config')
 
 const DEV_ACCOUNTS = [
   { username: 'admin', label: '管理员' },
@@ -10,7 +10,7 @@ Page({
   data: {
     loading: false,
     error: '',
-    loginMode: 'password', // 'password' | 'dev'
+    loginMode: 'phone', // 'phone' | 'password' | 'dev'
     username: '',
     password: '',
     showPassword: false,
@@ -33,6 +33,7 @@ Page({
         password: savedPassword || '',
         saveAccount: true,
         savePassword: !!savedPassword,
+        loginMode: 'password',
       })
     }
     this._trySkipLogin()
@@ -46,8 +47,12 @@ Page({
     if (!token || !user) return
     this.setData({ checkingLogin: true })
     // 用一个轻量且所有角色都能访问的接口探活，避免"页面进来了、第一个请求才发现登录失效"
-    Promise.resolve(organizationApi.list())
-      .then(() => { wx.switchTab({ url: '/pages/customers/index' }) })
+    const memberOnly = user.role === 'customer'
+    Promise.resolve(memberOnly ? authApi.memberData('home') : organizationApi.list())
+      .then(async result => {
+        if (memberOnly && result.can_manage) saveLoginState(await authApi.switchToManagement())
+        getApp().enterDefaultView()
+      })
       .catch(() => { this.setData({ checkingLogin: false }) })
   },
 
@@ -57,9 +62,36 @@ Page({
     // 双保险：非开发环境禁止进入 dev 登录（入口已隐藏，此处兜底）
     if (!this.data.isDev) return
     this.setData({
-      loginMode: this.data.loginMode === 'dev' ? 'password' : 'dev',
+      loginMode: this.data.loginMode === 'dev' ? 'phone' : 'dev',
       error: '',
     })
+  },
+
+  onToggleLoginMode() {
+    if (this.data.loading) return
+    this.setData({ loginMode: this.data.loginMode === 'password' ? 'phone' : 'password', error: '' })
+  },
+
+  async onGetPhoneNumber(event) {
+    if (this.data.loading) return
+    if (!event.detail.code || event.detail.errMsg !== 'getPhoneNumber:ok') {
+      this.setData({ error: '请授权手机号后登录' })
+      return
+    }
+    this.setData({ loading: true, error: '' })
+    try {
+      const loginCode = await new Promise((resolve, reject) => wx.login({
+        success: result => result.code ? resolve(result.code) : reject(new Error('微信登录失败，请重试')),
+        fail: () => reject(new Error('微信登录失败，请重试')),
+      }))
+      const result = await authApi.entryLogin(event.detail.code, loginCode)
+      this._saveLogin(result)
+      getApp().enterDefaultView()
+    } catch (error) {
+      this.setData({ error: error.message || '登录失败，请重试' })
+    } finally {
+      this.setData({ loading: false })
+    }
   },
 
   // ---------- 保存账号密码 ----------
@@ -129,7 +161,7 @@ Page({
       }
       this._saveLogin(data)
       this._silentBindWechat()
-      wx.switchTab({ url: '/pages/customers/index' })
+      getApp().enterDefaultView()
     }).catch((err) => {
       this.setData({ error: err.message || '用户名或密码错误' })
     }).finally(() => {
@@ -161,7 +193,7 @@ Page({
 
     authApi.devLogin(account.username).then((data) => {
       this._saveLogin(data)
-      wx.switchTab({ url: '/pages/customers/index' })
+      getApp().enterDefaultView()
     }).catch((err) => {
       this.setData({ error: err.message || '登录失败' })
     }).finally(() => {
@@ -172,12 +204,7 @@ Page({
   // ---------- 通用 ----------
 
   _saveLogin(data) {
-    wx.setStorageSync('auth_token', data.token)
-    wx.setStorageSync('currentUser', data.account)
-    wx.setStorageSync('userPermissions', data.permissions)
-    wx.setStorageSync('userEditPermissions', data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' })
-    // 记住这个登录态属于哪个数据源（本地 / 正式服务器），换源后要重新登录
-    wx.setStorageSync('auth_base_url', BASE_URL)
+    if (!saveLoginState(data)) throw new Error('登录信息不完整，请重试')
 
     // 开发模式登录不改动用户保存的账号密码
     if (this.data.loginMode === 'password') {
@@ -193,14 +220,5 @@ Page({
       }
     }
 
-    const app = getApp()
-    if (app) {
-      app.globalData.token = data.token
-      app.globalData.currentUser = data.account
-      app.globalData.permissions = data.permissions || []
-      app.globalData.editPermissions = data.edit_permissions || { customers: 'all', visits: 'own', activities: 'own', activity_teachers: 'own', activity_participants: 'all', activity_lock: false, visit_lock: false, payments: 'all' }
-      if (app.scheduleUsageTracking) app.scheduleUsageTracking()
-      else if (app.startUsageTracking) app.startUsageTracking()
-    }
   },
 })

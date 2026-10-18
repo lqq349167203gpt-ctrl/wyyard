@@ -32,13 +32,35 @@ function deferred() {
 }
 const settle = () => new Promise(resolve => setImmediate(resolve))
 
+test('邀约历史只在面板打开后读取，关闭或切日期后的旧响应不回写', async () => {
+  const reads = [], commits = [], failures = []
+  const setup = (selectedDate, historyPanelOpen, pending) => callback('components/visits/detail-view.tsx', 'visitHistoryApi.list(selectedDate', {
+    selectedDate, historyPanelOpen, spaceId: 'space',
+    visitHistoryApi: { list(date) { reads.push(date); return pending.promise } },
+    setHistoryLoading() {}, setHistoryError(message) { if (message) failures.push(message) },
+    setCloudHistory(entries) { commits.push(entries) },
+  }, true)()
+  assert.equal(setup('2026-09-12', false, deferred()), undefined)
+  assert.deepEqual(reads, [])
+  const old = deferred(), fresh = deferred()
+  const cancel = setup('2026-09-12', true, old)
+  cancel()
+  setup('2026-09-13', true, fresh)
+  old.resolve([{ id: 'old', created_at: '2026-09-12T09:00:00Z', rows_snapshot: [] }])
+  fresh.resolve([{ id: 'fresh', created_at: '2026-09-13T09:00:00Z', rows_snapshot: [] }])
+  await settle()
+  assert.equal(commits.length, 1)
+  assert.equal(commits[0][0].id, 'fresh')
+  assert.deepEqual(failures, [])
+})
+
 test('核对锁定与预览时课程老师只读，解锁后保持原编辑权限', () => {
   for (const [locked, previewRows, allowed, expected] of [
     [true, undefined, true, false], [false, [], true, false],
     [false, undefined, false, false], [false, undefined, true, true],
   ]) {
     const canEdit = callback('pages/daily-activities/activity-batch-table.tsx', 'canEditTeachers', {
-      locked, previewRows, canEditRow: () => allowed,
+      locked, previewRows, interactionBlocked: false, canEditRow: () => allowed,
     })
     assert.equal(canEdit({ id: 'course' }), expected)
   }
@@ -206,15 +228,149 @@ test('课表同一日期保存后的余额刷新不被之前的候选请求覆�
   let i = 0
   const run = callback('pages/daily-activities/activity-batch-table.tsx', 'fetchRemaining', {
     date: '2026-09-01', dateRef: { current: '2026-09-01' }, remainingSequences: { current: {} },
+    remainingRequests: { current: {} }, requestedRemainingTypes: { current: new Set() },
     energyKnotSessionApi: { searchCustomers: () => pending[i++].promise },
     setRemainingMap(update) { values.push(update({})) }, setRemainingError(value) { errors.push(value) },
   })
-  const old = run('eks', 'all'), fresh = run('eks', 'all')
+  const old = run('eks', 'all'), fresh = run('eks', 'all', true)
   pending[1].resolve([{ id: 'a', remaining: 2 }]); await fresh
   pending[0].resolve([{ id: 'a', remaining: 5 }]); await old
   assert.equal(values.length, 1)
   assert.equal(values[0].eks.a, 2)
   assert.deepEqual(errors, [])
+})
+
+test('课表案主聚焦读取合并在途请求，旧请求完成不能删除保存后的新请求', async () => {
+  const pending = [deferred(), deferred()], requests = { current: {} }
+  let reads = 0
+  const run = callback('pages/daily-activities/activity-batch-table.tsx', 'fetchRemaining', {
+    date: '2026-09-01', dateRef: { current: '2026-09-01' }, remainingSequences: { current: {} },
+    remainingRequests: requests, requestedRemainingTypes: { current: new Set() },
+    energyKnotSessionApi: { searchCustomers: () => pending[reads++].promise },
+    setRemainingMap() {}, setRemainingError() {},
+  })
+  const initial = run('eks', 'all')
+  assert.equal(run('eks', 'all'), initial)
+  const afterSave = run('eks', 'all', true)
+  pending[0].resolve([]); await initial
+  assert.equal(run('eks', 'all'), afterSave)
+  assert.equal(reads, 2)
+  pending[1].resolve([]); await afterSave
+  assert.equal(Object.keys(requests.current).length, 0)
+})
+
+test('课表历史快照仅在展开时加载，换日期后旧响应不能提交', async () => {
+  const requests = [], rows = []
+  const setup = (detailDate, historyPanelOpen, scopeChanging = false) => callback('pages/daily-activities/index.tsx', 'activityHistoryApi.list(detailDate', {
+    detailDate, selectedSpaceId: 'space', historyPanelOpen, scopeChanging,
+    activityHistoryApi: { list() { const pending = deferred(); requests.push(pending); return pending.promise } },
+    setCloudHistory(value) { rows.push(value) }, setHistoryLoading() {}, setHistoryError() {},
+  }, true)()
+  setup('2026-09-01', false)
+  setup('2026-09-01', true, true)
+  assert.equal(requests.length, 0)
+  const cleanup = setup('2026-09-01', true)
+  cleanup()
+  setup('2026-09-02', true)
+  requests[0].resolve([{ id: 'old', created_at: '2026-09-01T09:00:00Z', rows_snapshot: [] }])
+  requests[1].resolve([{ id: 'new', created_at: '2026-09-02T09:00:00Z', rows_snapshot: [] }])
+  await settle()
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0][0].id, 'new')
+})
+
+function scheduleLoadHarness({ known = [], customersPending = null, dashboard, previousScope = null } = {}) {
+  const state = {}, calls = [], customersRef = { current: known }, sequence = { current: 0 }
+  const run = callback('pages/daily-activities/index.tsx', 'loadDateData', {
+    selectedSpaceId: 'space', loadSeqRef: sequence, loadedScopeRef: { current: previousScope },
+    customersLoadRef: { current: customersPending }, allCustomersRef: customersRef,
+    flushPendingSavesRef: { current: async () => { calls.push('flush') } },
+    classRecordApi: { dashboard: async date => { calls.push(['dashboard', date]); return typeof dashboard === 'function' ? dashboard(date) : dashboard } },
+    customerApi: { batch: async ids => { calls.push(['batch', [...ids]]); return ids.map(id => ({ id })) } },
+    setDetailLoading(value) { state.loading = value }, setDetailError(value) { state.error = value },
+    setAllCustomers(update) { customersRef.current = update(customersRef.current) },
+    ...Object.fromEntries(['DetailRecords', 'DetailGcsSessions', 'DetailErsSessions', 'DetailEksSessions', 'DetailIcsSessions', 'DetailVisits', 'CalendarCounts', 'LoadedScope'].map(key => [
+      `set${key}`, value => { state[key] = value },
+    ])),
+  })
+  return { run, state, calls, customersRef, sequence }
+}
+
+function scheduleDashboard(classRecords = []) {
+  return { class_records: classRecords, gcs_sessions: [], ers_sessions: [], eks_sessions: [], ics_sessions: [], visits: [], calendar_counts: {} }
+}
+
+test('课表复用并行客户简表，只补缺失人员；已覆盖时不补取', async () => {
+  const customers = deferred()
+  const records = [{ id: 'course', teacher_ids: ['teacher'], participant_ids: ['known', 'missing'], groups: [] }]
+  const harness = scheduleLoadHarness({ customersPending: customers.promise, dashboard: scheduleDashboard(records) })
+  const pending = harness.run('2026-09-01')
+  await settle()
+  assert.equal(harness.calls.length, 1)
+  harness.customersRef.current = [{ id: 'known' }, { id: 'teacher' }]
+  customers.resolve(harness.customersRef.current)
+  await pending
+  assert.deepEqual(harness.calls[1], ['batch', ['missing']])
+  assert.equal(harness.state.DetailRecords[0].id, 'course')
+  const covered = scheduleLoadHarness({ known: [{ id: 'known' }, { id: 'teacher' }, { id: 'missing' }], dashboard: scheduleDashboard(records) })
+  await covered.run('2026-09-01')
+  assert.equal(covered.calls.length, 1)
+})
+
+test('课表切换范围先保存旧草稿，过期响应不覆盖新日期', async () => {
+  const requests = { '2026-09-01': deferred(), '2026-09-02': deferred() }
+  const harness = scheduleLoadHarness({ previousScope: { date: '2026-08-31', spaceId: 'space' }, dashboard: date => requests[date].promise })
+  const old = harness.run('2026-09-01')
+  await settle()
+  const current = harness.run('2026-09-02')
+  await settle()
+  assert.equal(harness.calls[0], 'flush')
+  requests['2026-09-02'].resolve(scheduleDashboard([{ id: 'new', teacher_ids: [], participant_ids: [], groups: [] }]))
+  await current
+  requests['2026-09-01'].resolve(scheduleDashboard([{ id: 'old', teacher_ids: [], participant_ids: [], groups: [] }]))
+  await old
+  assert.equal(harness.state.LoadedScope.date, '2026-09-02')
+  assert.equal(harness.state.DetailRecords[0].id, 'new')
+  assert.equal(harness.state.loading, false)
+})
+
+test('课表同ID刷新更新已保存内容、保留行节点与未保存草稿', () => {
+  const rowsRef = { current: [
+    { key: 1, record_id: 'saved', record_type: 'class', name: '旧老师' },
+    { key: 2, record_id: 'draft', record_type: 'class', name: '正在输入' },
+  ] }
+  const savedRowsRef = { current: { 2: { name: '草稿修改前' } } }
+  callback('pages/daily-activities/activity-batch-table.tsx', 'const signature = JSON.stringify', {
+    date: '2026-09-01', spaceId: 'space', records: [
+      { type: 'class', data: { id: 'saved', name: '新老师' } },
+      { type: 'class', data: { id: 'draft', name: '后台旧内容' } },
+    ], courses: [], spaces: [], courseTypes: [],
+    prevRecordsRef: { current: { scope: '2026-09-01|space', signature: 'old' } },
+    rowsRef, rowStatusRef: { current: { 1: 'saved', 2: 'idle' } }, savedRowsRef,
+    eksEditsRef: { current: new Map() },
+    recordToRow: (type, data) => ({ key: 99, record_id: data.id, record_type: type, name: data.name }),
+    localStorage: { getItem: () => null }, setRows() {}, setRowStatus() {},
+  }, true)()
+  assert.equal(rowsRef.current[0].name, '新老师')
+  assert.equal(rowsRef.current[0].key, 1)
+  assert.equal(rowsRef.current[1].name, '正在输入')
+  assert.equal(savedRowsRef.current[2].name, '草稿修改前')
+})
+
+test('课表课程配置晚于记录返回时，更新行显示而不重复获取排序', () => {
+  const records = [{ type: 'class', data: { id: 'saved' } }]
+  const rowsRef = { current: [{ key: 1, record_id: 'saved', record_type: 'class', name: '' }] }
+  const spaces = []
+  callback('pages/daily-activities/activity-batch-table.tsx', 'const signature = JSON.stringify', {
+    date: '2026-09-01', spaceId: 'space', records, courses: [{ id: 'course', name: '课程名称' }], spaces, courseTypes: [],
+    prevRecordsRef: { current: { scope: '2026-09-01|space', signature: JSON.stringify([records, [], spaces]) } },
+    rowsRef, rowStatusRef: { current: { 1: 'saved' } }, savedRowsRef: { current: {} },
+    eksEditsRef: { current: new Map() },
+    recordToRow: (type, data, courses) => ({ key: 99, record_id: data.id, record_type: type, name: courses[0].name }),
+    localStorage: { getItem: () => null }, setRows() {}, setRowStatus() {},
+  }, true)()
+  assert.equal(rowsRef.current[0].name, '课程名称')
+  assert.equal(rowsRef.current[0].key, 1)
 })
 
 test('报表详情快速换人或关闭后，旧响应不改标题下的数据与加载状态', async () => {

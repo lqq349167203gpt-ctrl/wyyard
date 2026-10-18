@@ -652,6 +652,8 @@ def create_coarse_door_course_deduction(
     notes: str,
     created_by: str,
     replacement: Optional[ProjectDeduction] = None,
+    deal_course_key: str = "",
+    deal_course_name: str = "",
 ) -> ProjectDeduction:
     with _deduct_lock:
         option = next(
@@ -722,6 +724,8 @@ def create_coarse_door_course_deduction(
             organization_id=settlement_organization.id,
             organization_name=settlement_organization.name,
             deduction_date=deal_date or option["date"],
+            deal_course_key=deal_course_key,
+            deal_course_name=deal_course_name,
             remaining_after=None,
             source_activity_type=option["record_type"],
             source_activity_id=option["record_id"],
@@ -771,6 +775,7 @@ def edit_coarse_door_course_deduction(deduction_id: str, data: dict, actor: str)
         return create_coarse_door_course_deduction(
             original.customer_id, data["record_type"], data["record_id"], data["course_organization_id"],
             original.organization_id, data["deal_date"], data["closers"], data["notes"], actor, replacement=original,
+            deal_course_key=data.get("deal_course_key", ""), deal_course_name=data.get("deal_course_name", ""),
         )
 
 

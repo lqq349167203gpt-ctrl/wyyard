@@ -49,7 +49,7 @@ App({
 
   onShow() {
     Promise.resolve(this.globalData._loginReady).catch(() => {}).then(() => {
-      if (!this.globalData.devMode && this.globalData.token) {
+      if (!this.globalData.devMode && this.globalData.token && this.globalData.currentUser?.role !== 'customer') {
         this.refreshPermissions().catch(() => {})
       }
       if (this.globalData.token) this.scheduleUsageTracking()
@@ -82,6 +82,7 @@ App({
   },
 
   scheduleUsageTracking(attempt) {
+    if (this.globalData.currentUser?.role === 'customer') return
     const retryCount = Number(attempt) || 0
     if (this.globalData._usageStartTimer) clearTimeout(this.globalData._usageStartTimer)
     this.globalData._usageStartTimer = setTimeout(() => {
@@ -93,6 +94,7 @@ App({
   },
 
   startUsageTracking(pagePath) {
+    if (this.globalData.currentUser?.role === 'customer') return false
     if (!this.globalData.token) return false
     const activePagePath = pagePath || this._currentPagePath()
     if (!activePagePath || activePagePath === '/pages/login/index') return false
@@ -107,6 +109,7 @@ App({
   },
 
   trackUsagePage(pagePath) {
+    if (this.globalData.currentUser?.role === 'customer') return
     if (!pagePath || pagePath === '/pages/login/index') return
     if (!this.globalData._usageActive) {
       this.globalData._usagePagePath = pagePath
@@ -135,6 +138,7 @@ App({
 
   async refreshPermissions() {
     const user = this.globalData.currentUser
+    if (user?.role === 'customer') return []
     if (!user || !user.role || user.role === '超级管理员') {
       return this.globalData.permissions || []
     }
@@ -149,7 +153,19 @@ App({
     return permissions
   },
 
-  checkLogin() {
+  enterDefaultView() {
+    if (this.globalData.currentUser?.role === 'customer') {
+      wx.reLaunch({ url: '/pages/member-view/index' })
+    } else {
+      wx.switchTab({ url: '/pages/customers/index' })
+    }
+  },
+
+  checkLogin(allowMember = false) {
+    if (!allowMember && this.globalData.currentUser?.role === 'customer') {
+      wx.reLaunch({ url: '/pages/member-view/index' })
+      return false
+    }
     // 开发模式跳过登录检查
     if (this.globalData.devMode) {
       return true
@@ -164,6 +180,7 @@ App({
   // 检查页面权限（与 PC 端 hasPagePermission 逻辑一致）
   checkPagePermission(pageKey) {
     var user = this.globalData.currentUser
+    if (user && user.role === 'customer') return false
     if (user && user.role === '超级管理员') return true
     var permissions = this.globalData.permissions || []
     if (permissions.indexOf(pageKey) !== -1) return true

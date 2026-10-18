@@ -1,4 +1,4 @@
-<view class="note-card">
+<view class="note-card {{enlargedMeta ? 'enlarged-meta' : ''}}">
   <view class="note-header">
     <text class="note-title">{{title}}</text>
     <text class="note-count" wx:if="{{personCount && !privateToCreator}}">{{personCount}}条记录</text>
@@ -6,12 +6,18 @@
 
   <!-- 我填写的 -->
   <view class="section-label" wx:if="{{loadError}}" bindtap="loadNotes">{{loadError}} · 点击重试</view>
-  <view class="section-label">
-    <text class="section-label-text">我填写的<text wx:if="{{myNote}}"> · {{myNote.feedbackText}}</text></text>
-    <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}} 更新 · 创建人：{{myNote.creatorText}}<text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>
+  <view class="section-label {{category === 'follow_up' ? 'follow-up-label' : ''}}">
+    <view class="own-heading">
+      <text class="section-label-text">我填写的</text>
+      <view class="own-note-meta" wx:if="{{myNote}}">
+        <text><text class="attribution-label">反馈：</text>{{myNote.feedbackText}}</text>
+        <text class="plan-meta" wx:if="{{category === 'follow_up' && (myNote.next_follow_up_person || myNote.next_follow_up_date)}}"><text class="attribution-label">下次跟进：</text>{{myNote.next_follow_up_person}}<text wx:if="{{myNote.next_follow_up_person && myNote.next_follow_up_date}}"> </text>{{myNote.followUpDateText}}</text>
+      </view>
+    </view>
+    <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}}<text class="attribution-action">更新</text> · {{myNote.creatorText}}<text class="attribution-action">创建</text><text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>
   </view>
   <view class="mine-box" bindtap="onAdd">
-    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : (readOnly ? '暂无记录' : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'))}}</text>
+    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.displayContent : (readOnly ? '暂无记录' : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'))}}</text>
   </view>
 
   <!-- 别人填写的 -->
@@ -20,11 +26,11 @@
       <text class="section-label-text">别人填写的</text>
     </view>
     <view class="note-item" wx:for="{{otherNotes}}" wx:key="id">
-      <view class="note-meta">
-        <text class="note-creator">{{item.feedbackText}}</text>
-        <view class="note-meta-right"><text class="note-time">{{item.timeText}}</text><text>创建人：{{item.creatorText}}</text></view>
+      <view class="note-meta {{category === 'follow_up' ? 'follow-up-meta' : ''}}">
+        <view class="note-person-plan"><text class="note-creator"><text class="attribution-label">反馈：</text>{{item.feedbackText}}</text><text class="plan-meta" wx:if="{{category === 'follow_up' && (item.next_follow_up_person || item.next_follow_up_date)}}"><text class="attribution-label">下次跟进：</text>{{item.next_follow_up_person}}<text wx:if="{{item.next_follow_up_person && item.next_follow_up_date}}"> </text>{{item.followUpDateText}}</text></view>
+        <view class="note-meta-right"><text class="note-time">{{item.timeText}}</text><text>{{item.creatorText}}<text class="attribution-action">创建</text></text></view>
       </view>
-      <text class="note-content">{{item.content}}</text>
+      <text class="note-content">{{item.displayContent}}</text>
     </view>
   </block>
 
@@ -43,12 +49,51 @@
     </view>
   </view>
   <scroll-view class="editor-body" scroll-y>
-  <view class="feedback-field">
+  <view wx:if="{{category === 'visit_need'}}" class="need-tags-section">
+    <text class="need-tags-label">来访需求（可多选）</text>
+    <view class="need-tags-options">
+      <text wx:for="{{needTagOptions}}" wx:key="id" class="need-tag {{item.selected ? 'need-tag-selected' : ''}}" data-id="{{item.id}}" bindtap="onToggleNeedTag">{{item.name}}</text>
+    </view>
+    <text wx:if="{{needTagsLoading}}" class="need-tags-state">加载中…</text>
+    <text wx:elif="{{needTagsError}}" class="need-tags-state" bindtap="loadNeedTags">{{needTagsError}} · 点击重试</text>
+    <text wx:elif="{{!needTagOptions.length}}" class="need-tags-state">暂未配置公共来访需求</text>
+  </view>
+  <view class="feedback-field feedback-field-plan">
     <view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view>
     <picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange">
       <view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view>
     </picker>
   </view>
+  <block wx:if="{{category === 'follow_up'}}">
+    <view class="editor-section-label">我填写的</view>
+    <view class="plan-fields">
+      <view class="plan-field plan-person-field">
+        <text class="plan-label">下次跟进</text>
+        <view class="plan-control plan-person-control">
+          <input class="plan-input" value="{{followUpSearchOpen ? followUpSearch : nextFollowUpPerson}}" placeholder="搜索昵称" placeholder-style="color:#c0c4cc" bindfocus="onFollowUpSearchFocus" bindinput="onFollowUpSearchInput" bindconfirm="onFollowUpSearchConfirm" confirm-type="search" cursor-spacing="20" />
+          <view class="plan-clear" wx:if="{{nextFollowUpPerson || followUpSearch}}" catchtap="onClearFollowUpPerson">×</view>
+        </view>
+      </view>
+      <view class="plan-field plan-date-field">
+        <text class="plan-label">跟进时间</text>
+        <view class="plan-control plan-date-control">
+          <picker mode="date" value="{{nextFollowUpDate || datePickerToday}}" bindchange="onFollowUpDateChange" bindtap="onCloseFollowUpSearch">
+            <view class="plan-date-value {{nextFollowUpDate ? '' : 'plan-placeholder'}}">{{nextFollowUpDateText || '选择日期'}}</view>
+          </picker>
+          <view class="plan-clear" wx:if="{{nextFollowUpDate}}" catchtap="onClearFollowUpDate">×</view>
+        </view>
+      </view>
+    </view>
+    <view class="plan-search-results" wx:if="{{followUpSearchOpen}}">
+      <view class="plan-search-state" wx:if="{{followUpPeopleLoading}}">人员加载中…</view>
+      <view class="plan-search-state" wx:elif="{{followUpPeopleError}}" bindtap="loadFollowUpPeople">{{followUpPeopleError}} · 点击重试</view>
+      <scroll-view class="plan-results-scroll" scroll-y style="height:{{followUpMatches.length > 4 ? 256 : followUpMatches.length * 64}}rpx" wx:elif="{{followUpMatches.length}}">
+        <view class="plan-person-option" wx:for="{{followUpMatches}}" wx:key="id" data-id="{{item.id}}" catchtap="onSelectFollowUpPerson"><text>{{item.nickname}}</text><text class="plan-person-name" wx:if="{{item.name && item.name !== item.nickname}}">{{item.name}}</text></view>
+      </scroll-view>
+      <view class="plan-search-state" wx:else>暂无匹配人员</view>
+      <view class="plan-search-state" wx:if="{{!followUpPeopleLoading && !followUpPeopleError && followUpMatchCount > 50}}">共{{followUpMatchCount}}位，继续输入可缩小范围</view>
+    </view>
+  </block>
   <view class="previous-box" wx:if="{{category === 'visit_need' && visitPurposeOpen}}">
     <text class="previous-empty" wx:if="{{visitPurposeLoading}}">正在加载到访目的…</text>
     <view class="previous-error" wx:elif="{{visitPurposeError}}" bindtap="loadVisitPurpose">
@@ -89,12 +134,13 @@
     cursor-spacing="20"
     fixed="{{true}}"
     bindinput="onEditorInput"
+    bindfocus="onCloseFollowUpSearch"
     confirm-type="done"
     bindconfirm="onSubmit"
   />
   </scroll-view>
   <view class="editor-footer">
     <text class="editor-hint">{{editorValue.length}} / 5000</text>
-    <view class="editor-submit {{saving || !editorValue ? 'editor-submit-disabled' : ''}}" bindtap="onSubmit">{{saving ? '保存中' : '保存'}}</view>
+    <view class="editor-submit {{saving || (!editorValue && !needTagIds.length && !(category === 'visit_need' && myNote)) ? 'editor-submit-disabled' : ''}}" bindtap="onSubmit">{{saving ? '保存中' : '保存'}}</view>
   </view>
 </view>

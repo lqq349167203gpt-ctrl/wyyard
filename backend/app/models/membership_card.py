@@ -1,13 +1,16 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from app.models.base import SafeBaseModel
+from pydantic import field_validator
+
+from app.models.payment_course import PaymentCourseFields
+from app.utils.payment_types import normalize_card_type
 
 
-class MembershipCardBase(SafeBaseModel):
+class MembershipCardBase(PaymentCourseFields):
     customer_id: str
     nickname: str
-    card_type: str  # 体验会员 / 常规通卡 / 半年卡 / 年卡
+    card_type: str  # 次卡 / 体验会员 / 30次卡 / 60次卡 / 定制化（粗门保持独立）
     price: float
     effective_date: str  # YYYY-MM-DD
     duration_type: Optional[str] = None  # day / month / null
@@ -25,6 +28,11 @@ class MembershipCardBase(SafeBaseModel):
     notes: str = ""  # 注释
     created_by: str = ""
     created_by_id: str = ""
+
+    @field_validator("card_type", mode="before")
+    @classmethod
+    def normalize_type(cls, value):
+        return normalize_card_type(value)
 
 
 class MembershipCardCreate(MembershipCardBase):

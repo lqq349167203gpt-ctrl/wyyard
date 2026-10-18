@@ -19,6 +19,7 @@ import {
 import { customerApi, projectDeductionApi, type CustomerLight, type ProjectDeduction } from "@/lib/api"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
+import { MEMBERSHIP_CARD_NAMES } from "@/lib/payment-types"
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "membership-cards", label: "会员卡" },
@@ -33,7 +34,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "group-cases": "觉醒游戏",
   "emotional-releases": "情绪释放",
   "energy-knots": "能量结",
-  "internal-courses": "内部课程",
+  "internal-courses": "沙龙技能学习",
   "other-projects": "其他项目",
 }
 
@@ -41,17 +42,7 @@ function EmptyValue({ className }: { className?: string }) {
   return <span className={`inline-block align-middle h-[2px] w-[4px] rounded-full bg-[#e5e8eb] shrink-0 ${className ?? ""}`} />
 }
 
-const CARD_TYPE_OPTIONS = [
-  { value: "次卡", label: "次卡" },
-  { value: "体验会员", label: "体验会员" },
-  { value: "月卡", label: "月卡" },
-  { value: "12次卡", label: "12次卡" },
-  { value: "3月卡", label: "3月卡" },
-  { value: "30次卡", label: "30次卡" },
-  { value: "60次卡", label: "60次卡" },
-  { value: "半年卡", label: "半年卡" },
-  { value: "年卡", label: "年卡" },
-]
+const CARD_TYPE_OPTIONS = MEMBERSHIP_CARD_NAMES.map(value => ({ value, label: value }))
 
 type AvailableDeductionItem = {
   id: string

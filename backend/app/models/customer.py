@@ -1,10 +1,15 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import Field, field_validator, model_validator
 
 from app.models.base import SafeBaseModel, StrictBaseModel
+
+IncomeStability = Literal["", "收入稳定", "收入不稳定"]
+PersonalAnnualIncome = Literal["", "10w以下", "10~20w", "20~30w", "30~50w", "50w以上"]
+HouseholdAnnualIncome = Literal["", "20w以下", "20~30w", "30~40w", "40~50w", "50~100w", "100w以上"]
+CustomerQuality = Literal["正常", "忽视"]
 
 
 def _validate_iso_date(value: str) -> str:
@@ -71,6 +76,7 @@ class CustomerBase(SafeBaseModel):
     referral_date: str = Field(default="", max_length=10)
     referrer_handler: str = Field(default="", max_length=50)
     follow_up_status: str = Field(default=FollowUpStatus.UNCONFIGURED.value, max_length=30)
+    customer_quality: CustomerQuality = "正常"
     member_type: str = Field(default="", max_length=50)
     paid_content: List[PaidContentItem] = Field(default=[], max_length=20)
     visit_count: int = Field(default=0, ge=0)
@@ -82,6 +88,9 @@ class CustomerBase(SafeBaseModel):
     self_tags: List[SelfTag] = Field(default=[], max_length=10)
     work_status: str = Field(default="", max_length=100)
     work_description: str = Field(default="", max_length=2000)
+    income_stability: IncomeStability = ""
+    personal_annual_income: PersonalAnnualIncome = ""
+    household_annual_income: HouseholdAnnualIncome = ""
     basic_info: str = Field(default="", max_length=5000)
     assessment: str = Field(default="", max_length=5000)
     tags: str = Field(default="", max_length=2000)
@@ -162,6 +171,7 @@ class CustomerUpdate(StrictBaseModel):
     referral_date: Optional[str] = Field(default=None, max_length=10)
     referrer_handler: Optional[str] = Field(default=None, max_length=50)
     follow_up_status: Optional[str] = Field(default=None, max_length=30)
+    customer_quality: Optional[CustomerQuality] = None
     member_type: Optional[str] = Field(default=None, max_length=50)
     paid_content: Optional[List[PaidContentItem]] = Field(default=None, max_length=20)
     visit_count: Optional[int] = Field(default=None, ge=0)
@@ -173,6 +183,9 @@ class CustomerUpdate(StrictBaseModel):
     self_tags: Optional[List[SelfTag]] = Field(default=None, max_length=10)
     work_status: Optional[str] = Field(default=None, max_length=100)
     work_description: Optional[str] = Field(default=None, max_length=2000)
+    income_stability: Optional[IncomeStability] = None
+    personal_annual_income: Optional[PersonalAnnualIncome] = None
+    household_annual_income: Optional[HouseholdAnnualIncome] = None
     basic_info: Optional[str] = Field(default=None, max_length=5000)
     assessment: Optional[str] = Field(default=None, max_length=5000)
     tags: Optional[str] = Field(default=None, max_length=2000)
@@ -183,6 +196,16 @@ class CustomerUpdate(StrictBaseModel):
     tracking_plan: Optional[str] = Field(default=None, max_length=2000)
     position_sort_orders: Optional[Dict[str, int]] = None
     space_id: Optional[str] = Field(default=None, max_length=50)
+
+    @field_validator("income_stability", "personal_annual_income", "household_annual_income", mode="before")
+    @classmethod
+    def normalize_empty_income(cls, value):
+        return "" if value is None else value
+
+    @field_validator("customer_quality", mode="before")
+    @classmethod
+    def normalize_empty_quality(cls, value):
+        return "正常" if value is None else value
 
     @field_validator("nickname")
     @classmethod

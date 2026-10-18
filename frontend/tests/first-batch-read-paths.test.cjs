@@ -38,7 +38,7 @@ function harness() {
     modules[relative] = exports
     return exports
   }
-  return { storage, requests, api: load('lib/api.ts'), permissions: load('hooks/use-edit-permissions.ts') }
+  return { storage, requests, location: context.window.location, api: load('lib/api.ts'), permissions: load('hooks/use-edit-permissions.ts') }
 }
 
 test('权限订阅不自行请求单角色，合并并发账号权限刷新', async () => {
@@ -145,4 +145,62 @@ test('权限配置读取合并在途请求，使用心跳不使配置失效', as
   const fresh = h.api.positionApi.list()
   assert.equal(h.requests.length, 3)
   h.requests[2].reply([]); await fresh
+})
+
+test('首次客户简表读取和强制刷新不打断邀约在途复用，简表旧响应不能覆盖新结果', async () => {
+  const h = harness()
+  const visits = h.api.visitApi.list('2026-09-12', undefined, 'space')
+  const oldDirectory = h.api.customerApi.light()
+  assert.equal(h.api.visitApi.list('2026-09-12', undefined, 'space'), visits)
+  const freshDirectory = h.api.customerApi.light(true)
+  assert.equal(h.api.visitApi.list('2026-09-12', undefined, 'space'), visits)
+  assert.equal(h.requests.length, 3)
+  h.requests[2].reply([{ id: 'fresh' }]); await freshDirectory
+  h.requests[1].reply([{ id: 'old' }]); await oldDirectory
+  assert.equal((await h.api.customerApi.light())[0].id, 'fresh')
+  h.requests[0].reply([]); await visits
+})
+
+test('邀约和课表同条件并发读取只发一次，完成后可立即重新读取最新结果', async () => {
+  const h = harness()
+  const readers = [
+    () => h.api.visitApi.list('2026-09-12', undefined, 'space'),
+    () => h.api.classRecordApi.dashboard('2026-09-12', 'space'),
+    () => h.api.dailyGroupingApi.get('2026-09-12'),
+    () => h.api.visitVerificationApi.list('2026-09-05', '2026-09-25', 'space'),
+    () => h.api.consumptionRecordsApi.getDailyCounts('2026-09-12'),
+    () => h.api.activityOrderApi.get('2026-09-12', 'space'),
+    () => h.api.visitHistoryApi.list('2026-09-12', 'space'),
+    () => h.api.activityHistoryApi.list('2026-09-12', 'space'),
+  ]
+  for (const read of readers) {
+    const before = h.requests.length
+    const first = read()
+    assert.equal(read(), first)
+    assert.equal(h.requests.length, before + 1)
+    h.requests[before].reply([])
+    await first
+    const fresh = read()
+    assert.equal(h.requests.length, before + 2)
+    h.requests[before + 1].reply([])
+    await fresh
+  }
+})
+
+test('邀约读取按日期、空间、账号和页面隔离，保存后不复用旧读取', async () => {
+  const h = harness()
+  const reads = [h.api.visitApi.list('2026-09-12', undefined, 'a'),
+    h.api.visitApi.list('2026-09-13', undefined, 'a'), h.api.visitApi.list('2026-09-12', undefined, 'b')]
+  h.storage.set('authToken', 'token-b')
+  reads.push(h.api.visitApi.list('2026-09-12', undefined, 'a'))
+  h.location.pathname = '/courses/class-records'
+  reads.push(h.api.visitApi.list('2026-09-12', undefined, 'a'))
+  assert.equal(h.requests.length, 5)
+  const save = h.api.visitApi.update('visit-id', { goal: '更新目标' })
+  h.requests[5].reply({ id: 'visit-id' })
+  await save
+  reads.push(h.api.visitApi.list('2026-09-12', undefined, 'a'))
+  assert.equal(h.requests.length, 7)
+  h.requests.forEach(request => request.reply([]))
+  await Promise.all(reads)
 })

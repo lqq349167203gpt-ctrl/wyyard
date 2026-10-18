@@ -1,0 +1,12 @@
+<template name="note-feedback-meta">
+  <view class="note-feedback-attribution {{inline ? 'note-feedback-inline' : ''}}">
+    <view><text class="note-feedback-label">反馈：</text><text>{{author || '未知'}}</text></view>
+    <view wx:if="{{nextFollowUpText}}"><text class="note-feedback-label">下次跟进：</text><text>{{nextFollowUpText}}</text></view>
+  </view>
+</template>
+<template name="note-feedback-records">
+  <view class="note-feedback-entry" wx:for="{{entries}}" wx:for-item="entry" wx:key="index">
+    <template is="note-feedback-meta" data="{{author: entry.author, nextFollowUpText: entry.nextFollowUpText, inline: true}}" />
+    <text class="note-feedback-content">{{entry.content}}</text>
+  </view>
+</template>

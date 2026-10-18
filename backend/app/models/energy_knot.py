@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import List, Optional
 
-from app.models.base import SafeBaseModel
+from app.models.payment_course import PaymentCourseFields
 
 
-class EnergyKnotBase(SafeBaseModel):
+class EnergyKnotBase(PaymentCourseFields):
     customer_id: str
     nickname: str
     purchase_count: int = 0

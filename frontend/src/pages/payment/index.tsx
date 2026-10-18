@@ -20,7 +20,7 @@ const TABS = [
   { key: "emotional_release", label: "情绪释放" },
   { key: "oh_card_reading", label: "OH卡诊断" },
   { key: "energy_knot", label: "能量结" },
-  { key: "internal_course", label: "内部课程" },
+  { key: "internal_course", label: "沙龙技能学习" },
   { key: "tea_seat_fee", label: "茶位费" },
   { key: "offline_course", label: "线下落地课程" },
   { key: "other", label: "其他项目" },
@@ -132,10 +132,10 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="dv-root bg-[#f4f5f6] h-full p-4 flex flex-col gap-3">
+    <div className="dv-root bg-[#f4f5f6] h-full w-full min-w-0 max-w-full p-4 flex flex-col gap-3">
       <style>{`.dv-root { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif; } .dv-root th, .dv-root td { padding-left: 4px; padding-right: 4px; font-size: 12px; } .dv-root th.pl-4, .dv-root td.pl-4 { padding-left: 16px; } .dv-root th.pr-4, .dv-root td.pr-4 { padding-right: 16px; }`}</style>
 
-      <div className="flex items-center rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
+      <div className="flex min-w-0 max-w-full items-center rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
         <div className="flex h-full min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map(tab => (
             <button

@@ -13,27 +13,6 @@
   color: #b0b5bb;
 }
 
-/* 时间范围 */
-.time-range {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 1;
-  min-width: 0;
-}
-
-.time-range .form-picker {
-  flex: none;
-  width: auto;
-}
-
-.time-sep {
-  font-size: 26rpx;
-  color: #8f959e;
-  margin: 0 12rpx;
-  flex-shrink: 0;
-}
-
 /* picker */
 .form-picker {
   flex: 1;

@@ -2,6 +2,7 @@ const { customerApi, customerTagApi, followUpStatusApi } = require('../../utils/
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 const { readSource, retrySources } = require('../../utils/source-state')
 const { disposeReads } = require('../../utils/read-scope')
+const { CUSTOMER_INCOME_FIELDS } = require('../../utils/customer-income')
 
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
@@ -54,11 +55,15 @@ Page({
     referral_date: getTodayDate(),
     referrer_handler: '',
     follow_up_status: '未配置',
+    customer_quality: '正常',
     traffic_source: '',
     traffic_source_detail: '',
     needTrafficDetail: false,
     work_status: '',
     work_description: '',
+    incomeFields: CUSTOMER_INCOME_FIELDS,
+    incomeValues: { income_stability: '', personal_annual_income: '', household_annual_income: '' },
+    incomeIndices: {},
     basic_info: '',
     core_situation: '',
     tags: '',
@@ -223,6 +228,12 @@ Page({
     return readSource(this, 'customer', () => customerApi.detail(id, undefined, false, '', 'basic'), customer => {
       const c = customer.customer || customer
       const ts = c.traffic_source || ''
+      const incomeValues = {}
+      const incomeIndices = {}
+      CUSTOMER_INCOME_FIELDS.forEach(field => {
+        incomeValues[field.key] = c[field.key] || ''
+        incomeIndices[field.key] = Math.max(0, field.values.indexOf(c[field.key]) + 1)
+      })
       this.setData({
         customerLoaded: true,
         nickname: c.nickname || '',
@@ -240,11 +251,14 @@ Page({
         referral_date: c.referral_date || '',
         referrer_handler: c.referrer_handler || '',
         follow_up_status: c.follow_up_status || '',
+        customer_quality: c.customer_quality || '正常',
         traffic_source: ts,
         traffic_source_detail: c.traffic_source_detail || '',
         needTrafficDetail: TRAFFIC_NEED_LINK.includes(ts),
         work_status: c.work_status || '',
         work_description: c.work_description || '',
+        incomeValues,
+        incomeIndices,
         basic_info: c.basic_info || '',
         core_situation: c.core_situation || '',
         tags: c.tags || '',
@@ -313,6 +327,10 @@ Page({
     this.setData({ follow_up_status: this.data.followUpStatuses[e.detail.value] })
   },
 
+  onQualityChange(e) {
+    this.setData({ customer_quality: ['正常', '忽视'][Number(e.detail.value)] || '正常' })
+  },
+
   onReferralDateChange(e) {
     this.setData({ referral_date: e.detail.value })
   },
@@ -320,6 +338,13 @@ Page({
   onWorkStatusChange(e) {
     const statuses = ['在职', '离职', '自由职业', '全职带孩子']
     this.setData({ work_status: statuses[e.detail.value], work_description: '' })
+  },
+
+  onIncomeChange(e) {
+    const field = CUSTOMER_INCOME_FIELDS.find(item => item.key === e.currentTarget.dataset.field)
+    if (!field) return
+    const options = ['', ...field.values]
+    this.setData({ [`incomeValues.${field.key}`]: options[Number(e.detail.value)] || '', [`incomeIndices.${field.key}`]: Number(e.detail.value) })
   },
 
   // 搜索选择弹窗
@@ -409,10 +434,12 @@ Page({
         referral_date: this.data.referral_date,
         referrer_handler: this.data.referrer_handler.trim(),
         follow_up_status: this.data.follow_up_status,
+        customer_quality: this.data.customer_quality,
         traffic_source: this.data.traffic_source.trim(),
         traffic_source_detail: this.data.traffic_source_detail.trim(),
         work_status: this.data.work_status,
         work_description: this.data.work_description.trim(),
+        ...this.data.incomeValues,
         basic_info: this.data.basic_info.trim(),
         core_situation: this.data.core_situation.trim(),
         tags: this.data.tags.trim(),
@@ -427,6 +454,7 @@ Page({
         if (sensitive.work_info === false) {
           delete data.work_status
           delete data.work_description
+          CUSTOMER_INCOME_FIELDS.forEach(field => { delete data[field.key] })
         }
         if (sensitive.other_info === false) delete data.other_info
         if (!this.data.contactDirty.phone) delete data.phone

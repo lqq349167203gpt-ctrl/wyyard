@@ -18,8 +18,10 @@ export const PAGES: PageDefinition[] = [
   { title: "每日报表", path: "/daily-report", permission: "daily-report", group: "data" },
   { title: "客户资料", path: "/healing-records", permission: "healing-records", group: "business" },
   { title: "邀约", path: "/courses/class-records", permission: "class-records", group: "business" },
-  { title: "课表", path: "/courses/daily-activities", permission: "daily-activities", group: "business" },
-  { title: "落地课程", path: "/offline-course-records", permission: "offline-course-records", group: "business" },
+  { title: "课表", path: "/courses/daily-activities", permission: "daily-activities", group: "business", permissions: [
+    { key: "daily-activities", label: "课表" }, { key: "activity-checkin", label: "活动核销（管理端小程序）" },
+  ] },
+  { title: "技能训练课程", path: "/offline-course-records", permission: "offline-course-records", group: "business" },
   { title: "监管", path: "/supervision", permission: "supervision", group: "business", permissions: [
     { key: "audit-check", label: "信息核对" }, { key: "debt-records", label: "欠卡记录" }, { key: "agreement-signings", label: "协议签订" },
   ] },

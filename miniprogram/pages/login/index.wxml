@@ -6,10 +6,14 @@
 
   <view class="page-content" wx:else>
     <text class="welcome-title">无忧茶院</text>
-    <text class="welcome-subtitle">欢迎回来 · 请使用内部账号登录</text>
+    <text class="welcome-subtitle">{{loginMode === 'password' ? '欢迎回来 · 请使用内部账号登录' : '欢迎回来 · 登录查看你的记录'}}</text>
 
     <!-- 登录表单 -->
     <view class="login-card">
+      <block wx:if="{{loginMode === 'phone'}}">
+        <button class="login-button phone-button" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" loading="{{loading}}" disabled="{{loading}}" hover-class="login-button-hover">手机号授权登录</button>
+        <text class="phone-tip">使用客户资料中登记的手机号登录</text>
+      </block>
       <block wx:if="{{loginMode === 'password'}}">
         <view class="login-field {{focusedField === 'username' ? 'is-focused' : ''}}">
           <text class="field-label">用户名</text>
@@ -97,12 +101,14 @@
       </view>
     </view>
 
+    <view class="dev-toggle" wx:if="{{loginMode !== 'dev'}}" bindtap="onToggleLoginMode"><text class="dev-toggle-text">{{loginMode === 'password' ? '手机号授权登录' : '内部账号登录'}}</text></view>
+
     <view class="dev-toggle" wx:if="{{isDev}}" bindtap="onToggleDev">
       <text class="dev-toggle-text">{{loginMode === 'dev' ? '返回登录' : '开发模式'}}</text>
     </view>
   </view>
 
   <view class="login-footer">
-    <text class="system-tagline">无忧茶院 · 内部管理系统</text>
+    <text class="system-tagline">无忧茶院</text>
   </view>
 </view>

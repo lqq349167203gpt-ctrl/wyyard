@@ -5,6 +5,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.accounts import router as accounts_router
 from app.api.activity_ai_config import router as activity_ai_config_router
+from app.api.activity_checkins import router as activity_checkins_router
 from app.api.activity_history import router as activity_history_router
 from app.api.activity_orders import router as activity_orders_router
 from app.api.activity_permissions import router as activity_permissions_router
@@ -150,6 +151,7 @@ app.include_router(system_logs_router)
 app.include_router(operation_logs_router)
 app.include_router(login_records_router)
 app.include_router(accounts_router)
+app.include_router(activity_checkins_router)
 app.include_router(position_permissions_router)
 app.include_router(positions_router)
 app.include_router(daily_groupings_router)

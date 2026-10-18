@@ -17,11 +17,13 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { HEALING_POSITIONS } from "@/lib/positions"
+import { MEMBERSHIP_CARD_NAMES } from "@/lib/payment-types"
+import { LEARNING_PAYMENT_TYPES } from "@/lib/learning-course-types"
 
 // 与 membership_card.card_type 实际值对齐；新增卡类型时需同步更新
-const CARD_TYPES = ["次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "60次卡", "半年卡", "年卡"]
-const COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
-const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "内部课程", "茶位费", "线下课程", "其他项目"]
+const CARD_TYPES = MEMBERSHIP_CARD_NAMES
+const COURSE_TYPES = Object.keys(LEARNING_PAYMENT_TYPES)
+const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "沙龙技能学习", "茶位费", "线下课程", "其他项目"]
 
 const TYPE_LABELS: Record<string, string> = {
   invitation: "邀约情况",
@@ -44,7 +46,7 @@ const COUNT_OPTIONS = Object.entries(COUNT_OP_LABELS).map(([value, label]) => ({
 
 function getPaymentCategories(c: IdentityCondition): string[] {
   if (c.type === "card") return ["会员卡"]
-  if (c.type === "course") return ["内部课程"]
+  if (c.type === "course") return ["沙龙技能学习"]
   return (c.payment_categories || []).map(category => category === "OH卡诊断" ? "OH卡梳理" : category === "会员活动" ? "会员卡" : category)
 }
 
@@ -75,7 +77,7 @@ function conditionSummary(c: IdentityCondition): string {
     const categories = getPaymentCategories(c)
     const parts: string[] = []
     for (const cat of categories) {
-      if (cat === "会员卡" || cat === "内部课程") {
+      if (cat === "会员卡" || cat === "沙龙技能学习") {
         const subItems = c.items.length > 0 ? c.items.join("或") : `任意${cat}`
         parts.push(`${cat === "会员卡" ? "持有" : "购买"}${c.validity === "active" ? "有效的" : ""}${subItems}${c.validity === "all" ? "（含过期）" : ""}`)
       } else {
@@ -156,7 +158,7 @@ export default function MemberIdentitiesPage() {
     // 兼容旧类型：card/course 自动转为 payment
     const conditions = item.conditions.length > 0 ? item.conditions.map(c => {
       if (c.type === "card") return { ...c, type: "payment" as const, payment_categories: ["会员卡"] }
-      if (c.type === "course") return { ...c, type: "payment" as const, payment_categories: ["内部课程"] }
+      if (c.type === "course") return { ...c, type: "payment" as const, payment_categories: ["沙龙技能学习"] }
       return c
     }) : [defaultCondition()]
     setFormConditions(conditions)
@@ -596,10 +598,10 @@ export default function MemberIdentitiesPage() {
                             </div>
                           )}
 
-                          {/* 内部课程子项 */}
-                          {getPaymentCategories(cond).includes("内部课程") && (
+                          {/* 沙龙技能学习子项 */}
+                          {getPaymentCategories(cond).includes("沙龙技能学习") && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">内部课程</span>
+                              <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">沙龙技能学习</span>
                               <SelectDropdown
                                 value={cond.items[0] || ""}
                                 options={COURSE_TYPES.map(t => ({value: t, label: t}))}
@@ -630,8 +632,8 @@ export default function MemberIdentitiesPage() {
                           )}
 
                           {getPaymentCategories(cond).some(cat => ["粗门次卡", "茶位费", "线下课程"].includes(cat)) && <p className="text-xs text-muted-foreground">按未删除、未取消的交易记录计笔数，不按扣卡次数；不判断有效期。</p>}
-                          {/* 有效期（会员卡或内部课程选中时显示） */}
-                          {getPaymentCategories(cond).some((cat: string) => cat === "会员卡" || cat === "内部课程") && (
+                          {/* 有效期（会员卡或沙龙技能学习选中时显示） */}
+                          {getPaymentCategories(cond).some((cat: string) => cat === "会员卡" || cat === "沙龙技能学习") && (
                             <div className="flex items-center gap-2">
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">有效期</span>
                               <SelectDropdown

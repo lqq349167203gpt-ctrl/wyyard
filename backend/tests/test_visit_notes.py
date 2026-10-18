@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 
 def _create_other_headers(client):
@@ -36,6 +37,33 @@ def _create_visit(client, customer_id: str, **extra):
     return response.json()
 
 
+def test_customer_feedback_is_independent_from_depth_need_and_has_audit_time(client, created_customer):
+    visit = _create_visit(client, created_customer["id"], feedback="原有深度需求")
+    created = client.post("/api/visit-notes", json={
+        "visit_id": visit["id"], "category": "customer_feedback", "content": "客户的课程反馈",
+    })
+    assert created.status_code == 200, created.text
+    note = created.json()
+    assert note["category_label"] == "客户反馈"
+    assert note["feedback_person"] == note["created_by"] == "不闹"
+    assert note["created_at"] and note["updated_at"]
+    row = client.get(f"/api/visits/{visit['id']}").json()
+    assert row["feedback"] == "不闹：原有深度需求"
+    assert "客户的课程反馈" in row["experience"]
+    detail = client.get(f"/api/customer-detail/{created_customer['id']}").json()
+    detail_row = next(item for item in detail["visit_records"] if item["id"] == visit["id"])
+    assert {item["category"] for item in detail_row["visit_notes"]} == {"customer_info", "customer_feedback"}
+    feedback = next(item for item in detail_row["visit_notes"] if item["category"] == "customer_feedback")
+    assert datetime.fromisoformat(feedback["updated_at"]) == datetime.fromisoformat(note["updated_at"])
+    logs = client.get("/api/operation-logs", params={"entity_id": note["id"]}).json()
+    assert any("新增客户反馈" in item["content"] and "客户的课程反馈" in item["content"] for item in logs)
+    assert client.delete(f"/api/visit-notes/{note['id']}").status_code == 200
+    row = client.get(f"/api/visits/{visit['id']}").json()
+    assert row["experience"] == ""
+    assert row["feedback"] == "不闹：原有深度需求"
+    client.delete(f"/api/visits/{visit['id']}")
+
+
 def test_visit_notes_are_collaborative_but_only_creator_can_manage(
     client, created_customer
 ):
@@ -61,10 +89,10 @@ def test_visit_notes_are_collaborative_but_only_creator_can_manage(
             params={"entity_id": first["id"], "method": "POST"},
         ).json()
         assert create_logs
-        assert "新增客户信息" in create_logs[0]["content"]
+        assert "新增深度需求" in create_logs[0]["content"]
         assert "日期：2026-08-23" in create_logs[0]["content"]
         assert "客户最近睡眠不稳定" in create_logs[0]["content"]
-        assert create_logs[0]["after_data"]["category_label"] == "客户信息"
+        assert create_logs[0]["after_data"]["category_label"] == "深度需求"
         assert create_logs[0]["after_data"]["visit_date"] == "2026-08-23"
         assert create_logs[0]["after_data"]["customer_nickname"] == created_customer["nickname"]
 
@@ -143,7 +171,7 @@ def test_visit_notes_are_collaborative_but_only_creator_can_manage(
             params={"entity_id": second["id"], "method": "DELETE"},
         ).json()
         assert delete_logs
-        assert "删除客户信息" in delete_logs[0]["content"]
+        assert "删除深度需求" in delete_logs[0]["content"]
         assert "日期：2026-08-23" in delete_logs[0]["content"]
         assert "已建议观察一周并记录睡眠" in delete_logs[0]["before_data"]["content"]
         remaining = client.get(f"/api/visit-notes?visit_id={visit['id']}").json()

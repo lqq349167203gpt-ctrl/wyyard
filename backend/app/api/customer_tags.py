@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Request
 
 from app.models.customer_tag import CustomerTagAssignmentUpdate, CustomerTagCreate, CustomerTagUpdate
@@ -20,6 +22,7 @@ def _tag_snapshot(tag: dict) -> dict:
     """仅保留操作日志中需要展示的标签字段。"""
     return {
         "name": tag.get("name", ""),
+        "category": tag.get("category", "customer"),
         "scope": tag.get("scope", "private"),
         "description": tag.get("description", ""),
         "enabled": tag.get("enabled", True),
@@ -88,14 +91,26 @@ def _can_manage_public(role: str, permissions: set[str]) -> bool:
 
 
 @router.get("")
-def list_tags(request: Request, include_disabled: bool = False):
-    actor_id, _, _, _ = _require_tag_access(request)
-    return customer_tag_service.list_visible_tags(actor_id, include_disabled=include_disabled)
+def list_tags(request: Request, include_disabled: bool = False, category: Literal["customer", "visit_need"] = "customer"):
+    if category == "visit_need":
+        actor_id, _, role, permissions = _actor(request)
+        if role != "超级管理员" and "customer-tags" not in permissions:
+            from app.api.visit_notes import _require_visit_permission
+
+            _require_visit_permission(request)
+            if not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
+                raise HTTPException(403, "没有查看来访需求的权限")
+            include_disabled = False
+    else:
+        actor_id, _, _, _ = _require_tag_access(request)
+    return customer_tag_service.list_visible_tags(actor_id, include_disabled=include_disabled, category=category)
 
 
 @router.post("")
 def create_tag(data: CustomerTagCreate, request: Request):
     actor_id, actor_name, role, permissions = _require_tag_access(request)
+    if data.category == "visit_need" and not _can_manage_public(role, permissions):
+        raise HTTPException(403, "无权配置来访需求标签")
     if data.scope == "public" and not _can_manage_public(role, permissions):
         raise HTTPException(status_code=403, detail="无权创建公共标签")
     try:

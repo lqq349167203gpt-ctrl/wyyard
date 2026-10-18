@@ -14,6 +14,8 @@ import { X, Upload, Copy, Edit, Eye, Inbox, Plus, Trash2, Download } from "lucid
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { UnifiedPaymentContent } from "@/pages/payment/unified-payment"
+import { CUSTOMER_INCOME_FIELDS } from "@/lib/customer-income"
+import { formatNoteTime } from "@/lib/note-time"
 
 interface HealingRec {
   id: string
@@ -55,10 +57,10 @@ function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
             className="max-w-[150px] shrink-0 truncate text-[12px] text-[#8f959e]"
             title={visitNoteAuthorName(note)}
           >
-            {visitNoteAuthorName(note)}
+            {visitNoteAuthorName(note)}<span className="ml-1 font-normal text-[#c0c4cc]">反馈</span>
           </span>
           <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{note.content}</span>
-          <span className="ml-auto shrink-0 text-right text-[11px] text-[#8f959e]">创建人：{note.created_by || "未知"}</span>
+          <span className="ml-auto shrink-0 text-right text-[11px] text-[#8f959e]"><span className="mr-2 tabular-nums">{formatNoteTime(note.updated_at || note.created_at)}</span>{note.created_by || "未知"}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>
         </div>
       ))}
     </div>
@@ -396,10 +398,11 @@ export default function DetailView({
     (!access || access.sensitive_fields.trauma_history) && ["创伤经历", c.basic_info || ""],
     (!access || access.sensitive_fields.current_block) && ["当下卡点", c.assessment || c.core_situation || ""],
     (!access || access.sensitive_fields.work_info) && ["工作情况", workInfo],
+    ...(!access || access.sensitive_fields.work_info ? CUSTOMER_INCOME_FIELDS.map(field => [field.label, c[field.key] || ""]) : []),
     (!access || access.sensitive_fields.other_info) && ["其他信息", c.other_info || ""],
   ].filter(Boolean) as [string, string][]
   const todayStr = new Date().toLocaleDateString("sv-SE")
-  // 次数余量摘要：余量为 0 或已过期的项目不显示；内部课程按不限次展示
+  // 次数余量摘要：余量为 0 或已过期的项目不显示；沙龙技能学习按不限次展示
   const remainSummary = (detail?.purchase_summary || [])
     .filter(s => {
       if (s.voided) return false
@@ -490,6 +493,7 @@ export default function DetailView({
             </div>
             <div className="border-t border-[#f0f0f0] pt-2">
               <div className="mb-1.5 text-[12px] text-[#a8b1bd]">客户标签</div>
+              <div className="mb-2 flex items-center gap-2 text-[12px]"><span className="text-[#a8b1bd]">客户质量</span><span className="rounded border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[#646a73]">{c.customer_quality || "正常"}</span></div>
               <div className="flex min-w-0 flex-wrap gap-1.5">
                 {customerTags.length > 0 ? customerTags.map(tag => (
                   <span key={tag.id} className="inline-flex max-w-[108px] items-center rounded-full border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[10.5px] font-normal text-[#646a73]">
@@ -591,7 +595,7 @@ export default function DetailView({
                   ? s.remaining
                   : (s.effective_remaining !== undefined ? s.effective_remaining : s.remaining)
                 const effTotal = s.total_purchased
-                const unlimited = s.remaining === "不限" || s.total_purchased === "不限" || s.type === "内部课程" || s.type === "线下落地课程"
+                const unlimited = s.remaining === "不限" || s.total_purchased === "不限" || s.type === "沙龙技能学习" || s.type === "线下落地课程"
                 return (
                 <div key={i} className="pt-[7px] pb-[9px] border-b border-[#f3f4f5] last:border-b-0">
                   <div className="flex items-baseline justify-between gap-2 mb-[5px] text-[12px]">
@@ -657,7 +661,7 @@ export default function DetailView({
                 { key: "communication" as const, label: "沟通记录", cnt: commRecords.length },
                 { key: "activities" as const, label: "活动记录", cnt: (detail?.activities || []).length },
                 { key: "purchase" as const, label: "卡次统计", cnt: null as number | null },
-                { key: "offline_course" as const, label: "线下落地课程", cnt: (detail?.offline_course_records || []).length },
+                { key: "offline_course" as const, label: "技能训练课程", cnt: (detail?.offline_course_records || []).length },
                 { key: "payment" as const, label: "交易记录", cnt: (detail?.payment_records || []).length },
               ].filter(tab => {
                 if (!access) return true
@@ -742,6 +746,7 @@ export default function DetailView({
                   const visitNeedNotes = (v.visit_notes || []).filter(note => note.category === "visit_need")
                   const followUpNotes = (v.visit_notes || []).filter(note => note.category === "follow_up")
                   const customerInfoNotes = (v.visit_notes || []).filter(note => note.category === "customer_info")
+                  const customerFeedbackNotes = (v.visit_notes || []).filter(note => note.category === "customer_feedback")
                   return (
                   <div key={v.id} className="mb-[9px] rounded-[4px] border-[0.5px] border-[#eef0f1] bg-[#fafbfc] px-3.5 py-2.5 last:mb-0">
                     <div className="mb-2 flex items-center gap-2">
@@ -774,10 +779,12 @@ export default function DetailView({
                     <div className="grid grid-cols-[64px_1fr] gap-x-3 gap-y-1.5">
                       <span className="text-[12px] text-[#a8b1bd] pt-px">来访需求</span>
                       <VisitNoteRows notes={visitNeedNotes} />
-                      <span className="text-[12px] text-[#a8b1bd] pt-px">客户信息</span>
+                      <span className="text-[12px] text-[#a8b1bd] pt-px">深度需求</span>
                       <VisitNoteRows notes={customerInfoNotes} />
                       <span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span>
                       <VisitNoteRows notes={followUpNotes} />
+                      <span className="pt-px text-[12px] text-[#a8b1bd]">客户反馈</span>
+                      <VisitNoteRows notes={customerFeedbackNotes} />
                     </div>
                   </div>
                   )
@@ -867,7 +874,7 @@ export default function DetailView({
               { key: "gcs", label: "觉醒游戏" },
               { key: "ers", label: "情绪释放" },
               { key: "eks", label: "能量结" },
-              { key: "ics", label: "内部课程" },
+              { key: "ics", label: "沙龙技能学习" },
               { key: "withdrawn", label: "退课" },
             ]
             const activitySummary = summaryDefaults.map(item => {
@@ -1210,7 +1217,7 @@ export default function DetailView({
                   else noteParts.push("不限")
                   noteParts.push(...cardDeductions)
                   if (totalManual > 0) noteParts.push(`销卡${totalManual}次`)
-                  if (icDeduct > 0) noteParts.push(`内部课程抵扣${icDeduct}次`)
+                  if (icDeduct > 0) noteParts.push(`沙龙技能学习抵扣${icDeduct}次`)
                   return (
                     <div className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px]">
                       <div className="flex items-baseline gap-[10px] pb-[7px]">
@@ -1306,12 +1313,12 @@ export default function DetailView({
                             return (
                               <div key={pi} className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
                                 <span className="text-[12.5px] text-[#212631] truncate">
-                                  {s.type === "内部课程" ? p.name
+                                  {s.type === "沙龙技能学习" ? p.name
                                     : s.type === "其他项目" ? <>{p.name}<span className="text-[12px] text-[#a8b1bd] ml-[5px]">{s.activity_mode || "线下"}</span></>
                                     : `购买 ${p.purchase_count} 次`}
                                 </span>
                                 <span className="text-[12px] text-[#8f959e] tabular-nums">
-                                  {s.type === "内部课程"
+                                  {s.type === "沙龙技能学习"
                                     ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
                                     : <><b className="text-[12.5px] font-semibold text-[#212631]">{rem}</b> / {p.purchase_count}</>
                                   }
@@ -1323,12 +1330,12 @@ export default function DetailView({
                           }) : (
                             <div className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
                               <span className="text-[12.5px] text-[#212631] truncate">
-                                {s.type === "内部课程" ? s.name
+                                {s.type === "沙龙技能学习" ? s.name
                                   : s.type === "其他项目" ? <>{s.name}<span className="text-[12px] text-[#a8b1bd] ml-[5px]">{s.activity_mode || "线下"}</span></>
                                   : s.name}
                               </span>
                               <span className="text-[12px] text-[#8f959e] tabular-nums">
-                                {s.type === "内部课程"
+                                {s.type === "沙龙技能学习"
                                   ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
                                   : s.type === "线下落地课程"
                                     ? <><b className="text-[12.5px] font-semibold text-[#212631]">{s.validity_value || 1} 个月</b></>
@@ -1363,7 +1370,7 @@ export default function DetailView({
             )
           })()}
 
-          {/* 线下落地课程 */}
+          {/* 技能训练课程 */}
           {activeTab === "offline_course" && (() => {
             const courseRecords = detail?.offline_course_records || []
             const pageSize = 5

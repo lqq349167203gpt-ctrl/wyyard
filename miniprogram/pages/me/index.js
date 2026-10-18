@@ -42,11 +42,20 @@ Page({
       canCourseRecords: app.checkPagePermission('course-statistics'),
       canAuditCheck: app.checkPagePermission('audit-check'),
       canPrincipal: app.checkPagePermission('principal'),
+      canActivityCheckin: app.checkPagePermission('activity-checkin'),
     })
   },
 
   onPaymentTap() {
     wx.navigateTo({ url: '/pages/payment/index' })
+  },
+
+  onMemberViewTap() {
+    wx.navigateTo({ url: '/pages/member-view/index' })
+  },
+
+  onActivityCheckinTap() {
+    wx.navigateTo({ url: '/pages/activity-checkin/index' })
   },
 
   onCommRecordsTap() {

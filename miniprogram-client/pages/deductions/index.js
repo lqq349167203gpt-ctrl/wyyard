@@ -14,7 +14,7 @@ const TYPE_LABELS = {
   'emotional-releases': '情绪释放',
   'oh-card-readings': 'OH卡诊断',
   'energy-knots': '能量结',
-  'internal-courses': '内部课程',
+  'internal-courses': '沙龙技能学习',
   'other-projects': '其他项目',
 }
 

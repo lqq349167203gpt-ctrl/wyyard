@@ -7,6 +7,7 @@ from app.models.base import SafeBaseModel, StrictBaseModel
 
 
 class CustomerTagCreate(StrictBaseModel):
+    category: Literal["customer", "visit_need"] = "customer"
     name: str = Field(min_length=1, max_length=30)
     scope: Literal["public", "private"] = "private"
     description: str = Field(default="", max_length=200)
@@ -19,6 +20,7 @@ class CustomerTagUpdate(StrictBaseModel):
 
 
 class CustomerTag(SafeBaseModel):
+    category: Literal["customer", "visit_need"] = "customer"
     id: str
     name: str
     scope: Literal["public", "private"]

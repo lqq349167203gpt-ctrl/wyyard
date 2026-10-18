@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from app.models.internal_course import InternalCourse, InternalCourseCreate
 from app.services import customer_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.learning_course_types import COURSE_DURATION_MONTHS
 
 FILENAME = "internal_courses.json"
 _courses: Dict[str, InternalCourse] = {}
@@ -41,12 +42,7 @@ _load()
 
 def _calc_expiry(effective_date: str, course_type: str) -> Optional[str]:
     """根据课程类型自动计算到期日期"""
-    durations = {
-        "疗愈师课程：自爱力构建": 12,  # 1年
-        "商业框架陪跑：自觉力提升": 3,   # 3个月
-        "落地赋能班：自洽力整合": 24,    # 2年
-    }
-    months = durations.get(course_type)
+    months = COURSE_DURATION_MONTHS.get(course_type)
     if not months:
         return None
     try:
@@ -62,7 +58,7 @@ def list_courses() -> List[InternalCourse]:
 
 
 def get_active_course(customer_id: str, usage_date: Optional[str] = None) -> Optional[InternalCourse]:
-    """返回客户指定日期生效的内部课程权益，多个权益时优先使用最早到期的一项。"""
+    """返回客户指定日期生效的沙龙技能学习权益，多个权益时优先使用最早到期的一项。"""
     target_date = usage_date or datetime.now().strftime("%Y-%m-%d")
     from app.services.project_refund_service import is_project_refunded
     active = [
@@ -80,7 +76,7 @@ def get_active_course(customer_id: str, usage_date: Optional[str] = None) -> Opt
 
 
 def has_active_course(customer_id: str, usage_date: Optional[str] = None) -> bool:
-    """判断用户在指定日期是否有有效期内的内部课程。"""
+    """判断用户在指定日期是否有有效期内的沙龙技能学习。"""
     return get_active_course(customer_id, usage_date) is not None
 
 
@@ -114,10 +110,12 @@ def update_course(course_id: str, data: dict) -> Optional[InternalCourse]:
     course = _courses.get(course_id)
     if not course or course.is_deleted:
         return None
+    recalculate_expiry = any(key in data and data[key] != getattr(course, key) for key in ("effective_date", "course_type"))
     for key, value in data.items():
-        if hasattr(course, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at"):
+        if hasattr(course, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at", "expiry_date"):
             setattr(course, key, value)
-    course.expiry_date = _calc_expiry(course.effective_date, course.course_type)
+    if recalculate_expiry:
+        course.expiry_date = _calc_expiry(course.effective_date, course.course_type)
     course.updated_at = datetime.now(timezone.utc)
     _courses[course_id] = course
     _save(course_id)

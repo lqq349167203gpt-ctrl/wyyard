@@ -329,7 +329,7 @@ def record_customer_feedback(customer_name: str, feedback: str) -> str:
     operator = _ctx_var.get().get("operator", "")
     visit_note_service.create_note(
         visit.id,
-        "customer_info",
+        "customer_feedback",
         feedback,
         creator=operator or "AI 助手",
     )

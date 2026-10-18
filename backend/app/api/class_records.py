@@ -33,7 +33,8 @@ from app.utils.request_roles import get_request_roles
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
 
 ACTIVITY_NOTE_CATEGORY_LABELS = {
-    "customer_info": "客户信息",
+    "customer_info": "深度需求",
+    "customer_feedback": "客户反馈",
     "follow_up": "跟进点",
 }
 ACTIVITY_NOTE_SOURCE_LABELS = {
@@ -41,7 +42,7 @@ ACTIVITY_NOTE_SOURCE_LABELS = {
     "group_case": "觉醒游戏",
     "emotional_release": "情绪释放",
     "energy_knot": "能量结",
-    "internal_course": "内部课程",
+    "internal_course": "沙龙技能学习",
 }
 
 
@@ -82,7 +83,7 @@ def _private_visit_need_map(request: Request | None, visit_ids: list[str]) -> di
         if note.category != "visit_need":
             continue
         creator = note.created_by or "未知"
-        result.setdefault(note.visit_id, []).append(f"{creator}：{note.content}")
+        result.setdefault(note.visit_id, []).append(f"{creator}：{visit_note_service.display_content(note)}")
     return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
 
 
@@ -1100,6 +1101,7 @@ def read_day_courses(date: str, space_id: str = "", request: Request = None, *, 
             ("energy_knot", eks_dicts),
             ("internal_course", ics_dicts),
         )
+        active_ids_by_course: list[tuple[dict, set[str]]] = []
         for activity_source, activity_rows in activity_note_rows:
             for activity in activity_rows:
                 withdrawn_ids = set(activity.get("withdrawn_participant_ids", []) or [])
@@ -1115,14 +1117,14 @@ def read_day_courses(date: str, space_id: str = "", request: Request = None, *, 
                     and owner_id not in withdrawn_ids
                 ):
                     active_ids.add(owner_id)
-                completed_ids = activity_participant_note_service.completed_customer_ids(
-                    activity_source,
-                    activity["id"],
-                )
-                activity["participant_note_total_count"] = len(active_ids)
-                activity["participant_note_completed_count"] = len(
-                    active_ids.intersection(completed_ids)
-                )
+                active_ids_by_course.append((activity, active_ids))
+        completed_ids = activity_participant_note_service.completed_customer_ids_for_day(
+            date,
+            set().union(*(active_ids for _, active_ids in active_ids_by_course)),
+        )
+        for activity, active_ids in active_ids_by_course:
+            activity["participant_note_total_count"] = len(active_ids)
+            activity["participant_note_completed_count"] = len(active_ids.intersection(completed_ids))
 
     return {
         "class_records": cr_dicts,

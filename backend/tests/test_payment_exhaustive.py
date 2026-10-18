@@ -58,6 +58,7 @@ class TestMembershipCardCreate:
             "customer_id": created_customer["id"],
             "nickname": created_customer["nickname"],
             "card_type": "常规通卡",
+            "agreement_status": "unsigned",
             "price": 3999.0,
             "effective_date": "2026-05-01",
             "remaining_count": 20,
@@ -71,6 +72,7 @@ class TestMembershipCardCreate:
             "customer_id": created_customer["id"],
             "nickname": created_customer["nickname"],
             "card_type": "半年卡",
+            "agreement_status": "unsigned",
             "price": 5999.0,
             "effective_date": "2026-05-01",
         })
@@ -82,6 +84,7 @@ class TestMembershipCardCreate:
             "customer_id": created_customer["id"],
             "nickname": created_customer["nickname"],
             "card_type": "年卡",
+            "agreement_status": "unsigned",
             "price": 9999.0,
             "effective_date": "2026-05-01",
         })
@@ -94,6 +97,7 @@ class TestMembershipCardCreate:
                 "customer_id": created_customer["id"],
                 "nickname": created_customer["nickname"],
                 "card_type": "常规通卡",
+                "agreement_status": "unsigned",
                 "price": 100.0,
                 "effective_date": "2026-05-01",
                 "remaining_count": count,
@@ -150,6 +154,7 @@ class TestMembershipCardCreate:
             "customer_id": created_customer["id"],
             "nickname": created_customer["nickname"],
             "card_type": "常规通卡",
+            "agreement_status": "unsigned",
             "price": 3999.0,
             "effective_date": "2026-05-01",
             "expiry_date": "2027-05-01",
@@ -189,9 +194,9 @@ class TestMembershipCardUpdate:
 
     def test_update_card_type(self, client, created_customer):
         cid = self._create(client, created_customer)
-        resp = client.patch(f"/api/membership-cards/{cid}", json={"card_type": "年卡"})
+        resp = client.patch(f"/api/membership-cards/{cid}", json={"card_type": "年卡", "agreement_status": "unsigned"})
         assert resp.status_code == 200
-        assert resp.json()["card_type"] == "年卡"
+        assert resp.json()["card_type"] == "定制化"
 
     def test_update_effective_date(self, client, created_customer):
         cid = self._create(client, created_customer)

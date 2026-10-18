@@ -40,6 +40,16 @@ def count_customer_visits(customer_id: str) -> int:
     return len(dates)
 
 
+def first_arrival_dates(customer_ids: set[str]) -> dict[str, str]:
+    """按实际到店记录判定首次到店日，供各端按邀约当天区分新老客户。"""
+    result: dict[str, str] = {}
+    for visit in _visits.values():
+        if visit.customer_id not in customer_ids or visit.is_deleted or visit.cancelled or not visit.arrived:
+            continue
+        result[visit.customer_id] = min(result.get(visit.customer_id, visit.visit_date), visit.visit_date)
+    return result
+
+
 def count_customer_invitations(customer_id: str) -> int:
     """统计某个客户的有效受邀次数（不含已删除、已取消）"""
     return sum(
@@ -205,7 +215,7 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
             elif cid in s.participant_ids:
                 result[cid].append(ActivityInfo(name="能量结", role=_role(cid), type="能量结", owner_name=s.owner_name or ""))
 
-    # 5. 内部课程（teacher > participant）
+    # 5. 沙龙技能学习（teacher > participant）
     for s in internal_course_session_service.list_sessions(date):
         teacher_names = "、".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         all_ids = set(s.teacher_ids) | set(s.participant_ids)
@@ -447,7 +457,7 @@ def count_arrived_chargeable_activities(customer_id: str) -> int:
 
 
 def current_remaining_by_customer(customer_ids: set[str]) -> dict[str, int]:
-    """邀约统一余量口径：有效卡合计，不扣历史欠卡，保留内部课程不限次权益。"""
+    """邀约统一余量口径：有效卡合计，不扣历史欠卡，保留沙龙技能学习不限次权益。"""
     from app.services import internal_course_service, membership_card_service
 
     if not customer_ids:
@@ -774,7 +784,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
 
 def update_collaboration_summary(visit_id: str, field: str, value: str) -> Optional[VisitRecord]:
     """更新多人协作记录的兼容汇总字段，不触发邀约业务状态校验。"""
-    if field not in {"needs", "feedback", "healing_notes"}:
+    if field not in {"needs", "feedback", "healing_notes", "experience"}:
         raise ValueError("不支持的协作汇总字段")
     with _visit_lock:
         record = _visits.get(visit_id)
@@ -828,7 +838,7 @@ def _deduct_for_arrival(visit):
                     membership_card_service.get_activity_deduction_count(s),
                 )
 
-        # 能量结和内部课程不产生会员卡扣卡，无需参与到店同步。
+        # 能量结和沙龙技能学习不产生会员卡扣卡，无需参与到店同步。
         for cr in class_record_service.list_records(date=date):
             if not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
@@ -864,7 +874,7 @@ def _restore_for_arrival(visit):
             if cid in chargeable:
                 membership_card_service._do_sync_activity_count(cid, f"ers:{s.id}", 0)
 
-        # 能量结和内部课程不产生会员卡扣卡，无需参与到店同步。
+        # 能量结和沙龙技能学习不产生会员卡扣卡，无需参与到店同步。
         for cr in class_record_service.list_records(date=date):
             if not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
@@ -983,7 +993,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理能量结记录失败 customer=%s date=%s", customer_id, date)
 
-    # 内部课程：teacher_ids, participant_ids
+    # 沙龙技能学习：teacher_ids, participant_ids
     try:
         for s in internal_course_session_service.list_sessions(date=date):
             changed = False
@@ -997,7 +1007,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if changed:
                 internal_course_session_service._save(s.id)
     except Exception:
-        logger.exception("清理内部课程记录失败 customer=%s date=%s", customer_id, date)
+        logger.exception("清理沙龙技能学习记录失败 customer=%s date=%s", customer_id, date)
 
     # 统一保存扣费/欠费数据
     membership_card_service._save_deductions()

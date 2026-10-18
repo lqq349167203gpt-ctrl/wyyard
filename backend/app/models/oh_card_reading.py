@@ -1,12 +1,23 @@
 from datetime import datetime
 from typing import List, Optional
 
-from app.models.base import SafeBaseModel
+from pydantic import field_validator
+
+from app.models.payment_course import PaymentCourseFields
+from app.utils.payment_types import OH_READING_TYPES
 
 
-class OhCardReadingBase(SafeBaseModel):
+class OhCardReadingBase(PaymentCourseFields):
     customer_id: str
     nickname: str
+    reading_type: str = ""  # 旧记录未设置子类时保留为空
+
+    @field_validator("reading_type")
+    @classmethod
+    def validate_reading_type(cls, value: str) -> str:
+        if value and value not in OH_READING_TYPES:
+            raise ValueError("请选择有效的OH卡诊断类型")
+        return value
     purchase_count: int = 1  # 固定为1，录入即完成
     diagnosis_duration: int = 1  # 诊断时长（半小时为单位），默认1=0.5小时
     amount: float = 298.0  # 默认298

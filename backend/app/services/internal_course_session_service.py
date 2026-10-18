@@ -53,22 +53,22 @@ def get_session(session_id: str) -> Optional[InternalCourseSession]:
 
 
 def _get_chargeable_ids(session) -> set:
-    """内部课程全部免费，不产生会员卡扣费人员。"""
+    """沙龙技能学习全部免费，不产生会员卡扣费人员。"""
     return set()
 
 
 def _deduct_for_session(session):
-    """内部课程不扣卡，无需写入扣卡与欠卡数据。"""
+    """沙龙技能学习不扣卡，无需写入扣卡与欠卡数据。"""
     return None
 
 
 def _restore_for_session(session):
-    """内部课程不扣卡，删除时无需恢复扣卡数据。"""
+    """沙龙技能学习不扣卡，删除时无需恢复扣卡数据。"""
     return None
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
-    """内部课程不扣卡，参与人员变化无需同步扣卡数据。"""
+    """沙龙技能学习不扣卡，参与人员变化无需同步扣卡数据。"""
     return None
 
 

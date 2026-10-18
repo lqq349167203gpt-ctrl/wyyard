@@ -1,3 +1,4 @@
+<import src="../../templates/note-feedback-meta.wxml" />
 <!-- 弹层打开时锁住页面滚动，避免上下滑动带动背景 -->
 <page-meta page-style="{{condSheet || showSaveRule || detail || teacherDetail || columnSheetOpen || sortSheetOpen || dealSheet || panelSheet || recordSheet ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="invite-tools-overlay" wx:if="{{inviteToolMenuOpen}}" catchtap="closeInviteToolMenu" catchtouchmove="noop"></view>
@@ -226,7 +227,7 @@
       <view class="teacher-day-head"><view class="teacher-day-date"><view class="teacher-day-mark"></view><text>{{day.shortDate}} {{day.weekday}}</text></view><text class="teacher-day-count">{{day.teacherCount}} 位老师 · {{day.courseCount}} 门课</text></view>
       <view class="teacher-group" wx:for="{{day.teachers}}" wx:key="id" wx:for-item="teacher">
         <view class="teacher-group-head">
-          <view class="teacher-group-summary"><text class="teacher-group-name">{{teacher.name}}</text><view class="teacher-group-stats"><text class="teacher-group-stat">客户信息 <text class="{{teacher.infoMissing ? 'teacher-pending' : ''}}">{{teacher.info}}/{{teacher.total}}</text></text><text class="teacher-group-stat">跟进点 <text class="{{teacher.pointMissing ? 'teacher-pending' : ''}}">{{teacher.point}}/{{teacher.total}}</text></text></view><text class="teacher-group-meta">{{teacher.courseCount}} 门课 · {{teacher.total}} 人次</text></view>
+          <view class="teacher-group-summary"><text class="teacher-group-name">{{teacher.name}}</text><view class="teacher-group-stats"><text class="teacher-group-stat">深度需求 <text class="{{teacher.infoMissing ? 'teacher-pending' : ''}}">{{teacher.info}}/{{teacher.total}}</text></text><text class="teacher-group-stat">跟进点 <text class="{{teacher.pointMissing ? 'teacher-pending' : ''}}">{{teacher.point}}/{{teacher.total}}</text></text></view><text class="teacher-group-meta">{{teacher.courseCount}} 门课 · {{teacher.total}} 人次</text></view>
         </view>
         <view class="teacher-courses">
           <view class="teacher-course" wx:for="{{teacher.courses}}" wx:key="id" wx:for-item="course">
@@ -234,8 +235,14 @@
             <view class="teacher-person" wx:for="{{course.rows}}" wx:key="id" wx:for-item="person">
               <view class="teacher-person-head"><text class="teacher-person-name" data-id="{{person.customer_id}}" data-course="{{person.course_id}}" bindtap="openParticipantProfile">{{person.customer}}</text><text wx:if="{{person.ownerFirst}}" class="teacher-owner">案主</text></view>
               <view class="teacher-feedback" wx:for="{{person.feedback}}" wx:key="index" wx:for-item="feedback" wx:for-index="fi" data-id="{{person.id}}" bindtap="openTeacherDetail">
-                <text class="teacher-feedback-label">{{fi === 0 ? '来访需求' : fi === 1 ? '客户信息' : '跟进点'}}</text>
-                <text class="teacher-feedback-text {{expandCells ? 'expanded' : ''}}" wx:if="{{feedback}}">{{feedback}}</text>
+                <text class="teacher-feedback-label">{{fi === 0 ? '来访需求' : fi === 1 ? '深度需求' : fi === 2 ? '跟进点' : '客户反馈'}}</text>
+                <view class="note-feedback-summary" wx:if="{{fi === 2 && person.followUpEntries.length}}">
+                  <view class="note-feedback-entry" wx:for="{{person.followUpEntries}}" wx:for-item="entry" wx:key="index">
+                    <template is="note-feedback-meta" data="{{author: entry.author, nextFollowUpText: entry.nextFollowUpText}}" />
+                    <text class="teacher-feedback-text {{expandCells ? 'expanded' : ''}}">{{entry.content}}</text>
+                  </view>
+                </view>
+                <text class="teacher-feedback-text {{expandCells ? 'expanded' : ''}}" wx:elif="{{feedback}}">{{feedback}}</text>
                 <text class="teacher-empty-dash" wx:else>—</text>
               </view>
             </view>
@@ -366,10 +373,10 @@
     <view class="teacher-dialog-section" wx:for="{{teacherDetail.sections}}" wx:key="label" wx:for-item="section">
       <text class="teacher-dialog-label">{{section.label}}</text>
       <view class="teacher-dialog-entry" wx:for="{{section.entries}}" wx:key="index" wx:for-item="entry">
-        <view class="teacher-dialog-head"><text>反馈人：{{entry.author || teacherDetail.teachers}}</text><text>{{entry.atText}} {{entry.created_by ? '创建人：' + entry.created_by : ''}}</text></view>
+        <view class="teacher-dialog-head"><view class="note-feedback-author"><template is="note-feedback-meta" data="{{author: entry.author || teacherDetail.teachers, nextFollowUpText: entry.nextFollowUpText}}" /></view><text>{{entry.atText}} <text wx:if="{{entry.created_by}}">{{entry.created_by}}<text class="attribution-action">创建</text></text></text></view>
         <text class="teacher-dialog-content">{{entry.content}}</text>
       </view>
-      <view class="teacher-dialog-entry" wx:if="{{!section.entries.length}}"><view class="teacher-dialog-head" wx:if="{{section.fallback}}"><text>反馈人：{{teacherDetail.teachers}}</text><text>创建人：{{section.creators || '未记录'}}</text></view><text class="teacher-dialog-content">{{section.fallback || '—'}}</text></view>
+      <view class="teacher-dialog-entry" wx:if="{{!section.entries.length}}"><view class="teacher-dialog-head" wx:if="{{section.fallback}}"><text>{{teacherDetail.teachers}}<text class="attribution-action">反馈</text></text><text wx:if="{{section.creators}}">{{section.creators}}<text class="attribution-action">创建</text></text><text wx:else>未记录</text></view><text class="teacher-dialog-content">{{section.fallback || '—'}}</text></view>
     </view>
   </scroll-view></view></view>
 

@@ -27,6 +27,7 @@ from app.services import (
     visit_service,
 )
 from app.services.chat_parser import _escape_xml
+from app.utils.learning_course_types import PAYMENT_COURSE_TYPES
 
 ACTION_LABELS = {
     "create_customer": "新建客户",
@@ -35,7 +36,7 @@ ACTION_LABELS = {
     "create_group_case": "觉醒游戏",
     "create_emotional_release": "情绪释放",
     "create_energy_knot": "能量结",
-    "create_internal_course": "内部课程",
+    "create_internal_course": "沙龙技能学习",
     "create_other_project": "其他项目",
 }
 
@@ -100,7 +101,7 @@ ENTRY_PROMPT = """你是"无忧茶院"后台管理系统的 AI 数据录入助�
 字段：
 - customer_id（必填）— 客户ID
 - nickname（必填）— 客户昵称
-- card_type（必填）— 卡类型（体验会员/常规通卡/半年卡/年卡）
+- card_type（必填）— 卡类型（次卡/体验会员/30次卡/60次卡/定制化）；定制化需询问次数和有效期，不得代填
 - agreement_status — 除次卡和体验会员外必填：unsigned（未签）或 signed（已签），必须询问用户，不得代选
 - price（必填）— 价格
 - effective_date（必填）— 生效日期，格式 YYYY-MM-DD，默认今天
@@ -134,12 +135,12 @@ ENTRY_PROMPT = """你是"无忧茶院"后台管理系统的 AI 数据录入助�
 - amount（可选）— 金额
 - closer_name（可选）— 成交人
 
-### 7. create_internal_course — 内部课程
-识别关键词：内部课程、买了课程、疗愈师课程、商业框架、落地赋能
+### 7. create_internal_course — 沙龙技能学习
+识别关键词：沙龙技能学习、买了课程、疗愈师课程、商业框架、落地赋能
 字段：
 - customer_id（必填）— 客户ID
 - nickname（必填）— 客户昵称
-- course_type（必填）— 课程类型（疗愈师课程：自爱力构建/商业框架陪跑：自觉力提升/落地赋能班：自洽力整合）
+- course_type（必填）— 课程类型（__LEARNING_PAYMENT_TYPES__）
 - price（必填）— 价格
 - effective_date（必填）— 生效日期，格式 YYYY-MM-DD，默认今天
 - closer_name（可选）— 成交人
@@ -191,7 +192,7 @@ ENTRY_PROMPT = """你是"无忧茶院"后台管理系统的 AI 数据录入助�
 3. 可选字段缺失时，在 missing_optional 中列出，并在 message 中询问是否需要补充
 4. 日期类字段如果用户没说，默认用今天日期
 5. 客户匹配到多个候选时，在 customer_candidates 中全部列出，让用户选择
-6. 如果用户说"不需要"或"跳过"，说明是在回复之前关于可选字段的询问"""
+6. 如果用户说"不需要"或"跳过"，说明是在回复之前关于可选字段的询问""".replace("__LEARNING_PAYMENT_TYPES__", "/".join(PAYMENT_COURSE_TYPES))
 
 
 def _build_customer_list() -> str:
@@ -462,7 +463,7 @@ def _execute_create_internal_course(data: Dict[str, Any]) -> Dict[str, Any]:
     course = internal_course_service.create_course(create_data)
     return {
         "success": True,
-        "message": f"已录入内部课程：{course.nickname} {course.course_type}",
+        "message": f"已录入沙龙技能学习：{course.nickname} {course.course_type}",
         "id": course.id,
     }
 

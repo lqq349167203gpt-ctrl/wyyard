@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from app.models.customer import Customer, CustomerCreate, CustomerUpdate
-from app.services.storage import load_data, save_data, save_item
+from app.services.storage import commit_pending_writes, load_data, save_data, save_item
 
 FILENAME = "customers.json"
 _customers: Dict[str, Customer] = {}
@@ -153,6 +153,28 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
         except Exception:
             pass
     return customer
+
+
+def bulk_update_profiles(customer_ids: list[str], changes: dict) -> list[Customer]:
+    """全部校验后单事务提交；失败时不留下半批数据或污染内存。"""
+    if not changes or not set(changes).issubset({"customer_quality", "service_teacher"}):
+        raise ValueError("批量修改字段不正确")
+    validated = CustomerUpdate.model_validate(changes).model_dump(exclude_unset=True)
+    with _customer_lock:
+        updated = []
+        now = datetime.now(timezone.utc)
+        for customer_id in customer_ids:
+            customer = _customers.get(customer_id)
+            if not customer or customer.is_deleted:
+                raise ValueError("客户不存在或已停用")
+            updated.append(customer.model_copy(update={**validated, "updated_at": now})
+                           if any(getattr(customer, key) != value for key, value in validated.items()) else customer)
+        writes = [("item", FILENAME, customer.id, customer.model_dump(mode="json"))
+                  for customer in updated if customer is not _customers[customer.id]]
+        if writes:
+            commit_pending_writes(writes)
+            _customers.update({customer.id: customer for customer in updated})
+        return updated
 
 
 def _cleanup_customer_from_activities(customer_id: str):

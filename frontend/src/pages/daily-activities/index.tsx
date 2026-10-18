@@ -32,6 +32,7 @@ import { LoadError } from "@/components/load-error"
 import { activityHistoryApi, type ActivityHistoryRecord } from "@/lib/api"
 import { POSITION_ENERGY_TEACHER, POSITION_COURSE_TEACHER } from "@/lib/positions"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { LEARNING_ACTIVITY_OPTIONS } from "@/lib/learning-course-types"
 
 // ===== Date utilities =====
 
@@ -52,8 +53,7 @@ function formatDateChinese(d: string): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 星期${getWeekday(d)}`
 }
 
-const ICS_COURSE_TYPES = ["疗愈师课程", "商业框架陪跑", "落地赋能班"]
-const ICS_COURSE_LABELS: Record<string, string> = { "疗愈师课程": "疗愈师", "商业框架陪跑": "陪跑", "落地赋能班": "赋能班" }
+const ICS_COURSE_TYPES = LEARNING_ACTIVITY_OPTIONS.map(option => option.value)
 
 function isDepleted(remaining: number | undefined): boolean {
   return remaining !== undefined && remaining !== -1 && remaining <= 0
@@ -1045,7 +1045,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
-          <DialogTitle className="text-[15px]">{editingRecord ? "编辑内部课程" : "新增内部课程"}</DialogTitle>
+          <DialogTitle className="text-[15px]">{editingRecord ? "编辑沙龙技能学习" : "新增沙龙技能学习"}</DialogTitle>
         </DialogHeader>
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
@@ -1084,7 +1084,7 @@ const IcsDialog = memo(({ open, date, spaces, teachers, session, defaultSpaceId,
             <span className="text-[12px] text-[#8f959e] text-right">课程类型</span>
             <SelectDropdown rounded="[2px]"
               value={formCourseType}
-              options={ICS_COURSE_TYPES.map(t => ({value: t, label: ICS_COURSE_LABELS[t] || t}))}
+              options={LEARNING_ACTIVITY_OPTIONS}
               onChange={(v) => setFormCourseType(v)}
             />
           </div>
@@ -1683,9 +1683,15 @@ export default function DailyActivitiesPage() {
       return formatDate(addDays(stored ? new Date(stored) : new Date(), -7))
     } catch { return formatDate(addDays(new Date(), -7)) }
   })
-  const [loading, setLoading] = useState(true)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(true)
+  const [detailError, setDetailError] = useState("")
+  const [loadedScope, setLoadedScope] = useState<{ date: string; spaceId: string } | null>(null)
+  const loadedScopeRef = useRef(loadedScope)
+  loadedScopeRef.current = loadedScope
   const [allCustomers, setAllCustomers] = useState<CustomerLight[]>([])
+  const allCustomersRef = useRef(allCustomers)
+  allCustomersRef.current = allCustomers
+  const customersLoadRef = useRef<Promise<CustomerLight[]> | null>(null)
   const [courses, setCourses] = useState<{id: string, name: string}[]>([])
   const [allCourseTypes, setAllCourseTypes] = useState<CourseType[]>([])
   const [configurationError, setConfigurationError] = useState("")
@@ -1761,11 +1767,16 @@ export default function DailyActivitiesPage() {
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
   const [cloudHistory, setCloudHistory] = useState<HistoryEntry[]>([])
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState("")
   const [previewEntry, setPreviewEntry] = useState<HistoryEntry | null>(null)
   const restoreRef = useRef<((entry: HistoryEntry) => Promise<void>) | null>(null)
   const captureRef = useRef<(() => void) | null>(null)
   const flushPendingSavesRef = useRef<(() => Promise<void>) | null>(null)
   const loadSeqRef = useRef(0)
+  const reloadCurrentDateRef = useRef<() => void>(() => {})
+  const reloadCurrentDate = useCallback(() => reloadCurrentDateRef.current(), [])
+  const scopeChanging = !loadedScope || loadedScope.date !== detailDate || loadedScope.spaceId !== selectedSpaceId
 
   const handleUndoRedoChange = useCallback((cu: boolean, cr: boolean, u: () => void, r: () => void, history: HistoryEntry[]) => {
     setCanUndo(cu); setCanRedo(cr)
@@ -1774,15 +1785,15 @@ export default function DailyActivitiesPage() {
   }, [])
 
   const undo = useCallback(() => {
-    if (!canUseHistoryRestore) return
+    if (!canUseHistoryRestore || scopeChanging) return
     undoRef.current()
     setPreviewEntry(null)
-  }, [canUseHistoryRestore])
+  }, [canUseHistoryRestore, scopeChanging])
   const redo = useCallback(() => {
-    if (!canUseHistoryRestore) return
+    if (!canUseHistoryRestore || scopeChanging) return
     redoRef.current()
     setPreviewEntry(null)
-  }, [canUseHistoryRestore])
+  }, [canUseHistoryRestore, scopeChanging])
 
   // 键盘快捷键 Ctrl+Z / Ctrl+Shift+Z
   useEffect(() => {
@@ -1798,11 +1809,15 @@ export default function DailyActivitiesPage() {
     return () => window.removeEventListener("keydown", handler)
   }, [canUseHistoryRestore, undo, redo])
 
-  // 从云端加载历史记录
+  // 历史快照较大，只在面板打开后读取；日期或空间切换时丢弃旧响应。
   useEffect(() => {
-    if (!selectedSpaceId) { setCloudHistory([]); return }
+    if (!historyPanelOpen || !selectedSpaceId || scopeChanging) return
+    let active = true
+    setHistoryLoading(true)
+    setHistoryError("")
     activityHistoryApi.list(detailDate, selectedSpaceId)
       .then(records => {
+        if (!active) return
         const entries: HistoryEntry[] = records.map(r => ({
           id: r.id,
           timestamp: new Date(r.created_at).getTime(),
@@ -1815,7 +1830,19 @@ export default function DailyActivitiesPage() {
         }))
         setCloudHistory(entries)
       })
-      .catch(() => {})
+      .catch(error => {
+        if (active) setHistoryError(error instanceof Error ? error.message : "历史记录加载失败")
+      })
+      .finally(() => { if (active) setHistoryLoading(false) })
+    return () => { active = false }
+  }, [historyPanelOpen, detailDate, selectedSpaceId, scopeChanging])
+
+  useEffect(() => {
+    setCloudHistory([])
+    setHistoryEntries([])
+    setPreviewEntry(null)
+    setHistoryError("")
+    setHistoryLoading(false)
   }, [detailDate, selectedSpaceId])
 
   // 合并本地 + 云端历史（按行数据内容去重）
@@ -2089,7 +2116,7 @@ export default function DailyActivitiesPage() {
       ...detailEksSessions.map(s => ({ type: "eks" as const, data: s })),
       ...detailIcsSessions.map(s => ({ type: "ics" as const, data: s })),
     ]
-    const filtered = selectedSpaceId ? all.filter(r => (r.data as any).space_id === selectedSpaceId) : all
+    const filtered = loadedScope?.spaceId ? all.filter(r => (r.data as any).space_id === loadedScope.spaceId) : all
     return filtered.sort((a, b) => {
       const at = (a.data as any).start_time || ""
       const bt = (b.data as any).start_time || ""
@@ -2098,15 +2125,15 @@ export default function DailyActivitiesPage() {
       if (!bt) return -1
       return at.localeCompare(bt)
     })
-  }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, selectedSpaceId])
+  }, [detailRecords, detailGcsSessions, detailErsSessions, detailEksSessions, detailIcsSessions, loadedScope?.spaceId])
 
   // 当日所有参与者（从到场记录读取，按空间过滤）
   const dayParticipants = useMemo(() => {
     return detailVisits
-      .filter(v => !selectedSpaceId || v.space_id === selectedSpaceId)
+      .filter(v => !loadedScope?.spaceId || v.space_id === loadedScope.spaceId)
       .map(v => ({ id: v.customer_id, nickname: v.nickname || v.customer_id }))
       .filter(p => p.nickname)
-  }, [detailVisits, selectedSpaceId])
+  }, [detailVisits, loadedScope?.spaceId])
 
   // Memoized customer lists — avoid re-filtering hundreds of customers on every render
   const eksHostCustomers = useMemo(() => allCustomers.filter(c => c.positions?.includes(POSITION_ENERGY_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_ENERGY_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_ENERGY_TEACHER] ?? 9999)), [allCustomers])
@@ -2129,23 +2156,26 @@ export default function DailyActivitiesPage() {
   const loadDateData = async (date: string) => {
     const seq = ++loadSeqRef.current
     setDetailLoading(true)
+    setDetailError("")
     try {
+      const previousScope = loadedScopeRef.current
+      if (previousScope && (previousScope.date !== date || previousScope.spaceId !== selectedSpaceId)) {
+        await flushPendingSavesRef.current?.()
+        if (seq !== loadSeqRef.current) return
+      }
       const dashboard = await classRecordApi.dashboard(date, selectedSpaceId || undefined)
       if (seq !== loadSeqRef.current) return
       const { class_records: records, gcs_sessions: gcs, ers_sessions: ers, eks_sessions: eks, ics_sessions: ics } = dashboard
 
-      setDetailRecords(records)
-      setDetailGcsSessions(gcs)
-      setDetailErsSessions(ers)
-      setDetailEksSessions(eks)
-      setDetailIcsSessions(ics)
-      setDetailVisits(dashboard.visits || [])
-      setCalendarCounts(dashboard.calendar_counts)
+      // 首次客户简表已经并行加载，先复用它，再补不在简表中的当前课程人员。
+      await customersLoadRef.current?.catch(() => [])
+      if (seq !== loadSeqRef.current) return
 
       // Collect unique customer IDs from all records
       const ids = new Set<string>()
       for (const r of records) {
         for (const t of r.teacher_ids) ids.add(t)
+        for (const participantId of r.participant_ids || []) ids.add(participantId)
         for (const g of (r.groups || [])) {
           if (g.leader_id) ids.add(g.leader_id)
           if (g.deputy_id) ids.add(g.deputy_id)
@@ -2165,15 +2195,29 @@ export default function DailyActivitiesPage() {
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
       for (const s of eks) {
+        if (s.owner_id) ids.add(s.owner_id)
+        if (s.host_id) ids.add(s.host_id)
+        for (const t of (s.teacher_ids || [])) ids.add(t)
+        try {
+          for (const owner of JSON.parse(s.description || "[]")) {
+            if (owner.id) ids.add(owner.id)
+          }
+        } catch { /* 历史简介可能不是部位 JSON。 */ }
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
       for (const s of ics) {
+        if (s.host_id) ids.add(s.host_id)
+        for (const t of (s.teacher_ids || [])) ids.add(t)
         for (const pid of (s.participant_ids || [])) ids.add(pid)
       }
+      for (const visit of dashboard.visits || []) {
+        if (visit.customer_id) ids.add(visit.customer_id)
+      }
 
-      const uniqueIds = [...ids]
-      if (uniqueIds.length > 0) {
-        const customers = await customerApi.batch(uniqueIds).catch(() => [] as CustomerLight[])
+      const existingIds = new Set(allCustomersRef.current.map(customer => customer.id))
+      const missingIds = [...ids].filter(id => !existingIds.has(id))
+      if (missingIds.length > 0) {
+        const customers = await customerApi.batch(missingIds)
         if (seq !== loadSeqRef.current) return
         // Merge into allCustomers without overwriting (teachers loaded separately via load())
         setAllCustomers(prev => {
@@ -2182,14 +2226,23 @@ export default function DailyActivitiesPage() {
           return newCustomers.length > 0 ? [...prev, ...newCustomers] : prev
         })
       }
-
+      setDetailRecords(records)
+      setDetailGcsSessions(gcs)
+      setDetailErsSessions(ers)
+      setDetailEksSessions(eks)
+      setDetailIcsSessions(ics)
+      setDetailVisits(dashboard.visits || [])
+      setCalendarCounts(dashboard.calendar_counts)
+      setLoadedScope({ date, spaceId: selectedSpaceId })
+    } catch (error) {
+      if (seq === loadSeqRef.current) setDetailError(error instanceof Error ? error.message : "当天课表加载失败")
     } finally {
       if (seq === loadSeqRef.current) {
         setDetailLoading(false)
-        setLoading(false)
       }
     }
   }
+  reloadCurrentDateRef.current = () => { void loadDateData(detailDate) }
 
   // ===== useCallback 稳定 onClose/onSaved 引用，避免 memo 子组件无效重渲染 =====
   const handleSalonClose = useCallback(() => { setDialogOpen(false) }, [])
@@ -2262,7 +2315,15 @@ export default function DailyActivitiesPage() {
   const load = () => {
     const sequence = ++configurationSequence.current
     setConfigurationError("")
-    Promise.all([courseTypeApi.list(), spaceApi.list(), customerApi.light(), memberIdentityApi.list()]).then(([types, list, customers, identities]) => {
+    const customersRequest = customerApi.light().then(customers => {
+      if (sequence !== configurationSequence.current) return customers
+      allCustomersRef.current = customers
+      setAllCustomers(customers)
+      setTeachers(customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999)))
+      return customers
+    })
+    customersLoadRef.current = customersRequest
+    Promise.all([courseTypeApi.list(), spaceApi.list(), customersRequest, memberIdentityApi.list()]).then(([types, list, , identities]) => {
       if (sequence !== configurationSequence.current) return
       setAllCourseTypes(types)
       setCourses(types.filter(t => t.category !== "other").map(t => ({ id: t.name, name: t.name })))
@@ -2273,8 +2334,6 @@ export default function DailyActivitiesPage() {
           localStorage.setItem("selected-space-id", list[0].id)
         }
       }
-      setAllCustomers(customers)
-      setTeachers(customers.filter(c => c.positions?.includes(POSITION_COURSE_TEACHER)).sort((a, b) => (a.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999) - (b.position_sort_orders?.[POSITION_COURSE_TEACHER] ?? 9999)))
       setMemberIdentities(identities)
     }).catch(error => {
       if (sequence === configurationSequence.current) setConfigurationError(error instanceof Error ? error.message : "课表配置加载失败")
@@ -2282,7 +2341,10 @@ export default function DailyActivitiesPage() {
   }
 
   useEffect(() => { load(); return () => { configurationSequence.current++ } }, [])
-  useEffect(() => { loadDateData(detailDate) }, [detailDate, selectedSpaceId])
+  useEffect(() => {
+    void loadDateData(detailDate)
+    return () => { loadSeqRef.current++ }
+  }, [detailDate, selectedSpaceId])
 
   const handleSpaceSelect = useCallback((id: string) => {
     startTransition(() => {
@@ -2614,7 +2676,7 @@ export default function DailyActivitiesPage() {
       "eks", "能量结", record, record.name || "能量结", [record.owner_id, ...(record.participant_ids || [])],
     ))
     detailIcsSessions.forEach(record => append(
-      "ics", "内部课程", record, record.course_name || "内部课程", record.participant_ids || [],
+      "ics", "沙龙技能学习", record, record.course_name || "沙龙技能学习", record.participant_ids || [],
     ))
     return options
   }, [
@@ -2828,24 +2890,25 @@ export default function DailyActivitiesPage() {
           </table>
         </div>}
         {/* Activity cards */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
-          {detailLoading ? (
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-busy={detailLoading} onMouseDown={(e) => e.stopPropagation()}>
+          <LoadError error={detailError} onRetry={reloadCurrentDate} />
+          {!loadedScope ? detailLoading && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Loader2 className="h-8 w-8 text-muted-foreground mb-2 animate-spin" />
               <p className="text-sm text-muted-foreground">加载中...</p>
             </div>
           ) : (
             <ActivityBatchTable
-              date={detailDate}
+              date={loadedScope.date}
               courseTypes={allCourseTypes}
               courses={courses}
               customers={allCustomers}
               invitedCustomerIds={detailVisits.map(visit => visit.customer_id)}
               teachers={teachers}
               spaces={spaces}
-              spaceId={selectedSpaceId}
+              spaceId={loadedScope.spaceId}
               records={unifiedDetailRecords}
-              onReload={() => loadDateData(detailDate)}
+              onReload={reloadCurrentDate}
               onParticipantsSaved={handleInlineParticipantsSaved}
               callbacks={cardCallbacks}
               getMemberName={getMemberName}
@@ -2861,11 +2924,12 @@ export default function DailyActivitiesPage() {
               previewChangedKeys={previewEntry?.changedKeys}
               previewChangedCells={previewChangedCells}
               locked={isDayLocked || !!previewEntry}
+              interactionBlocked={scopeChanging}
               onClosePreview={() => setPreviewEntry(null)}
               toolbarLeading={(
                 <>
                   <span className="text-[12px] font-medium text-[#2b2f36]">
-                    {detailDate.split("-")[1].replace(/^0/, "")}月{detailDate.split("-")[2].replace(/^0/, "")}日活动
+                    {loadedScope.date.split("-")[1].replace(/^0/, "")}月{loadedScope.date.split("-")[2].replace(/^0/, "")}日活动
                   </span>
                   {savingCount > 0 ? (
                     <span className="hidden items-center gap-1 text-[11px] text-[#8f959e] min-[1100px]:inline-flex">
@@ -2942,6 +3006,13 @@ export default function DailyActivitiesPage() {
                 </div>
               ) : undefined}
             />
+          )}
+          {loadedScope && scopeChanging && (
+            <div className="pointer-events-none absolute inset-0 z-40 flex items-start justify-center bg-white/60 pt-12" role="status">
+              <span className="flex items-center gap-1.5 rounded bg-white px-3 py-2 text-[12px] text-[#8f959e]">
+                {detailLoading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />加载中...</> : "当前日期课表尚未加载，请重试"}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -3044,8 +3115,10 @@ export default function DailyActivitiesPage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
+            {historyError && <p className="mb-2 text-[12px] text-[#c4506a]">{historyError}</p>}
+            {historyLoading && <p className="mb-2 text-[12px] text-[#8f959e]">历史记录加载中...</p>}
             {mergedHistory.length === 0 ? (
-              <div className="text-center text-[12px] text-[#8f959e] py-8">暂无历史记录</div>
+              !historyLoading && !historyError && <div className="text-center text-[12px] text-[#8f959e] py-8">暂无历史记录</div>
             ) : (
               (() => {
                 const todayStr = formatDate(new Date())
@@ -3267,8 +3340,8 @@ export default function DailyActivitiesPage() {
       <AlertDialog open={!!icsDeleteId} onOpenChange={(open) => !open && setIcsDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除内部课程</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除这条内部课程记录吗？此操作不可撤销。</AlertDialogDescription>
+            <AlertDialogTitle>删除沙龙技能学习</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条沙龙技能学习记录吗？此操作不可撤销。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>

@@ -3,7 +3,7 @@ from typing import Dict
 from app.services.storage import load_data, save_data, save_item
 
 FILENAME = "activity_permissions.json"
-ACTIVITY_TYPES = ["沙龙活动", "觉醒游戏", "情绪释放", "能量结", "内部课程"]
+ACTIVITY_TYPES = ["沙龙活动", "觉醒游戏", "情绪释放", "能量结", "沙龙技能学习"]
 
 _permissions: Dict[str, Dict[str, Dict[str, bool]]] = {}
 
@@ -12,6 +12,11 @@ def _migrate(data: dict) -> dict:
     """迁移旧格式 List[str] → 新格式 Dict[str, Dict[str, bool]]"""
     result = {}
     for member_type, value in data.items():
+        if isinstance(value, list):
+            value = ["沙龙技能学习" if item == "内部课程" else item for item in value]
+        elif isinstance(value, dict) and "内部课程" in value:
+            value = {**value, "沙龙技能学习": value.get("沙龙技能学习", value["内部课程"])}
+            value.pop("内部课程", None)
         if isinstance(value, list):
             result[member_type] = {}
             for at in ACTIVITY_TYPES:
@@ -49,6 +54,7 @@ def get_all() -> Dict[str, Dict[str, Dict[str, bool]]]:
 
 def set_all(permissions: Dict[str, Dict[str, Dict[str, bool]]]):
     global _permissions
+    permissions = _migrate(permissions)
     # 合并而非替换：保留未在本次请求中的身份
     for member_type, activities in permissions.items():
         # 检查是否全部为默认值（无实际限制），是则删除该身份

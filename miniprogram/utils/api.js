@@ -69,12 +69,13 @@ function _getResponseHeader(headers, name) {
 }
 
 function _saveLoginState(data) {
-  if (!data || !data.token || !data.account) return false
+  if (!data || !data.token || (!data.account && !data.customer)) return false
   pendingReads.clear()
+  const user = data.account || { id: data.customer.id, owner: data.customer.nickname, role: 'customer' }
   const permissions = data.permissions || []
   const editPermissions = data.edit_permissions || DEFAULT_EDIT_PERMISSIONS
   wx.setStorageSync('auth_token', data.token)
-  wx.setStorageSync('currentUser', data.account)
+  wx.setStorageSync('currentUser', user)
   wx.setStorageSync('userPermissions', permissions)
   wx.setStorageSync('userEditPermissions', editPermissions)
   // 记住这个登录态是哪个数据源发的，换源后旧 token 一定无效
@@ -83,7 +84,7 @@ function _saveLoginState(data) {
   const app = getApp()
   if (app) {
     app.globalData.token = data.token
-    app.globalData.currentUser = data.account
+    app.globalData.currentUser = user
     app.globalData.permissions = permissions
     app.globalData.editPermissions = editPermissions
     if (app.scheduleUsageTracking) app.scheduleUsageTracking()
@@ -125,7 +126,7 @@ function _silentRelogin() {
     wx.request({
       url: `${BASE_URL}/api/wechat/login`,
       method: 'POST',
-      data: { code },
+      data: { code, member_only: (wx.getStorageSync('currentUser') || {}).role === 'customer' },
       timeout: 30000,
       header: {
         'Content-Type': 'application/json',
@@ -491,6 +492,7 @@ const visitApi = {
 const visitNoteApi = {
   list: (visitId) => request(`/api/visit-notes?visit_id=${encodeURIComponent(visitId)}`),
   feedbackPeople: () => request('/api/visit-notes/feedback-people'),
+  followUpPeople: () => request('/api/visit-notes/follow-up-people', { silent: true }),
   previousVisitNeed: (customerId, beforeDate, excludeVisitId) => {
     const params = [`customer_id=${encodeURIComponent(customerId)}`]
     if (beforeDate) params.push(`before_date=${encodeURIComponent(beforeDate)}`)
@@ -626,7 +628,7 @@ const energyKnotSessionApi = {
   delete: (id) => request(`/api/energy-knot-sessions/${id}`, { method: 'DELETE' }),
 }
 
-// 内部课程 API
+// 沙龙技能学习 API
 const internalCourseSessionApi = {
   create: (data) => request('/api/internal-course-sessions', { method: 'POST', data }),
   update: (id, data) => request(`/api/internal-course-sessions/${id}`, { method: 'PATCH', data }),
@@ -669,7 +671,7 @@ const customerApi = {
 
 // 客户标签 API（公共标签 + 当前账号私有标签）
 const customerTagApi = {
-  list: () => request('/api/customer-tags'),
+  list: (category = 'customer') => request(`/api/customer-tags?category=${encodeURIComponent(category)}`),
   create: (data) => request('/api/customer-tags', { method: 'POST', data }),
   update: (tagId, data) => request(`/api/customer-tags/${tagId}`, { method: 'PUT', data }),
   archive: (tagId) => request(`/api/customer-tags/${tagId}`, { method: 'DELETE' }),
@@ -738,6 +740,20 @@ const memberIdentityApi = {
 // 登录请求本身不需要 token，因此绝不等待/依赖 dev-login——
 // 即使 devMode 判断失灵，dev-login 失败也永远无法阻断账号密码登录。
 const authApi = {
+  memberData: (section, page = 1) => {
+    const memberOnly = (wx.getStorageSync('currentUser') || {}).role === 'customer'
+    const path = memberOnly ? '/api/client/member-data' : '/api/accounts/me/member-data'
+    return request(`${path}?section=${encodeURIComponent(section)}&page=${page}&page_size=20`, { silent: true })
+  },
+  entryLogin: (code, loginCode) => request('/api/wechat/entry-login', { method: 'POST', data: { code, login_code: loginCode }, skipAuth: true, silent: true }),
+  switchToManagement: () => request('/api/client/management-login', { method: 'POST', silent: true }),
+  checkinCode: (activityKey) => {
+    const memberOnly = (wx.getStorageSync('currentUser') || {}).role === 'customer'
+    const path = memberOnly ? '/api/client/checkin-code' : '/api/accounts/me/checkin-code'
+    return request(`${path}?activity_key=${encodeURIComponent(activityKey)}`, { silent: true })
+  },
+  previewCheckin: (code) => request('/api/activity-checkins/preview', { method: 'POST', data: { code }, silent: true }),
+  confirmCheckin: (code) => request('/api/activity-checkins/confirm', { method: 'POST', data: { code }, silent: true }),
   login: (code) => request('/api/wechat/login', { method: 'POST', data: { code }, skipAuth: true }),
   phoneLogin: (code) => request('/api/wechat/phone-login', { method: 'POST', data: { code }, skipAuth: true }),
   devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username }, skipAuth: true }),
@@ -755,7 +771,7 @@ const PAYMENT_PROJECT_TYPES = [
   { key: 'emotional_release', label: '情绪释放', apiPath: 'emotional-releases' },
   { key: 'oh_card_reading', label: 'OH卡诊断', apiPath: 'oh-card-readings' },
   { key: 'energy_knot', label: '能量结', apiPath: 'energy-knots' },
-  { key: 'internal_course', label: '内部课程', apiPath: 'internal-courses' },
+  { key: 'internal_course', label: '沙龙技能学习', apiPath: 'internal-courses' },
   { key: 'tea_seat_fee', label: '茶位费', apiPath: 'tea-seat-fees' },
   { key: 'offline_course', label: '线下落地课程', apiPath: 'offline-courses' },
   { key: 'other', label: '其他项目', apiPath: 'other-projects' },
@@ -787,6 +803,7 @@ function _projectApi(basePath) {
 }
 
 const paymentApi = {
+  courseOptions: (date) => request(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}`),
   membershipCards: _projectApi('/api/membership-cards'),
   groupCases: _projectApi('/api/group-cases'),
   emotionalReleases: _projectApi('/api/emotional-releases'),
@@ -961,6 +978,7 @@ module.exports = {
     finance: (date) => request(`/api/daily-report/finance-sources?date=${encodeURIComponent(date)}&mobile=true`, { silent: true }),
   },
   ensureAuthSource,
+  saveLoginState: _saveLoginState,
   principalApi: {
     metadata: (lite = false) => request('/api/principal/metadata' + (lite ? '?lite=true' : '')),
     rules: () => request('/api/principal/rules'),

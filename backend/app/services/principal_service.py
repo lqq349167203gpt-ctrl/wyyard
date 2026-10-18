@@ -26,6 +26,7 @@ from app.services import (
 )
 from app.services.payment_sources import payment_loader
 from app.services.principal_conversion_service import calculate_conversion
+from app.utils.customer_profile import format_work_info
 from app.utils.request_roles import get_request_roles
 
 # 中文按拼音排序：和前端 localeCompare("zh-CN") 的口径一致；系统没有中文排序规则时退回码点排序
@@ -46,11 +47,11 @@ PRODUCTS = (
     ("group_case", "觉醒游戏", payment_loader("group-cases"), ""),
     ("emotional", "情绪释放", payment_loader("emotional-releases"), ""),
     ("energy", "能量结", payment_loader("energy-knots"), ""),
-    ("oh", "OH卡", payment_loader("oh-card-readings"), ""),
-    ("internal", "内部课程", payment_loader("internal-courses"), "course_type"),
+    ("oh", "OH卡", payment_loader("oh-card-readings"), "reading_type"),
+    ("internal", "沙龙技能学习", payment_loader("internal-courses"), "course_type"),
     ("other", "其他项目", payment_loader("other-projects"), "project_name"),
     ("tea", "茶位费", payment_loader("tea-seat-fees"), ""),
-    ("offline", "线下课程", payment_loader("offline-courses"), "course_name"),
+    ("offline", "线下课程", payment_loader("offline-courses"), "course_type"),
 )
 
 
@@ -272,7 +273,8 @@ def collect_data(request, *, metadata_only=False):
                 events.append({"id": f"purchase:{key}:{payment.id}", "kind": "purchase", "product": key,
                                "subtype": subtype, "date": day, "customer_id": cid, "customer": customer_name(cid),
                                "organization_id": org_id, "organization": org_names[org_id],
-                               "label": f"{label} · {subtype}" if subtype else label, "closers": closers})
+                               "label": f"{label} · {subtype}" if subtype else label, "closers": closers,
+                               "recorded_at": str(getattr(payment, "created_at", "") or "")})
     if metadata_only:
         return organizations, permissions, events, courses
     attendance = {(e["course_key"], e["customer_id"]): e for e in events if e["kind"] == "attendance"}
@@ -289,6 +291,7 @@ def collect_data(request, *, metadata_only=False):
                        "settlement_id": deduction.organization_id if deduction.organization_id in org_names else "",
                        "settlement": org_names.get(deduction.organization_id, "无权查看或未配置"),
                        "deal_date": valid_day(deduction.deduction_date), "count": deduction.count,
+                       "recorded_at": str(getattr(deduction, "created_at", "") or ""),
                        "closers": "、".join(str(c.get("name", "")) for c in deduction.closers or []) or deduction.closer_name or ""})
     return organizations, permissions, events, courses
 
@@ -355,14 +358,12 @@ def _profile_field_values(customer, allowed: list[str]) -> dict:
     """到访目的 / 创伤经历 / 当下卡点 / 工作情况 / 其他信息（口径与客户详情一致）。"""
     if not allowed:
         return {}
-    work_status = (getattr(customer, "work_status", "") or "").strip()
-    work_description = (getattr(customer, "work_description", "") or "").strip()
     values = {
         "visit_purpose": (getattr(customer, "tags", "") or "").strip(),
         "trauma_history": (getattr(customer, "basic_info", "") or "").strip(),
         "current_block": ((getattr(customer, "assessment", "") or "").strip()
                           or (getattr(customer, "core_situation", "") or "").strip()),
-        "work_info": f"{work_status} · {work_description}" if work_status and work_description else (work_status or work_description),
+        "work_info": format_work_info(customer),
         "other_info": (getattr(customer, "other_info", "") or "").strip(),
     }
     return {key: values.get(key, "") for key in allowed}
@@ -394,6 +395,8 @@ def apply_breakdown_picks(rows, picks):
         elif field == "name":
             # 具体课程按「课程名 + 组织」筛，同名课程在不同组织互不影响
             rows = [row for row in rows if _course_key(row) in values]
+        elif field == "classification":
+            rows = [row for row in rows if values & set(row.get("purchase_rule_labels") or [row.get("classification", "")])]
         else:
             rows = [row for row in rows if str(row.get(field) or "") in values]
     return rows
@@ -477,7 +480,7 @@ def course_participant_rows(courses, organizations, participant_scope="", custom
 
 def _teacher_feedback(notes, teacher_id, teacher_names):
     """同一天同客户的老师反馈只整理一次，供该老师当天多堂课复用。"""
-    categories = ("visit_need", "customer_info", "follow_up")
+    categories = ("visit_need", "customer_info", "follow_up", "customer_feedback")
     content = {key: [] for key in categories}
     creators = {key: [] for key in categories}
     entries = {key: [] for key in categories}
@@ -489,13 +492,7 @@ def _teacher_feedback(notes, teacher_id, teacher_names):
         text = note.content.strip()
         content[note.category].append(text)
         creator = (getattr(note, "created_by", "") or "").strip()
-        timestamp = getattr(note, "updated_at", None) or getattr(note, "created_at", None)
-        entries[note.category].append({
-            "content": text,
-            "author": (getattr(note, "feedback_person", "") or creator).strip(),
-            "at": timestamp.isoformat() if timestamp else "",
-            "created_by": creator,
-        })
+        entries[note.category].append(visit_note_service.note_entry(note))
         if creator and creator not in creators[note.category]:
             creators[note.category].append(creator)
     content = {key: "\n".join(values) for key, values in content.items()}
@@ -557,8 +554,9 @@ def teacher_follow_up_rows(courses, customers):
                     **content,
                     "details": [f'课程｜{course["name"]}', f'老师｜{teacher_name}', f'身份｜{role}',
                                 f'来访需求｜{content["visit_need"] or "—"}',
-                                f'客户信息｜{content["customer_info"] or "—"}',
-                                f'跟进点｜{content["follow_up"] or "—"}'],
+                                f'深度需求｜{content["customer_info"] or "—"}',
+                                f'跟进点｜{content["follow_up"] or "—"}',
+                                f'客户反馈｜{content["customer_feedback"] or "—"}'],
                 })
     return rows
 
@@ -567,7 +565,7 @@ def _public_rows(rows, columns, *, teacher_feedback=False):
     fields = ["id", "customer_id", "course_id", "product", "subtype", "repeat_times",
               "new_people", "old_people", "absent_people", "coarse_people", "order_count", "details", *[key for key, _ in columns]]
     if teacher_feedback:
-        fields.extend(["type", "course_subtype", "participant_role", "teacher_id", *[f"{category}_{suffix}" for category in ("visit_need", "customer_info", "follow_up")
+        fields.extend(["type", "course_subtype", "participant_role", "teacher_id", *[f"{category}_{suffix}" for category in ("visit_need", "customer_info", "follow_up", "customer_feedback")
                                 for suffix in ("creators", "entries")]])
     return [{key: row.get(key, "") for key in fields} for row in rows]
 
@@ -661,6 +659,8 @@ def analyze(request, query: PrincipalQuery, *, export=False):
             event["details"] = [f'成交｜{event["date"]}｜{event["label"]}｜{event["organization"]}', "成交人｜" + (event["closers"] or "—")]
         else:
             event["details"] = [f'课程日期｜{event["date"]}｜课程所属｜{event["organization"]}', f'扣卡｜{event["count"]}次｜成交归属｜{event["settlement"]}']
+    if upsell_config_service.rules_configured():
+        upsell_config_service.classify_purchases(order_timeline)
     ranged_orders = [e for e in purchases if e["organization_id"] in chosen and start <= e["date"] <= end and (not query.product or e["product"] == query.product)]
     # 粗门次卡扣卡按购买算：它也在成交口径里（成交量、成交人数、付费项目拆分都要算上）
     ranged_usages = [u for u in coarse_usages
@@ -763,12 +763,14 @@ def analyze(request, query: PrincipalQuery, *, export=False):
             breakdown["deals"].append({"key": "coarse", "label": "粗门次卡", "count": product_counts["coarse"],
                                        "buyers": len(product_buyers["coarse"]), "subtypes": []})
         # 购买类型（首购/同类复购/跨品类首购/升单）：可以和付费项目叠加筛选
-        buy_counts = Counter(order["classification"] for order in buy_scope)
+        buy_counts = Counter(label for order in buy_scope for label in (order.get("purchase_rule_labels") or [order["classification"]]))
         buy_buyers = defaultdict(set)
         for order in buy_scope:
-            buy_buyers[order["classification"]].add(order["customer_id"])
+            for label in order.get("purchase_rule_labels") or [order["classification"]]:
+                buy_buyers[label].add(order["customer_id"])
+        buy_labels = ("体验", "转化", "升单", "复购", "未匹配") if upsell_config_service.rules_configured() else ("首购", "同类复购", "跨品类首购", "升单")
         breakdown["buys"] = [{"key": name, "label": name, "count": buy_counts[name], "buyers": len(buy_buyers[name])}
-                             for name in ("首购", "同类复购", "跨品类首购", "升单") if buy_counts.get(name)]
+                             for name in buy_labels if buy_counts.get(name)]
         type_counts = Counter(c["type"] for c in type_scope)
         teacher_counts = Counter(
             name for course in teacher_scope for name in str(course.get("teachers") or "").split("、") if name
@@ -847,6 +849,9 @@ def analyze(request, query: PrincipalQuery, *, export=False):
             customer_products[order["customer_id"]][order["product"]] += 1
             if order["product"] == "membership" and order.get("subtype"):
                 customer_subtypes[order["customer_id"]][order["subtype"]] += 1
+            if upsell_config_service.rules_configured():
+                customer_upsell_levels[order["customer_id"]].update(order.get("purchase_rule_keys") or [])
+                continue
             for level, configured_items in upsell_level_items:
                 if any(
                     item_product == order["product"]
@@ -981,7 +986,7 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         def upsell_situations(entry: dict) -> list[str]:
             level_keys = [level.get("key", "") for level in entry.get("upsell_levels", [])]
             # 配置顺序就是升单顺序；客户归到当前达到的最高一档，避免一人同时落入多个档位。
-            return level_keys[-1:] if level_keys else []
+            return level_keys if upsell_config_service.rules_configured() else level_keys[-1:]
 
         def matched(entry, exclude_prefix: str) -> bool:
             selected_upsell = {
@@ -1135,6 +1140,7 @@ def analyze(request, query: PrincipalQuery, *, export=False):
             {"key": level.get("id") or level["name"], "label": level["name"], "count": 0}
             for level in upsell_level_definitions
         ]
+        breakdown["purchase_rules_configured"] = upsell_config_service.rules_configured()
         # 前端「列表设置」按这个决定哪些敏感列可以出现
         breakdown["traffic_profile_fields"] = allowed_profile_fields
         summary["引流人数"] = sum(len(items) for items in referred.values())
@@ -1147,10 +1153,12 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         rows = [r for r in result["items"] if not query.status or r["status"] == query.status]
         columns = [("customer", "客户"), ("date", "起点日期"), ("organization", "起点组织"), ("source", "起点"), ("deadline", "观察截止"), ("status_label", "状态"), ("target_count", "匹配目标数"), ("same_day", "说明")]
     elif query.tab == "orders":
-        rows = [r for r in ranged_orders if not query.order_filter or r["order_kind"] == query.order_filter]
-        if not query.order_filter and query.product in {"", "coarse"}:
+        rows = [r for r in ranged_orders if not query.order_filter or query.order_filter in r.get("purchase_rule_keys", []) or r["order_kind"] == query.order_filter]
+        if query.product in {"", "coarse"}:
             for usage in events:
                 if usage["kind"] != "coarse_usage" or usage.get("settlement_id") not in chosen or not start <= usage.get("deal_date", "") <= end:
+                    continue
+                if query.order_filter and query.order_filter not in usage.get("purchase_rule_keys", []) and usage.get("order_kind") != query.order_filter:
                     continue
                 rows.append({**usage, "date": usage["deal_date"], "organization": usage["settlement"],
                              "classification": usage["classification"], "details": usage["details"]})
@@ -1223,8 +1231,8 @@ def analyze(request, query: PrincipalQuery, *, export=False):
         rows = teacher_follow_up_rows(rows, people)
         columns = [("date", "课程日期"), ("teachers", "课程老师"), ("name", "课程"),
                    ("customer", "人员"), ("participant_role", "身份"), ("follow_up_status", "跟进状态"),
-                   ("visit_need", "来访需求"), ("customer_info", "客户信息"),
-                   ("follow_up", "跟进点")]
+                   ("visit_need", "来访需求"), ("customer_info", "深度需求"),
+                   ("follow_up", "跟进点"), ("customer_feedback", "客户反馈")]
     # 点「成交笔数」时只要这个客户的记录（笔数按整批算，所以放在上面之后）
     if query.customer_id:
         rows = [row for row in rows if row.get("customer_id") == query.customer_id]

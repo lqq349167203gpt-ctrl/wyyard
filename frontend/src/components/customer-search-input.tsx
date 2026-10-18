@@ -6,9 +6,11 @@ import { type Customer, type CustomerLight } from "@/lib/api"
 
 const MAX_VISIBLE = 50
 
+export type CustomerSearchOption = Pick<CustomerLight, "id" | "nickname"> & Partial<CustomerLight>
+
 export interface CustomerSearchInputProps {
   /** All available customers to search from */
-  customers: Customer[] | CustomerLight[]
+  customers: CustomerSearchOption[]
   /** Currently selected value (nickname for single, array for multi) */
   value: string | string[]
   /** Called when selection changes (receives nickname(s)) */
@@ -185,7 +187,7 @@ export function CustomerSearchInput({
     })
   }, [customers, excludeIds, positionFilter])
 
-  const selectItem = (customer: Customer | CustomerLight) => {
+  const selectItem = (customer: CustomerSearchOption) => {
     if (multi) {
       onChange([...selectedNames, customer.nickname])
       setSearch("")
@@ -201,7 +203,7 @@ export function CustomerSearchInput({
     }
   }
 
-  const toggleCompactItem = (customer: Customer | CustomerLight) => {
+  const toggleCompactItem = (customer: CustomerSearchOption) => {
     if (selectedNames.includes(customer.nickname)) {
       onChange(selectedNames.filter((name) => name !== customer.nickname))
     } else {

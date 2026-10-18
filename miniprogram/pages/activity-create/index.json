@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "新增活动",
-  "usingComponents": {}
+  "usingComponents": {
+    "time-picker": "/components/time-picker/index"
+  }
 }

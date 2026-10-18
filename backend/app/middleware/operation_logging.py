@@ -37,6 +37,7 @@ SECTION_MAP = {
     "/api/activity-registrations": "课表",
     "/api/activity-withdrawals": "课表",
     "/api/activity-orders": "课表",
+    "/api/activity-checkins": "活动核销",
     "/api/membership-cards": "付费项目",
     "/api/agreement-signings": "协议签订",
     "/api/debt-records": "欠卡记录",
@@ -136,6 +137,7 @@ PAGE_LABELS: dict[str, str] = {
     "class-records-activities": "邀约",
     "class-records-arrival": "邀约",
     "daily-activities": "课表",
+    "activity-checkin": "活动核销",
     "audit-check": "信息核对",
     "agreement-signings": "协议签订",
     "offline-course-records": "落地课程",
@@ -270,7 +272,7 @@ FIELD_NAMES = {
     "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
     "person_name": "人员", "benefit_date": "福利日期",
     "sort_order": "排序", "is_public_welfare": "公益",
-    "arrived": "到店状态", "cancelled": "邀约状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "客户信息",
+    "arrived": "到店状态", "cancelled": "邀约状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "深度需求",
     "needs": "来访需求", "receptionist": "接待人", "goal": "目标", "visit_date": "到访日期",
     "visit_time": "预计时间", "customer_id": "客户",
     "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "主要角色", "roles": "角色身份", "permissions": "权限",
@@ -285,12 +287,14 @@ FIELD_NAMES = {
     "referrer": "引流人", "traffic_source": "流量来源", "age": "年龄",
     "visit_count": "到店次数", "paid_content": "付费内容",
     "work_status": "工作状态", "work_description": "工作描述",
+    "income_stability": "收入是否稳定", "personal_annual_income": "个人年收入", "household_annual_income": "家庭年收入",
+    "customer_quality": "客户质量",
     "basic_info": "创伤经历", "assessment": "当下卡点",
     "tags": "到访目的", "self_tags": "个人标签",
     "scope": "可见范围", "description": "说明", "enabled": "启用状态", "tag_ids": "客户标签",
     "customer_tags": "客户标签",
     "wechat": "微信", "core_situation": "核心情况",
-    "deal_date": "成交日期", "last_visit_date": "最近到店", "other_info": "其他信息",
+    "deal_date": "成交日期", "deal_course_key": "成交课程标识", "deal_course_name": "成交课程", "last_visit_date": "最近到店", "other_info": "其他信息",
     "service_teacher": "服务老师", "is_leader": "组长",
     "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进阶段",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
@@ -309,6 +313,7 @@ FIELD_NAMES = {
     "daily_card_usage": "日卡使用",
     "healing_notes": "跟进点", "activity_count": "活动次数", "welfare_count": "公益次数",
     "visit_id": "邀约记录", "category_label": "记录类型",
+    "next_follow_up_person_id": "下次跟进人", "next_follow_up_person": "下次跟进人", "next_follow_up_date": "跟进时间",
     "activities": "活动记录",
     "provider": "模型供应商", "model": "模型", "api_key": "API密钥", "base_url": "接口地址",
     "system_prompt": "系统提示词", "temperature": "温度", "max_tokens": "最大Token数",
@@ -322,7 +327,7 @@ FIELD_NAMES = {
     "source_activity_date": "来源课程日期", "source_space_id": "来源空间编号",
     "source_space_name": "来源空间",
     "fee": "费用", "refund_amount": "退费金额", "payment_method": "支付方式",
-    "diagnosis_duration": "诊断时长", "quantity": "数量",
+    "diagnosis_duration": "诊断时长", "reading_type": "诊断类型", "quantity": "数量",
     "duration_type": "时长类型", "duration_value": "时长值",
     "record_date": "上课日期", "teacher": "课程老师", "result": "课程结果",
     "validity_value": "有效期", "validity_unit": "有效期单位",
@@ -525,7 +530,7 @@ VALUE_LABELS = {
     "true": "是", "false": "否",
     "offline": "线下", "online": "线上",
     "view": "仅浏览", "own": "仅本人录入", "all": "全部记录",
-    "class": "沙龙", "gcs": "觉醒游戏", "ers": "情绪释放", "eks": "能量结", "ics": "内部课程",
+    "class": "沙龙", "gcs": "觉醒游戏", "ers": "情绪释放", "eks": "能量结", "ics": "沙龙技能学习",
 }
 
 EDIT_PERMISSION_LABELS = {
@@ -914,7 +919,7 @@ def _build_create_summary(body: dict) -> str:
     parts = []
     for key in [
         "member_type", "card_type", "course_type", "purchase_count",
-        "diagnosis_duration", "quantity", "amount", "price", "closer_name",
+        "diagnosis_duration", "reading_type", "quantity", "amount", "price", "closer_name",
         "deal_date", "effective_date", "record_date", "settlement_organization_id",
         "role", "username", "referrer", "positions",
     ]:
@@ -1171,7 +1176,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "能量结",
-                "internal-courses": "内部课程", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
+                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)
@@ -1236,7 +1241,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "能量结",
-                "internal-courses": "内部课程", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
+                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)

@@ -25,6 +25,8 @@ function page(file, api, globals = {}) {
   const scheduleDate = load('miniprogram/utils/schedule-date.js', {}, { wx: globals.wx || {} })
   load(file, { '../../utils/api': api, '../../utils/util': { formatDate: () => '2026-10-01' },
     '../../utils/schedule-date': scheduleDate,
+    '../../utils/note-feedback-meta': load('miniprogram/utils/note-feedback-meta.js'),
+    '../../utils/visit-groups': load('miniprogram/utils/visit-groups.js'),
     '../../utils/record-ownership': { canEditRecord: () => true },
     '../../utils/customer-access': {}, '../../utils/customer-search': {},
     '../../utils/permissions': {} }, { Page: value => { instance = value }, wx: {}, ...globals })
@@ -172,7 +174,7 @@ test('日报展示五类统一课程来源，重读失败不暴露旧列表', as
           transaction_access: 'none', dashboard: {},
           activities: ['class_record', 'group_case', 'emotional_release', 'energy_knot', 'internal_course'].map(source => ({
             id: source + '_same', source, course_name: source, course_type: source,
-            participant_ids: ['a'], teacher_names: ['乙'],
+            participant_ids: ['a'], arrived_participant_ids: ['a'], teacher_names: ['乙'],
           })) }
       },
     },

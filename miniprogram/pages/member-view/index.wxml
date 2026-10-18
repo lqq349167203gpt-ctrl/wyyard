@@ -1,0 +1,92 @@
+<view class="member-page">
+  <view class="head">
+    <view class="g-hi">{{greeting}}</view>
+    <view class="id-row">
+      <view class="avatar"><text class="avatar-text">{{customer.nickname[0] || '用'}}</text></view>
+      <view class="id-text">
+        <text class="id-name">{{customer.nickname || '我的会员资料'}}</text>
+        <view class="id-meta">
+          <text class="id-slogan">{{customer.member_type || '会员端'}}</text>
+          <view wx:if="{{canManage}}" class="return-button" bindtap="onReturn">切换到管理端 <text>›</text></view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{!bound}}" class="empty">该账号未绑定客户信息</view>
+  <block wx:elif="{{tab === 'home'}}">
+    <view class="stats-flow" wx:if="{{customer}}">
+      <view class="sf"><text class="sf-num">{{stats.visit_count}}</text><text class="sf-lab">次到店</text></view>
+      <view class="sf"><text class="sf-num">{{stats.activity_count}}</text><text class="sf-lab">场活动</text></view>
+      <view class="sf-big" data-tab="cards" bindtap="onTab"><text class="sf-big-num">{{remainNum}}</text><text class="sf-big-lab">会员卡剩余次数 ›</text></view>
+    </view>
+    <view class="mgmt" wx:if="{{customer}}">
+      <view class="m-blk" data-tab="transactions" bindtap="onTab">交易记录</view>
+      <view class="m-blk" data-tab="cards" bindtap="onTab">剩余卡次</view>
+    </view>
+    <view class="sec-head"><text class="sec-title">我的活动</text><view class="sec-rule"></view><text class="sec-note">{{homeTotal}} 场</text></view>
+    <view class="days">
+      <view class="day-card" wx:for="{{previewGroups}}" wx:key="date" wx:for-item="group">
+        <view class="d-head"><text class="d-chip">{{group.dateText}}</text><text class="d-count">{{group.items.length}} 场</text></view>
+        <view class="activity-row" wx:for="{{group.items}}" wx:key="key">
+          <view class="activity-main"><text class="activity-name">{{item.name}}</text><text class="activity-status {{item.statusClass}}">{{item.statusText}}</text></view>
+          <view class="activity-meta">{{item.timeText}} · {{item.role || '参与者'}}</view>
+          <view wx:if="{{item.host}}" class="activity-meta">老师 · {{item.host}}</view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{homeTotal}}" class="all-link" data-tab="activities" bindtap="onTab">查看全部 {{homeTotal}} 场 ›</view>
+    <view wx:elif="{{!loading && !error}}" class="empty">暂无活动记录</view>
+    <view wx:if="{{customer}}" class="checkin-entry" data-tab="checkins" bindtap="onTab"><text>活动核销</text><text class="muted">出示已报名活动的核销码 ›</text></view>
+  </block>
+  <block wx:else>
+    <view class="detail-heading"><view class="back-link" data-tab="home" bindtap="onTab">‹ 我的</view><text class="section-title">{{sectionTitle}}</text><text class="section-count" wx:if="{{tab !== 'cards'}}">{{total}} 条</text></view>
+    <view wx:if="{{tab === 'cards'}}" class="detail-list">
+      <view class="entitlement-card" wx:for="{{groups}}" wx:key="key" wx:for-item="group">
+        <view class="card-title">{{group.title}}</view><view class="summary">{{group.summary}}</view>
+        <view class="card-detail" wx:for="{{group.details}}" wx:key="key">
+          <view class="line"><text>{{item.name}}</text><text class="muted">{{item.status}}</text></view>
+          <view class="balance">{{item.balance}}</view><view class="muted">{{item.validity}}</view>
+        </view>
+        <view class="debt" wx:if="{{group.debtCount}}">历史欠卡{{group.debtCount}}次
+          <view class="debt-line" wx:for="{{group.debts}}" wx:key="key">{{item.date}} · {{item.label}} · 欠卡{{item.count}}次</view>
+        </view>
+      </view>
+    </view>
+    <view wx:elif="{{tab === 'transactions'}}" class="detail-list">
+      <view class="entitlement-card" wx:for="{{items}}" wx:key="key">
+        <view class="line muted"><text>{{item.dateText}}</text><text>{{item.type}}</text></view>
+        <view class="line transaction"><text>{{item.name}}</text><text>{{item.amountText}}</text></view>
+        <view wx:if="{{item.quantity != null}}" class="muted">数量 {{item.quantity}}</view>
+        <view wx:if="{{item.effective_date || item.expiry_date}}" class="muted">有效期 {{item.effective_date || '—'}} ~ {{item.expiry_date || '不限'}}</view>
+        <view wx:if="{{item.closer_name}}" class="muted">经办 {{item.closer_name}}</view>
+      </view>
+    </view>
+    <view wx:else class="days">
+      <view class="day-card" wx:for="{{activityGroups}}" wx:key="date" wx:for-item="group">
+        <view class="d-head"><text class="d-chip">{{group.dateText}}</text><text class="d-count">{{group.items.length}} 场</text></view>
+        <view class="activity-row" wx:for="{{group.items}}" wx:key="key">
+          <view class="activity-main"><text class="activity-name">{{item.name}}</text><text class="activity-status {{item.statusClass}}">{{item.statusText}}</text></view>
+          <view class="activity-meta">{{item.timeText}} · {{item.activityType}} · {{item.role || '参与者'}}</view>
+          <view wx:if="{{item.host}}" class="activity-meta">老师 · {{item.host}}</view>
+          <view class="deduction">{{item.deduction_summary || '—'}}</view>
+          <view wx:if="{{tab === 'checkins' && !item.withdrawn && !item.checked}}" class="show-code" data-key="{{item.activity_key}}" bindtap="onShowCode">出示核销码</view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{!loading && !error && !items.length && !groups.length}}" class="empty">暂无记录</view>
+    <view wx:if="{{hasMore && !loading && !error}}" class="all-link" bindtap="onRetry">继续加载 ›</view>
+  </block>
+  <view wx:if="{{error}}" class="empty" bindtap="onRetry">{{error}} · 点击重试</view>
+  <view wx:elif="{{loading}}" class="empty">加载中…</view>
+  <view wx:if="{{memberOnly}}" class="member-logout" bindtap="onLogout">退出登录</view>
+</view>
+<view wx:if="{{showCode}}" class="code-mask" bindtap="closeCode" catchtouchmove="noop">
+  <view class="code-sheet" catchtap="noop">
+    <view class="code-title">活动核销码</view>
+    <image wx:if="{{codeImage}}" class="code-image" src="{{codeImage}}" mode="aspectFit" />
+    <view wx:elif="{{codeLoading}}" class="code-placeholder">生成中…</view>
+    <view wx:else class="code-placeholder">{{codeError}}</view>
+    <text class="code-note">请向工作人员出示，二维码10分钟内有效</text>
+    <view class="code-actions"><view bindtap="closeCode">关闭</view><view bindtap="onShowCode">刷新二维码</view></view>
+  </view>
+</view>

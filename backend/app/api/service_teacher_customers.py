@@ -185,9 +185,9 @@ def export_follow_ups(
         for item in result["items"]
     ]
     definition_label = {
-        "none": "客户信息或跟进点最近一项",
-        "both": "客户信息和跟进点",
-        "customer_info": "客户信息",
+        "none": "深度需求或跟进点最近一项",
+        "both": "深度需求和跟进点",
+        "customer_info": "深度需求",
         "follow_up": "跟进点",
     }[follow_up_definition]
     normalized_filter = {"inactive_30": "inactive", "active_30": "active"}.get(follow_up_filter, follow_up_filter)
@@ -195,7 +195,7 @@ def export_follow_ups(
     record_service_teacher_action(request, f"导出跟进记录：服务老师 {teacher}；{definition_label}；{filter_label}；共{len(rows)}人", export=True)
     return _xlsx_response(
         "跟进记录",
-        ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近客户信息", "客户信息反馈人", "客户信息创建人", "客户信息录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"],
+        ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近深度需求", "深度需求反馈人", "深度需求创建人", "深度需求录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"],
         rows,
         f"服务老师跟进记录_{teacher or '未选择'}.xlsx",
     )
@@ -215,7 +215,7 @@ def list_course_participants(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    """课程记录的「参与者」页签：自己课程的全部参与者 + 当天的来访需求 / 客户信息 / 跟进点。"""
+    """课程记录的「参与者」页签：自己课程的全部参与者 + 当天的来访需求 / 深度需求 / 跟进点。"""
     from app.api.statistics import get_course_statistics
 
     result = get_course_statistics(
@@ -286,7 +286,7 @@ def list_course_participants(
     rows.sort(key=lambda item: (item["course_date"], item["nickname"]), reverse=True)
 
     def same_course_key(row: dict) -> str:
-        """同类活动的口径：沙龙活动/内部课程有二级分类（按具体课程算），
+        """同类活动的口径：沙龙活动/沙龙技能学习有二级分类（按具体课程算），
         觉醒游戏、情绪释放、能量结没有二级（按整个活动类型算）。"""
         if row.get("activity_type") in ("class", "ics"):
             name = str(row.get("course_subtype") or row.get("course_name") or "")
@@ -338,13 +338,15 @@ def list_course_participants(
             row["visit_need"] = "；".join(daily_needs[key])
             row["customer_info"] = (getattr(visit, "feedback", None) or "").strip()
             row["follow_up"] = (getattr(visit, "healing_notes", None) or "").strip()
+            row["customer_feedback"] = (getattr(visit, "experience", None) or "").strip()
     # 同一个字段可能是不同人分别填写的：按填写人拆成多条，前端逐人换行展示
     notes_by_visit = visit_note_service.group_notes_by_visit(
         [row["visit_id"] for row in page_rows if row["visit_id"]]
     )
     for row in page_rows:
-        for field in ("visit_need", "customer_info", "follow_up"):
+        for field in ("visit_need", "customer_info", "follow_up", "customer_feedback"):
             entries = (notes_by_visit.get(row["visit_id"]) or {}).get(field, [])
+            row.setdefault(field, "")
             if not entries and row[field]:
                 # 兼容还没有独立填写记录的历史内容
                 entries = [{"author": "", "content": row[field], "at": ""}]
@@ -455,7 +457,7 @@ def list_customers(
 ):
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
     teacher = (service_teacher or _actor_name(request)).strip()
-    definitions = {"none": "客户信息或跟进点最近一项", "both": "客户信息和跟进点", "customer_info": "客户信息", "follow_up": "跟进点"}
+    definitions = {"none": "深度需求或跟进点最近一项", "both": "深度需求和跟进点", "customer_info": "深度需求", "follow_up": "跟进点"}
     normalized_filter = {"inactive_30": "inactive", "active_30": "active"}.get(follow_up_filter, follow_up_filter)
     filters = {"inactive": f"近{follow_up_days}天未录入", "active": f"近{follow_up_days}天已录入", "all": "全部客户"}
     record_service_teacher_action(request, f"查询跟进记录：服务老师 {teacher}；包含 {definitions[follow_up_definition]}；{filters[normalized_filter]}；第{page}页")

@@ -34,6 +34,13 @@ fi
 CONFIG_JS="$MP_DIR/utils/config.js"
 API_JS="$MP_DIR/utils/api.js"
 
+# 静态业务目录须与唯一源一致，避免小程序上传时遗漏类型/默认值。
+if python3 "$PROJECT_ROOT/scripts/generate-business-catalog.py" --check; then
+  pass "业务目录配置已同步"
+else
+  fail "业务目录配置未同步"
+fi
+
 # ── 1. DEV 总开关：提审包必须是生产态 ─────────────────────────
 if [ -f "$CONFIG_JS" ]; then
   if grep -qE "const DEV\s*=\s*true" "$CONFIG_JS"; then

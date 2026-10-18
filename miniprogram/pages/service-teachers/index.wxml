@@ -1,3 +1,4 @@
+<import src="../../templates/note-feedback-meta.wxml" />
 <page-meta page-style="{{participantEditing ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page {{activeTab === 'courses' && courseViewTab === 'courses' ? 'course-records-page' : ''}} {{activeTab === 'courses' && courseViewTab === 'participants' ? 'course-participants-page' : ''}} {{activeTab === 'courses' && courseViewTab === 'reviews' ? 'course-reviews-page' : ''}}">
   <!-- 课程记录 / 参与者 / 复盘记录：放到页面顶部（与组织/俱乐部页面的 tab 一致） -->
@@ -78,7 +79,7 @@
         <text class="filter-label">包含</text>
         <view class="definition-group">
           <view class="definition-option {{includeCustomerInfo ? 'active' : ''}}" data-definition="customer_info" bindtap="onDefinitionTap">
-            <view class="check-box">{{includeCustomerInfo ? '✓' : ''}}</view><text>客户信息</text>
+            <view class="check-box">{{includeCustomerInfo ? '✓' : ''}}</view><text>深度需求</text>
           </view>
           <view class="definition-option {{includeFollowUp ? 'active' : ''}}" data-definition="follow_up" bindtap="onDefinitionTap">
             <view class="check-box">{{includeFollowUp ? '✓' : ''}}</view><text>跟进点</text>
@@ -187,17 +188,26 @@
           </view>
           <view class="p-field {{!item.visit_need ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">来访需求</text>
-            <text class="p-field-value" wx:if="{{item.visit_need}}">{{item.visit_need}}</text>
+            <view class="p-field-value p-note-value" wx:if="{{item.visit_need_entries.length}}"><template is="note-feedback-records" data="{{entries: item.visit_need_entries}}" /></view>
+            <text class="p-field-value" wx:elif="{{item.visit_need}}">{{item.visit_need}}</text>
             <view class="p-field-input" wx:else>点击填写</view>
           </view>
           <view class="p-field {{!item.customer_info ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
-            <text class="p-field-label">客户信息</text>
-            <text class="p-field-value" wx:if="{{item.customer_info}}">{{item.customer_info}}</text>
+            <text class="p-field-label">深度需求</text>
+            <view class="p-field-value p-note-value" wx:if="{{item.customer_info_entries.length}}"><template is="note-feedback-records" data="{{entries: item.customer_info_entries}}" /></view>
+            <text class="p-field-value" wx:elif="{{item.customer_info}}">{{item.customer_info}}</text>
             <view class="p-field-input" wx:else>点击填写</view>
           </view>
           <view class="p-field {{!item.follow_up ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">跟进点</text>
-            <text class="p-field-value" wx:if="{{item.follow_up}}">{{item.follow_up}}</text>
+            <view class="p-field-value p-note-value" wx:if="{{item.follow_up_entries.length}}"><template is="note-feedback-records" data="{{entries: item.follow_up_entries}}" /></view>
+            <text class="p-field-value" wx:elif="{{item.follow_up}}">{{item.follow_up}}</text>
+            <view class="p-field-input" wx:else>点击填写</view>
+          </view>
+          <view class="p-field {{!item.customer_feedback ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_feedback" bindtap="onParticipantOpenEdit">
+            <text class="p-field-label">客户反馈</text>
+            <view class="p-field-value p-note-value" wx:if="{{item.customer_feedback_entries.length}}"><template is="note-feedback-records" data="{{entries: item.customer_feedback_entries}}" /></view>
+            <text class="p-field-value" wx:elif="{{item.customer_feedback}}">{{item.customer_feedback}}</text>
             <view class="p-field-input" wx:else>点击填写</view>
           </view>
         </view>
@@ -256,7 +266,7 @@
         </view>
         <view class="record-meta"><text>{{item.member_type || '—'}}</text><text>{{item.follow_up_status || '未配置'}}</text><text>{{item.lastAtText || '暂无录入'}}</text></view>
         <view class="note-block">
-          <text class="note-title">最近客户信息</text>
+          <text class="note-title">最近深度需求</text>
           <view class="note-entry" wx:if="{{item.latest_customer_info_content}}">
             <text class="note-author">{{item.customerInfoAttribution || '未知'}}</text>
             <text class="note-content {{contentExpanded ? 'expanded' : ''}}">{{item.latest_customer_info_content}}</text>
@@ -292,7 +302,7 @@
         <text class="edit-reference-title">别人填写的</text>
         <block wx:if="{{participantEditing.allEntries.length}}">
           <view class="reference-entry" wx:for="{{participantEditing.allEntries}}" wx:key="at">
-            <view class="reference-meta"><text class="reference-author">{{item.author || '未知'}}</text><view class="reference-right"><text wx:if="{{item.timeText}}">{{item.timeText}}</text><text wx:if="{{item.created_by}}">创建人：{{item.created_by}}</text></view></view>
+            <view class="reference-meta"><view class="note-feedback-author"><template is="note-feedback-meta" data="{{author: item.author, nextFollowUpText: item.nextFollowUpText, inline: true}}" /></view><view class="reference-right"><text wx:if="{{item.timeText}}">{{item.timeText}}</text><text wx:if="{{item.created_by}}">{{item.created_by}}<text class="attribution-action">创建</text></text></view></view>
             <text class="edit-reference-text">{{item.content}}</text>
           </view>
         </block>

@@ -29,7 +29,7 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "oh-card-readings", label: "OH卡诊断" },
   { value: "energy-knots", label: "能量结" },
   { value: "tea-seat-fees", label: "茶位费" },
-  { value: "internal-courses", label: "内部课程" },
+  { value: "internal-courses", label: "沙龙技能学习" },
   { value: "other-projects", label: "其他项目" },
 ]
 
@@ -40,7 +40,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "oh-card-readings": "OH卡诊断",
   "energy-knots": "能量结",
   "tea-seat-fees": "茶位费",
-  "internal-courses": "内部课程",
+  "internal-courses": "沙龙技能学习",
   "other-projects": "其他项目",
 }
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.base import StrictBaseModel
+from app.models.payment_course import PaymentCourseFields
 from app.models.project_deduction import ProjectDeductionCreate
 from app.services import customer_access_service, customer_service, project_deduction_service
 from app.utils.pagination import paginate
@@ -9,7 +10,7 @@ from app.utils.record_ownership import ensure_payment_record_manager, get_reques
 router = APIRouter(prefix="/api/project-deductions", tags=["project-deductions"])
 
 
-class CoarseDoorCourseDeductionCreate(StrictBaseModel):
+class CoarseDoorCourseDeductionCreate(PaymentCourseFields, StrictBaseModel):
     customer_id: str
     record_type: str
     record_id: str
@@ -39,6 +40,9 @@ def edit_coarse_door_course(deduction_id: str, data: CoarseDoorCourseDeductionCr
     ensure_payment_record_manager(request, record)
     customer_access_service.require_customer_scope(request, record.customer_id, action="修改")
     before = record.model_dump(mode="json")
+    from app.services.payment_course_service import normalize_course
+
+    normalize_course(data, record, request)
     try:
         result = project_deduction_service.edit_coarse_door_course_deduction(deduction_id, data.model_dump(), get_request_actor(request)[1])
         from app.services.member_identity_service import refresh_coarse_identity
@@ -59,6 +63,9 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
     _, actor_name = get_request_actor(request)
     course_organization_id = data.course_organization_id or data.organization_id
     settlement_organization_id = data.settlement_organization_id or course_organization_id
+    from app.services.payment_course_service import normalize_course
+
+    normalize_course(data, request=request)
     try:
         deduction = project_deduction_service.create_coarse_door_course_deduction(
             data.customer_id,
@@ -70,6 +77,8 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
             data.closers,
             data.notes,
             actor_name,
+            deal_course_key=data.deal_course_key,
+            deal_course_name=data.deal_course_name,
         )
         result = deduction.model_dump(mode="json")
         from app.services.member_identity_service import refresh_coarse_identity

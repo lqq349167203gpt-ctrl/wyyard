@@ -201,7 +201,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex w-full min-w-0 max-w-full min-h-0 flex-1 flex-col gap-3">
       {formOnly && <div className="bg-white">
         {showHeader && <DialogHeader className="border-b px-6 pb-4 pt-5">
           <DialogTitle className="text-base">{editRecord ? "编辑粗门次卡" : "新增粗门次卡"}</DialogTitle>
@@ -254,7 +254,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
         </div>
       </div>}
 
-      {!formOnly && <div className="min-h-0 flex-1 overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
+      {!formOnly && <div className="w-full min-w-0 max-w-full min-h-0 flex-1 overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <div className="flex items-center justify-end border-b border-[#f0f0f0] px-4 py-2.5">
           <Button size="sm" className="h-8 bg-[#212631] text-[12px] font-normal hover:bg-[#303641]" onClick={() => setEntryOpen(true)}>
             <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" />新增
@@ -263,27 +263,29 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
         <Table style={{ tableLayout: "fixed" }}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[105px] pl-4">成交日期</TableHead>
+              <TableHead className="pl-4" style={{ width: "100px" }}>成交日期</TableHead>
               <TableHead className="w-[110px]">用户</TableHead>
-              <TableHead className="w-[130px]">成交归属</TableHead>
-              <TableHead className="w-[130px]">课程所属</TableHead>
               <TableHead>所扣课程</TableHead>
               <TableHead className="w-[105px]">课程日期</TableHead>
               <TableHead className="w-[80px]">抵扣次数</TableHead>
-              <TableHead className="w-[110px]">成交人</TableHead>
+              <TableHead style={{ width: "100px" }}>成交人</TableHead>
               <TableHead className="w-[120px]">备注</TableHead>
-              <TableHead className="w-[90px]">创建人</TableHead>
+              <TableHead style={{ width: "80px" }}>创建人</TableHead>
               <TableHead className="w-[56px] pr-4 text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {records.map(record => (
               <TableRow key={record.id} className="group">
-                <TableCell className="pl-4 text-[12px]">{record.deduction_date || <EmptyValue />}</TableCell>
+                <TableCell className="pl-4 text-[12px]">
+                  <div className="truncate">{record.deduction_date || <EmptyValue />}</div>
+                  <div className="mt-1 truncate text-[12px] text-[#a8adb5]" title={record.organization_name}>{record.organization_name || <EmptyValue />}</div>
+                </TableCell>
                 <TableCell className="truncate text-[12px]" title={record.nickname}>{record.nickname}</TableCell>
-                <TableCell className="truncate text-[12px]" title={record.organization_name}>{record.organization_name || <EmptyValue />}</TableCell>
-                <TableCell className="truncate text-[12px]" title={record.source_organization_name}>{record.source_organization_name || <EmptyValue />}</TableCell>
-                <TableCell className="truncate text-[12px]" title={record.source_activity_name}>{record.source_activity_name || record.reason}</TableCell>
+                <TableCell className="text-[12px]">
+                  <div className="truncate" title={record.source_activity_name}>{record.source_activity_name || record.reason}</div>
+                  <div className="mt-1 truncate text-[12px] text-[#a8adb5]" title={record.source_organization_name}>{record.source_organization_name || <EmptyValue />}</div>
+                </TableCell>
                 <TableCell className="text-[12px]">{record.source_activity_date || <EmptyValue />}</TableCell>
                 <TableCell className="text-[12px]">{record.count} 次{record.cancelled && <div className="text-[12px] text-[#8f959e]">已取消｜已从课程移除</div>}</TableCell>
                 <TableCell className="truncate text-[12px]" title={(record.closers || []).map(item => item.name).join("、") || record.closer_name}>

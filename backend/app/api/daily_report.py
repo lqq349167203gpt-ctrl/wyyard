@@ -34,7 +34,7 @@ def report_activities(course_data, arrived_by_date=None, coarse_customers=None):
         ("gcs_sessions", "group_case", "gcs", "觉醒游戏"),
         ("ers_sessions", "emotional_release", "ers", "情绪释放"),
         ("eks_sessions", "energy_knot", "eks", "能量结"),
-        ("ics_sessions", "internal_course", "ics", "内部课程"),
+        ("ics_sessions", "internal_course", "ics", "沙龙技能学习"),
     )
     activities = []
     for key, source, kind, label in types:
@@ -101,6 +101,7 @@ def read_finance_sources(request: Request, date: date, mobile: bool = False):
         "ers": emotional_release_sessions.list_sessions(date=day, page=None, page_size=None, request=request),
         "eks": energy_knot_sessions.list_sessions(date=day, page=None, page_size=None, request=request),
     }
+    session_sources = {key: [item.model_dump(mode="json") for item in items] for key, items in session_sources.items()}
     deductions = [r.model_dump(mode="json") for r in project_deduction_service.list_deductions(include_cancelled=True) if r.customer_id in visible_ids]
     relevant_ids = {v.customer_id for v in visit_service.list_visits(day) if v.customer_id in visible_ids}
     for activity in class_record_service.list_records(day):

@@ -9,7 +9,7 @@ const { disposeReads } = require('../../utils/read-scope')
 const { readSource, retrySources } = require('../../utils/source-state')
 const {
   ACTIVITY_TYPES, TYPE_LABELS, TEACHER_POSITION,
-  SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES,
+  SINGLE_TEACHER_TYPES, ICS_COURSE_TYPES, LEARNING_COURSE_GROUPS,
 } = require('../../utils/activity-constants')
 
 Page({
@@ -31,10 +31,11 @@ Page({
     // 课程（沙龙）
     courses: [],
     courseIndex: -1,
-    // 内部课程类型
+    // 沙龙技能学习类型
     icsCourses: ICS_COURSE_TYPES,
+    icsCourseGroups: LEARNING_COURSE_GROUPS,
     icsCourseType: '',
-    // 活动方式（沙龙/内部课程）
+    // 活动方式（沙龙/沙龙技能学习）
     activityModes: ['线下', '线上'],
     activityModeIndex: 0,
     // 案主（觉醒/情绪释放/能量结）
@@ -251,8 +252,7 @@ Page({
     this.setData({ date: e.detail.value })
     this.loadDayVisitors(e.detail.value)
   },
-  onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
-  onEndTimeChange(e) { this.setData({ endTime: e.detail.value }) },
+  onTimeRangeChange(e) { this.setData({ startTime: e.detail.start, endTime: e.detail.end }) },
 
   // 空间/房间联动
   onSpaceChange(e) {

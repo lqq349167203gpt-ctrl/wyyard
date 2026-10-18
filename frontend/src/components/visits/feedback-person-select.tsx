@@ -15,10 +15,11 @@ export function currentFeedbackPersonName(): string {
   }
 }
 
-export function FeedbackPersonSelect({ options, value, onChange }: {
+export function FeedbackPersonSelect({ options, value, onChange, compact = false }: {
   options: FeedbackPersonOption[]
   value: string
   onChange: (value: string) => void
+  compact?: boolean
 }) {
   return (
     <SelectDropdown
@@ -27,9 +28,9 @@ export function FeedbackPersonSelect({ options, value, onChange }: {
       onChange={onChange}
       placeholder="选择反馈人"
       size="sm"
-      className="w-[180px]"
-      buttonClassName="!h-8 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2.5 !text-[12px] !shadow-none"
-      dropdownWidth={180}
+      className={compact ? "w-full" : "w-[180px]"}
+      buttonClassName={`${compact ? "!h-[26px]" : "!h-8"} !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2.5 !text-[12px] !shadow-none`}
+      dropdownWidth={compact ? undefined : 180}
       menuMaxHeight={240}
     />
   )

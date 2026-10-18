@@ -546,9 +546,9 @@ Page({
         dashboard.ics_sessions.forEach(r => {
           rawMap[`internal_course_${r.id}`] = r
           records.push({
-            id: r.id, badge: '内部课程',
+            id: r.id, badge: '沙龙技能学习',
             name: r.course_name || r.course_type || '',
-            color: BADGE_COLORS['内部课程'],
+            color: BADGE_COLORS['沙龙技能学习'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: r.host_name || (r.teacher_names || [])[0] || '',
             deductionCount: r.membership_deduction_count,
@@ -608,7 +608,7 @@ Page({
         { recordType: 'gcs', typeLabel: '觉醒游戏', records: dashboard.gcs_sessions || [], owner: true },
         { recordType: 'ers', typeLabel: '情绪释放', records: dashboard.ers_sessions || [], owner: true },
         { recordType: 'eks', typeLabel: '能量结', records: dashboard.eks_sessions || [], owner: true },
-        { recordType: 'ics', typeLabel: '内部课程', records: dashboard.ics_sessions || [], owner: false },
+        { recordType: 'ics', typeLabel: '沙龙技能学习', records: dashboard.ics_sessions || [], owner: false },
       ]
       withdrawalSources.forEach(function(source) {
         source.records.filter(function(record) {

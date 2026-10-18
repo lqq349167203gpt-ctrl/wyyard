@@ -1,5 +1,6 @@
 const { principalApi, customerApi } = require('../../utils/api')
 const { BASE_URL } = require('../../utils/config')
+const { followUpPlanText, noteRecordText } = require('../../utils/note-feedback-meta')
 // 引流客户列表的列（与 PC 的列表设置一致）：档案类字段只有该角色有权限时才出现
 const TRAFFIC_COLUMNS = [
   { key: 'name', label: '昵称（引流日期）' }, { key: 'referrer', label: '引流人' },
@@ -369,7 +370,7 @@ Page({
       orders: ['label', 'classification', 'closers', 'organization'],
       courses: ['type', 'teachers', 'participants', 'hours', 'owner'],
       participant: ['name', 'type', 'teachers', 'hours', 'participant_category'],
-      teacher_follow_up: ['teachers', 'name', 'follow_up_status', 'customer_info', 'follow_up', 'visit_need'],
+      teacher_follow_up: ['teachers', 'name', 'follow_up_status', 'customer_info', 'follow_up', 'visit_need', 'customer_feedback'],
       traffic: ['referrer', 'referrer_handler', 'identity', 'follow_up_status', 'traffic_source', 'tags'],
       invite: ['identity', 'arrive_inviter', 'initiated_count', 'cancel_count', 'no_show_count', 'arrive_count', 'same_day_deals'],
     }[group]
@@ -384,7 +385,7 @@ Page({
       .filter(Boolean)
     const rest = columns.filter(c => c !== titleColumn && c !== dateColumn && ordered.indexOf(c) < 0)
     // 新人/老人名单也是长文本：不放进标签，跟客户档案一样单独一行完整显示（不再提示「见明细」）
-    const LONG_FIELDS = ['new_names', 'old_names', 'coarse_names', 'absent_names', 'visit_need', 'customer_info', 'follow_up']
+    const LONG_FIELDS = ['new_names', 'old_names', 'coarse_names', 'absent_names', 'visit_need', 'customer_info', 'follow_up', 'customer_feedback']
     // 分三类展示：分类值（身份/阶段/来源/标签/类型/老师…）做成小标签，
     // 数字单独一行带短前缀（到店 3 次 / 课时 1），没值的不显示，长文本进明细弹窗
     // 会员身份挪到昵称右边单独显示，其余分类值都带上自己的标题前缀，避免看不出是什么
@@ -652,9 +653,9 @@ Page({
       selects.push(select('引流人', 'traffic', unassignedFirst((breakdown.traffic || []).map(item => {
         const customers = item.customers || []
         const consumers = mobile ? item.consumer_count || 0 : customers.filter(customer => Number(customer.deals || 0) > 0).length
-        const trial = mobile ? item.trial_count || 0 : firstLevel ? customers.filter(customer => (customer.upsell_levels || []).length === 1 && customer.upsell_levels[0].key === firstLevel).length : 0
+        const trial = mobile ? item.trial_count || 0 : firstLevel ? customers.filter(customer => breakdown.purchase_rules_configured ? (customer.upsell_levels || []).some(level => level.key === 'experience') : (customer.upsell_levels || []).length === 1 && customer.upsell_levels[0].key === firstLevel).length : 0
         const upsell = mobile ? item.upsell_count || 0 : customers.filter(customer => Number(customer.deals || 0) > 0 && customer.is_upsell).length
-        return { key: item.key, label: item.label, text: `引流 ${item.count} 人`, note: `（体验卡 ${rate(trial, mobile ? item.count : customers.length)} · 升单 ${rate(upsell, consumers)}）` }
+        return { key: item.key, label: item.label, text: `引流 ${item.count} 人`, note: `（${breakdown.purchase_rules_configured ? '体验' : '体验卡'} ${rate(trial, mobile ? item.count : customers.length)} · 升单 ${rate(upsell, consumers)}）` }
       }))))
       selects.push(select('会员身份', 'identity', unassignedFirst((filters.identity || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })))))
       selects.push(select('升单情况', 'upsell', (filters.upsell || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })), true))
@@ -704,7 +705,8 @@ Page({
         const upsell = picked('upsell')
         if (upsell.length) {
           const levels = customer.upsell_levels || []
-          if (!levels.length || !upsell.includes(levels[levels.length - 1].key)) return false
+          const applicable = breakdown.purchase_rules_configured ? levels : levels.slice(-1)
+          if (!applicable.some(level => upsell.includes(level.key))) return false
         }
         return true
       })
@@ -770,13 +772,14 @@ Page({
         rows: [],
       })
       const course = teacher.courses.get(courseKey)
-      const notes = ['visit_need', 'customer_info', 'follow_up'].map(key => {
+      const notes = ['visit_need', 'customer_info', 'follow_up', 'customer_feedback'].map(key => {
         const entries = row[`${key}_entries`] || []
-        return entries.length ? entries.map(entry => `${entry.author || '反馈人未记录'}：${entry.content}`).join('\n') : String(row[key] || '')
+        return noteRecordText(entries, String(row[key] || ''))
       })
       course.rows.push({
         id: row.id, customer_id: row.customer_id, course_id: row.course_id,
         customer: row.customer, feedback: notes, ownerFirst: row.participant_role === '案主',
+        followUpEntries: (row.follow_up_entries || []).map(entry => ({ ...entry, nextFollowUpText: followUpPlanText(entry) })),
       })
     })
     return [...days.values()].map(day => {
@@ -813,11 +816,11 @@ Page({
     if (this.data.loading && this.data.query.tab === 'overview' && this.data.overviewGroup === 'courses') return
     const row = (this._sourceRows || []).find(item => item.id === e.currentTarget.dataset.id)
     if (!row) return
-    const fields = [ ['visit_need', '来访需求'], ['customer_info', '客户信息'], ['follow_up', '跟进点'] ]
+    const fields = [ ['visit_need', '来访需求'], ['customer_info', '深度需求'], ['follow_up', '跟进点'], ['customer_feedback', '客户反馈'] ]
     const sections = fields.map(([key, label]) => ({
       label,
       entries: (row[`${key}_entries`] || []).map(entry => ({
-        ...entry, atText: shanghaiDateTime(entry.at),
+        ...entry, atText: shanghaiDateTime(entry.at), nextFollowUpText: followUpPlanText(entry),
       })),
       fallback: row[key] || '', creators: row[`${key}_creators`] || '',
     }))

@@ -141,7 +141,7 @@ def metadata(request: Request, lite: bool = False):
             "scope": permissions["principal_scope"], "products": options,
             "transaction_access": permissions["customer_access"]["transaction_access"],
             "can_view_follow_up": permissions["customer_access"].get("detail_tabs", {}).get("follow_up") is True,
-            "activity_types": [{"key": k, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "attendance" and e["product"] == k and e["subtype"]})} for k, label in [("class", "沙龙活动"), ("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "能量结"), ("ics", "内部课程")]]}
+            "activity_types": [{"key": k, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "attendance" and e["product"] == k and e["subtype"]})} for k, label in [("class", "沙龙活动"), ("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "能量结"), ("ics", "沙龙技能学习")]]}
 
 
 @router.get("/rule-fields")

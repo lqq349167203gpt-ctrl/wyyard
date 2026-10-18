@@ -104,19 +104,28 @@
     <view class="visit-list">
       <view class="switching-line" wx:if="{{dateSwitching}}"></view>
       <view class="visit-items {{dateSwitching ? 'switching' : ''}}">
+        <block wx:for="{{visitGroups}}" wx:key="slot" wx:for-item="group">
+        <view class="visit-time-group">
+          <text class="visit-time-label">{{group.label}} · {{group.count}}人</text>
+          <view class="visit-stage-actions">
+            <view aria-role="button" class="visit-stage-button {{group.filter === 'new' ? 'selected' : ''}}" data-stage="new" catchtap="onCustomerStageFilter" aria-label="{{group.label}}新人{{group.newCount}}，{{group.filter === 'new' ? '再次点击取消当天新人筛选' : '筛选当天全部新人'}}">新人{{group.newCount}}</view>
+            <view aria-role="button" class="visit-stage-button {{group.filter === 'returning' ? 'selected' : ''}}" data-stage="returning" catchtap="onCustomerStageFilter" aria-label="{{group.label}}老人{{group.oldCount}}，{{group.filter === 'returning' ? '再次点击取消当天老人筛选' : '筛选当天全部老人'}}">老人{{group.oldCount}}</view>
+          </view>
+        </view>
+        <view wx:if="{{!group.items.length}}" class="visit-stage-empty">暂无{{group.filter === 'new' ? '新人' : '老人'}}，再次点击已选按钮可显示全部</view>
         <visit-card
-          wx:for="{{visits}}"
+          wx:for="{{group.items}}"
           wx:key="id"
           visit="{{item}}"
           leader-name="{{leaderMap[item.customer_id] || ''}}"
           edit-mode="{{editMode}}"
           editable="{{item.can_edit && !isDayVerified}}"
           cancelable="{{!isViewOnly && !isDayVerified}}"
-          sortable="{{!isViewOnly && !isDayVerified}}"
+          sortable="{{!isViewOnly && !isDayVerified && !group.filter}}"
           arrival-editable="{{!isViewOnly && !isDayVerified && !item.cancelled}}"
-          can-move-up="{{index > 0}}"
-          can-move-down="{{index < visits.length - 1}}"
-          is-last="{{index === visits.length - 1}}"
+          can-move-up="{{item.can_move_up}}"
+          can-move-down="{{item.can_move_down}}"
+          is-last="{{index === group.items.length - 1}}"
           bind:cardtap="onVisitTap"
           data-visit="{{item}}"
 
@@ -127,6 +136,7 @@
           bind:moveup="onMoveUp"
           bind:movedown="onMoveDown"
         />
+        </block>
       </view>
     </view>
   </view>

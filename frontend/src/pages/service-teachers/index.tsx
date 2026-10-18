@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Download } from "lucide-react"
 import { CourseRosterNames } from "@/components/course-roster-names"
+import { NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
 import { loadExcel } from "@/lib/excel"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -40,7 +41,7 @@ const DEFAULT_ACTIVITY_TYPES = [
   { value: "gcs", label: "觉醒游戏" },
   { value: "ers", label: "情绪释放" },
   { value: "eks", label: "能量结" },
-  { value: "ics", label: "内部课程" },
+  { value: "ics", label: "沙龙技能学习" },
 ]
 type ServiceTeacherTab = "courses" | "follow-ups"
 type CourseViewTab = "courses" | "reviews" | "participants"
@@ -53,9 +54,10 @@ const PARTICIPANT_COLUMNS = [
   { key: "nickname", label: "昵称", width: "10%" },
   { key: "identity", label: "身份", width: "9%" },
   { key: "same_count", label: "同类活动参与数", width: "11%" },
-  { key: "visit_need", label: "当天的来访需求", width: "23%" },
-  { key: "customer_info", label: "客户信息", width: "23%" },
-  { key: "follow_up", label: "跟进点", width: "24%" },
+  { key: "visit_need", label: "当天的来访需求", width: "17.5%" },
+  { key: "customer_info", label: "深度需求", width: "17.5%" },
+  { key: "follow_up", label: "跟进点", width: "17.5%" },
+  { key: "customer_feedback", label: "客户反馈", width: "17.5%" },
 ]
 const COURSE_VIEW_TABS: Array<{ key: CourseViewTab; label: string }> = [
   { key: "courses", label: "课程记录" },
@@ -182,7 +184,7 @@ function ParticipantNoteLines({
   fallback: string
   expanded?: boolean
 }) {
-  const list = entries.length > 0 ? entries : (fallback ? [{ author: "", content: fallback, at: "" }] : [])
+  const list: CourseParticipantNoteEntry[] = entries.length > 0 ? entries : (fallback ? [{ author: "", content: fallback, at: "" }] : [])
   if (list.length === 0) return null
   if (expanded) {
     return (
@@ -190,10 +192,10 @@ function ParticipantNoteLines({
         {list.map((entry, index) => (
           <div key={`${entry.author}-${index}`} className="border-b border-[#eceef0] pb-1.5 last:border-b-0 last:pb-0">
             <div className="flex min-w-0 items-baseline gap-2">
-              {entry.author && <span className="min-w-0 flex-1 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>}
+              {entry.author && <span className="min-w-0 flex-1 text-[12px] leading-5"><NoteFeedbackMeta author={entry.author} plan={entry} inline /></span>}
               <span className="ml-auto flex shrink-0 items-center gap-2 text-right text-[11px] text-[#8f959e]">
                 {entry.at && <span className="tabular-nums">{formatDateTime(entry.at)}</span>}
-                {entry.created_by && <span className="max-w-[145px] truncate" title={`创建人：${entry.created_by}`}>创建人：{entry.created_by}</span>}
+                {entry.created_by && <span className="max-w-[145px] truncate" title={`${entry.created_by} 创建`}>{entry.created_by}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>}
               </span>
             </div>
             <div className="mt-0.5 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{entry.content}</div>
@@ -207,9 +209,9 @@ function ParticipantNoteLines({
   return (
     <div className="space-y-0.5">
       {visible.map((entry, index) => (
-        <div key={`${entry.author}-${index}`} className="flex min-w-0 items-baseline gap-2">
+        <div key={`${entry.author}-${index}`} className="min-w-0 border-t border-[#eceef0] pt-1.5 first:border-t-0 first:pt-0">
           {entry.author && (
-            <span className="max-w-[120px] shrink-0 truncate text-[12px] text-[#8f959e]" title={entry.author}>{entry.author}</span>
+            <span className="block text-[12px] leading-5"><NoteFeedbackMeta author={entry.author} plan={entry} inline /></span>
           )}
           <span
             className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a] group-hover:text-[#3370ff]"
@@ -269,7 +271,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [truncatedReviewIds, setTruncatedReviewIds] = useState<string[]>([])
   const reviewRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
   const [reviewMeasureTick, setReviewMeasureTick] = useState(0)
-  // 「参与者」页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点（可以填自己那份）
+  // 「参与者」页签：自己课程的全部参与者 + 当天的来访需求/深度需求/跟进点（可以填自己那份）
   const [participantGroups, setParticipantGroups] = useState<CourseParticipantGroup[]>([])
   const [participantTotalParticipants, setParticipantTotalParticipants] = useState(0)
   const [participantTotal, setParticipantTotal] = useState(0)
@@ -283,7 +285,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [participantMemberTypes, setParticipantMemberTypes] = useState<string[]>([])
   const [participantEditing, setParticipantEditing] = useState<{
     row: CourseParticipantRow
-    field: "visit_need" | "customer_info" | "follow_up"
+    field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback"
   } | null>(null)
   const [participantDraft, setParticipantDraft] = useState("")
   const [participantMyNoteId, setParticipantMyNoteId] = useState("")
@@ -449,7 +451,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
     return () => clearTimeout(timer)
   }, [participantKeyword])
 
-  const openParticipantEditor = async (row: CourseParticipantRow, field: "visit_need" | "customer_info" | "follow_up") => {
+  const openParticipantEditor = async (row: CourseParticipantRow, field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback") => {
     setParticipantEditing({ row, field })
     setParticipantMyNoteId("")
     setParticipantDraft("")
@@ -540,8 +542,8 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   }
 
   const followUpDefinitionLabel = followUpDefinition === "both"
-    ? "客户信息、跟进点"
-    : followUpDefinition === "customer_info" ? "客户信息" : followUpDefinition === "follow_up" ? "跟进点" : "客户信息或跟进点最近一项"
+    ? "深度需求、跟进点"
+    : followUpDefinition === "customer_info" ? "深度需求" : followUpDefinition === "follow_up" ? "跟进点" : "深度需求或跟进点最近一项"
 
   const toggleFollowUpDefinition = (definition: "customer_info" | "follow_up", checked: boolean) => {
     if (definition === "customer_info") {
@@ -652,10 +654,10 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         { header: "客户昵称", key: "nickname", width: 16 },
         { header: "会员身份", key: "memberType", width: 16 },
         { header: "跟进阶段", key: "followUpStatus", width: 16 },
-        { header: "最近客户信息", key: "customerInfo", width: 42 },
-        { header: "客户信息反馈人", key: "customerInfoBy", width: 16 },
-        { header: "客户信息创建人", key: "customerInfoCreatedBy", width: 16 },
-        { header: "客户信息录入时间", key: "customerInfoAt", width: 22 },
+        { header: "最近深度需求", key: "customerInfo", width: 42 },
+        { header: "深度需求反馈人", key: "customerInfoBy", width: 16 },
+        { header: "深度需求创建人", key: "customerInfoCreatedBy", width: 16 },
+        { header: "深度需求录入时间", key: "customerInfoAt", width: 22 },
         { header: "最近跟进点", key: "followUp", width: 42 },
         { header: "跟进点反馈人", key: "followUpBy", width: 16 },
         { header: "跟进点创建人", key: "followUpCreatedBy", width: 16 },
@@ -875,7 +877,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                     onChange={event => toggleFollowUpDefinition("customer_info", event.target.checked)}
                     className="h-3.5 w-3.5 accent-[#3370ff]"
                   />
-                  客户信息
+                  深度需求
                 </label>
                 <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[#646a73]">
                   <input
@@ -1030,7 +1032,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                               </td>
                               <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</td>
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
-                              {(["visit_need", "customer_info", "follow_up"] as const).map(field => {
+                              {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).map(field => {
                                 const entries = row[`${field}_entries`] || []
                                 return (
                                   <td key={field} className="px-3 py-2.5">
@@ -1041,7 +1043,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                                         className="group block w-full text-left"
                                         title="点击填写自己的内容"
                                       >
-                                        <ParticipantNoteLines entries={entries} fallback={row[field]} />
+                                        <ParticipantNoteLines entries={entries} fallback={row[field] || ""} />
                                       </button>
                                     ) : (
                                       <button
@@ -1244,7 +1246,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 onChange={event => toggleFollowUpDefinition("customer_info", event.target.checked)}
                 className="h-3.5 w-3.5 accent-[#3370ff]"
               />
-              客户信息
+              深度需求
             </label>
             <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[#646a73]">
               <input
@@ -1343,7 +1345,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 <TableHead className="h-9 w-[110px] px-3 pl-4 text-[11px] font-normal">客户昵称</TableHead>
                 <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">会员身份</TableHead>
                 <TableHead className="h-9 w-[120px] px-3 text-[11px] font-normal">跟进阶段</TableHead>
-                <TableHead className="h-9 px-3 text-[11px] font-normal">最近客户信息</TableHead>
+                <TableHead className="h-9 px-3 text-[11px] font-normal">最近深度需求</TableHead>
                 <TableHead className="h-9 px-3 text-[11px] font-normal">最近跟进点</TableHead>
                 <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">最近录入时间</TableHead>
                 <TableHead className="h-9 w-[80px] px-3 pr-4 text-right text-[11px] font-normal">距今</TableHead>
@@ -1398,7 +1400,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         <DialogContent initialFocus={false} className="w-[560px] max-w-[92vw] max-h-[88vh] gap-0 overflow-hidden rounded-[6px] border-[0.5px] border-[#e8eaed] p-0">
           <div className="border-b-[0.5px] border-[#f0f0f0] px-5 pb-2 pt-3">
             <h3 className="text-[14px] font-normal text-[#1f2329]">
-              填写{participantEditing?.field === "visit_need" ? "来访需求" : participantEditing?.field === "customer_info" ? "客户信息" : "跟进点"}
+              填写{participantEditing?.field === "visit_need" ? "来访需求" : participantEditing?.field === "customer_info" ? "深度需求" : participantEditing?.field === "customer_feedback" ? "客户反馈" : "跟进点"}
             </h3>
           </div>
           <div className="max-h-[64vh] space-y-3 overflow-y-auto px-5 py-4">
@@ -1410,7 +1412,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 <div className="mb-1 text-[11px] text-[#8f959e]">别人填写的</div>
                 <ParticipantNoteLines
                   entries={participantEditing.row[`${participantEditing.field}_entries`] || []}
-                  fallback={participantEditing.row[participantEditing.field]}
+                  fallback={participantEditing.row[participantEditing.field] || ""}
                   expanded
                 />
               </div>
@@ -1427,7 +1429,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 disabled={participantEditorLoading || participantEditorReadFailed}
                 rows={5}
                 maxLength={5000}
-                placeholder={participantEditing?.field === "customer_info" ? "填写客户信息..." : participantEditing?.field === "follow_up" ? "填写跟进点..." : "填写来访需求..."}
+                placeholder={participantEditing?.field === "customer_info" ? "填写深度需求..." : participantEditing?.field === "follow_up" ? "填写跟进点..." : participantEditing?.field === "customer_feedback" ? "填写客户反馈..." : "填写来访需求..."}
                 className="w-full rounded-[4px] border-[0.5px] border-[#e1e4e7] px-3 py-2 text-[12.5px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#b0b5bb] focus:border-[#b9cdf8]"
               />
               {participantEditorError && <p className="mt-1 text-[11px] text-[#c4506a]">{participantEditorError}</p>}

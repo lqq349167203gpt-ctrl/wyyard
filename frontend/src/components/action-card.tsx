@@ -19,7 +19,7 @@ const ACTION_LABELS: Record<string, string> = {
   create_group_case: "觉醒游戏",
   create_emotional_release: "情绪释放",
   create_energy_knot: "能量结",
-  create_internal_course: "内部课程",
+  create_internal_course: "沙龙技能学习",
   create_other_project: "其他项目",
 }
 

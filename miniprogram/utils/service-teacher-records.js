@@ -1,11 +1,7 @@
 const { serviceTeacherApi, customerFollowUpApi } = require('./api')
 const { pickerData, attributionFromPicker } = require('./feedback-person')
 const { beginRead, invalidateRead, disposeReads } = require('./read-scope')
-
-function recordText(entries, fallback) {
-  if (!Array.isArray(entries) || !entries.length) return fallback || ''
-  return entries.map(entry => `${entry.author || '未知'}：${entry.content || ''}`).join('\n')
-}
+const { followUpPlanText, noteRecordText: recordText } = require('./note-feedback-meta')
 
 const COURSE_TYPES = [
   { value: 'all', label: '全部课程' },
@@ -13,7 +9,7 @@ const COURSE_TYPES = [
   { value: 'gcs', label: '觉醒游戏' },
   { value: 'ers', label: '情绪释放' },
   { value: 'eks', label: '能量结' },
-  { value: 'ics', label: '内部课程' },
+  { value: 'ics', label: '沙龙技能学习' },
 ]
 
 const COURSE_RANGE_PRESETS = [
@@ -125,7 +121,7 @@ module.exports = function createRecordsPage(mode) { return {
     courseViewTab: 'courses',
     reviewRecords: [],
     reviewExpanded: {},
-    // 「参与者」子页签：自己课程的全部参与者 + 当天的来访需求/客户信息/跟进点
+    // 「参与者」子页签：自己课程的全部参与者 + 当天的来访需求/深度需求/跟进点
     participantRecords: [],
     participantGroups: [],
     participantTotalParticipants: 0,
@@ -334,7 +330,7 @@ module.exports = function createRecordsPage(mode) { return {
       const labels = definition === 'both'
         ? [`近${days}天两项均录入`, `近${days}天存在未录入`]
         : definition === 'customer_info'
-          ? [`近${days}天已录入客户信息`, `近${days}天未录入客户信息`]
+          ? [`近${days}天已录入深度需求`, `近${days}天未录入深度需求`]
           : definition === 'follow_up'
             ? [`近${days}天已录入跟进点`, `近${days}天未录入跟进点`]
             : [`近${days}天有任一录入`, `近${days}天无任何录入`]
@@ -437,7 +433,9 @@ module.exports = function createRecordsPage(mode) { return {
       ...row,
       visit_need: recordText(row.visit_need_entries, row.visit_need),
       customer_info: recordText(row.customer_info_entries, row.customer_info),
+      customer_feedback: recordText(row.customer_feedback_entries, row.customer_feedback),
       follow_up: recordText(row.follow_up_entries, row.follow_up),
+      follow_up_entries: (row.follow_up_entries || []).map(entry => ({ ...entry, nextFollowUpText: followUpPlanText(entry) })),
       dateText: parts.length === 3 ? `${Number(parts[1])}月${Number(parts[2])}日` : (row.course_date || ''),
       identityText: row.member_type || row.identity_group || '',
       participantRoleText: row.participant_role === '案主' ? '案主' : '',
@@ -567,8 +565,8 @@ module.exports = function createRecordsPage(mode) { return {
     const group = this.data.participantGroups[groupIndex]
     const row = group && group.participants[index]
     if (!row) return
-    const titles = { visit_need: '来访需求', customer_info: '客户信息', follow_up: '跟进点' }
-    const placeholders = { visit_need: '填写来访需求...', customer_info: '填写客户信息...', follow_up: '填写跟进点...' }
+    const titles = { visit_need: '来访需求', customer_info: '深度需求', follow_up: '跟进点', customer_feedback: '客户反馈' }
+    const placeholders = { visit_need: '填写来访需求...', customer_info: '填写深度需求...', follow_up: '填写跟进点...', customer_feedback: '填写客户反馈...' }
     const noteEntries = row[`${field}_entries`] || []
     const hasReference = noteEntries.length
       ? noteEntries.some(entry => String(entry.content || '').trim())
@@ -581,7 +579,7 @@ module.exports = function createRecordsPage(mode) { return {
         hasReference,
         nickname: row.nickname, dateText: row.dateText, courseName: row.course_name,
         all: row[field] || '',
-        allEntries: noteEntries.map(entry => ({ ...entry, timeText: formatNoteTime(entry.at) })),
+        allEntries: noteEntries.map(entry => ({ ...entry, timeText: formatNoteTime(entry.at), nextFollowUpText: followUpPlanText(entry) })),
       },
       participantDraft: '',
       participantMyNoteId: '',

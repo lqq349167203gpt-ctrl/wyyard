@@ -6,7 +6,7 @@ from app.services import account_service, visit_note_service, visit_service
 
 FOLLOW_UP_CATEGORY_LABELS = {
     "visit_need": "来访需求",
-    "customer_info": "客户信息",
+    "customer_info": "深度需求",
     "follow_up": "跟进点",
 }
 FOLLOW_UP_FILTERS = {"inactive", "active", "all", "inactive_30", "active_30"}

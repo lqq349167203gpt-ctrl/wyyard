@@ -78,14 +78,14 @@ function buildDetail(item, type) {
     return item.project_name || item.category || ''
   }
   if (type === 'oh_card_reading') {
-    return formatDuration(item.diagnosis_duration)
+    return [item.reading_type, formatDuration(item.diagnosis_duration)].filter(Boolean).join(' · ')
   }
   if (type === 'tea_seat_fee') {
     const qty = item.quantity || 1
     return `${qty}位`
   }
   if (type === 'offline_course') {
-    return `${item.validity_value || 1} 个月`
+    return [item.course_type, `${item.validity_value || 1} 个月`].filter(Boolean).join(' · ')
   }
   // group_case, emotional_release, energy_knot
   const count = item.purchase_count
@@ -125,6 +125,8 @@ function getSubtypeConfig(type) {
   const configs = {
     membership_card: { field: 'card_type', label: '会员卡类型' },
     internal_course: { field: 'course_type', label: '课程类型' },
+    offline_course: { field: 'course_type', label: '课程类型' },
+    oh_card_reading: { field: 'reading_type', label: '诊断类型' },
     other: { field: 'project_name', label: '项目名称' },
   }
   return configs[type] || null

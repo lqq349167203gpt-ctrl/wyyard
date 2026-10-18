@@ -1,6 +1,7 @@
 const { visitApi, spaceApi, visitVerificationApi, downloadFile } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
+const { visitTimeSlot, decorateVisitGroups, buildVisitDisplayGroups } = require('../../utils/visit-groups')
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const { readScheduleDate, writeScheduleDate } = require('../../utils/schedule-date')
@@ -98,6 +99,8 @@ Page({
     dateSwitching: false,
     weekdays: WEEKDAYS,
     visits: [],
+    visitGroups: [],
+    customerStageFilter: '',
     visitCounts: {},
     spaces: [],
     spaceIndex: 0,
@@ -338,16 +341,17 @@ Page({
       if (!isDayVerified) await this._migrateLocalOrder(visits || [])
       if (sequence !== this._loadSequence) return
 
-      const visibleVisits = (visits || []).map(v => Object.assign({}, v, {
+      const visibleVisits = decorateVisitGroups((visits || []).map(v => Object.assign({}, v, {
         can_edit: canEditRecord(v, 'visits'),
         // 轻量邀约接口已按当前账号返回本人填写的来访需求。
         needs: v.needs || '',
-      }))
+      })))
       const leaderMap = this.buildLeaderMap(visibleVisits)
 
       this._calendarCounts = counts || {}
       const nextData = {
         visits: visibleVisits,
+        visitGroups: buildVisitDisplayGroups(visibleVisits, this.data.customerStageFilter),
         visitCounts: counts || {},
         weekPages: buildWeekPages(reqDate, counts || {}, verificationMap),
         calendarDays: buildCalendar(this.data.calYear, this.data.calMonth, reqDate, counts || {}, verificationMap),
@@ -454,7 +458,10 @@ Page({
   buildLeaderMap(visits) {
     const leaderMap = {}
     let currentLeader = ''
+    let currentSlot = -1
     for (const v of visits) {
+      const slot = visitTimeSlot(v.visit_time)
+      if (slot !== currentSlot) { currentLeader = ''; currentSlot = slot }
       if (v.is_leader) {
         currentLeader = v.nickname
         leaderMap[v.customer_id] = ''
@@ -465,11 +472,35 @@ Page({
     return leaderMap
   },
 
+  _setVisits(visits, extra, callback) {
+    const grouped = decorateVisitGroups(visits)
+    this.setData(Object.assign({}, extra || {}, {
+      visits: grouped,
+      visitGroups: buildVisitDisplayGroups(grouped, this.data.customerStageFilter),
+      leaderMap: this.buildLeaderMap(grouped),
+    }), callback)
+  },
+
+  onCustomerStageFilter(e) {
+    const stage = e.currentTarget.dataset.stage
+    if (!['new', 'returning'].includes(stage)) return
+    const filter = this.data.customerStageFilter === stage ? '' : stage
+    this.setData({
+      customerStageFilter: filter,
+      visitGroups: buildVisitDisplayGroups(this.data.visits, filter),
+      editMode: false,
+    })
+  },
+
   // ---- 编辑模式 ----
 
   onToggleEditMode() {
     if (this.data.isDayVerified) return
-    this.setData({ editMode: !this.data.editMode })
+    const entering = !this.data.editMode
+    this.setData({
+      editMode: entering,
+      ...(entering ? { customerStageFilter: '', visitGroups: buildVisitDisplayGroups(this.data.visits) } : {}),
+    })
   },
 
   onSortByTime() {
@@ -489,8 +520,7 @@ Page({
         return timeDifference || left.index - right.index
       })
       .map(item => item.visit)
-    const leaderMap = this.buildLeaderMap(visits)
-    this.setData({ visits, leaderMap }, () => {
+    this._setVisits(visits, {}, () => {
       this.saveOrder().then(saved => {
         wx.showToast({ title: saved ? '已按时间排序' : '排序保存失败', icon: 'none' })
       })
@@ -502,10 +532,9 @@ Page({
     const visit = e.detail.visit
     const visits = this.data.visits.slice()
     const idx = visits.findIndex(v => v.id === visit.id)
-    if (idx <= 0) return
+    if (idx <= 0 || visitTimeSlot(visits[idx - 1].visit_time) !== visitTimeSlot(visit.visit_time)) return
     [visits[idx - 1], visits[idx]] = [visits[idx], visits[idx - 1]]
-    const leaderMap = this.buildLeaderMap(visits)
-    this.setData({ visits, leaderMap })
+    this._setVisits(visits)
     this.saveOrder()
   },
 
@@ -514,10 +543,9 @@ Page({
     const visit = e.detail.visit
     const visits = this.data.visits.slice()
     const idx = visits.findIndex(v => v.id === visit.id)
-    if (idx < 0 || idx >= visits.length - 1) return
+    if (idx < 0 || idx >= visits.length - 1 || visitTimeSlot(visits[idx + 1].visit_time) !== visitTimeSlot(visit.visit_time)) return
     [visits[idx], visits[idx + 1]] = [visits[idx + 1], visits[idx]]
-    const leaderMap = this.buildLeaderMap(visits)
-    this.setData({ visits, leaderMap })
+    this._setVisits(visits)
     this.saveOrder()
   },
 
@@ -579,9 +607,7 @@ Page({
       }
     })
     // 先即时反馈，再等待后端完成扣卡等业务；失败时恢复原状态。
-    this.setData({
-      visits: optimisticVisits,
-      leaderMap: this.buildLeaderMap(optimisticVisits),
+    this._setVisits(optimisticVisits, {
       todayArrivedCount: optimisticVisits.filter(item => item.arrived && !item.cancelled).length,
     })
     wx.showToast({ title: arrived ? '已确认到店' : '已设为未到店' })
@@ -601,17 +627,13 @@ Page({
           can_edit: item.can_edit,
         }
       })
-      this.setData({
-        visits,
-        leaderMap: this.buildLeaderMap(visits),
+      this._setVisits(visits, {
         todayArrivedCount: visits.filter(item => item.arrived && !item.cancelled).length,
       })
       // 静默同步扣卡余量等服务端计算字段；列表不隐藏，因此不会跳回顶部。
       this.loadData(undefined, { silent: true })
     }).catch(() => {
-      this.setData({
-        visits: previousVisits,
-        leaderMap: this.buildLeaderMap(previousVisits),
+      this._setVisits(previousVisits, {
         todayArrivedCount: previousVisits.filter(item => item.arrived && !item.cancelled).length,
       })
       wx.showToast({ title: '操作失败', icon: 'none' })
@@ -631,8 +653,7 @@ Page({
       const visits = this.data.visits.map(v => v.id === visit.id ? { ...v, cancelled } : v)
       // 已取消的行移到末尾，未取消保持相对顺序
       const reordered = [...visits.filter(v => !v.cancelled), ...visits.filter(v => v.cancelled)]
-      const leaderMap = this.buildLeaderMap(reordered)
-      this.setData({ visits: reordered, leaderMap })
+      this._setVisits(reordered)
       // 同步日历圆点计数（已取消的邀约不计入）
       const counts = { ...(this._calendarCounts || {}) }
       const date = visit.visit_date || this.data.currentDate
@@ -670,7 +691,7 @@ Page({
       title: willUnlock ? '解锁当天邀约？' : '确认核对当天的邀约？',
       content: willUnlock
         ? '解锁后，拥有相应权限的员工可以继续修改当天全部邀约资料。'
-        : '锁定后当天该空间的邀约资料将不能修改（来访需求、客户信息、跟进点除外）',
+        : '锁定后当天该空间的邀约资料将不能修改（来访需求、深度需求、跟进点、客户反馈除外）',
       confirmText: willUnlock ? '确认解锁' : '确认核对',
       success: async (result) => {
         if (!result.confirm) return

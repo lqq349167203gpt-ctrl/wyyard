@@ -1,6 +1,8 @@
 const { customerApi, customerTagApi, communicationRecordApi, PAYMENT_PROJECT_TYPES } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
+const { CUSTOMER_INCOME_FIELDS } = require('../../utils/customer-income')
+const { formatNoteTime } = require('../../utils/note-feedback-meta')
 function visitNoteRows(visit, category) {
   return (visit.visit_notes || [])
     .filter(note => note.category === category && note.content)
@@ -8,6 +10,7 @@ function visitNoteRows(visit, category) {
       id: note.id,
       feedbackText: note.feedback_person || note.created_by || '未知',
       creatorText: note.created_by || '未知',
+      timeText: formatNoteTime(note.updated_at || note.created_at),
       content: note.content,
     }))
 }
@@ -23,7 +26,7 @@ const ACTIVITY_SUMMARY_TYPES = [
   { key: 'gcs', label: '觉醒游戏' },
   { key: 'ers', label: '情绪释放' },
   { key: 'eks', label: '能量结' },
-  { key: 'ics', label: '内部课程' },
+  { key: 'ics', label: '沙龙技能学习' },
 ]
 
 function buildActivitySummary(activities, serverSummary) {
@@ -115,6 +118,7 @@ function buildPurchaseSummary(items) {
 
 Page({
   data: {
+    incomeFields: CUSTOMER_INCOME_FIELDS,
     customerId: '',
     customer: null,
     customerAccessPermissions: null,
@@ -150,7 +154,7 @@ Page({
       { key: 'communication', label: '沟通', count: 0 },
       { key: 'activities', label: '活动', count: 0 },
       { key: 'purchase', label: '卡次', count: 0 },
-      { key: 'offline_course', label: '课程', count: 0 },
+      { key: 'offline_course', label: '技能训练课程', count: 0 },
       { key: 'payment', label: '交易', count: 0 },
     ],
     isViewOnly: false,
@@ -246,6 +250,7 @@ Page({
           needNotes: visitNoteRows(v, 'visit_need'),
           infoNotes: visitNoteRows(v, 'customer_info'),
           followNotes: visitNoteRows(v, 'follow_up'),
+          feedbackNotes: visitNoteRows(v, 'customer_feedback'),
           growth_record: (hr && hr.growth_record) || v.healing_notes || '',
         })
       })
@@ -254,8 +259,9 @@ Page({
       const absentCount = visitRecords.length - arrivedCount - cancelledCount
       const courseParticipantNotes = (detail.activity_participant_notes || []).map(function(note) {
         return Object.assign({}, note, {
-          categoryText: note.category === 'customer_info' ? '客户信息' : '跟进点',
+          categoryText: ({ customer_info: '深度需求', follow_up: '跟进点', customer_feedback: '客户反馈' })[note.category] || note.category,
           timeText: [note.start_time, note.end_time].filter(Boolean).join('–'),
+          recordTimeText: formatNoteTime(note.updated_at || note.created_at),
         })
       })
 
@@ -341,7 +347,7 @@ Page({
       (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: this.data.communicationLoading || this.data.communicationError ? null : commRecords.length },
       (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
       (!access || access.detail_tabs.card_statistics) && { key: 'purchase', label: '卡次', count: purchaseSummary.length },
-      (!access || access.detail_tabs.offline_courses) && { key: 'offline_course', label: '课程', count: offlineCourseRecords.length },
+      (!access || access.detail_tabs.offline_courses) && { key: 'offline_course', label: '技能训练课程', count: offlineCourseRecords.length },
       (!access || access.transaction_access === 'detail') && { key: 'payment', label: '交易', count: paymentRecords.length },
     ].filter(Boolean)
     tabs.forEach(tab => { if (!(this._loadedSections || {})[tab.key]) tab.count = null })

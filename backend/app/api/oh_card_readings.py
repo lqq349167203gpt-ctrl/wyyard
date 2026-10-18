@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.oh_card_reading import OhCardReadingCreate
 from app.services import customer_access_service, oh_card_reading_service
 from app.utils.payment_list import payment_list_response
+from app.utils.payment_types import OH_READING_TYPES
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -24,7 +25,7 @@ def list_readings(request: Request, page: int | None = Query(None, ge=1), page_s
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
-    return payment_list_response(request, items_dict, page, page_size)
+    return payment_list_response(request, items_dict, page, page_size, subtype_field="reading_type")
 
 
 @router.get("/search-customers")
@@ -62,6 +63,8 @@ def update_reading(reading_id: str, data: dict, request: Request):
     ensure_payment_record_manager(request, existing)
     data.pop("created_by", None)
     data.pop("created_by_id", None)
+    if "reading_type" in data and data["reading_type"] not in (*OH_READING_TYPES, ""):
+        raise HTTPException(status_code=400, detail="请选择有效的OH卡诊断类型")
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")

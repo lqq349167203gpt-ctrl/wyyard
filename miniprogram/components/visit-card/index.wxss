@@ -34,7 +34,7 @@
 .card-main {
   display: flex;
   align-items: flex-start;
-  padding: 30rpx 34rpx 26rpx;
+  padding: 22rpx 34rpx 22rpx;
 }
 
 .move-btns {
@@ -107,6 +107,15 @@
   font-weight: 500;
 }
 
+.new-customer-tag {
+  padding: 0 8rpx;
+  border-radius: 6rpx;
+  background: #fff8e8;
+  color: #a78a4d;
+  font-size: 20rpx;
+  line-height: 32rpx;
+}
+
 .member-tag {
   font-size: 20rpx;
   color: #646a73;
@@ -123,7 +132,7 @@
   border-radius: 16rpx;
   background-color: #f2f3f5;
   color: #646a73;
-  font-size: 20rpx;
+  font-size: 21rpx;
   line-height: 30rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -153,7 +162,7 @@
 
 .visit-details {
   margin-top: 26rpx;
-  padding-top: 30rpx;
+  padding-top: 22rpx;
   border-top: 2rpx solid #f9fafb;
 }
 
@@ -161,13 +170,13 @@
   display: flex;
   align-items: flex-start;
   gap: 16rpx;
-  font-size: 24rpx;
+  font-size: 25rpx;
   color: #646a73;
   line-height: 37rpx;
 }
 
 .needs-row + .needs-row {
-  margin-top: 24rpx;
+  margin-top: 20rpx;
 }
 
 .needs-label {
@@ -228,8 +237,8 @@
 .card-actions {
   display: flex;
   align-items: center;
-  margin-top: 30rpx;
-  padding-top: 24rpx;
+  margin-top: 22rpx;
+  padding-top: 20rpx;
   border-top: 2rpx solid #f9fafb;
 }
 

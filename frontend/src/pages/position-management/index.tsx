@@ -875,7 +875,7 @@ export default function PositionManagementPage() {
                       </div>
                       {([
                         { key: "sensitive_fields", title: "隐私信息查看", fields: { visit_purpose: "到访目的", trauma_history: "创伤经历", current_block: "当下卡点", work_info: "工作情况", other_info: "其他信息" } },
-                        { key: "detail_tabs", title: "详情内容查看", fields: { follow_up: "跟进点", communication: "沟通记录", activities: "活动记录", card_statistics: "卡次统计", offline_courses: "线下落地课程" } },
+                        { key: "detail_tabs", title: "详情内容查看", fields: { follow_up: "跟进点", communication: "沟通记录", activities: "活动记录", card_statistics: "卡次统计", offline_courses: "技能训练课程" } },
                       ] as const).map(group => (
                         <div key={group.key} className="mb-4">
                           <div className="mb-2 text-[13px] font-medium">{group.title}</div>
@@ -949,14 +949,14 @@ export default function PositionManagementPage() {
                       </div>
                     </section>
                     <section>
-                      <div className="mb-3 text-[14px] font-medium text-[#1f2329]">落地课程操作</div>
+                      <div className="mb-3 text-[14px] font-medium text-[#1f2329]">技能训练课程操作</div>
                       <div className="rounded-[4px] border border-[#f0f0f0]">
                         <label className={`flex min-h-[76px] items-center justify-between gap-6 px-4 py-3 ${isSystemRole || !formPermissions.includes("offline-course-records") ? "" : "cursor-pointer"}`}>
                           <div className="min-w-0">
                             <div className="text-[13px] font-medium text-[#2b2f36]">管理课程类型</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">允许新增、修改和删除落地课程类型；这不是独立页面。</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">允许新增、修改和删除技能训练课程类型；这不是独立页面。</div>
                             {!formPermissions.includes("offline-course-records") && !isSystemRole && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“落地课程”页面权限</div>
+                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“技能训练课程”页面权限</div>
                             )}
                           </div>
                           <input
@@ -1213,7 +1213,7 @@ export default function PositionManagementPage() {
                           { key: "communication" as const, label: "沟通记录" },
                           { key: "activities" as const, label: "活动记录" },
                           { key: "card_statistics" as const, label: "卡次统计" },
-                          { key: "offline_courses" as const, label: "线下落地课程" },
+                          { key: "offline_courses" as const, label: "技能训练课程" },
                         ]).map(item => (
                           <label key={item.key} className="flex min-h-[48px] cursor-pointer items-center gap-2 border-b border-r border-[#f0f0f0] px-4 text-[13px] text-[#2b2f36]">
                             <input

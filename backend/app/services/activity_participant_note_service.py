@@ -92,6 +92,7 @@ def update_note_content(
     actor_name: str = "",
     feedback_person_id: str | None = None,
     feedback_person: str | None = None,
+    follow_up_plan: dict | None = None,
 ) -> ActivityParticipantNote:
     """客户跟进页里直接改自己填过的内容；不是本人填的不能改。"""
     normalized = content.strip()
@@ -106,9 +107,12 @@ def update_note_content(
         if note_id.startswith("visit-note|"):
             from app.services import visit_note_service
 
-            visit_note_service.update_note(note_id.split("|")[-1], normalized)
+            visit_note_service.update_note(note_id.split("|")[-1], normalized,
+                feedback_person_id=feedback_person_id, feedback_person=feedback_person, follow_up_plan=follow_up_plan)
             return get_note(note_id)
         note.content = normalized
+        for key, value in (follow_up_plan or {}).items():
+            setattr(note, key, value)
         if feedback_person_id is not None or feedback_person is not None:
             note.feedback_person_id = (feedback_person_id or "").strip()
             note.feedback_person = (feedback_person or "").strip() or note.created_by
@@ -224,3 +228,9 @@ def completed_customer_ids(
         for customer_id, categories in categories_by_customer.items()
         if {"customer_info", "follow_up"}.issubset(categories)
     }
+
+
+def completed_customer_ids_for_day(day: str, customer_ids: set[str]) -> set[str]:
+    from app.services import daily_customer_note_service
+
+    return daily_customer_note_service.completed_customer_ids_for_day(day, customer_ids)

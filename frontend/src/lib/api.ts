@@ -65,7 +65,7 @@ export interface PrincipalQuery {
   product: string
   activity_type: string
   course_subtype: string
-  order_filter: "" | "first" | "repeat" | "cross"
+  order_filter: "" | "first" | "repeat" | "cross" | "experience" | "conversion" | "upsell" | "repurchase"
   /** 课程列表：只看当日有成交 / 有关联成交的课程 */
   course_deal?: "" | "same_day" | "related"
   status: "" | "converted" | "unconverted" | "observing"
@@ -177,6 +177,7 @@ export interface PrincipalBreakdownItem {
   upsell_count?: number
 }
 export interface PrincipalBreakdown {
+  purchase_rules_configured?: boolean
   record_period?: { from: string; to: string }
   deals?: PrincipalBreakdownItem[]
   buys?: PrincipalBreakdownItem[]
@@ -363,13 +364,17 @@ const SHARED_READ_RESOURCES = new Set([
   "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions",
   "positions", "accounts", "position-permissions", "membership-cards", "group-cases",
   "emotional-releases", "energy-knots", "internal-courses", "oh-card-readings", "tea-seat-fees", "offline-courses", "other-projects",
+  "visits", "class-records", "daily-groupings", "visit-verifications", "consumption-records",
+  "activity-orders", "activity-themes", "visit-history", "activity-history",
 ])
 
 function request<T>(path: string, options?: RequestInit): Promise<T> {
   const resource = path.split("?")[0].split("/")[2]
   const method = (options?.method || "GET").toUpperCase()
   // 有效权限由 refreshAccountPermissions 管理在途复用，保留其强制刷新语义。
-  if (method === "GET" && path.split("?")[0] !== "/api/accounts/me/permissions" && !options?.signal && !options?.headers && SHARED_READ_RESOURCES.has(resource)) {
+  // 客户简表已有自己的在途请求与失效机制，避免再叠一层通用复用。
+  const hasDedicatedReadState = ["/api/accounts/me/permissions", "/api/customers/light"].includes(path.split("?")[0])
+  if (method === "GET" && !hasDedicatedReadState && !options?.signal && !options?.headers && SHARED_READ_RESOURCES.has(resource)) {
     // 页面路径保留独立使用统计归属，完整 URL 保留日期/搜索条件，权限与账号隔离。
     const key = JSON.stringify([window.location.pathname, customerLightScope(), path])
     return reusePendingRead(key, () => performRequest<T>(path, options))
@@ -634,6 +639,7 @@ export interface FollowUpStatusConfig {
 export type CustomerTagScope = "public" | "private"
 
 export interface CustomerTag {
+  category?: "customer" | "visit_need"
   id: string
   name: string
   scope: CustomerTagScope
@@ -647,6 +653,7 @@ export interface CustomerTag {
 }
 
 export interface CustomerTagCreate {
+  category?: "customer" | "visit_need"
   name: string
   scope: CustomerTagScope
   description: string
@@ -680,6 +687,10 @@ export interface Customer {
   self_tags: ("自我成长" | "共创" | "变现")[]
   work_status: string
   work_description: string
+  income_stability?: string
+  personal_annual_income?: string
+  household_annual_income?: string
+  customer_quality?: "正常" | "忽视"
   basic_info: string
   assessment: string
   tags: string
@@ -735,7 +746,6 @@ let _customerLightRevision = 0
 const CUSTOMER_LIGHT_CACHE_TTL = 30_000
 
 function clearCustomerLightCache() {
-  clearPendingReads()
   _customerLightCache = null
   _customerLightCachedAt = 0
   _customerLightPromise = null
@@ -775,7 +785,8 @@ export const customerApi = {
     return pending
   },
   batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
-  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; service_teacher?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
+  bulkUpdate: (ids: string[], changes: { customer_quality?: "正常" | "忽视"; service_teacher?: string }) => request<{ updated_count: number }>("/api/customers/bulk-update", { method: "PATCH", body: JSON.stringify({ ids, ...changes }) }),
+  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; service_teacher?: string; customer_quality?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
     const params = new URLSearchParams()
     params.set("page", String(page))
     params.set("page_size", String(pageSize))
@@ -784,6 +795,7 @@ export const customerApi = {
     if (filters?.referrer) params.set("referrer", filters.referrer)
     if (filters?.referrer_handler) params.set("referrer_handler", filters.referrer_handler)
     if (filters?.service_teacher) params.set("service_teacher", filters.service_teacher)
+    if (filters?.customer_quality) params.set("customer_quality", filters.customer_quality)
     if (filters?.member_types) params.set("member_types", filters.member_types)
     if (filters?.tag_ids) params.set("tag_ids", filters.tag_ids)
     if (filters?.tag_match) params.set("tag_match", filters.tag_match)
@@ -849,7 +861,7 @@ export interface ServiceTeacherCustomerResponse extends PaginatedResponse<Servic
 
 // 课程记录的「参与者」页签：一行 = 某场课的一个参与者 + 当天的邀约备注
 /** 备注条目：同一条备注可能是不同人分别填写的，按填写人拆开 */
-export interface CourseParticipantNoteEntry {
+export interface CourseParticipantNoteEntry extends NextFollowUpPlan {
   author: string
   created_by?: string
   content: string
@@ -870,6 +882,8 @@ export interface CourseParticipantRow {
   customer_info: string
   follow_up: string
   visit_need_entries?: CourseParticipantNoteEntry[]
+  customer_feedback?: string
+  customer_feedback_entries?: CourseParticipantNoteEntry[]
   customer_info_entries?: CourseParticipantNoteEntry[]
   follow_up_entries?: CourseParticipantNoteEntry[]
   visit_id: string
@@ -952,7 +966,7 @@ export const serviceTeacherCustomerApi = {
 }
 
 export const customerTagApi = {
-  list: (includeDisabled = false) => request<CustomerTag[]>(`/api/customer-tags${includeDisabled ? "?include_disabled=true" : ""}`),
+  list: (includeDisabled = false, category: "customer" | "visit_need" = "customer") => request<CustomerTag[]>(`/api/customer-tags?include_disabled=${includeDisabled}&category=${category}`),
   create: (data: CustomerTagCreate) => request<CustomerTag>("/api/customer-tags", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Omit<CustomerTagCreate, "scope">> & { enabled?: boolean }) => request<CustomerTag>(`/api/customer-tags/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/customer-tags/${id}`, { method: "DELETE" }),
@@ -968,11 +982,14 @@ export const followUpStatusApi = {
 
 // 升单配置：若干「大类」（名字 + 一组付费项目），数组顺序＝升单先后
 export interface UpsellLevel { id: string; name: string; products: string[] }
-export interface UpsellConfig { levels: UpsellLevel[]; products: { key: string; label: string }[] }
+export type PurchaseRuleKey = "experience" | "conversion" | "upsell" | "repurchase"
+export interface PurchaseRule { key: PurchaseRuleKey; conditions: { product: string; operator: "eq" | "gte"; count: number }[] }
+export interface UpsellConfig { levels: UpsellLevel[]; rules: PurchaseRule[]; configured: boolean; products: { key: string; label: string }[] }
 export const upsellConfigApi = {
   get: () => request<UpsellConfig>("/api/upsell-config"),
   save: (levels: UpsellLevel[]) =>
     request<UpsellConfig>("/api/upsell-config", { method: "PUT", body: JSON.stringify({ levels }) }),
+  saveRules: (rules: PurchaseRule[]) => request<UpsellConfig>("/api/upsell-config", { method: "PUT", body: JSON.stringify({ rules }) }),
 }
 
 // AI Config
@@ -1109,9 +1126,17 @@ export interface ActivityInfo {
   is_welfare: boolean
 }
 
-export type VisitNoteCategory = "visit_need" | "customer_info" | "follow_up"
+export type VisitNoteCategory = "visit_need" | "customer_info" | "follow_up" | "customer_feedback"
 
-export interface VisitNoteSummary {
+export interface NextFollowUpPlan {
+  next_follow_up_person_id?: string
+  next_follow_up_person?: string
+  next_follow_up_date?: string
+}
+
+export interface FollowUpPerson { id: string; nickname: string; name: string }
+
+export interface VisitNoteSummary extends NextFollowUpPlan {
   id: string
   category: VisitNoteCategory
   content: string
@@ -1130,6 +1155,7 @@ export interface FeedbackPeopleResponse {
 
 export interface VisitRecord {
   id: string
+  is_new_customer?: boolean
   created_by_id: string
   created_by: string
   visit_date: string
@@ -1185,6 +1211,7 @@ export interface VisitRecordCreate {
 }
 
 export interface VisitNote extends VisitNoteSummary {
+  need_tags?: Array<{ id: string; name: string }>
   visit_id: string
   category_label: string
   can_edit: boolean
@@ -1263,11 +1290,14 @@ export const visitNoteApi = {
     return request<PreviousVisitNeed | null>(`/api/visit-notes/previous-visit-need?${params.toString()}`)
   },
   feedbackPeople: () => request<FeedbackPeopleResponse>("/api/visit-notes/feedback-people"),
-  create: (data: { visit_id: string; category: VisitNoteCategory; content: string; feedback_person_id?: string; feedback_person?: string }) =>
+  followUpPeople: () => request<FollowUpPerson[]>("/api/visit-notes/follow-up-people"),
+  create: (data: { visit_id: string; category: VisitNoteCategory; content: string; need_tag_ids?: string[]; feedback_person_id?: string; feedback_person?: string } & NextFollowUpPlan) =>
     request<VisitNote>("/api/visit-notes", { method: "POST", body: JSON.stringify(data) }),
-  update: (id: string, content: string, feedbackPerson?: { id: string; name: string }) =>
+  update: (id: string, content: string, feedbackPerson?: { id: string; name: string }, followUpPlan?: NextFollowUpPlan, needTagIds?: string[]) =>
     request<VisitNote>(`/api/visit-notes/${id}`, { method: "PATCH", body: JSON.stringify({
       content,
+      ...(needTagIds !== undefined ? { need_tag_ids: needTagIds } : {}),
+      ...followUpPlan,
       ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
     }) }),
   delete: (id: string) => request<{ ok: boolean }>(`/api/visit-notes/${id}`, { method: "DELETE" }),
@@ -1699,6 +1729,7 @@ export interface OhCardReading {
   id: string
   customer_id: string
   nickname: string
+  reading_type: string
   purchase_count: number
   diagnosis_duration: number
   amount: number
@@ -1717,6 +1748,7 @@ export interface OhCardReading {
 export interface OhCardReadingCreate {
   customer_id: string
   nickname: string
+  reading_type?: string
   purchase_count?: number
   diagnosis_duration?: number
   diagnosis_teacher?: string
@@ -1730,7 +1762,15 @@ export interface OhCardReadingCreate {
 
 export const ohCardReadingApi = {
   list: () => request<OhCardReading[]>("/api/oh-card-readings"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<OhCardReading>>(`/api/oh-card-readings?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; reading_type?: string; subtypes?: string }) => {
+    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.customer_ids) query.set("customer_ids", params.customer_ids)
+    if (params?.nickname) query.set("nickname", params.nickname)
+    if (params?.closer_name) query.set("closer_name", params.closer_name)
+    const subtypes = params?.subtypes || (params?.reading_type ? JSON.stringify([params.reading_type]) : "")
+    if (subtypes) query.set("subtypes", subtypes)
+    return request<PaginatedResponse<OhCardReading>>(`/api/oh-card-readings?${query}`)
+  },
   create: (data: OhCardReadingCreate) => request<OhCardReading>("/api/oh-card-readings", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<OhCardReadingCreate>) => request<OhCardReading>(`/api/oh-card-readings/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/oh-card-readings/${id}`, { method: "DELETE" }),
@@ -1780,6 +1820,7 @@ export const teaSeatFeeApi = {
 
 // Offline Courses
 export interface OfflineCourse {
+  course_type?: string
   id: string
   customer_id: string
   nickname: string
@@ -1799,6 +1840,7 @@ export interface OfflineCourse {
 }
 
 export interface OfflineCourseCreate {
+  course_type?: string
   customer_id: string
   nickname: string
   effective_date?: string
@@ -1816,7 +1858,7 @@ export interface OfflineCourseCreate {
 
 export const offlineCourseApi = {
   list: () => request<OfflineCourse[]>("/api/offline-courses"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => {
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; course_type?: string; subtypes?: string }) => {
     const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
     return request<PaginatedResponse<OfflineCourse>>(`/api/offline-courses?${qs}`)
@@ -2163,7 +2205,15 @@ export interface InternalCourseCreate {
 
 export const internalCourseApi = {
   list: () => request<InternalCourse[]>("/api/internal-courses"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; course_type?: string; subtypes?: string }) => {
+    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (params?.customer_ids) query.set("customer_ids", params.customer_ids)
+    if (params?.nickname) query.set("nickname", params.nickname)
+    if (params?.closer_name) query.set("closer_name", params.closer_name)
+    const subtypes = params?.subtypes || (params?.course_type ? JSON.stringify([params.course_type]) : "")
+    if (subtypes) query.set("subtypes", subtypes)
+    return request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?${query}`)
+  },
   create: (data: InternalCourseCreate) => request<InternalCourse>("/api/internal-courses", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<InternalCourseCreate>) => request<InternalCourse>(`/api/internal-courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/internal-courses/${id}`, { method: "DELETE" }),
@@ -2216,7 +2266,7 @@ export interface MembershipCardCreate {
 
 export const membershipCardApi = {
   list: () => request<MembershipCard[]>("/api/membership-cards"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; card_type?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}${params?.card_type ? `&card_type=${encodeURIComponent(params.card_type)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; card_type?: string; subtypes?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}${params?.card_type ? `&card_type=${encodeURIComponent(params.card_type)}` : ""}${params?.subtypes ? `&subtypes=${encodeURIComponent(params.subtypes)}` : ""}`),
   create: (data: MembershipCardCreate) => request<MembershipCard>("/api/membership-cards", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<MembershipCardCreate>) => request<MembershipCard>(`/api/membership-cards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/membership-cards/${id}`, { method: "DELETE" }),
@@ -2315,6 +2365,8 @@ export interface OtherProjectDeduction {
 }
 
 export interface ProjectDeduction {
+  deal_course_key?: string
+  deal_course_name?: string
   cancelled?: boolean
   cancellation_reason?: string
   id: string
@@ -2390,6 +2442,7 @@ export const projectDeductionApi = {
   getCoarseDoorOptions: (customerId: string, editingId = "") =>
     request<CoarseDoorOptions>(`/api/project-deductions/coarse-door-options?customer_id=${encodeURIComponent(customerId)}&editing_id=${encodeURIComponent(editingId)}`),
   createCoarseDoorCourse: (data: {
+    deal_course_key?: string
     customer_id: string
     record_type: string
     record_id: string
@@ -2451,6 +2504,7 @@ export interface PaymentExportParams {
 }
 
 export const paymentExportApi = {
+  courseOptions: (date: string) => request<Array<{ key: string; name: string; date: string }>>(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}`),
   records: (page: number, pageSize: number, nickname: string, closerName: string) =>
     request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
   download: async (params: PaymentExportParams) => {
@@ -4026,12 +4080,12 @@ export const customerFollowUpApi = {
       content,
       ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
     }) }),
-  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up", content: string, feedbackPerson?: { id: string; name: string }) =>
+  create: (visitId: string, category: "visit_need" | "customer_info" | "follow_up" | "customer_feedback", content: string, feedbackPerson?: { id: string; name: string }) =>
     request<CustomerFollowUpNote>("/api/customer-follow-ups", { method: "POST", body: JSON.stringify({
       visit_id: visitId, category, content,
       ...(feedbackPerson ? { feedback_person_id: feedbackPerson.id, feedback_person: feedbackPerson.name } : {}),
     }) }),
-  myNote: (visitId: string, category: "visit_need" | "customer_info" | "follow_up") =>
+  myNote: (visitId: string, category: "visit_need" | "customer_info" | "follow_up" | "customer_feedback") =>
     request<CustomerFollowUpNote | null>(
       `/api/customer-follow-ups/my-note?visit_id=${encodeURIComponent(visitId)}&category=${category}`,
     ),

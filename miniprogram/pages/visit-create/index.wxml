@@ -19,9 +19,9 @@
     </view>
     <view class="form-item">
       <text class="form-label">预计时间</text>
-      <picker class="form-picker" mode="time" value="{{time}}" bindchange="onTimeChange">
+      <time-picker class="form-picker" value="{{time}}" bindchange="onTimeChange">
         <view class="picker-display">{{time}}</view>
-      </picker>
+      </time-picker>
     </view>
     <view class="form-item switch-row {{arrived ? '' : 'last'}}">
       <text class="form-label">到店</text>
@@ -31,9 +31,9 @@
     </view>
     <view class="form-item last" wx:if="{{arrived}}">
       <text class="form-label">到达时间</text>
-      <picker class="form-picker" mode="time" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
+      <time-picker class="form-picker" value="{{arrivalTime}}" bindchange="onArrivalTimeChange">
         <view class="picker-display">{{arrivalTime || '选择时间'}}</view>
-      </picker>
+      </time-picker>
     </view>
   </view>
 

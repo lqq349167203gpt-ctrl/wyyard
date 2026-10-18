@@ -39,9 +39,17 @@ def payment_list_response(request: Request, items: list[dict], page, page_size, 
                 and (not subtypes or (subtype_field and str(item.get(subtype_field) or '').strip() in subtypes))
                 and (not keyword or keyword in str(item.get('nickname') or '').casefold()
                      or keyword in names.get(item.get('customer_id'), ''))]
-    selected.sort(key=lambda item: str(item.get('created_at') or ''), reverse=True)
+    # 先按成交日期统一排序，再分页，避免补录旧单排在近期成交前面。
+    selected.sort(key=lambda item: (
+        str(item.get('deal_date') or ''),
+        str(item.get('created_at') or ''),
+        str(item.get('id') or ''),
+    ), reverse=True)
     result = paginate(selected, page, page_size or 10) if page is not None else None
     returned = result['items'] if result is not None else selected
+    from app.services.payment_course_service import fill_course_organizations
+
+    fill_course_organizations(returned)
     if decorate:
         for item in returned:
             decorate(item)

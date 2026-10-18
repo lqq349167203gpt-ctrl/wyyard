@@ -29,7 +29,7 @@ CHECK_ITEMS: list[dict] = [
     {"key": "visit_nickname", "label": "缺昵称", "scope": "visit", "default": True},
     {"key": "visit_time", "label": "缺邀约时间", "scope": "visit", "default": True},
     {"key": "visit_needs", "label": "未填来访需求", "scope": "visit", "default": False},
-    {"key": "visit_customer_info", "label": "未填客户信息", "scope": "visit", "default": False},
+    {"key": "visit_customer_info", "label": "未填深度需求", "scope": "visit", "default": False},
     {"key": "visit_follow_up", "label": "未填跟进点", "scope": "visit", "default": False},
     {"key": "visit_inviter", "label": "缺邀约人", "scope": "visit", "default": False},
     {"key": "visit_receptionist", "label": "缺接待人", "scope": "visit", "default": False},
@@ -41,7 +41,7 @@ CHECK_ITEMS: list[dict] = [
 
 OWNER_ACTIVITY_TYPES = {"gcs", "ers", "eks"}
 
-# 这两类活动天生就是 0 次扣卡（能量结按部位数单独算、内部课程不扣卡），不算漏填
+# 这两类活动天生就是 0 次扣卡（能量结按部位数单独算、沙龙技能学习不扣卡），不算漏填
 DEDUCTION_EXEMPT_ACTIVITY_TYPES = {"eks", "ics"}
 
 # 核对（锁定）只从这天起算：之前的历史数据不参与核对，也不需要补锁
@@ -52,7 +52,7 @@ TYPE_LABELS = {
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
     "eks": "能量结",
-    "ics": "内部课程",
+    "ics": "沙龙技能学习",
 }
 
 

@@ -1,0 +1,3 @@
+<picker mode="multiSelector" range="{{columns}}" value="{{indices}}" disabled="{{disabled}}" bindcolumnchange="onColumnChange" bindchange="onConfirm" bindcancel="onCancel">
+  <slot />
+</picker>

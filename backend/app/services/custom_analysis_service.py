@@ -31,6 +31,7 @@ from app.services import (
 )
 from app.services.payment_sources import payment_loader
 from app.utils.cn_datetime import TZ
+from app.utils.customer_profile import format_work_info
 
 FIELD_LABELS = {
     "nickname": "昵称",
@@ -271,9 +272,9 @@ def _payment_events() -> list[dict[str, Any]]:
         (payment_loader("group-cases"), "amount", "觉醒游戏", ""),
         (payment_loader("emotional-releases"), "amount", "情绪释放", ""),
         (payment_loader("energy-knots"), "amount", "能量结", ""),
-        (payment_loader("internal-courses"), "price", "内部课程", "course_type"),
-        (payment_loader("offline-courses"), "amount", "落地课程", ""),
-        (payment_loader("oh-card-readings"), "amount", "OH卡梳理", ""),
+        (payment_loader("internal-courses"), "price", "沙龙技能学习", "course_type"),
+        (payment_loader("offline-courses"), "amount", "落地课程", "course_type"),
+        (payment_loader("oh-card-readings"), "amount", "OH卡诊断", "reading_type"),
         (payment_loader("tea-seat-fees"), "amount", "茶位费", ""),
         (payment_loader("other-projects"), "fee", "其他项目", "project_name"),
     ]
@@ -388,7 +389,7 @@ def _period_activity_summary(
         (group_case_session_service.list_sessions, "觉醒游戏"),
         (emotional_release_session_service.list_sessions, "情绪释放"),
         (energy_knot_session_service.list_sessions, "能量结"),
-        (internal_course_session_service.list_sessions, "内部课程"),
+        (internal_course_session_service.list_sessions, "沙龙技能学习"),
     ]
     for list_sessions, activity_type in session_sources:
         sessions = list_sessions(start_date=date_from or None, end_date=date_to or None)
@@ -542,7 +543,7 @@ def build_customer_dataset(
         "觉醒": "觉醒游戏",
         "情绪": "情绪释放",
         "能量结": "能量结",
-        "内部课": "内部课程",
+        "内部课": "沙龙技能学习",
     }
     rows: list[dict[str, Any]] = []
     for customer in customers:
@@ -605,11 +606,7 @@ def build_customer_dataset(
             "visit_purpose": customer.tags or "",
             "trauma_history": customer.basic_info or "",
             "current_block": customer.assessment or customer.core_situation or "",
-            "work_info": " · ".join(
-                item
-                for item in [customer.work_status or "", customer.work_description or ""]
-                if item
-            ),
+            "work_info": format_work_info(customer),
             "other_info": customer.other_info or "",
             "_payment_amounts_by_project_period": {
                 project: round(amount, 2)
@@ -1594,13 +1591,13 @@ def _local_plan(query: str, actor_id: str) -> AnalysisPlan:
         "觉醒游戏": ["觉醒游戏"],
         "情绪释放": ["情绪释放"],
         "能量结": ["能量结"],
-        "内部课程": ["内部课程"],
+        "沙龙技能学习": ["沙龙技能学习"],
     }
     for activity_type, aliases in activity_aliases.items():
         if any(alias in normalized_query for alias in aliases) and any(word in normalized_query for word in ["参加", "参与", "上过"]):
             _add_condition(conditions, "activity_types", "eq", activity_type)
 
-    purchase_aliases = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "内部课程", "OH卡梳理", "茶位费"]
+    purchase_aliases = ["会员卡", "觉醒游戏", "情绪释放", "能量结", "沙龙技能学习", "OH卡诊断", "OH卡梳理", "茶位费"]
     if any(word in normalized_query for word in ["购买", "买过", "消费过"]):
         for project_name in purchase_aliases:
             if project_name in normalized_query:

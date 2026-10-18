@@ -15,7 +15,7 @@ ACTIVITY_TYPE_LABELS: dict[ActivityRecordType, str] = {
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
     "eks": "能量结",
-    "ics": "内部课程",
+    "ics": "沙龙技能学习",
 }
 
 _withdrawal_lock = threading.RLock()

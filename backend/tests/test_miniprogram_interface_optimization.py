@@ -6,12 +6,11 @@ from types import SimpleNamespace as NS
 from urllib.parse import urlencode
 
 import pytest
-from starlette.requests import Request
-
 from app.api import client as client_api
 from app.api import customers
 from app.services import customer_access_service
 from app.utils.payment_list import payment_list_response
+from starlette.requests import Request
 
 
 def request(params=''):
@@ -43,7 +42,8 @@ def test_all_payment_types_filter_before_paging_keep_complete_visible_options(mo
     from app.services import customer_service
     api = importlib.import_module('app.api.' + module)
     rows = [Record({'id': str(i), 'customer_id': 'c', 'nickname': '昵称', 'created_by': '甲' if i < 21 else '乙',
-                    'created_at': f'{i:03}', subtype or 'irrelevant': '目标' if i < 21 else '其他'}) for i in range(23)]
+                    'created_at': f'{i:03}', 'deal_date': f'2026-10-{23-i:02}',
+                    subtype or 'irrelevant': '目标' if i < 21 else '其他'}) for i in range(23)]
     rows.append(Record({'id': 'hidden', 'created_by': '秘密', 'customer_id': 'hidden'}))
     monkeypatch.setattr(getattr(api, service), loader, lambda: rows)
     monkeypatch.setattr(customer_access_service, 'require_transaction_access', lambda *a, **k: None)
@@ -62,8 +62,11 @@ def test_all_payment_types_filter_before_paging_keep_complete_visible_options(mo
     kwargs = dict(request=request(urlencode(params)), page=2, page_size=20, customer_ids=None, nickname=None, closer_name=None)
     if module == 'membership_cards':
         kwargs['card_type'] = None
+    if module == 'offline_courses':
+        kwargs['course_type'] = None  # 直接调用路由时显式传入默认值，避免把 Query 对象当作筛选值。
     result = getattr(api, handler)(**kwargs)
     assert result['total'] == 21 and len(result['items']) == 1
+    assert result['items'][0]['id'] == '20'  # 成交日期优先于录入时间，且先排序再分页。
     assert {option['name'] for option in result['creator_options']} == {'甲', '乙'}
     if subtype:
         assert {option['name'] for option in result['subtype_options']} == {'目标', '其他'}
@@ -71,6 +74,18 @@ def test_all_payment_types_filter_before_paging_keep_complete_visible_options(mo
     assert len(remaining_calls) <= 1
     kwargs.update(request=request(), page=None)
     assert len(getattr(api, handler)(**kwargs)) == 23
+
+
+def test_payment_date_sort_ties_and_missing_dates():
+    items = [
+        {'id': 'old', 'deal_date': '2026-10-01', 'created_at': '2026-10-18'},
+        {'id': 'recent-a', 'deal_date': '2026-10-18', 'created_at': '2026-10-18T10:00'},
+        {'id': 'recent-b', 'deal_date': '2026-10-18', 'created_at': '2026-10-18T11:00'},
+        {'id': 'missing', 'deal_date': None, 'created_at': '2026-10-19'},
+    ]
+    assert [row['id'] for row in payment_list_response(request(), items, None, None)] == [
+        'recent-b', 'recent-a', 'old', 'missing',
+    ]
 
 
 def test_payment_invalid_multi_selection_fails_explicitly():

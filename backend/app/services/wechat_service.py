@@ -5,17 +5,17 @@
 写入保持同步落库（save_item / delete_item），过期删除同样写穿到 DB。
 （模式比照 session_service.py）
 """
-import uuid
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from urllib.request import urlopen, Request
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
+from app.config.settings import settings
 from app.models.wechat_session import WechatSession
 from app.services.storage import delete_item, load_data, load_item, save_item
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -157,9 +157,9 @@ def get_client_access_token() -> str:
     return _client_access_token_cache["token"]
 
 
-def get_phone_number(code: str) -> str:
+def get_phone_number(code: str, *, management: bool = False) -> str:
     """用微信 getPhoneNumber code 解密手机号"""
-    access_token = get_client_access_token()
+    access_token = get_access_token() if management else get_client_access_token()
     url = f"https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token={access_token}"
     body = json.dumps({"code": code}).encode()
     req = Request(url, data=body, headers={"Content-Type": "application/json"})

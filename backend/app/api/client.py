@@ -1,6 +1,7 @@
 import uuid
 from datetime import date as date_cls
 from datetime import datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
@@ -27,6 +28,42 @@ from app.utils.pagination import paginate
 
 router = APIRouter(prefix="/api/client", tags=["client"])
 
+
+@router.get("/member-data")
+def member_data(request: Request, section: Literal["home", "cards", "transactions", "activities", "checkins"] = "home",
+                page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)):
+    from app.services import staff_member_service
+
+    customer_id = _current_customer_id(request)
+    if not customer_id:
+        raise HTTPException(401, "请先登录会员端")
+    return staff_member_service.read_customer_member_data(customer_id, section, page, page_size)
+
+
+@router.get("/checkin-code")
+def checkin_code(request: Request, activity_key: str):
+    from app.services import activity_checkin_service
+
+    customer_id = _current_customer_id(request)
+    if not customer_id:
+        raise HTTPException(401, "请先登录会员端")
+    return activity_checkin_service.create_code(customer_id, activity_key)
+
+
+@router.post("/management-login")
+def management_login(request: Request):
+    from app.api.wechat import _build_login_response, _make_jwt_token
+    from app.services import staff_member_service
+
+    customer_id = _current_customer_id(request)
+    customer = get_customer(customer_id) if customer_id else None
+    account = staff_member_service.management_account_for(customer) if customer and not customer.is_deleted else None
+    if not account:
+        raise HTTPException(403, "未关联可用的管理端账号")
+    result = _build_login_response(account)
+    result.update(token=_make_jwt_token(account, request), bound=True)
+    return result
+
 SIGNUPS_FILE = "client_signups.json"
 
 OTHER_ACTIVITY_SERVICES = {
@@ -47,7 +84,7 @@ ACTIVITY_KEY_LABELS = {
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
     "eks": "能量结",
-    "ics": "内部课程",
+    "ics": "沙龙技能学习",
 }
 
 
@@ -101,7 +138,7 @@ def _aggregate_published_activities() -> list[dict]:
     for s in internal_course_session_service.list_sessions():
         d = s.model_dump(mode="json") if hasattr(s, "model_dump") else dict(s)
         if d.get("is_published", False):
-            display_type = d.get("course_type") or "内部课程"
+            display_type = d.get("course_type") or "沙龙技能学习"
             items.append(_session_item("ics", s, display_type))
 
     for display_type, (activity_type, service) in OTHER_ACTIVITY_SERVICES.items():
@@ -268,7 +305,7 @@ def _activity_role_ids(item: dict) -> dict[str, set[str]]:
     owner_ids = {data.get("owner_id")} - {None, ""}
     teacher_ids = {customer_id for customer_id in (data.get("teacher_ids") or []) if customer_id}
 
-    # 与详情页展示的老师口径保持一致：内部课程以主持人为老师；
+    # 与详情页展示的老师口径保持一致：沙龙技能学习以主持人为老师；
     # 其他活动未单独指定老师时，以带领者/主持人为老师。
     if item["type"] == "ics" and data.get("host_id"):
         teacher_ids.add(data["host_id"])
@@ -374,7 +411,7 @@ def _find_activity(activity_id: str) -> dict | None:
 
     internal_session = internal_course_session_service.get_session(activity_id)
     if internal_session:
-        display_type = internal_session.course_type or "内部课程"
+        display_type = internal_session.course_type or "沙龙技能学习"
         return _session_item("ics", internal_session, display_type)
 
     for display_type, (activity_type, service) in OTHER_ACTIVITY_SERVICES.items():
@@ -913,7 +950,7 @@ def _enrich_activity_time(act: dict):
             "觉醒游戏": "group_case_session_service",
             "情绪释放": "emotional_release_session_service",
             "能量结": "energy_knot_session_service",
-            "内部课程": "internal_course_session_service",
+            "沙龙技能学习": "internal_course_session_service",
         }
         svc_name = service_map.get(act_type)
         if svc_name:
@@ -959,7 +996,7 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
             "activity_role": "",
         })
 
-    # 活动会员权益使用：内部课程场次免费，不进入销卡记录
+    # 活动会员权益使用：沙龙技能学习场次免费，不进入销卡记录
     raw_deductions = membership_card_service.list_activity_usage_records(customer_id)
     for item in raw_deductions:
         key = item.get("key", "") if isinstance(item, dict) else str(item)
@@ -990,7 +1027,7 @@ def _build_client_deduction_items(customer_id: str) -> list[dict]:
             "activity_role": activity_roles.get(activity_key, ""),
         })
 
-    # 没有可用会员卡/内部课程权益时产生的预支扣卡，也属于真实销卡流水。
+    # 没有可用会员卡/沙龙技能学习权益时产生的预支扣卡，也属于真实销卡流水。
     for item in membership_card_service.list_debt_activity_usage_records(customer_id):
         key = item.get("key", "")
         activity = _resolve_activity_usage(key)
@@ -1082,7 +1119,7 @@ def _resolve_activity_usage(key: str) -> dict | None:
 
 
 def _resolve_usage_benefit(item: dict) -> tuple[str, str]:
-    """返回活动实际使用的卡或内部课程权益。"""
+    """返回活动实际使用的卡或沙龙技能学习权益。"""
     benefit_name = item.get("benefit_name", "")
     benefit_type = item.get("benefit_type", "")
     card_id = item.get("card_id")

@@ -10,6 +10,8 @@ interface PaginationBarProps {
   onPageChange: (page: number) => void
   /** 计数单位文案，默认「条」；如按天分页可传「天」 */
   unit?: string
+  pageSize?: number
+  onPageSizeChange?: (size: number) => void
 }
 
 export function PaginationBar({
@@ -20,6 +22,8 @@ export function PaginationBar({
   endIndex,
   onPageChange,
   unit = "条",
+  pageSize = 10,
+  onPageSizeChange,
 }: PaginationBarProps) {
   const [jumpValue, setJumpValue] = useState("")
 
@@ -59,8 +63,15 @@ export function PaginationBar({
           </span>
         )}
       </span>
+      {(totalPages > 1 || onPageSizeChange) && <div className="ml-auto flex max-w-full flex-wrap items-center gap-3">
+        {onPageSizeChange && <label className="flex shrink-0 items-center gap-2 text-[12px] text-[#646a73]">
+          <span>每页</span>
+          <select aria-label="每页显示条数" value={pageSize} onChange={event => onPageSizeChange(Number(event.target.value))} className="h-7 rounded-[4px] border border-[#e1e4e7] bg-white px-2 text-[12px] text-[#4e535a] outline-none focus:border-[#3370ff]">
+            {[10, 20, 50].map(size => <option key={size} value={size}>{size} 条</option>)}
+          </select>
+        </label>}
       {totalPages > 1 && (
-        <div className="ml-auto flex max-w-full items-center gap-1 overflow-x-auto pb-px scrollbar-hide">
+        <div className="flex max-w-full items-center gap-1 overflow-x-auto pb-px scrollbar-hide">
           <button
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
@@ -105,6 +116,7 @@ export function PaginationBar({
           <span className="shrink-0 text-[11px] text-[#646a73]">页</span>
         </div>
       )}
+      </div>}
     </div>
   )
 }

@@ -21,13 +21,14 @@ import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { createTableDragPreview } from "@/lib/table-drag-preview"
 import { useReadResource } from "@/hooks/use-read-resource"
 import { LoadError } from "@/components/load-error"
+import { LEARNING_ACTIVITY_OPTIONS, LEARNING_COURSE_TYPES } from "@/lib/learning-course-types"
 
 type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 
 const PARTICIPANT_DRAG_TYPE = "application/x-wyyard-participant"
 
 const TYPE_NAMES: Record<ActivityType, string> = {
-  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "内部课程",
+  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "沙龙技能学习",
 }
 
 function parseEksDescription(desc: string): { id: string; name: string; count: number } {
@@ -52,6 +53,7 @@ const ICS_COURSE_MAP: Record<string, string> = {
 }
 
 function resolveIcsCourseKey(courseName: string): string {
+  if (LEARNING_COURSE_TYPES.includes(courseName)) return `ics:${courseName}`
   if (ICS_COURSE_MAP[courseName]) return ICS_COURSE_MAP[courseName]
   if (courseName.startsWith("疗愈师")) return "ics:疗愈师课程"
   if (courseName.startsWith("商业框架") || courseName.startsWith("陪跑")) return "ics:商业框架陪跑"
@@ -291,6 +293,7 @@ interface ActivityBatchTableProps {
   previewChangedKeys?: number[]
   previewChangedCells?: ChangedCell[]
   locked?: boolean
+  interactionBlocked?: boolean
   onClosePreview?: () => void
   toolbarLeading?: React.ReactNode
   toolbarTrailing?: React.ReactNode
@@ -301,7 +304,7 @@ export function ActivityBatchTable({
   date, courses, courseTypes, customers, invitedCustomerIds, teachers, spaces, spaceId,
   records, onReload, onParticipantsSaved, callbacks, getMemberName, memberIdentities,
   onSavingCountChange, onSavedCountChange, onUndoRedoChange, onRestoreRef, onCaptureRef, onFlushRef, onHistoryPushed,
-  previewRows, previewChangedKeys, previewChangedCells, locked, onClosePreview,
+  previewRows, previewChangedKeys, previewChangedCells, locked, interactionBlocked = false, onClosePreview,
   toolbarLeading, toolbarTrailing, toolbarSupplement,
 }: ActivityBatchTableProps) {
   const [rows, setRows] = useState<ActivityRow[]>([])
@@ -322,6 +325,10 @@ export function ActivityBatchTable({
   const eksEditsRef = useRef<Map<string, { owner_id: string; owner_name: string; billing_description: string }>>(new Map())
   const dateRef = useRef(date)
   dateRef.current = date
+  const scopeRef = useRef(`${date}|${spaceId || ""}`)
+  scopeRef.current = `${date}|${spaceId || ""}`
+  const interactionBlockedRef = useRef(interactionBlocked)
+  interactionBlockedRef.current = interactionBlocked
   const [remainingMap, setRemainingMap] = useState<Record<string, Record<string, number>>>({})
   const [remainingError, setRemainingError] = useState("")
   const prevOwnerRef = useRef<Record<number, string>>({})
@@ -378,26 +385,27 @@ export function ActivityBatchTable({
     !isViewOnly && (canEditAllActivities || isOwnRow(row))
   ), [canEditAllActivities, isOwnRow, isViewOnly])
   const canEditParticipants = useCallback((row: ActivityRow) => {
+    if (interactionBlocked) return false
     if (currentUser.role === "超级管理员") return true
     if (editPermissions.activity_participants === "view") return false
     return editPermissions.activity_participants === "all" || isOwnRow(row)
-  }, [currentUser.role, editPermissions.activity_participants, isOwnRow])
+  }, [interactionBlocked, currentUser.role, editPermissions.activity_participants, isOwnRow])
   // 老师多选器使用独立浮层，不能只依靠表格内的置灰样式拦截。
   const canEditTeachers = useCallback((row: ActivityRow) => (
-    !locked && !previewRows && canEditRow(row)
-  ), [locked, previewRows, canEditRow])
+    !interactionBlocked && !locked && !previewRows && canEditRow(row)
+  ), [interactionBlocked, locked, previewRows, canEditRow])
   const canEditField = useCallback((row: ActivityRow, field: keyof ActivityRow) => (
-    field === "participant_ids"
+    !interactionBlocked && (field === "participant_ids"
       ? canEditParticipants(row)
-      : canEditRow(row) || (!isViewOnly && !ACTIVITY_CREATOR_ONLY_FIELDS.has(field))
-  ), [canEditParticipants, canEditRow, isViewOnly])
+      : canEditRow(row) || (!isViewOnly && !ACTIVITY_CREATOR_ONLY_FIELDS.has(field)))
+  ), [interactionBlocked, canEditParticipants, canEditRow, isViewOnly])
   const canEditChanges = useCallback((row: ActivityRow, changes: Partial<ActivityRow>) => (
-    Object.keys(changes).every(field => (
+    !interactionBlocked && Object.keys(changes).every(field => (
       field === "participant_ids"
         ? canEditParticipants(row)
         : canEditRow(row) || (!isViewOnly && !ACTIVITY_CREATOR_ONLY_FIELDS.has(field as keyof ActivityRow))
     ))
-  ), [canEditParticipants, canEditRow, isViewOnly])
+  ), [interactionBlocked, canEditParticipants, canEditRow, isViewOnly])
   const invitedOwnerCustomers = useMemo(() => {
     // 邀约名单加载完成前保持为空，避免短暂暴露全部客户作为案主候选。
     if (!invitedCustomerIds) return []
@@ -462,6 +470,7 @@ export function ActivityBatchTable({
   }, [canDeleteRow])
 
   const undo = useCallback(() => {
+    if (interactionBlockedRef.current) return
     if (undoStack.length === 0) return
     const entry = undoStack[undoStack.length - 1]
     // 同步捕获当前快照（在 state 更新前）
@@ -493,6 +502,7 @@ export function ActivityBatchTable({
   }, [undoStack, getUserName, deleteRecordFromBackend])
 
   const redo = useCallback(() => {
+    if (interactionBlockedRef.current) return
     if (redoStack.length === 0) return
     const entry = redoStack[redoStack.length - 1]
     const currentEntry: HistoryEntry = {
@@ -527,6 +537,7 @@ export function ActivityBatchTable({
 
   // 恢复历史版本函数（async，等待所有保存完成）
   const restoreFromHistory = useCallback(async (entry: HistoryEntry) => {
+    if (interactionBlockedRef.current) return
     pushHistory("恢复了历史版本")
     // 在 setRows 之前捕获当前行，用于找出需要删除的行
     const currentRows = rowsRef.current
@@ -630,9 +641,7 @@ export function ActivityBatchTable({
       { value: "gcs", label: "觉醒游戏" },
       { value: "ers", label: "情绪释放" },
       { value: "eks", label: "能量结" },
-      { value: "ics:疗愈师课程", label: "疗愈师课程" },
-      { value: "ics:商业框架陪跑", label: "商业框架陪跑" },
-      { value: "ics:落地赋能班", label: "落地赋能班" },
+      { value: "ics", label: "沙龙技能学习", children: LEARNING_ACTIVITY_OPTIONS.map(option => ({ ...option, value: `ics:${option.value}` })) },
     ]
   }, [courseTypes, organizations])
 
@@ -654,37 +663,69 @@ export function ActivityBatchTable({
   const savedRowsRef = useRef<Record<number, ActivityRow>>({})
 
   const remainingSequences = useRef<Record<string, number>>({})
-  const fetchRemaining = useCallback(async (type: string, customerId: string) => {
-    if (!customerId) return
+  const remainingRequests = useRef<Partial<Record<string, Promise<void>>>>({})
+  const requestedRemainingTypes = useRef<Set<string>>(new Set())
+  const fetchRemaining = useCallback((type: string, customerId: string, force = false): Promise<void> => {
+    if (!customerId || !["eks", "gcs", "ers"].includes(type)) return Promise.resolve()
+    const requestKey = `${date}|${type}`
+    const inFlight = remainingRequests.current[requestKey]
+    if (!force && inFlight) return inFlight
+    requestedRemainingTypes.current.add(type)
     const sequence = (remainingSequences.current[type] || 0) + 1
     remainingSequences.current[type] = sequence
     const isCurrent = () => dateRef.current === date && remainingSequences.current[type] === sequence
-    try {
-      const requestedDate = date
-      let results: { id: string; remaining: number }[] = []
-      if (type === "eks") results = await energyKnotSessionApi.searchCustomers("", date)
-      else if (type === "gcs") results = await groupCaseSessionApi.searchCustomers("", date)
-      else if (type === "ers") results = await emotionalReleaseSessionApi.searchCustomers("", date)
-      else return
-      if (dateRef.current !== requestedDate || !isCurrent()) return
-      const map: Record<string, number> = {}
-      for (const r of results) map[r.id] = r.remaining
-      setRemainingMap(prev => ({ ...prev, [type]: { ...prev[type], ...map } }))
-    } catch (error) {
-      if (isCurrent()) setRemainingError(error instanceof Error ? error.message : "案主次数加载失败")
-    }
+    const task = (async () => {
+      try {
+        const api = type === "eks" ? energyKnotSessionApi : type === "gcs" ? groupCaseSessionApi : emotionalReleaseSessionApi
+        const results = await api.searchCustomers("", date)
+        if (!isCurrent()) return
+        const map: Record<string, number> = {}
+        for (const result of results) map[result.id] = result.remaining
+        setRemainingMap(prev => ({ ...prev, [type]: map }))
+      } catch (error) {
+        if (isCurrent()) setRemainingError(error instanceof Error ? error.message : "案主次数加载失败")
+      }
+    })()
+    const request = task.finally(() => {
+      if (remainingRequests.current[requestKey] === request) delete remainingRequests.current[requestKey]
+    })
+    remainingRequests.current[requestKey] = request
+    return request
   }, [date])
 
-  // 从 records 加载行数据（优先从 API 获取排序，fallback 到 localStorage）
-  const prevRecordsRef = useRef<string | null>(null)
+  // 表格保留挂载，日期／空间切换时重置本地编辑历史，避免撤回到另一日。
   useEffect(() => {
-    const sig = `${date}|${spaceId}|${records.map(r => `${r.type}-${r.data.id}`).join(",")}`
-    if (prevRecordsRef.current !== null && sig === prevRecordsRef.current) return
-    prevRecordsRef.current = sig
+    setUndoStack([])
+    setRedoStack([])
+    historyPushedRef.current.clear()
+    eksEditsRef.current.clear()
+    eksCountEditRef.current = {}
+    prevOwnerRef.current = {}
+    setMembershipDeductionDrafts({})
+    setEditingDescriptionKey(null)
+    setEditingReviewKey(null)
+  }, [date, spaceId])
+
+  // 从 records 加载行数据（优先从 API 获取排序，fallback 到 localStorage）
+  const prevRecordsRef = useRef<{ scope: string; signature: string } | null>(null)
+  useEffect(() => {
+    const scope = `${date}|${spaceId || ""}`
+    const signature = JSON.stringify([records, courses, spaces])
+    const sameScope = prevRecordsRef.current?.scope === scope
+    if (sameScope && signature === prevRecordsRef.current?.signature) return
+    prevRecordsRef.current = { scope, signature }
 
     const buildRows = (order: string[]) => {
+      const existingRows = sameScope ? rowsRef.current : []
+      const existingById = new Map(existingRows.filter(row => row.record_id).map(row => [`${row.record_type}-${row.record_id}`, row]))
       let items = records.map(r => {
         const row = recordToRow(r.type, r.data, courses, spaceId || "", spaces)
+        const existing = existingById.get(`${r.type}-${r.data.id}`)
+        if (existing) {
+          // 刷新同一日时保留行节点及未保存编辑，已保存行接收服务端的新内容。
+          if (rowStatusRef.current[existing.key] && rowStatusRef.current[existing.key] !== "saved") return existing
+          row.key = existing.key
+        }
         if (r.type === "eks" && r.data.id) {
           const edit = eksEditsRef.current.get(r.data.id)
           if (edit) {
@@ -695,6 +736,13 @@ export function ActivityBatchTable({
         }
         return row
       })
+      if (sameScope) {
+        const incomingIds = new Set(items.map(row => `${row.record_type}-${row.record_id}`))
+        items.push(...existingRows.filter(row => (
+          row.pendingCreate
+          || (rowStatusRef.current[row.key] === "saving" && !incomingIds.has(`${row.record_type}-${row.record_id}`))
+        )))
+      }
       if (order.length) {
         const orderMap = new Map(order.map((id, i) => [id, i]))
         items.sort((a, b) => (orderMap.get(`${a.record_type}-${a.record_id}`) ?? 999) - (orderMap.get(`${b.record_type}-${b.record_id}`) ?? 999))
@@ -708,12 +756,19 @@ export function ActivityBatchTable({
         }
         items = [fresh]
       }
+      rowsRef.current = items
       setRows(items)
       savedRowsRef.current = Object.fromEntries(
-        items.filter(item => item.record_id).map(item => [item.key, { ...item }]),
+        items.filter(item => item.record_id).map(item => [
+          item.key,
+          sameScope && rowStatusRef.current[item.key] && rowStatusRef.current[item.key] !== "saved"
+            ? savedRowsRef.current[item.key] || { ...item }
+            : { ...item },
+        ]),
       )
       const statuses: Record<number, RowStatus> = {}
-      items.forEach(r => { statuses[r.key] = r.record_id ? "saved" : "idle" })
+      items.forEach(r => { statuses[r.key] = sameScope && rowStatusRef.current[r.key] ? rowStatusRef.current[r.key] : r.record_id ? "saved" : "idle" })
+      rowStatusRef.current = statuses
       setRowStatus(statuses)
     }
 
@@ -722,21 +777,41 @@ export function ActivityBatchTable({
     let localOrder: string[] = []
     try { localOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
     buildRows(localOrder)
+  }, [records, courses, date, spaceId, spaces, courseTypes])
 
-    // 再从 API 获取排序（覆盖 localStorage）
+  // 排序与记录刷新解耦：同日刷新不重复请求，也不会取消尚未完成的首次读取。
+  useEffect(() => {
+    const scope = `${date}|${spaceId || ""}`
+    const orderKey = `daily_activity_order_${date}_${spaceId || ""}`
+    let localOrder: string[] = []
+    try { localOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
     let current = true
     activityOrderApi.get(date, spaceId || "").then(apiOrder => {
-      if (current && apiOrder.length > 0) {
-        buildRows(apiOrder)
+      if (current && scopeRef.current === scope && apiOrder.length > 0) {
+        // 排序读取期间已有本地拖动时，以用户刚保存的顺序为准。
+        let latestOrder: string[] = []
+        try { latestOrder = JSON.parse(localStorage.getItem(orderKey) || "[]") } catch {}
+        if (JSON.stringify(latestOrder) !== JSON.stringify(localOrder)) return
+        const positions = new Map(apiOrder.map((id, index) => [id, index]))
+        setRows(previous => {
+          const sorted = [...previous].sort((left, right) => (
+            (positions.get(`${left.record_type}-${left.record_id}`) ?? 999)
+            - (positions.get(`${right.record_type}-${right.record_id}`) ?? 999)
+          ))
+          rowsRef.current = sorted
+          return sorted
+        })
         // 同步回 localStorage
         try { localStorage.setItem(orderKey, JSON.stringify(apiOrder)) } catch {}
       }
     }).catch(() => {})
     return () => { current = false }
-  }, [records, courses, date, spaceId, spaces, courseTypes])
+  }, [date, spaceId])
 
   // 保存单行（返回 API 结果，供 handleCreate 获取 record_id）
   const saveRowInner = useCallback(async (row: ActivityRow, conversion = false): Promise<any> => {
+    const requestScope = `${date}|${spaceId || ""}`
+    if (scopeRef.current !== requestScope) throw new Error("当前日期或空间已切换，请重新编辑")
     rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saving" }
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
@@ -803,6 +878,7 @@ export function ActivityBatchTable({
         else if (type === "ers") result = await emotionalReleaseSessionApi.create(createData, conversion)
         else if (type === "eks") result = await energyKnotSessionApi.create(createData, conversion)
         else if (type === "ics") result = await internalCourseSessionApi.create(createData, conversion)
+        if (scopeRef.current !== requestScope) return result
 
         // 更新行：标记为已创建。先同步 rowsRef，避免 React 批处理期间再次被当成未创建记录。
         const rowsWithCreatedRecord = rowsRef.current.map(r => r.key === row.key ? {
@@ -825,7 +901,7 @@ export function ActivityBatchTable({
         setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
         if (["eks", "gcs", "ers"].includes(row.record_type)) {
           // 余额列表数据量较大，不阻塞场次创建和旧类型清理。
-          void fetchRemaining(row.record_type, "all")
+          void fetchRemaining(row.record_type, "all", true)
         }
         onReload()
         return result
@@ -894,6 +970,7 @@ export function ActivityBatchTable({
         }
       }
 
+      if (scopeRef.current !== requestScope) return
       rowStatusRef.current = { ...rowStatusRef.current, [row.key]: "saved" }
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
       savedRowsRef.current[row.key] = { ...row }
@@ -917,9 +994,10 @@ export function ActivityBatchTable({
         if (row.owner_id || prevOwnerRef.current[row.key]) {
           delete prevOwnerRef.current[row.key]
         }
-        fetchRemaining(row.record_type, "all")
+        void fetchRemaining(row.record_type, "all", true)
       }
     } catch (e: any) {
+      if (scopeRef.current !== requestScope) throw e
       const msg = e?.message || ""
       // 404 = record_id 已失效（记录被删后重建），降级为 create
       if (row.record_id && !row.pendingCreate && (msg.includes("404") || msg.includes("不存在"))) {
@@ -1080,6 +1158,7 @@ export function ActivityBatchTable({
 
   // 删除按钮
   const handleDelete = useCallback((row: ActivityRow) => {
+    if (interactionBlockedRef.current) return
     if (!canDeleteRow(row)) return
     // 不在确认前移除行，等父组件确认后由 loadDateData 同步
     if (row.record_type === "class") callbacks.onDeleteClass(row.record_id)
@@ -1091,6 +1170,7 @@ export function ActivityBatchTable({
 
   // 类型切换 → 先创建新记录，成功后再删除旧记录（防止数据丢失）
   const handleTypeChange = useCallback(async (rowKey: number, newType: string) => {
+    if (interactionBlockedRef.current) return
     // 同一行的类型转换必须串行执行，避免连续切换时留下中间类型的孤立场次。
     if (typeChangeKeysRef.current.has(rowKey) || rowStatusRef.current[rowKey] === "saving") return
     const row = rowsRef.current.find(r => r.key === rowKey)
@@ -1172,7 +1252,7 @@ export function ActivityBatchTable({
         }
         // 旧专项类型的余额也要刷新，否则界面会暂时显示未返还。
         if (["eks", "gcs", "ers"].includes(row.record_type)) {
-          void fetchRemaining(row.record_type, "all")
+          void fetchRemaining(row.record_type, "all", true)
         }
       }
       pushHistory("切换了类型", [rowKey], `将「${oldName}」切换为${newTypeName}`, preRows, [{ rowKey, fields: ["record_type", "name"] }])
@@ -1214,6 +1294,7 @@ export function ActivityBatchTable({
     dragPreviewRef.current = null
   }, [])
   const handleDragStart = useCallback((e: React.DragEvent<HTMLTableCellElement>, key: number) => {
+    if (interactionBlockedRef.current) { e.preventDefault(); return }
     const row = rowsRef.current.find(item => item.key === key)
     if (!row) return
     dragKeyRef.current = key
@@ -1253,6 +1334,7 @@ export function ActivityBatchTable({
   }, [])
   const handleDragEnd = useCallback(() => { resetDragState() }, [resetDragState])
   const handleDrop = useCallback((targetKey: number, e?: React.DragEvent) => {
+    if (interactionBlockedRef.current) { resetDragState(); return }
     const sourceKey = dragKeyRef.current
     // 外部拖入（添加参与者）
     if (sourceKey === null && e) {
@@ -1350,16 +1432,17 @@ export function ActivityBatchTable({
     return { oldMembers, newMembers }
   }, [getMemberName, customers, identityTypeMap])
 
-  // 预加载案主剩余次数（组件挂载后立即加载，确保首次搜索即可显示）
+  // 案主余量仅在进入对应输入框后加载，不挤占课表首屏请求。
   useEffect(() => {
     dateRef.current = date
     setRemainingMap({})
     setRemainingError("")
-    for (const type of ["eks", "gcs", "ers"]) void fetchRemaining(type, "all")
+    requestedRemainingTypes.current.clear()
     return () => { dateRef.current = "" }
-  }, [date, fetchRemaining])
+  }, [date])
 
   const handleCreate = async (type: string, classCourseType?: string) => {
+    if (interactionBlockedRef.current) return
     const fresh = createFreshRow(type as ActivityType, spaceId || "", spaces)
     const newName = classCourseType || fresh.name || TYPE_NAMES[type as ActivityType] || "活动"
     if (classCourseType) {
@@ -1470,9 +1553,9 @@ export function ActivityBatchTable({
   }
 
   return (
-    <div className={`relative flex min-h-0 flex-1 flex-col rounded-[2px] bg-white ${isLocked ? "activity-table-locked" : ""}`}>
+    <div inert={interactionBlocked || undefined} className={`relative flex min-h-0 flex-1 flex-col rounded-[2px] bg-white ${isLocked ? "activity-table-locked" : ""}`}>
       <LoadError error={configuration.error} onRetry={configuration.refresh} />
-      <LoadError error={remainingError} onRetry={() => { setRemainingError(""); for (const type of ["eks", "gcs", "ers"]) void fetchRemaining(type, "all") }} />
+      <LoadError error={remainingError} onRetry={() => { setRemainingError(""); for (const type of requestedRemainingTypes.current) void fetchRemaining(type, "all") }} />
       {isPreview && (
         <div className="px-3 py-2 bg-[#f5eeff] border-b border-[#e0d0f5]">
           <span className="text-[12px] text-[#7c3aed]">正在预览历史版本</span>
@@ -1585,7 +1668,7 @@ export function ActivityBatchTable({
               const typeLabel = row.record_type === "class"
                 ? (row.class_course_type || "沙龙")
                 : row.record_type === "ics"
-                  ? (row.ics_course_key.replace("ics:", "") || "内部课程")
+                  ? (row.ics_course_key.replace("ics:", "") || "沙龙技能学习")
                   : TYPE_NAMES[row.record_type]
               const hostDisplayText = getHostDisplay(row).join("、")
               return (
@@ -1702,7 +1785,11 @@ export function ActivityBatchTable({
                   </td>
 
                   {/* 案主 */}
-                  {hasOwnerType && <td className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
+                  {hasOwnerType && <td
+                    onFocusCapture={() => {
+                      if (!interactionBlocked && !remainingMap[row.record_type]) void fetchRemaining(row.record_type, "all")
+                    }}
+                    className={`pl-1.5 pr-0 py-0.5 w-[60px] align-top ${isCellChanged(row.key, "owner_name") || isCellChanged(row.key, "owner_id") ? "bg-[#f5eeff] rounded" : ""}`}>
                     {rowReadOnly || ownerWithdrawn ? (
                       <span className={`inline-flex h-7 w-full items-center truncate text-[12px] ${row.owner_name ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`} title={row.owner_name}>
                         {row.owner_name || "-"}{ownerWithdrawn && <span className="ml-1 text-[11px] text-[#c4506a]">已退课</span>}

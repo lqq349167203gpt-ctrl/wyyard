@@ -33,6 +33,8 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.utils.learning_course_types import ACTIVITY_COURSE_TYPES, PAYMENT_COURSE_TYPES
+from app.utils.payment_types import MEMBERSHIP_CARD_TYPES
 from app.utils.record_ownership import request_actor_customer_ids
 from app.utils.request_roles import get_request_roles
 
@@ -61,6 +63,17 @@ def _get_record_amount(record) -> float:
         or getattr(record, "price", None)
         or getattr(record, "amount", None)
         or 0
+    )
+
+
+def _get_product_name(record) -> str:
+    """统计订单和成交人数明细共用子类型名称，兼容未录入子类型的历史订单。"""
+    return (
+        getattr(record, "card_type", None)
+        or getattr(record, "project_name", None)
+        or getattr(record, "course_type", None)
+        or getattr(record, "reading_type", None)
+        or ""
     )
 
 
@@ -437,7 +450,7 @@ def get_details(
         "group-cases": "觉醒游戏",
         "emotional-releases": "情绪释放",
         "energy-knots": "能量结",
-        "internal-courses": "内部课程",
+        "internal-courses": "沙龙技能学习",
         "oh-card-readings": "OH卡诊断",
         "other-projects": "其他项目",
     }
@@ -629,13 +642,13 @@ PRODUCT_TYPE_MAP = {
     "emotional-releases": "情绪释放",
     "oh-card-readings": "OH卡诊断",
     "energy-knots": "能量结",
-    "internal-courses": "内部课程",
+    "internal-courses": "沙龙技能学习",
     "offline-courses": "落地课程",
     "other-projects": "其他项目",
 }
 
-CARD_TYPES = ["次卡", "粗门次卡", "体验会员", "月卡", "12次卡", "3月卡", "30次卡", "60次卡", "半年卡", "年卡"]
-COURSE_TYPES = ["疗愈师课程：自爱力构建", "商业框架陪跑：自觉力提升", "落地赋能班：自洽力整合"]
+CARD_TYPES = list(MEMBERSHIP_CARD_TYPES)
+COURSE_TYPES = list(PAYMENT_COURSE_TYPES)
 
 
 @router.get("/products")
@@ -643,7 +656,7 @@ def get_products(
     date_from: str | None = Query(None, description="开始日期 YYYY-MM-DD"),
     date_to: str | None = Query(None, description="结束日期 YYYY-MM-DD"),
     product_type: str | None = Query(None, description="产品类型筛选"),
-    name_filter: str | None = Query(None, description="子类型名称筛选（会员卡卡类型/内部课程课程类型/其他项目项目名称）"),
+    name_filter: str | None = Query(None, description="子类型名称筛选（会员卡卡类型/沙龙技能学习课程类型/其他项目项目名称）"),
     granularity: str = Query("day", description="聚合粒度: day/week/month"),
     referrer: str | None = Query(None, description="引流人筛选"),
     teacher_id: str | None = Query(None, description="疗愈老师客户ID（按成交人筛选）"),
@@ -731,7 +744,7 @@ def get_products(
     daily_card_type_count: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     daily_card_type_persons: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
 
-    # 内部课程类型细分（当选 product_type=内部课程 时）
+    # 沙龙技能学习类型细分（当选 product_type=沙龙技能学习 时）
     course_type_amounts: dict[str, float] = defaultdict(float)
     course_type_counts: dict[str, int] = defaultdict(int)
     course_type_persons: dict[str, set[str]] = defaultdict(set)
@@ -819,7 +832,7 @@ def get_products(
                     if customer_id:
                         card_type_persons[ct].add(customer_id)
                         daily_card_type_persons[deal_date][ct].add(customer_id)
-                # 内部课程类型细分
+                # 沙龙技能学习类型细分
                 if type_name == "internal-courses":
                     ct = getattr(r, "course_type", None) or "其他"
                     course_type_amounts[ct] += amount
@@ -899,7 +912,7 @@ def get_products(
         granularity, date_from, date_to, CARD_TYPES,
     )
 
-    # 内部课程类型细分图表数据（始终返回全部课程类型）
+    # 沙龙技能学习类型细分图表数据（始终返回全部课程类型）
     course_type_names = list(COURSE_TYPES)
     for ds_dict in [daily_course_type_amount, daily_course_type_count]:
         for ct in COURSE_TYPES:
@@ -1107,7 +1120,7 @@ def get_product_details(
             "emotional-releases": "情绪释放",
             "oh-card-readings": "OH卡诊断",
             "energy-knots": "能量结",
-            "internal-courses": "内部课程",
+            "internal-courses": "沙龙技能学习",
             "offline-courses": "落地课程",
             "other-projects": "其他项目",
         }
@@ -1125,7 +1138,7 @@ def get_product_details(
                 if deal_date == date and not voided and _record_visible(r):
                     customer_id = getattr(r, "customer_id", None)
                     if customer_id:
-                        product_name = getattr(r, "card_type", None) or getattr(r, "project_name", None) or getattr(r, "course_type", None) or ""
+                        product_name = _get_product_name(r)
                         if product_name:
                             person_products[customer_id].append(f"{label}：{product_name}")
                         else:
@@ -1172,7 +1185,7 @@ def get_product_details(
                         records.append({
                             "nickname": c.nickname if c else (customer_id or "-"),
                             "type": TYPE_LABELS.get(type_name, type_name),
-                            "name": getattr(r, "card_type", None) or getattr(r, "project_name", None) or getattr(r, "course_type", None) or "",
+                            "name": _get_product_name(r),
                             "amount": amount,
                             "purchase_count": getattr(r, "purchase_count", None),
                             "diagnosis_duration": diagnosis_duration,
@@ -1562,14 +1575,14 @@ COURSE_ACTIVITY_TYPES = (
     ("gcs", "觉醒游戏", group_case_session_service.list_sessions),
     ("ers", "情绪释放", emotional_release_session_service.list_sessions),
     ("eks", "能量结", energy_knot_session_service.list_sessions),
-    ("ics", "内部课程", internal_course_session_service.list_sessions),
+    ("ics", "沙龙技能学习", internal_course_session_service.list_sessions),
 )
 
-INTERNAL_COURSE_SUBTYPES = ("疗愈师课程", "商业框架陪跑", "落地赋能班")
+INTERNAL_COURSE_SUBTYPES = ACTIVITY_COURSE_TYPES
 
 
 def _course_subtype_name(activity_type: str, activity) -> str:
-    """统一课程二级分类名称，兼容内部课程的新旧长名称。"""
+    """统一课程二级分类名称，兼容沙龙技能学习的新旧长名称。"""
     subtype = (getattr(activity, "course_type", "") or "未分类").strip()
     if activity_type != "ics":
         return subtype
@@ -1942,7 +1955,7 @@ def get_course_statistics(
     granularity: str = Query("day", description="时间单位: day/week/month"),
     organization_id: str | None = Query(None, description="所属组织 ID"),
     activity_type: str | None = Query(None, description="活动类型编码"),
-    course_subtype: str | None = Query(None, description="沙龙活动或内部课程二级类目"),
+    course_subtype: str | None = Query(None, description="沙龙活动或沙龙技能学习二级类目"),
     teacher_id: str | None = Query(None, description="疗愈老师客户 ID"),
     mobile_view: str = Query("", pattern="^(|courses|reviews|participants_source)$"),
     page: int = Query(1, ge=1),

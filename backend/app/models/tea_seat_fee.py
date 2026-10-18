@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import List, Optional
 
-from app.models.base import SafeBaseModel
+from app.models.payment_course import PaymentCourseFields
 
 
-class TeaSeatFeeBase(SafeBaseModel):
+class TeaSeatFeeBase(PaymentCourseFields):
     customer_id: str
     nickname: str
     quantity: int = 1

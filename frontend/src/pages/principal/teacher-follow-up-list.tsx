@@ -1,4 +1,5 @@
-import type { PrincipalRow } from "@/lib/api"
+import type { CourseParticipantNoteEntry, PrincipalRow } from "@/lib/api"
+import { followUpPlanText, NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
 import { EmptyValue } from "@/components/empty-value"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
@@ -31,15 +32,20 @@ function dayLabel(date: string) {
   return { short: `${match[2]}.${match[3]}`, full: `${match[1]}年${Number(match[2])}月${Number(match[3])}日 · ${weekday}` }
 }
 
-const textOf = (row: PrincipalRow, field: "visit_need" | "customer_info" | "follow_up") =>
+const textOf = (row: PrincipalRow, field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback") =>
   String(row[field] ?? "").trim()
 
-function feedbackTextOf(row: PrincipalRow, field: "visit_need" | "customer_info" | "follow_up") {
+function feedbackEntries(row: PrincipalRow, field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback"): CourseParticipantNoteEntry[] {
+  const entries: unknown = row[`${field}_entries`]
+  return Array.isArray(entries) ? entries.filter((entry): entry is CourseParticipantNoteEntry => !!entry && typeof entry.content === "string") : []
+}
+
+function feedbackTextOf(row: PrincipalRow, field: "visit_need" | "customer_info" | "follow_up" | "customer_feedback") {
   const rawEntries: unknown = row[`${field}_entries`]
   if (Array.isArray(rawEntries) && rawEntries.length) {
     return rawEntries
-      .filter((entry): entry is { author?: string; content: string } => !!entry && typeof entry.content === "string" && !!entry.content.trim())
-      .map(entry => `${entry.author?.trim() || "反馈人未记录"}：${entry.content.trim()}`)
+      .filter((entry): entry is CourseParticipantNoteEntry => !!entry && typeof entry.content === "string" && !!entry.content.trim())
+      .map(entry => [`反馈：${entry.author?.trim() || "未记录"}`, followUpPlanText(entry) ? `下次跟进：${followUpPlanText(entry)}` : "", entry.content.trim()].filter(Boolean).join("\n"))
       .join("\n")
   }
   return textOf(row, field)
@@ -47,11 +53,12 @@ function feedbackTextOf(row: PrincipalRow, field: "visit_need" | "customer_info"
 
 const FEEDBACK_FIELDS = [
   { key: "visit_need", creatorKey: "visit_need_creators", entriesKey: "visit_need_entries", label: "来访需求" },
-  { key: "customer_info", creatorKey: "customer_info_creators", entriesKey: "customer_info_entries", label: "客户信息" },
+  { key: "customer_info", creatorKey: "customer_info_creators", entriesKey: "customer_info_entries", label: "深度需求" },
   { key: "follow_up", creatorKey: "follow_up_creators", entriesKey: "follow_up_entries", label: "跟进点" },
+  { key: "customer_feedback", creatorKey: "customer_feedback_creators", entriesKey: "customer_feedback_entries", label: "客户反馈" },
 ] as const
 
-type FeedbackEntry = { content: string; author: string; at: string; created_by: string }
+type FeedbackEntry = CourseParticipantNoteEntry
 
 function formatFeedbackDate(value: string): string {
   if (!value) return ""
@@ -90,10 +97,10 @@ export function TeacherFollowUpDialog({ row, onClose }: { row: PrincipalRow | nu
                   {entries.length ? entries.map((entry, index) => (
                     <div key={index} className="border-b border-[#f0f1f3] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
                       <div className="flex min-w-0 items-baseline gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-[#2b2f36]" title={entry.author}><span className="text-[#8f959e]">反馈人：</span>{entry.author || String(row?.teachers || "未记录")}</span>
+                        <span className="min-w-0 flex-1 text-[11px] leading-5"><NoteFeedbackMeta author={entry.author || String(row?.teachers || "未记录")} plan={entry} /></span>
                         <span className="ml-auto flex shrink-0 items-center gap-2 text-right text-[11px] text-[#8f959e]">
                           {entry.at && <span className="tabular-nums">{formatFeedbackDate(entry.at)}</span>}
-                          {entry.created_by && <span className="max-w-[145px] truncate" title={`创建人：${entry.created_by}`}>创建人：{entry.created_by}</span>}
+                          {entry.created_by && <span className="max-w-[145px] truncate" title={`${entry.created_by} 创建`}>{entry.created_by}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>}
                         </span>
                       </div>
                       <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-6 text-[#4e535a]">{entry.content}</p>
@@ -101,10 +108,10 @@ export function TeacherFollowUpDialog({ row, onClose }: { row: PrincipalRow | nu
                   )) : (
                     <div>
                       {content && <div className="flex min-w-0 items-baseline gap-2">
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-[#2b2f36]"><span className="text-[#8f959e]">反馈人：</span>{String(row?.teachers || "未记录")}</span>
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-[#8f959e]">{String(row?.teachers || "未记录")}<span className="ml-1 font-normal text-[#c0c4cc]">反馈</span></span>
                         <span className="ml-auto flex shrink-0 items-center gap-2 text-right text-[11px] text-[#8f959e]">
                           {row?.date && <span className="tabular-nums">{String(row.date)}</span>}
-                          {creators && <span className="max-w-[145px] truncate" title={`创建人：${creators}`}>创建人：{creators}</span>}
+                          {creators && <span className="max-w-[145px] truncate" title={`${creators} 创建`}>{creators}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>}
                         </span>
                       </div>}
                       <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-6 text-[#4e535a]">{content || <EmptyValue />}</p>
@@ -156,7 +163,7 @@ export function TeacherFollowUpList({ rows, loading, expanded, onOpenCustomer, o
                 {[...teacherStats].map(([key, stats]) => (
                   <div key={key} className="border-t border-[#eceef0] pt-1.5 text-[11px] leading-[18px]">
                     <span className="block truncate text-[#4e535a]" title={stats.name}>{stats.name}</span>
-                    <span className="block text-[#8f959e]">客户信息 <span className={stats.info < stats.total ? "text-[#bd803f]" : ""}>{stats.info}/{stats.total}</span></span>
+                    <span className="block text-[#8f959e]">深度需求 <span className={stats.info < stats.total ? "text-[#bd803f]" : ""}>{stats.info}/{stats.total}</span></span>
                     <span className="block text-[#8f959e]">跟进点 <span className={stats.point < stats.total ? "text-[#bd803f]" : ""}>{stats.point}/{stats.total}</span></span>
                   </div>
                 ))}
@@ -181,21 +188,27 @@ export function TeacherFollowUpList({ rows, loading, expanded, onOpenCustomer, o
                     </div>
                     <div className="overflow-x-auto">
                       <div className="min-w-[610px]">
-                        <div className="grid grid-cols-[105px_repeat(3,minmax(0,1fr))] gap-2 border-b border-[#f0f0f0] px-3 py-2 text-[11px] text-[#8f959e]">
-                          <span>人员</span><span>来访需求</span><span>客户信息</span><span>跟进点</span>
+                        <div className="grid grid-cols-[105px_repeat(4,minmax(0,1fr))] gap-2 border-b border-[#f0f0f0] px-3 py-2 text-[11px] text-[#8f959e]">
+                          <span>人员</span><span>来访需求</span><span>深度需求</span><span>跟进点</span><span>客户反馈</span>
                         </div>
                         {course.rows.map(row => (
-                          <div key={row.id} className="grid grid-cols-[105px_repeat(3,minmax(0,1fr))] gap-2 border-b border-[#f5f6f7] px-3 py-2.5 text-[11.5px] leading-[1.5] text-[#4e535a] last:border-b-0 hover:bg-[#fcfcfd]">
+                          <div key={row.id} className="grid grid-cols-[105px_repeat(4,minmax(0,1fr))] gap-2 border-b border-[#f5f6f7] px-3 py-2.5 text-[11.5px] leading-[1.5] text-[#4e535a] last:border-b-0 hover:bg-[#fcfcfd]">
                             <div className="min-w-0">
                               {row.customer_id ? <button type="button" onClick={() => onOpenCustomer(row)} className="block max-w-full truncate text-left font-medium text-[#2b2f36] hover:underline" title={String(row.customer || "")}>{String(row.customer || "未命名")}</button>
                                 : <span className="block truncate font-medium text-[#2b2f36]">{String(row.customer || "未命名")}</span>}
                               {row.participant_role === "案主" && <span className="mt-0.5 block text-[11px] text-[#8f959e]">案主</span>}
                             </div>
-                            {(["visit_need", "customer_info", "follow_up"] as const).map(field => {
+                            {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).map(field => {
                               const content = feedbackTextOf(row, field)
+                              const entries = field === "follow_up" ? feedbackEntries(row, field) : []
                               return <div key={field} className="min-w-0">
                                 {content ? <button type="button" onClick={() => onOpenDetail(row)} title={expanded ? "查看记录详情" : content}
-                                  className={`block w-full text-left hover:underline ${expanded ? "whitespace-pre-wrap break-words" : "truncate"}`}>{content}</button> : <EmptyValue />}
+                                  className={`block w-full text-left hover:underline ${expanded || entries.length ? "whitespace-pre-wrap break-words" : "truncate"}`}>
+                                  {entries.length ? entries.map((entry, index) => <span key={index} className="mb-1 block last:mb-0">
+                                    <NoteFeedbackMeta author={entry.author} plan={entry} />
+                                    <span className={expanded ? "block" : "line-clamp-3"}>{entry.content}</span>
+                                  </span>) : content}
+                                </button> : <EmptyValue />}
                               </div>
                             })}
                           </div>

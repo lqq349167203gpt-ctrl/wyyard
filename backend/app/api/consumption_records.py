@@ -46,7 +46,7 @@ def get_daily_payment_totals(request: Request, date: str = Query(...)):
         if k.deal_date == date:
             totals[k.customer_id] = totals.get(k.customer_id, 0) + k.amount
 
-    # 内部课程
+    # 沙龙技能学习
     for c in internal_course_service.list_courses():
         if c.deal_date == date:
             totals[c.customer_id] = totals.get(c.customer_id, 0) + c.price
@@ -170,13 +170,13 @@ def list_payment_records(
             "customer_id": k.customer_id,
         })
 
-    # 内部课程
+    # 沙龙技能学习
     for c in internal_course_service.list_courses():
         created = c.created_at.strftime("%Y-%m-%d") if hasattr(c.created_at, "strftime") else str(c.created_at)
         records.append({
             "date": c.deal_date or "",
             "nickname": "",
-            "type": "内部课程",
+            "type": "沙龙技能学习",
             "name": c.course_type,
             "quantity": 1,
             "amount": c.price,

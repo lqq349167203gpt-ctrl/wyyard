@@ -14,8 +14,9 @@ router = APIRouter(prefix="/api/visits", tags=["visits"])
 
 VISIT_NOTE_CATEGORY_LABELS = {
     "visit_need": "来访需求",
-    "customer_info": "客户信息",
+    "customer_info": "深度需求",
     "follow_up": "跟进点",
+    "customer_feedback": "客户反馈",
 }
 
 
@@ -35,7 +36,7 @@ def _filter_visible_visits(request: Request | None, records: list) -> list:
     return [record for record in records if record.customer_id in visible_ids]
 
 
-def _fill_member_type(record, private_need: str = "", *, refresh_remaining: bool = False, shared_summary: dict | None = None):
+def _fill_member_type(record, private_need: str = "", *, refresh_remaining: bool = False, shared_summary: dict | None = None, first_arrivals: dict[str, str] | None = None):
     """从客户信息实时填充会员身份、昵称和引流来源"""
     data = record.model_dump(mode="json")
     from app.services import daily_customer_note_service
@@ -46,33 +47,37 @@ def _fill_member_type(record, private_need: str = "", *, refresh_remaining: bool
     data["nickname"] = customer.nickname if customer else ""
     data["referrer"] = customer.referrer if customer else ""
     data["needs"] = private_need
+    if first_arrivals is None:
+        first_arrivals = visit_service.first_arrival_dates({record.customer_id})
+    first_arrival = first_arrivals.get(record.customer_id, "")
+    data["is_new_customer"] = not first_arrival or first_arrival >= record.visit_date
     if refresh_remaining:
         data["remaining_count"] = visit_service.current_remaining_by_customer({record.customer_id}).get(record.customer_id, 0)
     return data
 
 
-def _private_need_map(request: Request | None, visit_ids: list[str]) -> dict[str, str]:
+def _private_need_map(request: Request | None, visit_ids: list[str], *, notes=None) -> dict[str, str]:
     if request is None or not visit_ids:
         return {}
     from app.services import visit_note_service
 
-    notes = visit_note_service.list_visible_notes(
-        visit_ids,
+    visible_notes = visit_note_service.filter_visible_notes(
+        visit_note_service.list_notes(visit_ids) if notes is None else notes,
         getattr(request.state, "user_id", "") or "",
         getattr(request.state, "user_owner", "") or "",
         getattr(request.state, "user_name", "") or "",
     )
     result: dict[str, list[str]] = {}
-    for note in notes:
+    for note in visible_notes:
         if note.category != "visit_need":
             continue
         result.setdefault(note.visit_id, []).append(
-            f"{visit_note_service.display_author(note)}：{note.content}"
+            f"{visit_note_service.display_author(note)}：{visit_note_service.display_content(note)}"
         )
     return {visit_id: "\n".join(lines) for visit_id, lines in result.items()}
 
 
-def _visit_note_maps(request: Request | None, visit_ids: list[str]) -> tuple[dict[str, str], dict[str, list[dict]]]:
+def _visit_note_maps(request: Request | None, visit_ids: list[str], *, notes=None) -> tuple[dict[str, str], dict[str, list[dict]]]:
     """一次读取可见信息，同时生成兼容需求文本和表格所需的信息列表。"""
     if request is None or not visit_ids:
         return {}, {}
@@ -81,15 +86,15 @@ def _visit_note_maps(request: Request | None, visit_ids: list[str]) -> tuple[dic
     account_id = getattr(request.state, "user_id", "") or ""
     owner_name = getattr(request.state, "user_owner", "") or ""
     username = getattr(request.state, "user_name", "") or ""
-    notes = visit_note_service.list_visible_notes(
-        visit_ids,
+    visible_notes = visit_note_service.filter_visible_notes(
+        visit_note_service.list_notes(visit_ids) if notes is None else notes,
         account_id,
         owner_name,
         username,
     )
     need_lines: dict[str, list[str]] = {}
     note_map: dict[str, list[dict]] = {}
-    for note in notes:
+    for note in visible_notes:
         can_manage = visit_note_service.can_manage_note(
             note,
             account_id,
@@ -103,7 +108,7 @@ def _visit_note_maps(request: Request | None, visit_ids: list[str]) -> tuple[dic
         note_map.setdefault(note.visit_id, []).append(item)
         if note.category == "visit_need":
             need_lines.setdefault(note.visit_id, []).append(
-                f"{visit_note_service.display_author(note)}：{note.content}"
+                f"{visit_note_service.display_author(note)}：{visit_note_service.display_content(note)}"
             )
     return (
         {visit_id: "\n".join(lines) for visit_id, lines in need_lines.items()},
@@ -178,13 +183,16 @@ async def list_visits(
         request,
         visit_service.list_visits(date, customer_id, space_id),
     )
-    need_map, note_map = _visit_note_maps(request, [record.id for record in records])
-    from app.services import daily_customer_note_service
+    from app.services import daily_customer_note_service, visit_note_service
 
-    summaries = daily_customer_note_service.visit_summaries({record.id for record in records})
+    visit_ids = [record.id for record in records]
+    notes = visit_note_service.list_notes(visit_ids, ensure_legacy=False)
+    need_map, note_map = _visit_note_maps(request, visit_ids, notes=notes)
+    summaries = daily_customer_note_service.visit_summaries(visit_ids, notes=notes)
+    first_arrivals = visit_service.first_arrival_dates({record.customer_id for record in records})
     items = []
     for record in records:
-        item = _fill_member_type(record, need_map.get(record.id, ""), shared_summary=summaries.get(record.id, {}))
+        item = _fill_member_type(record, need_map.get(record.id, ""), shared_summary=summaries.get(record.id, {}), first_arrivals=first_arrivals)
         item["visit_notes"] = note_map.get(record.id, [])
         items.append(item)
     role = get_request_roles(request) if request else ["超级管理员"]
@@ -204,17 +212,22 @@ async def list_visits_light(
     """轻量版列表，不计算活动详情，适用于主页快速加载"""
     try:
         items = visit_service.list_visits_light(date, space_id)
-        need_map = _private_need_map(request, [str(item.get("id") or "") for item in items])
-        from app.services import daily_customer_note_service
+        visible_ids = _visible_customer_ids(request)
+        if visible_ids is not None:
+            items = [item for item in items if item.get("customer_id") in visible_ids]
+        from app.services import daily_customer_note_service, visit_note_service
 
-        summaries = daily_customer_note_service.visit_summaries({str(item.get("id") or "") for item in items})
+        visit_ids = [str(item.get("id") or "") for item in items]
+        notes = visit_note_service.list_notes(visit_ids, ensure_legacy=request is not None)
+        need_map = _private_need_map(request, visit_ids, notes=notes)
+        summaries = daily_customer_note_service.visit_summaries(visit_ids, notes=notes)
+        first_arrivals = visit_service.first_arrival_dates({item["customer_id"] for item in items})
         for item in items:
+            first_arrival = first_arrivals.get(item["customer_id"], "")
+            item["is_new_customer"] = not first_arrival or first_arrival >= item["visit_date"]
             item["needs"] = need_map.get(str(item.get("id") or ""), "")
             item.update(summaries.get(str(item.get("id") or ""), {}))
-        visible_ids = _visible_customer_ids(request)
-        if visible_ids is None:
-            return items
-        return [item for item in items if item.get("customer_id") in visible_ids]
+        return items
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -294,7 +307,8 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     )
     active_records = [record for record in records if not record.cancelled]
     need_map = _private_need_map(request, [record.id for record in active_records])
-    items = [_fill_member_type(record, need_map.get(record.id, "")) for record in active_records]
+    first_arrivals = visit_service.first_arrival_dates({record.customer_id for record in active_records})
+    items = [_fill_member_type(record, need_map.get(record.id, ""), first_arrivals=first_arrivals) for record in active_records]
 
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
@@ -459,6 +473,7 @@ async def update_visit(visit_id: str, data: dict, request: Request):
         "needs": "visit_need",
         "feedback": "customer_info",
         "healing_notes": "follow_up",
+        "experience": "customer_feedback",
     }
     collaboration_updates = []
     for field, category in collaboration_fields.items():

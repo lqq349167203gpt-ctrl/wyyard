@@ -6,6 +6,7 @@ Page({
     hasPermission: false,
     loading: true,
     tags: [],
+    needTags: [],
     statuses: [],
     filteredTags: [],
     scopeFilter: 'all',
@@ -59,9 +60,9 @@ Page({
     const version = this._loadVersion = (this._loadVersion || 0) + 1
     this.setData({ loading: true, loadError: '' })
     try {
-      const [tags, statuses] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true)])
+      const [tags, statuses, needTags] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true), customerTagApi.list('visit_need')])
       if (version !== this._loadVersion) return
-      this.setData({ tags: tags || [], statuses: statuses || [], loading: false })
+      this.setData({ tags: tags || [], statuses: statuses || [], needTags: needTags || [], loading: false })
       this.applyFilter()
     } catch (e) {
       if (version === this._loadVersion) this.setData({ loading: false, loadError: e.message || '标签加载失败，请重试' })
@@ -82,6 +83,7 @@ Page({
     const filter = this.data.scopeFilter
     const filteredTags = filter === 'follow-up'
       ? this.data.statuses
+      : filter === 'visit_need' ? this.data.needTags
       : filter === 'all'
       ? this.data.tags
       : this.data.tags.filter(tag => tag.scope === filter)
@@ -162,7 +164,7 @@ Page({
       } else if (this.data.editingId) {
         await customerTagApi.update(this.data.editingId, { name, description })
       } else {
-        await customerTagApi.create({ name, scope: this.data.formScope, description })
+        await customerTagApi.create({ name, scope: this.data.scopeFilter === 'visit_need' ? 'public' : this.data.formScope, category: this.data.scopeFilter === 'visit_need' ? 'visit_need' : 'customer', description })
       }
       this.setData({ showEditor: false })
       wx.showToast({ title: '已保存' })
@@ -190,7 +192,7 @@ Page({
     const name = e.currentTarget.dataset.name
     wx.showModal({
       title: '停用标签',
-      content: `停用“${name}”后，该标签将从客户资料中移除，是否继续？`,
+      content: this.data.scopeFilter === 'visit_need' ? `停用“${name}”后不再提供选择，已填写的历史来访需求仍会保留，是否继续？` : `停用“${name}”后，该标签将从客户资料中移除，是否继续？`,
       confirmColor: '#c4506a',
       success: async (result) => {
         if (!result.confirm) return

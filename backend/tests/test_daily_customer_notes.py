@@ -3,7 +3,7 @@ import pytest
 from tests.test_visit_notes import _create_other_headers
 
 
-@pytest.mark.parametrize("category,field", [("customer_info", "feedback"), ("follow_up", "healing_notes")])
+@pytest.mark.parametrize("category,field", [("customer_info", "feedback"), ("follow_up", "healing_notes"), ("customer_feedback", "experience")])
 @pytest.mark.parametrize("origin", ["course", "visit"])
 def test_course_and_visit_edit_one_daily_note(client, created_customer, category, field, origin):
     customer_id = created_customer["id"]

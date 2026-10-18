@@ -11,6 +11,7 @@ import { CustomerTagField } from "@/components/customer-tag-editor"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { useReadResource } from "@/hooks/use-read-resource"
 import { LoadError } from "@/components/load-error"
+import { CUSTOMER_INCOME_FIELDS } from "@/lib/customer-income"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
@@ -23,8 +24,10 @@ const UPDATE_FIELDS = [
   "nickname", "name", "gender", "phone", "wechat", "age",
   "service_teacher", "referrer", "referral_date", "referrer_handler",
   "follow_up_status",
+  "customer_quality",
   "traffic_source", "traffic_source_detail",
   "work_status", "work_description",
+  ...CUSTOMER_INCOME_FIELDS.map(field => field.key),
   "basic_info", "assessment", "tags", "other_info",
 ]
 
@@ -221,6 +224,7 @@ export default function CustomerFormPage() {
         if (sensitive?.work_info === false) {
           delete payload.work_status
           delete payload.work_description
+          CUSTOMER_INCOME_FIELDS.forEach(field => { delete payload[field.key] })
         }
         if (sensitive?.other_info === false) delete payload.other_info
         if (!contactDirty.phone) delete payload.phone
@@ -384,11 +388,16 @@ export default function CustomerFormPage() {
               </div>
               {fieldErrors.phone && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{fieldErrors.phone}</p>}
             </div>
-            {(!isEdit || customerAccessPermissions?.sensitive_fields.work_info !== false) && <div className="flex items-center gap-2 w-full">
+            {(!isEdit || customerAccessPermissions?.sensitive_fields.work_info !== false) && <><div className="flex flex-wrap items-center gap-2 w-full">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">工作情况</label>
               <SelectDropdown value={form.work_status || ""} options={[{ value: "在职", label: "在职" }, { value: "离职", label: "离职" }, { value: "自由职业", label: "自由职业" }, { value: "全职带孩子", label: "全职带孩子" }]} placeholder="是否在职" onChange={(v) => setField("work_status", v)} className="w-[120px]" />
-              <Input value={form.work_description || ""} onChange={(e) => setField("work_description", e.target.value)} placeholder="工作情况详情..." className="flex-1 mr-[96px]" />
-            </div>}
+              <Input value={form.work_description || ""} onChange={(e) => setField("work_description", e.target.value)} placeholder="工作情况详情..." className="flex-1 min-w-[160px]" />
+            </div>
+            {CUSTOMER_INCOME_FIELDS.map(field => <div key={field.key} className="flex items-center gap-2">
+              <label className="text-[12px] text-[#4e535a] font-light w-[72px] flex-shrink-0 text-right">{field.label}</label>
+              <SelectDropdown value={form[field.key] || ""} options={field.values.map(value => ({ value, label: value }))} placeholder="请选择" clearable onChange={value => setField(field.key, value)} className="w-[160px]" />
+            </div>)}
+            </>}
           </div>
         </div>
 
@@ -459,6 +468,10 @@ export default function CustomerFormPage() {
         <div>
           <h2 className="mb-3 text-[13px] font-normal text-[#1f2329]">标签信息</h2>
           <div className="flex flex-wrap gap-x-[14px] gap-y-3 pl-[15px]">
+            <div className="flex items-center gap-2">
+              <label className="w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">客户质量</label>
+              <SelectDropdown value={form.customer_quality || "正常"} options={["正常", "忽视"].map(value => ({ value, label: value }))} onChange={value => setField("customer_quality", value)} className="w-[200px]" />
+            </div>
             <div className="flex items-center gap-2">
               <label className="w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">跟进阶段</label>
               <SelectDropdown

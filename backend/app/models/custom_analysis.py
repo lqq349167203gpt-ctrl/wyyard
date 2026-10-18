@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional
 from pydantic import Field, field_validator, model_validator
 
 from app.models.base import StrictBaseModel
+from app.utils.payment_types import normalize_card_type
 
 AnalysisField = Literal[
     "nickname",
@@ -127,10 +128,29 @@ DAY_TYPE_OPERATORS = {"is_weekday", "is_weekend"}
 VALUELESS_OPERATORS = {"is_empty", "is_not_empty", *DAY_TYPE_OPERATORS}
 
 
+def _normalize_filter_label(value: Any, field: str, operator: str) -> Any:
+    """旧模板只转换有明确分类含义的值，不修改原始存储和用户的模糊搜索词。"""
+    if not isinstance(value, str) or field not in {"activity_types", "payment_categories", "purchased_projects"}:
+        return value
+    if value == "内部课程" or value.startswith("内部课程·"):
+        value = "沙龙技能学习" + value[len("内部课程"):]
+    # OH卡梳理仍是活动类型；只有付费分类的旧名称改为OH卡诊断。
+    if field in {"payment_categories", "purchased_projects"} and (
+        value == "OH卡梳理" or value.startswith("OH卡梳理·")
+    ):
+        value = "OH卡诊断" + value[len("OH卡梳理"):]
+    if field == "purchased_projects" and operator in {"eq", "ne", "in"} and value.startswith("会员卡·"):
+        card_type = value[len("会员卡·"):]
+        if card_type:
+            value = f"会员卡·{normalize_card_type(card_type)}"
+    return value
+
+
 class AnalysisCondition(StrictBaseModel):
     field: AnalysisField
     operator: AnalysisOperator
     value: Any = None
+
     inherit_period: bool = False
 
     @model_validator(mode="after")
@@ -153,6 +173,10 @@ class AnalysisCondition(StrictBaseModel):
                 self.value = [item.strip() for item in self.value.split(",") if item.strip()]
             if not isinstance(self.value, list):
                 self.value = []
+        if isinstance(self.value, list):
+            self.value = [_normalize_filter_label(item, self.field, self.operator) for item in self.value]
+        else:
+            self.value = _normalize_filter_label(self.value, self.field, self.operator)
         # 没填完的条件不再报错：查询时会被忽略（页面已经会提示当前模式里没填的条件），
         # 否则另一种模式里遗留的空条件会让整个查询失败。
         return self

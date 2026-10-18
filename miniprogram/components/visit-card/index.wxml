@@ -13,6 +13,7 @@
       <view class="row-top">
         <view class="name-area">
           <text class="nickname {{visit.cancelled ? 'cancelled' : ''}}">{{visit.nickname}}</text>
+          <text class="new-customer-tag" wx:if="{{visit.is_new_customer}}">新</text>
           <text class="leader-tag" wx:if="{{visit.is_leader}}">组长</text>
           <text class="member-tag" wx:if="{{leaderName}}">{{leaderName}}组员</text>
           <text class="member-summary" wx:if="{{visit.member_type || remainingText}}">{{visit.member_type}}{{visit.member_type && remainingText ? ' · ' : ''}}{{remainingText}}</text>
@@ -33,11 +34,11 @@
         <text>到店 {{visit.arrived_count || 0}} 次</text>
       </view>
       <view class="visit-details">
-        <view class="needs-row" wx:if="{{visit.needs}}">
-          <text class="needs-label">来访需求</text>
-          <text class="needs-content">{{visit.needs}}</text>
-        </view>
         <view class="needs-row">
+          <text class="needs-label">来访需求</text>
+          <text class="needs-content {{visit.needs ? '' : 'empty'}}">{{visit.needs || '-'}}</text>
+        </view>
+        <view class="needs-row" wx:if="{{visit.receptionist}}">
           <text class="needs-label">接待人</text>
           <text class="needs-content {{visit.receptionist ? '' : 'empty'}}">{{visit.receptionist || '-'}}</text>
         </view>

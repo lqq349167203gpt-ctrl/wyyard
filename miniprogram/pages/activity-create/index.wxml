@@ -30,15 +30,9 @@
     </view>
     <view class="form-item last">
       <text class="form-label">时间</text>
-      <view class="time-range">
-        <picker class="form-picker" mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
-          <view class="picker-display">{{startTime}}</view>
-        </picker>
-        <text class="time-sep">至</text>
-        <picker class="form-picker" mode="time" value="{{endTime}}" bindchange="onEndTimeChange">
-          <view class="picker-display">{{endTime}}</view>
-        </picker>
-      </view>
+      <time-picker class="form-picker" is-range="{{true}}" start="{{startTime}}" end="{{endTime}}" bindchange="onTimeRangeChange">
+        <view class="picker-display">{{startTime}} 至 {{endTime}}</view>
+      </time-picker>
     </view>
   </view>
 
@@ -57,7 +51,7 @@
       <input class="form-input" placeholder="活动名称（选填）" placeholder-style="color: #b0b5bb;" value="{{activityName}}" bindinput="onNameInput" />
     </view>
 
-    <!-- 沙龙/内部课程: 活动方式 -->
+    <!-- 沙龙/沙龙技能学习: 活动方式 -->
     <view class="form-item" wx:if="{{activityType === 'class' || activityType === 'ics'}}">
       <text class="form-label">活动方式</text>
       <picker class="form-picker" mode="selector" range="{{activityModes}}" value="{{activityModeIndex}}" bindchange="onActivityModeChange">
@@ -170,9 +164,9 @@
           <text class="picker-item-name">{{item.label}}</text>
           <text class="picker-item-check" wx:if="{{item.value === activityType}}">✓</text>
         </view>
-        <!-- 内部课程入口 -->
+        <!-- 沙龙技能学习入口 -->
         <view class="picker-item {{activityType === 'ics' ? 'selected' : ''}}" bindtap="onTypeSelect" data-value="ics">
-          <text class="picker-item-name">内部课程</text>
+          <text class="picker-item-name">沙龙技能学习</text>
           <text class="picker-item-check" wx:if="{{activityType === 'ics'}}">✓</text>
           <text class="picker-item-arrow">›</text>
         </view>
@@ -193,10 +187,12 @@
             </view>
           </block>
         </block>
-        <!-- 内部课程：课程类型列表 -->
+        <!-- 沙龙技能学习：课程类型列表 -->
         <block wx:if="{{_pendingType === 'ics'}}">
+          <block wx:for="{{icsCourseGroups}}" wx:key="name" wx:for-item="courseGroup">
+          <view class="course-organization-title">{{courseGroup.name}}</view>
           <view
-            wx:for="{{icsCourses}}"
+            wx:for="{{courseGroup.items}}"
             wx:key="*this"
             class="picker-item {{item === _pendingCourseName ? 'selected' : ''}}"
             bindtap="onCourseSelect"
@@ -205,6 +201,7 @@
             <text class="picker-item-name">{{item}}</text>
             <text class="picker-item-check" wx:if="{{item === _pendingCourseName}}">✓</text>
           </view>
+          </block>
         </block>
       </block>
     </scroll-view>

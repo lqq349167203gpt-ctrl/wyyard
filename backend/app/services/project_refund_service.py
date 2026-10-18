@@ -110,7 +110,7 @@ def get_available_items(customer_id: str, project_type: str) -> list:
         items = [r for r in readings if r.customer_id == customer_id and not r.is_deleted]
         return [{
             "id": r.id,
-            "name": f"OH卡诊断（{r.purchase_count}次）",
+            "name": f"{r.reading_type or 'OH卡诊断'}（{r.purchase_count}次）",
             "paid_amount": r.amount,
             "detail": f"¥{r.amount}",
         } for r in items if not is_project_refunded("oh-card-readings", r.id)]

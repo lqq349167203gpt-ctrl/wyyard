@@ -20,11 +20,12 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { usePagination } from "@/hooks/use-pagination"
 import { customerTagApi, followUpStatusApi, type CustomerTag, type CustomerTagScope, type FollowUpStatusConfig } from "@/lib/api"
 
-type ScopeFilter = "all" | CustomerTagScope | "follow-up"
+type ScopeFilter = "all" | CustomerTagScope | "follow-up" | "visit_need"
 
 export default function CustomerTagsPage() {
   const navigate = useNavigate()
   const [tags, setTags] = useState<CustomerTag[]>([])
+  const [needTags, setNeedTags] = useState<CustomerTag[]>([])
   const [statuses, setStatuses] = useState<FollowUpStatusConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all")
@@ -41,9 +42,10 @@ export default function CustomerTagsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [tagItems, statusItems] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true)])
+      const [tagItems, statusItems, needItems] = await Promise.all([customerTagApi.list(), followUpStatusApi.list(true), customerTagApi.list(false, "visit_need")])
       setTags(tagItems)
       setStatuses(statusItems)
+      setNeedTags(needItems)
     } catch (e) {
       setError(e instanceof Error ? e.message : "标签加载失败")
     } finally {
@@ -54,8 +56,8 @@ export default function CustomerTagsPage() {
   useEffect(() => { load() }, [])
 
   const filteredTags = useMemo(
-    () => tags.filter(tag => scopeFilter === "all" || (scopeFilter !== "follow-up" && tag.scope === scopeFilter)),
-    [scopeFilter, tags],
+    () => scopeFilter === "visit_need" ? needTags : tags.filter(tag => scopeFilter === "all" || (scopeFilter !== "follow-up" && tag.scope === scopeFilter)),
+    [scopeFilter, tags, needTags],
   )
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredTags)
 
@@ -110,7 +112,7 @@ export default function CustomerTagsPage() {
       } else if (editing) {
         await customerTagApi.update(editing.id, { name: normalizedName, description: description.trim() })
       } else {
-        await customerTagApi.create({ name: normalizedName, scope, description: description.trim() })
+        await customerTagApi.create({ name: normalizedName, scope: scopeFilter === "visit_need" ? "public" : scope, category: scopeFilter === "visit_need" ? "visit_need" : "customer", description: description.trim() })
       }
       setDialogOpen(false)
       await load()
@@ -157,8 +159,8 @@ export default function CustomerTagsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-[15px] font-medium text-[#212631]">{scopeFilter === "follow-up" ? "跟进状态配置" : "客户标签"}</h1>
-            <p className="mt-0.5 text-[11px] text-[#8f959e]">{scopeFilter === "follow-up" ? "配置客户跟进状态及必填描述" : "公共标签团队共享，我的标签仅自己可见"}</p>
+            <h1 className="text-[15px] font-medium text-[#212631]">{scopeFilter === "follow-up" ? "跟进状态配置" : scopeFilter === "visit_need" ? "来访需求配置" : "客户标签"}</h1>
+            <p className="mt-0.5 text-[11px] text-[#8f959e]">{scopeFilter === "follow-up" ? "配置客户跟进状态及必填描述" : scopeFilter === "visit_need" ? "公共来访需求，供邀约时多选使用" : "公共标签团队共享，我的标签仅自己可见"}</p>
           </div>
           <Button className="ml-auto h-8 bg-[#212631] px-3 text-[12px] text-white hover:bg-[#303641]" onClick={openCreate}>
             <Plus className="mr-1 h-3.5 w-3.5" />{scopeFilter === "follow-up" ? "新建状态" : "新建标签"}
@@ -171,6 +173,7 @@ export default function CustomerTagsPage() {
             ["public", "公共标签"],
             ["private", "我的标签"],
             ["follow-up", "跟进状态"],
+            ["visit_need", "来访需求"],
           ] as [ScopeFilter, string][]).map(([value, label]) => (
             <button
               key={value}
@@ -275,7 +278,7 @@ export default function CustomerTagsPage() {
               <label className="mb-1.5 block text-[12px] text-[#4e535a]">{scopeFilter === "follow-up" ? "状态名称" : "标签名称"}</label>
               <Input value={name} maxLength={30} onChange={e => { setName(e.target.value); setError("") }} placeholder={scopeFilter === "follow-up" ? "例如：重点跟进" : "例如：高意向、亲子需求"} />
             </div>
-            {scopeFilter !== "follow-up" && !editing && (
+            {scopeFilter !== "follow-up" && scopeFilter !== "visit_need" && !editing && (
               <div>
                 <label className="mb-1.5 block text-[12px] text-[#4e535a]">可见范围</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -308,7 +311,7 @@ export default function CustomerTagsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>停用标签</AlertDialogTitle>
-            <AlertDialogDescription>停用「{deleteTarget?.name}」后，客户身上的该标签会被移除，历史客户资料不会删除。</AlertDialogDescription>
+            <AlertDialogDescription>{deleteTarget?.category === "visit_need" ? `停用「${deleteTarget.name}」后不再提供选择，已填写的历史来访需求仍会保留。` : `停用「${deleteTarget?.name}」后，客户身上的该标签会被移除，历史客户资料不会删除。`}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>

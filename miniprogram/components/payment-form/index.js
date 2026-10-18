@@ -1,23 +1,8 @@
 const { paymentApi, customerApi, organizationApi } = require('../../utils/api')
 const { beginRead, disposeReads } = require('../../utils/read-scope')
+const { CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES } = require('../../utils/payment-types')
 
-const CARD_TYPES = [
-  { key: '次卡', label: '次卡', price: 198, count: 1, duration_type: 'month', duration_value: 1 },
-  { key: '体验会员', label: '体验会员', price: 398, count: 4, duration_type: 'month', duration_value: 1 },
-  { key: '月卡', label: '月卡', price: 1999, count: null, duration_type: 'month', duration_value: 1 },
-  { key: '12次卡', label: '12次卡', price: 1800, count: 12, duration_type: 'month', duration_value: 12 },
-  { key: '3月卡', label: '3月卡', price: 3999, count: null, duration_type: 'month', duration_value: 3 },
-  { key: '30次卡', label: '30次卡', price: 3999, count: 30, duration_type: 'month', duration_value: 12 },
-  { key: '60次卡', label: '60次卡', price: 5999, count: 60, duration_type: 'month', duration_value: 12 },
-  { key: '半年卡', label: '半年卡', price: 7999, count: null, duration_type: 'month', duration_value: 6 },
-  { key: '年卡', label: '年卡', price: 12800, count: null, duration_type: 'month', duration_value: 12 },
-]
-
-const COURSE_TYPES = [
-  { key: '疗愈师课程：自爱力构建', label: '疗愈师课程：自爱力构建', price: 20000, duration_type: 'month', duration_value: 12 },
-  { key: '商业框架陪跑：自觉力提升', label: '商业框架陪跑：自觉力提升', price: 36800, duration_type: 'month', duration_value: 3 },
-  { key: '落地赋能班：自洽力整合', label: '落地赋能班：自洽力整合', price: 58000, duration_type: 'month', duration_value: 24 },
-]
+const { LEARNING_PAYMENT_TYPES: COURSE_TYPES } = require('../../utils/learning-course-types')
 
 const DURATION_TYPES = [
   { key: 'day', label: '天' },
@@ -139,8 +124,17 @@ Component({
     closerIdMap: {},
     hidePaymentDetails: true,
     formData: {},
+    dealCourseOptions: [{ key: '', name: '与课程无关' }],
+    dealCourseIndex: 0,
+    dealCourseLoading: false,
+    dealCourseError: '',
     cardTypes: CARD_TYPES,
     cardTypeIndex: -1,
+    cardUnlimited: false,
+    offlineCourseTypes: OFFLINE_COURSE_TYPES,
+    ohReadingTypes: OH_READING_TYPES,
+    ohReadingTypeIndex: -1,
+    offlineCourseTypeIndex: -1,
     courseTypes: COURSE_TYPES,
     courseTypeIndex: -1,
     durationTypes: DURATION_TYPES,
@@ -165,6 +159,9 @@ Component({
   },
 
   observers: {
+    'formData.deal_date': function(date) {
+      if (date) this._loadDealCourses(date)
+    },
     'editData, isEdit, organizations': function(editData, isEdit, organizations) {
       if (isEdit && editData && organizations.length > 0) {
         this._populateEditData(editData)
@@ -202,6 +199,27 @@ Component({
   },
 
   methods: {
+    _loadDealCourses(date) {
+      if (this.data.type === 'coarse_door_card') return
+      const isCurrent = beginRead(this, 'dealCourses', () => this.data.formData.deal_date === date)
+      this.setData({ dealCourseLoading: true, dealCourseError: '', dealCourseOptions: [{ key: '', name: '与课程无关' }], dealCourseIndex: 0 })
+      return paymentApi.courseOptions(date).then(items => {
+        if (!isCurrent()) return
+        const options = [{ key: '', name: '与课程无关' }].concat(items || [])
+        const key = this.data.formData.deal_course_key || ''
+        if (key && !options.some(item => item.key === key)) options.push({ key, name: this.data.formData.deal_course_name || '原成交课程（可重新选择）' })
+        this.setData({ dealCourseOptions: options, dealCourseIndex: Math.max(0, options.findIndex(item => item.key === key)), dealCourseLoading: false })
+      }).catch(error => {
+        if (isCurrent()) this.setData({ dealCourseLoading: false, dealCourseError: error.message || '课程加载失败' })
+      })
+    },
+    onDealCourseRetry() { return this._loadDealCourses(this.data.formData.deal_date) },
+    onDealCourseChange(e) {
+      const index = Number(e.detail.value)
+      const item = this.data.dealCourseOptions[index]
+      if (!item) return
+      this.setData({ dealCourseIndex: index, 'formData.deal_course_key': item.key, 'formData.deal_course_name': item.key ? item.name : '' })
+    },
     _applyTypeDefaults(type) {
       if (!type || this.data.isEdit || this._defaultTypeInitialized === type) return
       this._defaultTypeInitialized = type
@@ -215,7 +233,7 @@ Component({
         if (initData.amount === undefined || initData.amount === '') initData.amount = '68'
       } else if (type === 'offline_course') {
         if (!initData.effective_date) initData.effective_date = today()
-        if (!initData.validity_value) initData.validity_value = '1'
+        if (!initData.validity_value) initData.validity_value = initData.course_type === '商业落地三个月' ? '3' : initData.course_type === '商业落地一年' ? '12' : '1'
       } else if (!initData.effective_date) {
         initData.effective_date = today()
       }
@@ -256,6 +274,7 @@ Component({
       const hidePaymentDetails = true
       const rows = [
         { label: '成交日期', value: formData.deal_date || '-' },
+        { label: '成交课程', value: formData.deal_course_name || '与课程无关' },
         { label: '用户', value: selectedCustomer ? selectedCustomer.nickname : '-' },
       ]
       let amountRow = { label: '付费金额', value: '¥' + formatMoney(this._getFeeAmount()) }
@@ -273,6 +292,7 @@ Component({
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
         amountRow = { label: '费用', value: '¥' + formatMoney(formData.fee) }
       } else if (type === 'oh_card_reading') {
+        rows.push({ label: '诊断类型', value: formData.reading_type || '-' })
         const teacher = this.data.diagnosisTeachers[this.data.diagnosisTeacherIndex]
         rows.push({ label: '诊断老师', value: teacher ? teacher.nickname : '-' })
         rows.push({ label: '诊断时长', value: ((Number(formData.diagnosis_duration) || 1) * 0.5) + '小时' })
@@ -281,6 +301,7 @@ Component({
         rows.push({ label: '数量', value: (formData.quantity || '1') + ' 位' })
         amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
       } else if (type === 'offline_course') {
+        rows.push({ label: '课程类型', value: formData.course_type || '-' })
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
         amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
       } else {
@@ -392,6 +413,8 @@ Component({
         customer_id: d.customer_id,
         organization_id: d.organization_id ?? '',
         deal_date: (d.deal_date || d.deduction_date || today()).slice(0, 10),
+        deal_course_key: d.deal_course_key || '',
+        deal_course_name: d.deal_course_name || '',
         effective_date: d.effective_date ? d.effective_date.slice(0, 10) : '',
         duration_type: d.duration_type ?? '',
         duration_value: d.duration_value ?? '',
@@ -406,13 +429,17 @@ Component({
         card_type: d.card_type ?? '',
         agreement_status: d.agreement_status || '',
         course_type: d.course_type ?? '',
+        reading_type: d.reading_type ?? '',
         payment_method: d.payment_method ?? '',
         notes: d.notes ?? '',
         diagnosis_duration: d.diagnosis_duration ?? 1,
         quantity: d.quantity ?? '1',
       }
       const type = this.data.type
+      this.setData({ ohReadingTypeIndex: OH_READING_TYPES.indexOf(d.reading_type) })
       const hidePaymentDetails = true
+      if (type === 'offline_course') this.setData({ offlineCourseTypeIndex: OFFLINE_COURSE_TYPES.indexOf(d.course_type) })
+      if (type === 'membership_card') this.setData({ cardUnlimited: d.total_count == null && d.remaining_count == null })
       if (type === 'membership_card' && d.card_type) {
         const idx = CARD_TYPES.findIndex(c => c.key === d.card_type)
         if (idx >= 0) {
@@ -480,6 +507,7 @@ Component({
 
       this.setData({
         formData: fd,
+        dealCourseIndex: Math.max(0, this.data.dealCourseOptions.findIndex(item => item.key === fd.deal_course_key)),
         selectedCustomer: d.nickname ? { id: d.customer_id, nickname: d.nickname } : null,
         closers,
         closerTotal,
@@ -612,7 +640,13 @@ Component({
 
     onFieldChange(e) {
       const field = e.currentTarget.dataset.field
-      this.setData({ [`formData.${field}`]: e.detail.value })
+      const updates = { [`formData.${field}`]: e.detail.value }
+      if (field === 'deal_date') {
+        updates['formData.deal_course_key'] = ''
+        updates['formData.deal_course_name'] = ''
+        updates.dealCourseIndex = 0
+      }
+      this.setData(updates)
     },
 
     onOrgChange(e) {
@@ -645,6 +679,7 @@ Component({
       const hidePaymentDetails = true
       this.setData({
         cardTypeIndex: idx,
+        cardUnlimited: ct.count === null,
         hidePaymentDetails,
         'formData.card_type': ct.key,
         'formData.price': ct.price,
@@ -661,6 +696,20 @@ Component({
       if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
     },
 
+    onOfflineCourseTypeChange(e) {
+      const index = Number(e.detail.value)
+      const courseType = OFFLINE_COURSE_TYPES[index]
+      this.setData({
+        offlineCourseTypeIndex: index,
+        'formData.course_type': courseType,
+        'formData.validity_value': courseType === '商业落地三个月' ? '3' : courseType === '商业落地一年' ? '12' : '1',
+      })
+    },
+
+    onCardUnlimitedChange(e) {
+      this.setData({ cardUnlimited: e.detail.value, 'formData.remaining_count': '' })
+    },
+
     onCourseTypeChange(e) {
       const idx = parseInt(e.detail.value)
       const ct = COURSE_TYPES[idx]
@@ -673,6 +722,12 @@ Component({
       })
       const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === ct.duration_type)
       if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
+    },
+
+    onOhReadingTypeChange(e) {
+      const index = Number(e.detail.value)
+      if (!OH_READING_TYPES[index]) return
+      this.setData({ ohReadingTypeIndex: index, 'formData.reading_type': OH_READING_TYPES[index] })
     },
 
     onDurationTypeChange(e) {
@@ -832,6 +887,15 @@ Component({
       if (type === 'membership_card' && cardTypeIndex < 0) {
         wx.showToast({ title: '请选择会员卡类型', icon: 'none' })
         return
+      }
+      if (type === 'membership_card' && formData.card_type === '定制化' && !isEdit && (!Number.isInteger(Number(formData.duration_value)) || Number(formData.duration_value) <= 0 || (!this.data.cardUnlimited && (!Number.isInteger(Number(formData.remaining_count)) || Number(formData.remaining_count) <= 0)))) {
+        wx.showToast({ title: '请填写次数和有效期，或选择不限次数', icon: 'none' }); return
+      }
+      if (type === 'offline_course' && !isEdit && this.data.offlineCourseTypeIndex < 0) {
+        wx.showToast({ title: '请选择课程类型', icon: 'none' }); return
+      }
+      if (type === 'oh_card_reading' && !isEdit && !formData.reading_type) {
+        wx.showToast({ title: '请选择诊断类型', icon: 'none' }); return
       }
       if (type === 'membership_card' && !['次卡', '体验会员', '粗门次卡'].includes(formData.card_type) && !formData.agreement_status) {
         wx.showToast({ title: '请选择协议签订状态', icon: 'none' }); return

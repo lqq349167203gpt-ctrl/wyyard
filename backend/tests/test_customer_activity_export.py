@@ -1,10 +1,9 @@
 from types import SimpleNamespace as NS
 
 import pytest
-from openpyxl import load_workbook
-
 from app.api import customer_detail
 from app.services import customer_activity_export_service as service
+from openpyxl import load_workbook
 
 
 def activity(key, day="2026-09-01", **kwargs):
@@ -82,7 +81,7 @@ def test_pool_preserves_each_card_status_deductions_dates_and_debt_details():
     assert by_label["生效卡"] == "剩余6次 / 总10次 · 2026-09-01~2026-10-31 · 生效中"
     for name, status in (("未来卡", "未生效"), ("过期卡", "已过期"), ("用完卡", "无次数"), ("退费卡", "已退费")):
         assert by_label[name].endswith(status)
-    assert by_label["会员卡扣卡说明"] == "总50次 · 生效卡扣卡2次 · 销卡2次 · 内部课程抵扣3次"
+    assert by_label["会员卡扣卡说明"] == "总50次 · 生效卡扣卡2次 · 销卡2次 · 沙龙技能学习抵扣3次"
     assert by_label["读书会"] == "2026-08-01 · 欠卡2次"
 
 

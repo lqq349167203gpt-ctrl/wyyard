@@ -150,7 +150,7 @@ def _get_payment_categories(condition: IdentityCondition) -> list:
     if condition.type == "card":
         return ["会员卡"]
     if condition.type == "course":
-        return ["内部课程"]
+        return ["沙龙技能学习"]
     cats = condition.payment_categories or []
     return ["会员卡" if c == "会员活动" else c for c in cats]
 
@@ -229,7 +229,7 @@ def _check_condition(condition, customer_id: str,
                     if condition.validity == "active" and c.expiry_date and c.expiry_date < today_str:
                         continue
                     return True
-            elif cat == "内部课程":
+            elif cat == "沙龙技能学习":
                 for c in customer_courses:
                     if item_set and c.course_type not in item_set:
                         continue

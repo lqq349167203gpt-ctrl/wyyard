@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.membership_card import MembershipCardCreate
 from app.services import customer_access_service, membership_card_service
 from app.utils.payment_list import payment_list_response
+from app.utils.payment_types import normalize_card_type
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -71,6 +72,8 @@ def create_card(data: MembershipCardCreate, request: Request):
 @router.patch("/{card_id}")
 def update_card(card_id: str, data: dict, request: Request):
     customer_access_service.require_transaction_access(request, detail=True)
+    if "card_type" in data:
+        data["card_type"] = normalize_card_type(data["card_type"])
     # remaining_count 正常情况下禁止直接修改（由流水派生）
     # 但卡类型变更时需要重置 remaining_count / total_count
     old_card = membership_card_service.get_card(card_id)

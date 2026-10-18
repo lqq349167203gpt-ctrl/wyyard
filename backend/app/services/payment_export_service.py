@@ -17,7 +17,7 @@ PROJECT_SOURCES = (
     ("emotional_release", "情绪释放", payment_loader("emotional-releases")),
     ("oh_card_reading", "OH卡诊断", payment_loader("oh-card-readings")),
     ("energy_knot", "能量结", payment_loader("energy-knots")),
-    ("internal_course", "内部课程", payment_loader("internal-courses")),
+    ("internal_course", "沙龙技能学习", payment_loader("internal-courses")),
     ("tea_seat_fee", "茶位费", payment_loader("tea-seat-fees")),
     ("offline_course", "线下落地课程", payment_loader("offline-courses")),
     ("other", "其他项目", payment_loader("other-projects")),
@@ -62,11 +62,11 @@ def _offline_expiry(item: dict) -> str:
 def _project_detail(item: dict, project_type: str, type_label: str) -> str:
     if project_type == "membership_card":
         return item.get("card_type") or ""
-    if project_type == "internal_course":
+    if project_type in {"internal_course", "offline_course"}:
         return item.get("course_type") or ""
     if project_type == "oh_card_reading":
         teacher = item.get("diagnosis_teacher") or ""
-        return f"诊断老师：{teacher}" if teacher else type_label
+        return " · ".join(filter(None, [item.get("reading_type"), f"诊断老师：{teacher}" if teacher else ""])) or type_label
     if project_type == "other":
         return " / ".join(filter(None, [item.get("category"), item.get("project_name")]))
     return type_label

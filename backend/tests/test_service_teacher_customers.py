@@ -5,10 +5,9 @@ from app.services import service_teacher_customer_service
 
 
 def test_course_export_includes_coarse_customers_after_existing_names(monkeypatch):
-    from starlette.requests import Request
-
     from app.api import service_teacher_customers as api
     from app.api import statistics
+    from starlette.requests import Request
 
     course = dict(date="2026-08-01", start_time="10:00", end_time="12:00", name="测试课程",
                   activity_type_label="沙龙活动", class_hours=2, teachers=["老师"], owner_name="",
@@ -53,9 +52,8 @@ def test_course_export_audit_uses_course_page_and_usage_source(client):
 
 
 def test_course_teacher_options_use_teaching_ids_and_preserve_same_names(monkeypatch):
-    from starlette.requests import Request
-
     from app.api import service_teacher_customers, statistics
+    from starlette.requests import Request
 
     customers = [
         SimpleNamespace(id="a", nickname="同名老师", name="", positions=[], service_teacher="客户服务人"),
@@ -292,11 +290,10 @@ def test_follow_up_definition_filters_each_note_category_independently(monkeypat
 
 def test_course_participants_split_notes_by_author(monkeypatch):
     """参与者页签的备注要按填写人拆开，前端才能逐人换行展示。"""
-    from starlette.requests import Request
-
     from app.api import service_teacher_customers, statistics
     from app.models.visit_note import VisitNote
     from app.services import visit_note_service, visit_service
+    from starlette.requests import Request
 
     now = datetime.now(timezone.utc)
     courses = [{
@@ -322,6 +319,8 @@ def test_course_participants_split_notes_by_author(monkeypatch):
     monkeypatch.setattr(visit_note_service, "list_notes", lambda _ids, ensure_legacy=True: [
         VisitNote(id="n2", visit_id="v1", category="visit_need", content="想改善睡眠", created_by="沁桐", created_at=now, updated_at=now),
         VisitNote(id="n1", visit_id="v1", category="visit_need", content="想了解课程", created_by="潘潘", created_at=now, updated_at=now),
+        VisitNote(id="n3", visit_id="v1", category="follow_up", content="下周继续联系", created_by="潘潘", created_at=now, updated_at=now,
+                  next_follow_up_person_id="teacher-2", next_follow_up_person="沁桐", next_follow_up_date="2026-09-08"),
     ])
 
     result = service_teacher_customers.list_course_participants(
@@ -342,14 +341,15 @@ def test_course_participants_split_notes_by_author(monkeypatch):
     assert [entry["content"] for entry in row["visit_need_entries"]] == ["想了解课程", "想改善睡眠"]
     # 没有独立填写记录时回退到原来的整段内容，保证历史数据仍可见
     assert row["customer_info_entries"] == [{"author": "", "content": "潘潘：第一次到店", "at": ""}]
-    assert row["follow_up_entries"] == []
+    assert row["follow_up_entries"][0]["next_follow_up_person_id"] == "teacher-2"
+    assert row["follow_up_entries"][0]["next_follow_up_person"] == "沁桐"
+    assert row["follow_up_entries"][0]["next_follow_up_date"] == "2026-09-08"
 
 
 def test_course_participants_only_loads_notes_for_requested_page(monkeypatch):
-    from starlette.requests import Request
-
     from app.api import service_teacher_customers, statistics
     from app.services import visit_note_service, visit_service
+    from starlette.requests import Request
 
     courses = [
         {

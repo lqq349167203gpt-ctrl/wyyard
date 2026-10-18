@@ -15,8 +15,8 @@ import {
 } from "@/lib/api"
 import type { AuditCheckCourseRow, AuditCheckVisitRow, CustomerLight } from "@/lib/api"
 
-/** 内部课程的类型选项，与课表页保持一致 */
-const ICS_COURSE_TYPES = ["疗愈师课程", "商业框架陪跑", "落地赋能班"]
+/** 沙龙技能学习的类型选项，与课表页保持一致 */
+import { LEARNING_ACTIVITY_OPTIONS } from "@/lib/learning-course-types"
 
 export type AuditEditTarget =
   | { mode: "visit"; date: string; spaceId: string; locked: boolean; visit: AuditCheckVisitRow }
@@ -186,7 +186,7 @@ export function AuditEditDrawer({
     const type = course?.activity_type || "class"
     const ownerId = customers.find(item => (item.nickname || "") === String(draft.owner_name || ""))?.id || ""
     const publicWelfare = Boolean(draft.public_welfare)
-    // 和课表页同一套规则：能量结/内部课程/公益都不扣卡
+    // 和课表页同一套规则：能量结/沙龙技能学习/公益都不扣卡
     const deduction = (type === "eks" || type === "ics" || publicWelfare)
       ? 0
       : Math.max(0, Number(draft.deduction_count) || 0)
@@ -400,10 +400,9 @@ export function AuditEditDrawer({
                 <Field label="类型" disabledReason={disabledReason("course_type")}>
                   <SelectDropdown
                     value={String(draft.type_label || "")}
-                    options={(course.activity_type === "class"
-                      ? salonTypes
-                      : ICS_COURSE_TYPES
-                    ).map(name => ({ value: name, label: name }))}
+                    options={course.activity_type === "class"
+                      ? salonTypes.map(name => ({ value: name, label: name }))
+                      : LEARNING_ACTIVITY_OPTIONS}
                     onChange={value => set("type_label", value)}
                     disabled={!canEdit("course_type")}
                     placeholder="选择类型"
@@ -478,7 +477,7 @@ export function AuditEditDrawer({
                 label="扣卡次数"
                 hint={course.activity_type === "eks" || course.activity_type === "ics" ? "这类活动不扣卡" : undefined}
                 disabledReason={course.activity_type === "eks" || course.activity_type === "ics"
-                  ? "能量结/内部课程不扣卡"
+                  ? "能量结/沙龙技能学习不扣卡"
                   : disabledReason("membership_deduction_count")}
               >
                 <input

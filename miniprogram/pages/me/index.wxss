@@ -9,7 +9,7 @@
 /* 头部：纯白 + 蓝底白字头像 + 名字 + 角色副标题 */
 .head {
   background-color: #ffffff;
-  padding: 52rpx 44rpx 48rpx;
+  padding: 52rpx 24rpx 48rpx 44rpx;
 }
 
 .id-row {
@@ -35,6 +35,7 @@
 }
 
 .id-text {
+  flex: 1;
   margin-left: 28rpx;
   display: flex;
   flex-direction: column;
@@ -49,11 +50,18 @@
 }
 
 .id-slogan {
-  margin-top: 6rpx;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 22rpx;
   color: #a8b1bd;
   letter-spacing: 2rpx;
 }
+
+.id-meta { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 6rpx; }
+.member-switch { flex-shrink: 0; padding: 8rpx 14rpx; border-radius: 10rpx; background: #f5f6f8; color: #646a73; font-size: 22rpx; line-height: 30rpx; }
+.member-switch text { margin-left: 6rpx; color: #a8b1bd; }
 
 /* 功能入口 */
 .menu-card {

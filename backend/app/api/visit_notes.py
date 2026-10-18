@@ -35,8 +35,9 @@ router = APIRouter(
 
 CATEGORY_LABELS = {
     "visit_need": "来访需求",
-    "customer_info": "客户信息",
+    "customer_info": "深度需求",
     "follow_up": "跟进点",
+    "customer_feedback": "客户反馈",
 }
 
 
@@ -100,9 +101,51 @@ def _log_content(action: str, note, previous: str | None = None, previous_person
     attribution = f"反馈人：{note.feedback_person or note.created_by or '未知'}｜创建人：{note.created_by or '未知'}｜"
     if previous_person is not None and previous_person != (note.feedback_person or note.created_by):
         attribution = f"反馈人：{previous_person or '未知'}→{note.feedback_person or note.created_by or '未知'}｜创建人：{note.created_by or '未知'}｜"
-    if previous is not None and previous != note.content:
-        return f"{action}{category}：{date_part}客户：{customer}｜{attribution}内容：{previous} → {note.content}"
-    return f"{action}{category}：{date_part}客户：{customer}｜{attribution}内容：{note.content}"
+    if note.category == "follow_up":
+        attribution += f"下次跟进人：{note.next_follow_up_person or '未设置'}｜跟进时间：{note.next_follow_up_date or '未设置'}｜"
+    content = visit_note_service.display_content(note)
+    if previous is not None and previous != content:
+        return f"{action}{category}：{date_part}客户：{customer}｜{attribution}内容：{previous} → {content}"
+    return f"{action}{category}：{date_part}客户：{customer}｜{attribution}内容：{content}"
+
+
+def _follow_up_plan(request: Request, data, category: str, existing=None) -> dict | None:
+    from app.services import customer_service
+
+    keys = {"next_follow_up_person_id", "next_follow_up_person", "next_follow_up_date"}
+    supplied = keys.intersection(data.model_fields_set)
+    if category != "follow_up":
+        if supplied:
+            raise HTTPException(400, "仅跟进点可以设置下次跟进安排")
+        return None
+    if existing is not None and not supplied:
+        return None
+    _, owner, username = _actor(request)
+    current_name = owner or username
+    person_fields = supplied - {"next_follow_up_date"}
+    if existing is not None and not person_fields:
+        person_id, person_name = existing.next_follow_up_person_id, existing.next_follow_up_person
+    elif not person_fields:
+        person_id, person_name = "", current_name
+    else:
+        person_id = (data.next_follow_up_person_id or "").strip()
+        person_name = (data.next_follow_up_person or "").strip()
+    saved_person = bool(existing and person_id and person_id == existing.next_follow_up_person_id)
+    if saved_person:
+        person_name = existing.next_follow_up_person
+    elif person_id:
+        person = customer_service.get_customer(person_id)
+        if not person or person.is_deleted:
+            raise HTTPException(400, "下次跟进人不存在或已停用，请重新选择")
+        person_name = person.nickname or person.name
+    elif person_name and person_name != current_name:
+        people = [c for c in customer_service.list_customers() if not c.is_deleted and person_name in {c.nickname, c.name}]
+        if len(people) != 1:
+            raise HTTPException(400, "请从搜索结果中选择唯一的下次跟进人")
+        person_id, person_name = people[0].id, people[0].nickname or people[0].name
+    day = ((data.next_follow_up_date or "") if "next_follow_up_date" in supplied
+           else existing.next_follow_up_date if existing else "")
+    return {"next_follow_up_person_id": person_id, "next_follow_up_person": person_name, "next_follow_up_date": day}
 
 
 def _feedback_people(request: Request) -> dict:
@@ -215,13 +258,22 @@ def get_previous_visit_need(
     return {
         "visit_id": note.visit_id,
         "visit_date": visit_date,
-        "content": note.content,
+        "content": visit_note_service.display_content(note),
     }
 
 
 @router.get("/feedback-people")
 def get_feedback_people(request: Request):
     return _feedback_people(request)
+
+
+@router.get("/follow-up-people")
+def follow_up_people():
+    """指派跟进只提供全平台有效人员的昵称/姓名，不附带客户隐私或业务数据。"""
+    from app.services import customer_service
+
+    return [{"id": c.id, "nickname": c.nickname or c.name, "name": c.name}
+            for c in customer_service.list_customers() if not c.is_deleted and (c.nickname or c.name)]
 
 
 @router.post("")
@@ -231,6 +283,8 @@ def create_visit_note(data: VisitNoteCreate, request: Request):
     feedback_person_id = feedback_person = ""
     if data.feedback_person_id or data.feedback_person:
         feedback_person_id, feedback_person = _resolve_feedback_person(request, data.feedback_person_id, data.feedback_person)
+    existing = visit_note_service._find_creator_note(data.visit_id, data.category, account_id, owner_name or username)
+    plan = _follow_up_plan(request, data, data.category, existing)
     try:
         note = visit_note_service.create_note(
             data.visit_id,
@@ -240,6 +294,8 @@ def create_visit_note(data: VisitNoteCreate, request: Request):
             creator=owner_name or username,
             feedback_person_id=feedback_person_id,
             feedback_person=feedback_person,
+            follow_up_plan=plan,
+            need_tag_ids=data.need_tag_ids if "need_tag_ids" in data.model_fields_set else None,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -261,19 +317,22 @@ def update_visit_note(note_id: str, data: VisitNoteUpdate, request: Request):
     if not visit_note_service.can_manage_note(existing, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能修改自己录入的信息")
     before = _snapshot(existing)
-    previous = existing.content
+    previous = visit_note_service.display_content(existing)
     previous_person = existing.feedback_person or existing.created_by
     feedback_person_id = feedback_person = None
     if data.feedback_person_id is not None or data.feedback_person is not None:
         feedback_person_id, feedback_person = _resolve_feedback_person(
             request, data.feedback_person_id or "", data.feedback_person or "", existing
         )
+    plan = _follow_up_plan(request, data, existing.category, existing)
     try:
         note = visit_note_service.update_note(
             note_id,
             data.content,
             feedback_person_id=feedback_person_id,
             feedback_person=feedback_person,
+            follow_up_plan=plan,
+            need_tag_ids=data.need_tag_ids,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

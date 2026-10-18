@@ -45,7 +45,7 @@ export default function ClassRecordsPage() {
     localStorage.setItem("shared-selected-date", detailDate)
     localStorage.setItem("visit_selected_date", detailDate)
   }, [detailDate])
-  const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(), -7)))
+  const [dateRangeStart, setDateRangeStart] = useState(() => formatDate(addDays(new Date(detailDate), -7)))
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false)
   const [activityCustomerId, setActivityCustomerId] = useState<string | null>(null)

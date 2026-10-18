@@ -1,5 +1,9 @@
-from app.models.base import SafeBaseModel, StrictBaseModel
 from datetime import datetime
+
+from pydantic import model_validator
+
+from app.models.base import SafeBaseModel, StrictBaseModel
+from app.utils.payment_types import normalize_card_type
 
 
 class ProjectRefundBase(SafeBaseModel):
@@ -13,6 +17,12 @@ class ProjectRefundBase(SafeBaseModel):
     refund_date: str  # YYYY-MM-DD
     created_by: str = ""
     updated_by: str = ""
+
+    @model_validator(mode="after")
+    def normalize_card_name(self):
+        if self.project_type == "membership-cards" and self.project_name and self.project_name != "会员卡":
+            self.project_name = normalize_card_type(self.project_name)
+        return self
 
 
 class ProjectRefundCreate(StrictBaseModel):

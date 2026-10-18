@@ -31,6 +31,10 @@ interface Props {
   filterReferrer: string
   filterReferrerHandler: string
   filterServiceTeacher: string
+  filterQuality: string
+  selectionMode?: boolean
+  selectedIds?: string[]
+  onSelectionChange?: (ids: string[]) => void
   filterTagIds: string[]
   filterTagMatch: "any" | "all"
   refreshKey?: number
@@ -38,7 +42,8 @@ interface Props {
   readOnly?: boolean
 }
 
-export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, refreshKey = 0, summary = null, readOnly = false }: Props) {
+export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteCustomer, onEditCustomer, filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterQuality, selectionMode = false, selectedIds = [], onSelectionChange, filterTagIds, filterTagMatch, refreshKey = 0, summary = null, readOnly = false }: Props) {
+  const [pageSize, setPageSize] = useState(10)
   // 排序状态
   const [sortState, setSortState] = useState<{
     field: SortField | null
@@ -60,15 +65,16 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
       referrer: filterReferrer || undefined,
       referrer_handler: filterReferrerHandler || undefined,
       service_teacher: filterServiceTeacher || undefined,
+      customer_quality: filterQuality || undefined,
       tag_ids: filterTagIds.length ? filterTagIds.join(",") : undefined,
       tag_match: filterTagMatch,
       sort_by: sortField || undefined,
       sort_order: sortOrder,
     })
-  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, sortField, sortOrder])
+  }, [filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterQuality, filterTagIds, filterTagMatch, sortField, sortOrder])
 
-  const queryKey = JSON.stringify([filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterTagIds, filterTagMatch, sortField, sortOrder])
-  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, error, refresh } = useServerPagination(fetchFn, { queryKey })
+  const queryKey = JSON.stringify([filterNickname, filterIdentity, filterReferrer, filterReferrerHandler, filterServiceTeacher, filterQuality, filterTagIds, filterTagMatch, sortField, sortOrder, pageSize])
+  const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, error, refresh } = useServerPagination(fetchFn, { queryKey, pageSize })
 
   // 外部触发刷新（新增/编辑/删除后）
   const refreshKeyRef = useRef(refreshKey)
@@ -91,6 +97,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
           <Table className="w-full min-w-0" style={{ tableLayout: "fixed" }}>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
+                {selectionMode && <TableHead style={{ width: 36 }}><input type="checkbox" aria-label="勾选本页客户" className="accent-[#3370ff]" checked={paginatedItems.length > 0 && paginatedItems.every(customer => selectedIds.includes(customer.id))} ref={element => { if (element) element.indeterminate = paginatedItems.some(customer => selectedIds.includes(customer.id)) && !paginatedItems.every(customer => selectedIds.includes(customer.id)) }} onChange={event => onSelectionChange?.(event.target.checked ? [...new Set([...selectedIds, ...paginatedItems.map(customer => customer.id)])] : selectedIds.filter(id => !paginatedItems.some(customer => customer.id === id)))} /></TableHead>}
                 <TableHead className="pl-4" style={{ width: "13%" }}>客户</TableHead>
                 <TableHead style={{ width: "9%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("member_type")}>
@@ -135,6 +142,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                 className="group cursor-pointer hover:bg-[#f7f8fa]"
                 onClick={() => onSelectCustomer(c.id)}
               >
+                {selectionMode && <TableCell onClick={event => event.stopPropagation()}><input type="checkbox" aria-label={`勾选${c.nickname || c.name}`} className="accent-[#3370ff]" checked={selectedIds.includes(c.id)} onChange={event => onSelectionChange?.(event.target.checked ? [...selectedIds, c.id] : selectedIds.filter(id => id !== c.id))} /></TableCell>}
                 <TableCell className="pl-4">
                   <div className="flex items-center gap-2.5">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef0f2] text-[11px] font-medium text-[#646a73]">
@@ -221,6 +229,8 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
           startIndex={startIndex}
           endIndex={endIndex}
           onPageChange={goToPage}
+          pageSize={pageSize}
+          onPageSizeChange={setPageSize}
         />
       </div>
   )

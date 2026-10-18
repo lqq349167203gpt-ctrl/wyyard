@@ -42,6 +42,7 @@ def _legacy_field(category: VisitNoteCategory) -> str:
         "visit_need": "needs",
         "customer_info": "feedback",
         "follow_up": "healing_notes",
+        "customer_feedback": "experience",
     }[category]
 
 
@@ -50,6 +51,31 @@ def display_author(note: VisitNote) -> str:
     creator = note.created_by or "历史记录"
     person = note.feedback_person or creator
     return f"{person}（{creator}创建）" if person != creator else creator
+
+
+def display_content(note: VisitNote) -> str:
+    labels = "、".join(tag.get("name", "") for tag in getattr(note, "need_tags", []) if tag.get("name"))
+    return "\n".join(value for value in (labels, note.content) if value)
+
+
+def _resolve_need_tags(category, tag_ids, previous=()):
+    from app.services import customer_tag_service
+
+    if tag_ids is None:
+        return list(previous)
+    if category != "visit_need" and tag_ids:
+        raise ValueError("只有来访需求可以选择需求标签")
+    saved = {item["id"]: item for item in previous}
+    result = []
+    for tag_id in dict.fromkeys(tag_ids):
+        tag = customer_tag_service.get_tag(tag_id)
+        if tag and tag.category == "visit_need" and tag.scope == "public" and tag.enabled:
+            result.append({"id": tag.id, "name": tag.name})
+        elif tag_id in saved:
+            result.append(saved[tag_id])
+        else:
+            raise ValueError("包含无效或已停用的来访需求标签，请重新选择")
+    return result
 
 
 def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
@@ -61,7 +87,7 @@ def _sync_visit_cache(visit_id: str, category: VisitNoteCategory) -> None:
         return
     lines = []
     for note in _active_notes(visit_id, category):
-        lines.append(f"{display_author(note)}：{note.content}")
+        lines.append(f"{display_author(note)}：{display_content(note)}")
     field = _legacy_field(category)
     value = "\n".join(lines)
     if str(getattr(record, field, "") or "") != value:
@@ -85,7 +111,7 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
             visit = visit_service.get_visit_without_metrics(visit_id)
             if not visit:
                 continue
-            for category in ("visit_need", "customer_info", "follow_up"):
+            for category in ("visit_need", "customer_info", "follow_up", "customer_feedback"):
                 typed_category: VisitNoteCategory = category
                 if (visit_id, typed_category) in existing_categories:
                     continue
@@ -112,6 +138,8 @@ def ensure_legacy_entries(visit_ids: Iterable[str]) -> None:
 
 def list_notes(visit_ids: Iterable[str], ensure_legacy: bool = True) -> list[VisitNote]:
     ids = {visit_id for visit_id in visit_ids if visit_id}
+    if not ids:
+        return []
     if ensure_legacy:
         ensure_legacy_entries(ids)
     from app.services import daily_customer_note_service
@@ -127,6 +155,23 @@ def list_notes(visit_ids: Iterable[str], ensure_legacy: bool = True) -> list[Vis
     )
 
 
+def note_entry(note) -> dict:
+    """下游列表共用的备注投影，跟进安排不能在整理正文时丢失。"""
+    creator = getattr(note, "created_by", "") or "历史记录"
+    timestamp = getattr(note, "updated_at", None) or getattr(note, "created_at", None)
+    entry = {
+        "author": getattr(note, "feedback_person", "") or creator,
+        "created_by": creator,
+        "content": display_content(note),
+        "at": timestamp.isoformat() if timestamp else "",
+    }
+    if note.category == "follow_up":
+        entry.update({key: getattr(note, key, "") or "" for key in (
+            "next_follow_up_person_id", "next_follow_up_person", "next_follow_up_date",
+        )})
+    return entry
+
+
 def group_notes_by_visit(visit_ids: Iterable[str]) -> Dict[str, Dict[str, list[dict]]]:
     """按「邀约 → 分类」分组，每条带上填写人；课表「参与者」页签据此按人换行展示。
 
@@ -135,12 +180,7 @@ def group_notes_by_visit(visit_ids: Iterable[str]) -> Dict[str, Dict[str, list[d
     grouped: Dict[str, Dict[str, list[dict]]] = {}
     for note in sorted(list_notes(visit_ids, ensure_legacy=False), key=lambda item: (item.created_at, item.id)):
         entries = grouped.setdefault(note.visit_id, {}).setdefault(note.category, [])
-        entries.append({
-            "author": note.feedback_person or note.created_by or "历史记录",
-            "created_by": note.created_by or "历史记录",
-            "content": note.content,
-            "at": (note.updated_at or note.created_at).isoformat(),
-        })
+        entries.append(note_entry(note))
     return grouped
 
 
@@ -195,12 +235,22 @@ def list_visible_notes(
     username: str = "",
 ) -> list[VisitNote]:
     """来访需求共享可见，但必须具备角色的跟进点查看权限。"""
+    return filter_visible_notes(list_notes(visit_ids), account_id, owner_name, username)
+
+
+def filter_visible_notes(
+    notes: Iterable[VisitNote],
+    account_id: str = "",
+    owner_name: str = "",
+    username: str = "",
+) -> list[VisitNote]:
+    """复用本次请求已读取的备注，权限口径与独立备注接口一致。"""
     from app.services import account_service, customer_access_service
 
     account = account_service.get_account(account_id) if account_id else None
     roles = (account.roles or [account.role]) if account else []
     can_view_need = customer_access_service.can_view_detail_tab(roles, "follow_up")
-    return [note for note in list_notes(visit_ids) if note.category != "visit_need" or can_view_need]
+    return [note for note in notes if note.category != "visit_need" or can_view_need]
 
 
 def get_previous_visit_need(
@@ -290,22 +340,28 @@ def create_note(
     creator: str = "",
     feedback_person_id: str = "",
     feedback_person: str = "",
+    follow_up_plan: dict | None = None,
+    need_tag_ids: list[str] | None = None,
 ) -> VisitNote:
     from app.services import visit_service
 
     if not visit_service.get_visit(visit_id):
         raise ValueError("邀约记录不存在")
     normalized = content.strip()
-    if not normalized:
-        raise ValueError("记录内容不能为空")
     ensure_legacy_entries([visit_id])
     with _note_lock:
         now = datetime.now(timezone.utc)
         existing = _find_creator_note(visit_id, category, creator_id, creator)
+        need_tags = _resolve_need_tags(category, need_tag_ids, getattr(existing, "need_tags", []))
+        if not normalized and not need_tags:
+            raise ValueError("请选择来访需求标签或填写内容" if category == "visit_need" else "记录内容不能为空")
         if existing:
             if existing.id.startswith("course-note|"):
-                return update_note(existing.id, normalized, feedback_person_id or None, feedback_person or None)
+                return update_note(existing.id, normalized, feedback_person_id or None, feedback_person or None, follow_up_plan)
             existing.content = normalized
+            existing.need_tags = need_tags
+            for key, value in (follow_up_plan or {}).items():
+                setattr(existing, key, value)
             if feedback_person_id or feedback_person:
                 existing.feedback_person_id = feedback_person_id.strip()
                 existing.feedback_person = feedback_person.strip() or creator.strip()
@@ -319,10 +375,12 @@ def create_note(
             visit_id=visit_id,
             category=category,
             content=normalized,
+            need_tags=need_tags,
             created_by_id=creator_id,
             created_by=creator,
             feedback_person_id=feedback_person_id.strip(),
             feedback_person=feedback_person.strip() or creator.strip(),
+            **(follow_up_plan or {}),
             created_at=now,
             updated_at=now,
         )
@@ -337,10 +395,16 @@ def update_note(
     content: str,
     feedback_person_id: str | None = None,
     feedback_person: str | None = None,
+    follow_up_plan: dict | None = None,
+    need_tag_ids: list[str] | None = None,
 ) -> VisitNote | None:
     normalized = content.strip()
-    if not normalized:
-        raise ValueError("记录内容不能为空")
+    existing = get_note(note_id)
+    if not existing:
+        return None
+    need_tags = _resolve_need_tags(existing.category, need_tag_ids, getattr(existing, "need_tags", []))
+    if not normalized and not need_tags:
+        raise ValueError("请选择来访需求标签或填写内容" if existing.category == "visit_need" else "记录内容不能为空")
     if note_id.startswith("course-note|"):
         from app.services import activity_participant_note_service
 
@@ -352,6 +416,7 @@ def update_note(
             note_id=original.id, content=normalized,
             actor_id=original.created_by_id, actor_name=original.created_by,
             feedback_person_id=feedback_person_id, feedback_person=feedback_person,
+            follow_up_plan=follow_up_plan,
         )
         return get_note(note_id)
     with _note_lock:
@@ -359,6 +424,9 @@ def update_note(
         if not note:
             return None
         note.content = normalized
+        note.need_tags = need_tags
+        for key, value in (follow_up_plan or {}).items():
+            setattr(note, key, value)
         if feedback_person_id is not None or feedback_person is not None:
             note.feedback_person_id = (feedback_person_id or "").strip()
             note.feedback_person = (feedback_person or "").strip() or note.created_by

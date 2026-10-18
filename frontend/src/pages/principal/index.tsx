@@ -59,9 +59,10 @@ const STATUS_FILTERS = [
 ] as const
 const ORDER_FILTER_OPTIONS = [
   { value: "", label: "全部购买类型" },
-  { value: "first", label: "首购" },
-  { value: "repeat", label: "同类复购" },
-  { value: "cross", label: "跨品类首购" },
+  { value: "experience", label: "体验" },
+  { value: "conversion", label: "转化" },
+  { value: "upsell", label: "升单" },
+  { value: "repurchase", label: "复购" },
 ]
 // 与课程记录页列宽对齐：课程名加宽截断，老师/案主/组织/部位数收窄
 const COLUMN_WIDTH: Record<string, string> = {
@@ -462,10 +463,9 @@ const PARTICIPATION_HOURS_TIP = <>统计周期内，累计参与当前组织/俱
 
 const PURCHASE_TYPE_TIP = (
   <>
-    <b className="font-medium text-white">首购</b>：这个客户第一次买这一类项目<br />
-    <b className="font-medium text-white">同类复购</b>：非第一次购买同类里的同一个具体项目，会员卡按卡种算（换了卡种不算复购）<br />
-    <b className="font-medium text-white">跨品类首购</b>：该类项目第一次购买，但之前买过别的类目<br />
-    <b className="font-medium text-white">升单</b>：「升单配置」页面配置，同一人多次升单，仅记作一次
+    体验、转化、升单、复购按「升单配置」中的条件判定。<br />
+    购买次数按具体卡种或课程类型从历史第一笔累计，统计周期按成交日期筛选。<br />
+    同一笔可命中多类；人数按客户去重，笔数按命中的成交记录统计。新规则保存前暂沿用旧档位。
   </>
 )
 
@@ -1146,7 +1146,7 @@ export default function PrincipalPage() {
   // 展开面板：每个维度一个下拉，选项在菜单里（带数量），一行单选
   const referralConversionText = (item: NonNullable<PrincipalBreakdown["traffic"]>[number]) => {
     const rate = (count: number, total: number) => total > 0 ? `${Math.round(count * 1000 / total) / 10}%` : "0%"
-    return `（体验卡 ${rate(item.trial_count ?? 0, item.count)} · 升单 ${rate(item.upsell_count ?? 0, item.consumer_count ?? 0)}）`
+    return `（${breakdown?.purchase_rules_configured ? "体验" : "体验卡"} ${rate(item.trial_count ?? 0, item.count)} · 升单 ${rate(item.upsell_count ?? 0, item.consumer_count ?? 0)}）`
   }
   const panelSelects: { label: string; prefix: string; placeholder: string; multi?: boolean; items: { value: string; label: string; text: string; note?: string; compactText?: boolean; muted?: boolean }[] }[] = []
   if (overviewGroup === "deals") {

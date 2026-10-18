@@ -3,7 +3,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from app.models.base import SafeBaseModel, StrictBaseModel
+from app.models.base import StrictBaseModel
+from app.models.visit_note import FollowUpPlanFields
 
 ActivityParticipantNoteSource = Literal[
     "class_record",
@@ -12,7 +13,7 @@ ActivityParticipantNoteSource = Literal[
     "energy_knot",
     "internal_course",
 ]
-ActivityParticipantNoteCategory = Literal["customer_info", "follow_up"]
+ActivityParticipantNoteCategory = Literal["customer_info", "follow_up", "customer_feedback"]
 
 
 class ActivityParticipantNoteUpsert(StrictBaseModel):
@@ -23,7 +24,7 @@ class ActivityParticipantNoteUpsert(StrictBaseModel):
     content: str = Field(min_length=1, max_length=5000)
 
 
-class ActivityParticipantNote(SafeBaseModel):
+class ActivityParticipantNote(FollowUpPlanFields):
     id: str
     activity_source: ActivityParticipantNoteSource
     session_id: str

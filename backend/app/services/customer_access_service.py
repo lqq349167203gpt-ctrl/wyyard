@@ -13,7 +13,7 @@ SENSITIVE_FIELD_MAP = {
     "trauma_history": ("basic_info",),
     # PC 端历史上使用 assessment，小程序和语音录入使用 core_situation，必须作为同一项保护。
     "current_block": ("assessment", "core_situation"),
-    "work_info": ("work_status", "work_description"),
+    "work_info": ("work_status", "work_description", "income_stability", "personal_annual_income", "household_annual_income"),
     "other_info": ("other_info",),
 }
 

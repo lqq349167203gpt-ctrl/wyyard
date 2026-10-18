@@ -1,6 +1,7 @@
 """课表与邀约是当天客户信息的两个入口；投影已有记录，不复制业务数据。"""
 
 import threading
+from collections.abc import Iterable
 
 from app.models.activity_participant_note import ActivityParticipantNote
 from app.models.visit_note import VisitNote
@@ -49,7 +50,7 @@ def for_course(source: str, session_id: str, customer_ids: set[str]):
     visit_note_service.ensure_legacy_entries([v.id for v in visits])
     visits_by_id = {v.id: v for v in visits}
     for note in visit_note_service._notes.values():
-        if not note.is_deleted and note.category in {"customer_info", "follow_up"} and note.visit_id in visits_by_id:
+        if not note.is_deleted and note.category in {"customer_info", "follow_up", "customer_feedback"} and note.visit_id in visits_by_id:
             notes.append(as_course_note(note, source, session_id, visits_by_id[note.visit_id]))
     return notes
 
@@ -75,13 +76,49 @@ def as_visit_note(note, visit_id: str):
 def for_visits(visit_ids: set[str]):
     from app.services import activity_participant_note_service, visit_service
 
-    visits = [v for v in visit_service.list_basic_visits() if v.id in visit_ids and not v.cancelled]
+    visits = [
+        visit for visit_id in visit_ids
+        if (visit := visit_service.get_visit_without_metrics(visit_id)) and not visit.cancelled
+    ]
+    keys = {(visit.customer_id, visit.visit_date) for visit in visits}
+    if not keys:
+        return []
     by_day = {}
     for note in activity_participant_note_service._notes.values():
-        if not note.is_deleted:
-            by_day.setdefault((note.customer_id, note.activity_date), []).append(note)
+        key = (note.customer_id, note.activity_date)
+        if not note.is_deleted and key in keys:
+            by_day.setdefault(key, []).append(note)
     return [as_visit_note(note, visit.id) for visit in visits
             for note in by_day.get((visit.customer_id, visit.visit_date), [])]
+
+
+def completed_customer_ids_for_day(day: str, customer_ids: set[str]) -> set[str]:
+    """当天各课共用分类索引；完成数无需构造正文投影、排序或回填历史记录。"""
+    from app.services import activity_participant_note_service, visit_note_service, visit_service
+
+    if not customer_ids:
+        return set()
+    required = {"customer_info", "follow_up"}
+    categories_by_customer: dict[str, set[str]] = {}
+    for note in activity_participant_note_service._notes.values():
+        if not note.is_deleted and note.activity_date == day and note.customer_id in customer_ids and note.category in required:
+            categories_by_customer.setdefault(note.customer_id, set()).add(note.category)
+    visits = {
+        visit.id: visit for visit in visit_service.list_basic_visits(customer_ids)
+        if visit.visit_date == day and not visit.cancelled
+    }
+    for note in visit_note_service._notes.values():
+        if not note.is_deleted and note.category in required and note.visit_id in visits:
+            categories_by_customer.setdefault(visits[note.visit_id].customer_id, set()).add(note.category)
+    # 与 ensure_legacy_entries 相同的旧字段判定，仅读取，列表计数不产生迁移写入。
+    for visit in visits.values():
+        for category, field in (("customer_info", "feedback"), ("follow_up", "healing_notes")):
+            if str(getattr(visit, field, "") or "").strip():
+                categories_by_customer.setdefault(visit.customer_id, set()).add(category)
+    return {
+        customer_id for customer_id, categories in categories_by_customer.items()
+        if required.issubset(categories)
+    }
 
 
 def resolve_course_note(note_id: str):
@@ -92,7 +129,7 @@ def resolve_course_note(note_id: str):
         return None
     _, source, session_id, original_id = parts
     note = visit_note_service._notes.get(original_id)
-    if not note or note.is_deleted or note.category not in {"customer_info", "follow_up"}:
+    if not note or note.is_deleted or note.category not in {"customer_info", "follow_up", "customer_feedback"}:
         return None
     visit = visit_service.get_visit_without_metrics(note.visit_id)
     course = course_context(source, session_id)
@@ -121,13 +158,15 @@ def visit_summary(visit_id: str):
     return visit_summaries({visit_id}).get(visit_id, {})
 
 
-def visit_summaries(visit_ids):
+def visit_summaries(visit_ids, *, notes: Iterable[VisitNote] | None = None):
     from app.services import visit_note_service
 
+    ids = set(visit_ids)
     grouped = {}
-    fields = {"customer_info": "feedback", "follow_up": "healing_notes"}
-    for note in visit_note_service.list_notes(visit_ids, ensure_legacy=False):
-        if note.category in fields:
+    fields = {"customer_info": "feedback", "follow_up": "healing_notes", "customer_feedback": "experience"}
+    source_notes = notes if notes is not None else visit_note_service.list_notes(ids, ensure_legacy=False)
+    for note in source_notes:
+        if note.visit_id in ids and note.category in fields:
             grouped.setdefault(note.visit_id, {}).setdefault(fields[note.category], []).append(
                 f"{visit_note_service.display_author(note)}：{note.content}",
             )

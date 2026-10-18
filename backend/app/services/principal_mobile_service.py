@@ -42,7 +42,8 @@ def selected_customers(breakdown: dict, picks: list[str]) -> list[dict]:
             if selected.get("inviter") and not selected["inviter"].intersection(row.get("inviters") or []):
                 continue
             levels = row.get("upsell_levels") or []
-            if selected.get("upsell") and (not levels or levels[-1]["key"] not in selected["upsell"]):
+            applicable_levels = levels if breakdown.get("purchase_rules_configured") else levels[-1:]
+            if selected.get("upsell") and not any(level["key"] in selected["upsell"] for level in applicable_levels):
                 continue
             rows.append(row)
     return rows
@@ -96,7 +97,7 @@ def overview_metrics(breakdown: dict, picks: list[str], customers=None) -> dict:
         "traffic_products": [{"key": key, "label": label, "count": count}
                              for (key, label), count in products.most_common()],
         "traffic_levels": [{**level, "count": levels[level["key"]]}
-                           for level in breakdown.get("traffic_upsell_levels") or []] if any(key == "membership" for key, _ in products) else [],
+                           for level in breakdown.get("traffic_upsell_levels") or []] if breakdown.get("purchase_rules_configured") or any(key == "membership" for key, _ in products) else [],
         "invite": {
             key: {"times": sum(int(row.get(key) or 0) for row in customers),
                   "people": sum(int(row.get(key) or 0) > 0 for row in customers)}
@@ -123,7 +124,7 @@ def compact_breakdown(breakdown: dict) -> dict:
         consumers = [row for row in group_customers if int(row.get("deals") or 0) > 0]
         first_level = (breakdown.get("traffic_upsell_levels") or [{}])[0].get("key")
         compact_traffic.append({key: value for key, value in group.items() if key != "customers"} | {
-            "trial_count": sum(len(row.get("upsell_levels") or []) == 1 and row["upsell_levels"][0]["key"] == first_level
+            "trial_count": sum((any(level["key"] == "experience" for level in row.get("upsell_levels") or []) if breakdown.get("purchase_rules_configured") else len(row.get("upsell_levels") or []) == 1 and row["upsell_levels"][0]["key"] == first_level)
                                for row in group_customers) if first_level else 0,
             "consumer_count": len(consumers),
             "upsell_count": sum(bool(row.get("is_upsell")) for row in consumers),

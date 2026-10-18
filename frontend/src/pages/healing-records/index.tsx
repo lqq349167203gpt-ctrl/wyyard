@@ -45,6 +45,15 @@ export default function HealingRecordsPage() {
   const [searchReferrer, setSearchReferrer] = useState("")
   const [searchReferrerHandler, setSearchReferrerHandler] = useState("")
   const [searchServiceTeacher, setSearchServiceTeacher] = useState("")
+  const [searchQuality, setSearchQuality] = useState("正常")
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkField, setBulkField] = useState("customer_quality")
+  const [bulkQuality, setBulkQuality] = useState<"正常" | "忽视">("正常")
+  const [bulkTeacher, setBulkTeacher] = useState("")
+  const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkError, setBulkError] = useState("")
   const [searchTagIds, setSearchTagIds] = useState<string[]>([])
   const [tagMatch, setTagMatch] = useState<"any" | "all">("any")
 
@@ -110,6 +119,7 @@ export default function HealingRecordsPage() {
     setSearchReferrer("")
     setSearchReferrerHandler("")
     setSearchServiceTeacher("")
+    setSearchQuality("正常")
     setSearchTagIds([])
     setTagMatch("any")
   }
@@ -117,6 +127,27 @@ export default function HealingRecordsPage() {
   const handleSelectCustomer = (customerId: string) => {
     setSelectedCustomerId(customerId)
     setDetailOpen(true)
+  }
+
+  useEffect(() => { setSelectedIds([]) }, [searchNickname, searchIdentity, searchReferrer, searchReferrerHandler, searchServiceTeacher, searchQuality, searchTagIds, tagMatch])
+
+  const handleBulkSave = async () => {
+    if (!selectedIds.length || bulkSaving) return
+    setBulkSaving(true)
+    setBulkError("")
+    try {
+      await customerApi.bulkUpdate(selectedIds, bulkField === "customer_quality" ? { customer_quality: bulkQuality } : { service_teacher: bulkTeacher.trim() })
+      customerApi.clearLightCache()
+      setBulkOpen(false)
+      setSelectedIds([])
+      setSelectionMode(false)
+      setRefreshKey(key => key + 1)
+      customerApi.light().then(setCustomers).catch(() => {})
+    } catch (error) {
+      setBulkError(error instanceof Error ? error.message : "批量修改失败")
+    } finally {
+      setBulkSaving(false)
+    }
   }
 
   const handleAddNew = () => navigate("/healing-records/new")
@@ -218,7 +249,7 @@ export default function HealingRecordsPage() {
       {/* 表格卡：筛选条 + 数据表 */}
       <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
-          <div className="w-[172px]">
+          <div className="w-[141px] shrink-0">
             <CustomerSearchInput
               customers={customers}
               value={searchNickname}
@@ -230,7 +261,7 @@ export default function HealingRecordsPage() {
             />
           </div>
           <SelectDropdown
-            className="w-[138px]"
+            className="w-[141px] shrink-0"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchIdentity}
@@ -239,7 +270,7 @@ export default function HealingRecordsPage() {
             textColor={searchIdentity ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
             onChange={(v) => { setSearchIdentity(v) }}
           />
-          <div className="w-[138px]">
+          <div className="w-[141px] shrink-0">
             <CustomerSearchInput
               customers={customers}
               value={searchReferrer}
@@ -251,7 +282,7 @@ export default function HealingRecordsPage() {
             />
           </div>
           <SelectDropdown
-            className="w-[138px]"
+            className="w-[141px] shrink-0"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchServiceTeacher}
@@ -262,7 +293,7 @@ export default function HealingRecordsPage() {
           />
           <SelectDropdown
             multi
-            className="w-[148px]"
+            className="w-[141px] shrink-0"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchTagIds}
@@ -273,7 +304,7 @@ export default function HealingRecordsPage() {
           />
           {searchTagIds.length > 1 && (
             <SelectDropdown
-              className="w-[104px]"
+              className="w-[141px] shrink-0"
               buttonClassName="border-[#e1e4e7] bg-white px-2.5"
               rounded="7px"
               value={tagMatch}
@@ -281,7 +312,7 @@ export default function HealingRecordsPage() {
               onChange={value => setTagMatch(value as "any" | "all")}
             />
           )}
-          <div className="w-[138px]">
+          <div className="w-[141px] shrink-0">
             <CustomerSearchInput
               customers={customers}
               value={searchReferrerHandler}
@@ -292,6 +323,7 @@ export default function HealingRecordsPage() {
               rounded="7px"
             />
           </div>
+          <SelectDropdown value={searchQuality} options={[{ value: "", label: "全部质量" }, { value: "正常", label: "正常" }, { value: "忽视", label: "忽视" }]} onChange={setSearchQuality} placeholder="全部质量" triggerLabel={searchQuality ? `客户质量：${searchQuality}` : "全部质量"} className="w-[141px] shrink-0" buttonClassName="!h-8 !rounded-[7px] !border-[#e1e4e7] !text-[12px]" />
           <button
             onClick={handleClear}
             className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
@@ -300,11 +332,14 @@ export default function HealingRecordsPage() {
             清空
           </button>
           <div className="flex-1" />
-          {canManageTags && !isViewOnly && (
+          {!isViewOnly && <div className="flex shrink-0 items-center gap-2">
+          {canManageTags && (
             <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => navigate("/config/customer-tags")}>
               <Tags className="mr-1 h-3.5 w-3.5" /> 标签管理
             </Button>
           )}
+          <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => { setSelectionMode(value => !value); setSelectedIds([]); setBulkError("") }}>{selectionMode ? "退出批量" : "批量操作"}</Button>
+          </div>}
           {!isViewOnly && (
             <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
               <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新建客户
@@ -312,6 +347,11 @@ export default function HealingRecordsPage() {
           )}
         </div>
 
+        {selectionMode && <div className="mb-2 flex flex-wrap items-center gap-3 rounded border border-[#eef0f2] bg-[#fafbfc] px-3 py-2 text-[12px] text-[#646a73]">
+          <span>已选 {selectedIds.length} 位客户</span><span className="text-[#8f959e]">可跨页勾选，切换筛选会清空选择（最多500位）</span>
+          <Button size="sm" className="ml-auto h-7 text-[12px]" disabled={!selectedIds.length || selectedIds.length > 500} onClick={() => { setBulkOpen(true); setBulkError("") }}>编辑所选</Button>
+          <Button variant="ghost" size="sm" className="h-7 text-[12px]" onClick={() => setSelectedIds([])}>清空选择</Button>
+        </div>}
         <ListView
           refreshKey={refreshKey}
           onSelectCustomer={handleSelectCustomer}
@@ -323,12 +363,30 @@ export default function HealingRecordsPage() {
           filterReferrer={searchReferrer}
           filterReferrerHandler={searchReferrerHandler}
           filterServiceTeacher={searchServiceTeacher}
+          filterQuality={searchQuality}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
           filterTagIds={searchTagIds}
           filterTagMatch={tagMatch}
           summary={summary}
           readOnly={isViewOnly}
         />
       </div>
+
+      <Dialog open={bulkOpen} onOpenChange={open => { if (!bulkSaving) setBulkOpen(open) }}>
+        <DialogContent className="max-w-[440px]" initialFocus={false}>
+          <h2 className="text-[14px] font-medium text-[#1f2329]">批量编辑客户信息</h2>
+          <p className="text-[12px] text-[#8f959e]">将修改已勾选的 {selectedIds.length} 位客户，其他信息保持不变。</p>
+          <div className="space-y-3 text-[12px]">
+            <div className="flex items-center gap-3"><span className="w-16 shrink-0 text-[#646a73]">修改项目</span><SelectDropdown className="flex-1" value={bulkField} options={[{ value: "customer_quality", label: "客户质量" }, { value: "service_teacher", label: "服务老师" }]} onChange={value => { setBulkField(value); setBulkError("") }} /></div>
+            <div className="flex items-center gap-3"><span className="w-16 shrink-0 text-[#646a73]">{bulkField === "customer_quality" ? "客户质量" : "服务老师"}</span><div className="min-w-0 flex-1">{bulkField === "customer_quality" ? <SelectDropdown value={bulkQuality} options={["正常", "忽视"].map(value => ({ value, label: value }))} onChange={value => setBulkQuality(value as "正常" | "忽视")} /> : <CustomerSearchInput customers={customers} value={bulkTeacher} onChange={value => setBulkTeacher(typeof value === "string" ? value : value[0] || "")} placeholder="搜索姓名或昵称" filterSelected={false} />}</div></div>
+            {bulkField === "service_teacher" && !bulkTeacher && <p className="pl-[76px] text-[#8f959e]">留空保存将清除所选客户的服务老师。</p>}
+            {bulkError && <p role="alert" className="text-destructive">{bulkError}</p>}
+          </div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSaving}>取消</Button><Button onClick={handleBulkSave} disabled={bulkSaving}>{bulkSaving ? "保存中…" : "确认修改"}</Button></div>
+        </DialogContent>
+      </Dialog>
 
       {/* 客户详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>

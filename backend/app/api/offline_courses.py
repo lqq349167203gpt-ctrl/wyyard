@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from app.models.offline_course import OfflineCourseCreate
 from app.services import customer_access_service, offline_course_service
 from app.utils.payment_list import payment_list_response
+from app.utils.payment_types import OFFLINE_COURSE_TYPES
 from app.utils.payment_validation import ensure_payment_closer_total
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
 
@@ -10,7 +11,7 @@ router = APIRouter(prefix="/api/offline-courses", tags=["offline-courses"])
 
 
 @router.get("")
-def list_courses(request: Request, page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None)):
+def list_courses(request: Request, page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), customer_ids: str | None = Query(None), nickname: str | None = Query(None), closer_name: str | None = Query(None), course_type: str | None = Query(None)):
     customer_access_service.require_transaction_access(request, detail=True)
     items = offline_course_service.list_courses()
     items_dict = [i.model_dump() if hasattr(i, "model_dump") else i for i in items]
@@ -24,7 +25,9 @@ def list_courses(request: Request, page: int | None = Query(None, ge=1), page_si
     if closer_name:
         kw = closer_name.lower()
         items_dict = [i for i in items_dict if kw in (i.get("closer_name") or "").lower() or any(kw in (c.get("name") or "").lower() for c in (i.get("closers") or []))]
-    return payment_list_response(request, items_dict, page, page_size)
+    if course_type:
+        items_dict = [item for item in items_dict if item.get("course_type") == course_type]
+    return payment_list_response(request, items_dict, page, page_size, subtype_field="course_type")
 
 
 @router.get("/search-customers")
@@ -66,6 +69,8 @@ def update_course(course_id: str, data: dict, request: Request):
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
     ensure_payment_closer_total(data, "amount", existing, request)
+    if "course_type" in data and data["course_type"] not in (*OFFLINE_COURSE_TYPES, ""):
+        raise HTTPException(status_code=400, detail="请选择有效的线下落地课程类型")
     course = offline_course_service.update_course(course_id, data)
     if not course:
         raise HTTPException(status_code=404, detail="记录不存在")

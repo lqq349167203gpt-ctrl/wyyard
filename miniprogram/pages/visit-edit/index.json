@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "编辑邀约",
   "usingComponents": {
+    "time-picker": "/components/time-picker/index",
     "visit-note-section": "/components/visit-note-section/index"
   }
 }

@@ -2,13 +2,12 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace as NS
 
 import pytest
-from fastapi import HTTPException
-
 from app.api import principal as principal_api
 from app.models.custom_analysis import AnalysisCondition
 from app.models.principal import ConversionAction, ConversionRule, PrincipalQuery
 from app.services import principal_service as service
 from app.services.principal_conversion_service import calculate_conversion
+from fastapi import HTTPException
 
 
 def event(eid, day, customer="c1", org="a", kind="purchase", product="membership", subtype="398会员"):
@@ -31,7 +30,8 @@ def test_teacher_follow_up_matches_feedback_person_and_course_day(monkeypatch):
               NS(id="visit-2", customer_id="customer-1", visit_date="2026-01-03", cancelled=False)]
     notes = [NS(visit_id="visit-1", category="customer_info", content="睡眠不稳", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="潘潘", updated_at=when),
              NS(visit_id="visit-1", category="customer_info", content="工作压力", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="娟娟"),
-             NS(visit_id="visit-1", category="follow_up", content="下周回访", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="娟娟"),
+             NS(visit_id="visit-1", category="follow_up", content="下周回访", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="娟娟",
+                next_follow_up_person_id="teacher-2", next_follow_up_person="老师乙", next_follow_up_date="2026-01-09"),
              NS(visit_id="visit-1", category="visit_need", content="改善睡眠", feedback_person_id="teacher-1", feedback_person="老师甲", created_by="潘潘"),
              NS(visit_id="visit-1", category="customer_info", content="别人的记录", feedback_person_id="teacher-2", feedback_person="老师乙", created_by="婷婷")]
     monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda ids: visits)
@@ -51,9 +51,12 @@ def test_teacher_follow_up_matches_feedback_person_and_course_day(monkeypatch):
         {"content": "工作压力", "author": "老师甲", "at": "", "created_by": "娟娟"},
     ]
     assert first["follow_up_creators"] == "娟娟"
+    assert first["follow_up_entries"][0]["next_follow_up_person"] == "老师乙"
+    assert first["follow_up_entries"][0]["next_follow_up_date"] == "2026-01-09"
     assert first["course_subtype"] == "读书交流"
     public_row = service._public_rows([first], [("customer_info", "客户信息")], teacher_feedback=True)[0]
     assert public_row["customer_info_entries"] == first["customer_info_entries"]
+    assert public_row["follow_up_entries"] == first["follow_up_entries"]
     assert public_row["type"] == "沙龙活动"
     assert public_row["course_subtype"] == "读书交流"
     second = next(row for row in rows if row["teachers"] == "老师乙")

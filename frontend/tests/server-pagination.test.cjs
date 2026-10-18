@@ -8,7 +8,7 @@ const ts = require('typescript')
 // 定向执行公共 Hook，模拟状态提交/副作用清理，不依赖浏览器或业务数据。
 function paginationHarness(initialKey, initialEnabled = true) {
   const slots = [], effects = [], requests = []
-  let cursor = 0, dirty = false, key = initialKey, enabled = initialEnabled, result
+  let cursor = 0, dirty = false, key = initialKey, enabled = initialEnabled, pageSize = 10, result
   const same = (a, b) => a && b && a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
   const react = {
     useState(initial) {
@@ -45,8 +45,8 @@ function paginationHarness(initialKey, initialEnabled = true) {
       dirty = false; cursor = 0
       const requestKey = key
       result = exports.useServerPagination((page, size, isCurrent) => new Promise((resolve, reject) => {
-        requests.push({ page, key: requestKey, isCurrent, reject, reply: (value = requestKey) => resolve({ items: [value], total: 100, page, page_size: size, total_pages: 10 }) })
-      }), { queryKey: key, enabled })
+        requests.push({ page, size, key: requestKey, isCurrent, reject, reply: (value = requestKey) => resolve({ items: [value], total: 100, page, page_size: size, total_pages: Math.ceil(100 / size) }) })
+      }), { queryKey: key, enabled, pageSize })
       while (effects.length) effects.shift()()
     } while (dirty)
   }
@@ -54,6 +54,7 @@ function paginationHarness(initialKey, initialEnabled = true) {
   return {
     requests, flush, get result() { return result },
     query(next) { key = next; flush() },
+    resize(next) { pageSize = next; key = JSON.stringify([initialKey, next]); flush() },
     enable(value) { enabled = value; flush() },
     unmount() { for (const slot of slots) slot?.cleanup?.() },
     async settle() { await new Promise(resolve => setImmediate(resolve)); flush() },
@@ -93,6 +94,24 @@ test('筛选变更只请求第一页一次，旧翻页结果不得覆盖', async
   assert.equal(h.requests[3].page, 1)
   h.requests[3].reply(); await h.settle()
   assert.equal(h.result.currentPage, 1)
+})
+
+test('每页条数切换回到第一页，旧页请求不能覆盖新条数结果', async () => {
+  const h = paginationHarness('客户筛选')
+  h.requests[0].reply(); await h.settle()
+  h.result.goToPage(3); h.flush()
+  h.resize(20)
+  assert.equal(h.requests[2].page, 1)
+  assert.equal(h.requests[2].size, 20)
+  h.resize(50)
+  assert.equal(h.requests[3].page, 1)
+  assert.equal(h.requests[3].size, 50)
+  h.requests[3].reply('50条结果'); await h.settle()
+  h.requests[2].reply('20条旧结果'); h.requests[1].reply('旧第三页'); await h.settle()
+  assert.equal(h.result.paginatedItems[0], '50条结果')
+  assert.equal(h.result.currentPage, 1)
+  assert.equal(h.result.totalPages, 2)
+  assert.equal(h.result.endIndex, 50)
 })
 
 test('相同查询标识不重复请求，失败后能重试', async () => {

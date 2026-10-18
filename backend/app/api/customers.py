@@ -9,7 +9,7 @@ from starlette.requests import Request as StarletteRequest
 from app.middleware.jwt_auth import require_admin
 from app.middleware.rate_limit import limiter
 from app.models.base import StrictBaseModel
-from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerUpdate
+from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerQuality, CustomerUpdate
 from app.services import (
     customer_access_service,
     customer_contact_service,
@@ -57,6 +57,12 @@ class TagsGenerateRequest(StrictBaseModel):
 
 class BatchRequest(StrictBaseModel):
     ids: list[str] = Field(max_length=500)
+
+
+class BulkCustomerUpdate(StrictBaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
+    customer_quality: CustomerQuality | None = None
+    service_teacher: str | None = Field(default=None, max_length=50)
 
 
 class ContactAccessRequest(StrictBaseModel):
@@ -121,9 +127,11 @@ def _customer_list_base(customer) -> dict:
         "member_type", "positions", "self_tags", "paid_content",
         "referrer", "referral_date", "referrer_handler", "service_teacher",
         "follow_up_status",
+        "customer_quality",
         "traffic_source", "traffic_source_detail",
         "need_tags", "follow_up_node", "follow_up_action",
         "core_situation", "tags", "work_status", "work_description",
+        "income_stability", "personal_annual_income", "household_annual_income",
         "basic_info", "assessment", "other_info", "tracking_plan",
         "created_at", "created_by", "space_id", "position_sort_orders",
     )
@@ -148,7 +156,7 @@ def _build_payment_totals() -> dict[str, float]:
     # 能量结
     for k in energy_knot_service.list_knots():
         payment_map[k.customer_id] += k.amount
-    # 内部课程
+    # 沙龙技能学习
     for c in internal_course_service.list_courses():
         payment_map[c.customer_id] += c.price
     # OH卡诊断
@@ -239,6 +247,7 @@ async def list_customers(
     referrer: str | None = Query(None),
     referrer_handler: str | None = Query(None),
     service_teacher: str | None = Query(None),
+    customer_quality: CustomerQuality | None = Query(None),
     member_types: str | None = Query(None),
     tag_ids: str | None = Query(None),
     tag_match: str = Query("any", pattern="^(any|all)$"),
@@ -270,6 +279,8 @@ async def list_customers(
         items = [c for c in items if referrer_handler.lower() in (c.get("referrer_handler", "") or "").lower()]
     if service_teacher:
         items = [c for c in items if service_teacher.lower() in (c.get("service_teacher", "") or "").lower()]
+    if customer_quality:
+        items = [c for c in items if c.get("customer_quality", "正常") == customer_quality]
     if member_types:
         allowed = [m.strip() for m in member_types.split(",") if m.strip()]
         if allowed:
@@ -423,6 +434,48 @@ async def batch_customers(data: BatchRequest, request: Request):
         for c in customers
         if c.id in id_set
     ]
+
+
+@router.patch("/bulk-update")
+async def bulk_update_customers(data: BulkCustomerUpdate, request: Request):
+    changes = data.model_dump(exclude_none=True, exclude={"ids"})
+    if not changes:
+        raise HTTPException(status_code=422, detail="请选择要批量修改的信息")
+    if "service_teacher" in changes:
+        changes["service_teacher"] = changes["service_teacher"].strip()
+        if changes["service_teacher"] and not customer_service.get_by_nickname(changes["service_teacher"]):
+            raise HTTPException(status_code=422, detail="服务老师不存在或已停用")
+    ids = list(dict.fromkeys(data.ids))
+    before = []
+    labels = {"customer_quality": "客户质量", "service_teacher": "服务老师"}
+    for customer_id in ids:
+        customer = customer_access_service.require_customer_scope(request, customer_id, action="修改")
+        if customer.is_deleted:
+            raise HTTPException(status_code=409, detail="所选客户已停用，请刷新后重试")
+        before.append({"昵称": customer.nickname, **{labels[key]: getattr(customer, key) for key in changes}})
+    try:
+        updated = customer_service.bulk_update_profiles(ids, changes)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    details = []
+    after = []
+    for previous, customer in zip(before, updated):
+        changed = [f"{labels[key]}({previous[labels[key]] or '未设置'}→{getattr(customer, key) or '未设置'})"
+                   for key in changes if previous[labels[key]] != getattr(customer, key)]
+        after.append({"昵称": customer.nickname, **{labels[key]: getattr(customer, key) for key in changes}})
+        if changed:
+            details.append(f"{customer.nickname}：{'，'.join(changed)}")
+    if details:
+        content = f"批量修改{len(details)}位客户：" + "；".join(details)
+        if len(content) > 8000:
+            content = f"批量修改{len(details)}位客户的{'、'.join(labels[key] for key in changes)}，完整逐人变更见操作详情"
+        request.state.operation_log_context = {
+            "content": content,
+            "before_data": {"客户信息": before}, "after_data": {"客户信息": after},
+        }
+    else:
+        request.state.skip_operation_log = True
+    return {"updated_count": len(details)}
 
 
 @router.get("/disabled")

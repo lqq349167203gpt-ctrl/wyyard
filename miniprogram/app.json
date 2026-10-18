@@ -23,6 +23,8 @@
     "pages/payment-detail/index",
     "pages/payment-edit/index",
     "pages/me/index",
+    "pages/member-view/index",
+    "pages/activity-checkin/index",
     "pages/daily-report/index",
     "pages/communication-records/index",
     "pages/communication-records/search",
