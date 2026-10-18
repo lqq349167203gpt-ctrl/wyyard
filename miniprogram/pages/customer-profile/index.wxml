@@ -379,7 +379,7 @@
             <text wx:if="{{item.type === '粗门扣卡' && item.cancelled}}" class="rec-sub">已取消｜已从课程移除</text>
           </view>
           <view class="rec-sub" wx:if="{{item.type === '粗门扣卡'}}">
-            <text>{{item.activity_name || item.name || '课程抵扣'}}</text>
+            <text wx:if="{{item.course_organization_name}}">（{{item.course_organization_name}}）</text><text>{{item.activity_name || item.name || '课程抵扣'}}</text>
             <text class="sep">·</text>
             <text>扣{{item.quantity}}次</text>
           </view>
@@ -393,7 +393,6 @@
           <view class="rec-sub" wx:if="{{item.type === '粗门扣卡'}}">
             <text>抵扣日期 {{item.deal_date || item.effective_date || '-'}}</text>
             <text wx:if="{{item.settlement_organization_name}}"> · 成交归属：{{item.settlement_organization_name}}</text>
-            <text wx:if="{{item.course_organization_name}}"> · 成交课程：{{item.course_organization_name}}</text>
             <text wx:if="{{item.closer_name}}"> · {{item.closer_name}}录入</text>
           </view>
           <view class="rec-sub" wx:elif="{{item.effective_date || item.expiry_date}}">

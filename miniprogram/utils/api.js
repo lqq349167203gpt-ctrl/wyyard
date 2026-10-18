@@ -446,8 +446,19 @@ async function performRequest(path, options = {}) {
         }
       },
       fail: (err) => {
+        const reason = (err && err.errMsg) || ''
         console.error('[request] 网络错误:', path, err)
-        if (!options.silent) wx.showToast({ title: '网络错误', icon: 'none' })
+        if (!options.silent) {
+          if (reason.indexOf('url not in domain list') >= 0) {
+            wx.showModal({
+              title: '手机需要打开调试',
+              content: '点右上角「…」打开调试，然后重新进入。手机和电脑要连同一个 Wi-Fi。',
+              showCancel: false,
+            })
+          } else {
+            wx.showToast({ title: '网络错误', icon: 'none' })
+          }
+        }
         reject(err)
       },
     })

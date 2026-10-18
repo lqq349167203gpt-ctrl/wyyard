@@ -71,9 +71,11 @@
           <text class="coarse-record-delete {{coarseDeletingId === item.id ? 'disabled' : ''}}" wx:if="{{item._canDelete}}" catchtap="onCoarseDeleteTap" data-id="{{item.id}}">{{coarseDeletingId === item.id ? '删除中' : '删除'}}</text>
         </view>
       </view>
-      <text class="coarse-record-course">{{item.source_activity_name || item.reason}}</text>
-      <text class="coarse-record-meta" style="color: #a8adb5;">成交课程：{{item.source_organization_name || '-'}}</text>
-      <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}<text wx:if="{{item.source_activity_date}}"> · 课程日期：{{item.source_activity_date}}</text><text wx:if="{{item.organization_name}}"> · 成交归属：{{item.organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
+      <view class="card-meta"><text class="card-meta-item">成交归属：{{item.organization_name || '—'}}</text></view>
+      <text class="coarse-record-course">成交课程：<text wx:if="{{item.source_organization_name}}">（{{item.source_organization_name}}）</text>{{item.source_activity_name || item.reason || '-'}}</text>
+      <view class="card-meta"><text class="card-meta-item">课程日期：{{item.source_activity_date || '—'}}</text></view>
+      <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}</text>
+      <view class="card-meta" wx:if="{{item.created_by}}"><text class="card-meta-item">创建人 {{item.created_by}}</text></view>
     </view>
     <view class="empty" wx:if="{{!loading && !loadError && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
   </view>
@@ -194,6 +196,9 @@
           <text class="card-status" wx:if="{{item._status}}" style="color: {{item._statusColor}}; background-color: {{item._statusBg}}">{{item._status}}</text>
         </view>
         <view class="card-meta"><text class="card-meta-item">成交归属：{{item._organizationName || '—'}}</text></view>
+        <view class="card-meta">
+          <text class="card-meta-item">成交课程：<text wx:if="{{item.deal_course_organization_name}}" class="card-meta-item">（{{item.deal_course_organization_name}}）</text><text class="{{item.deal_course_name ? 'card-meta-item' : 'card-empty'}}">{{item.deal_course_name || '无'}}</text></text>
+        </view>
         <view class="card-agreement-row">
           <view class="card-closer">成交人：<text class="{{item._closerNames ? '' : 'card-empty'}}">{{item._closerNames || '—'}}</text></view>
           <view class="card-agreement">协议签订：<text class="{{item._agreementStatus ? '' : 'card-empty'}}">{{item._agreementStatus || '—'}}</text></view>
@@ -208,12 +213,6 @@
           <text class="stat-item" wx:if="{{item._remaining !== '' && item._remaining !== '不限'}}">剩余<text class="stat-num {{item._remaining === 0 || item._remaining === '0' ? 'danger' : ''}}">{{item._remaining}}</text>次</text>
           <text class="stat-item" wx:if="{{item._remaining === '不限'}}">剩余<text class="stat-num">不限</text></text>
           <text class="stat-item stat-to" wx:if="{{item._expiry}}">至 {{item._expiry}}</text>
-        </view>
-        <view class="card-meta">
-          <text class="card-meta-item">成交课程：<text style="{{item.deal_course_name ? '' : 'color: #d0d3d6;'}}">{{item.deal_course_name || '无'}}</text></text>
-        </view>
-        <view class="card-meta">
-          <text class="card-meta-item" style="color: #a8adb5;">{{item.deal_course_organization_name || '-'}}</text>
         </view>
         <view class="card-row3" wx:if="{{item.notes}}">
           <text class="card-notes">备注：{{item.notes}}</text>

@@ -32,6 +32,15 @@ App({
   },
 
   onLaunch() {
+    // 手机预览默认仍校验服务器域名，局域网地址会被拦成「网络错误」。
+    // 开发模式下打开调试后，微信才允许访问这台电脑。只记一次，避免每次启动都重启小程序。
+    if (DEV && !wx.getStorageSync('dev_debug_on')) {
+      wx.setStorageSync('dev_debug_on', 1)
+      wx.setEnableDebug({
+        enableDebug: true,
+        fail: () => wx.removeStorageSync('dev_debug_on'),
+      })
+    }
     // 启动只恢复本地登录态；开发版的自动登录已移除（它会清掉使用者自己登录的 token）。
     // 免登录由登录页的登录态探测负责，失效时回落到账号密码（记住密码）。
     // 数据源换了（本地 ↔ 正式服务器）就清掉登录态，避免一直弹「网络不稳定」

@@ -51,7 +51,8 @@
   border-bottom: 1rpx solid #f0f1f2;
 }
 
-.pd-row-last {
+.pd-row-last,
+.pd-card > .pd-row:last-child {
   border-bottom: none;
 }
 

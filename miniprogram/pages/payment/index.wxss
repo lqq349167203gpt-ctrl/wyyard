@@ -486,6 +486,10 @@
   color: #8f959e;
 }
 
+.card-meta .card-empty {
+  color: #d0d3d6;
+}
+
 .card-meta-separator {
   margin: 0 10rpx;
   font-size: 23rpx;
@@ -794,8 +798,8 @@
 .payment-entry-title { color: #1f2329; font-size: 30rpx; font-weight: 500; }
 .payment-entry-close { color: #646a73; font-size: 25rpx; }
 .payment-entry-body { min-height: 0; flex: 1; padding-top: 4rpx; box-sizing: border-box; }
-.card-agreement-row { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 10rpx; color: #8f959e; font-size: 22rpx; line-height: 1.5; }
+.card-agreement-row { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 10rpx; color: #8f959e; font-size: 23rpx; line-height: 1.5; }
 .card-closer { flex: 1; min-width: 0; word-break: break-all; }
 .card-agreement { flex-shrink: 0; }
-.card-agreement-row text { color: #4e535a; }
+.card-agreement-row text { color: #8f959e; }
 .card-agreement-row .card-empty { color: #d0d3d6; }

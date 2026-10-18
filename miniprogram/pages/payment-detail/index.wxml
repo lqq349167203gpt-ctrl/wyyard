@@ -13,13 +13,13 @@
       <text class="pd-label">成交日期</text>
       <text class="pd-value">{{item._dealDate || '-'}}</text>
     </view>
-    <view class="pd-row" wx:if="{{type !== 'coarse_door_card'}}">
-      <text class="pd-label">成交课程</text>
-      <text class="pd-value">{{item.deal_course_name || '无'}}</text>
-    </view>
     <view class="pd-row" wx:if="{{item._orgName}}">
       <text class="pd-label">所属组织</text>
       <text class="pd-value">{{item._orgName}}</text>
+    </view>
+    <view class="pd-row" wx:if="{{type !== 'coarse_door_card'}}">
+      <text class="pd-label">成交课程</text>
+      <text class="pd-value">{{item.deal_course_name || '无'}}</text>
     </view>
     <view class="pd-row">
       <text class="pd-label">成交人</text>
@@ -28,10 +28,6 @@
     <view class="pd-row" wx:if="{{type === 'membership_card' && item.card_type !== '次卡' && item.card_type !== '体验会员' && item.card_type !== '粗门次卡'}}">
       <text class="pd-label">协议签订</text>
       <text class="pd-value">{{item.agreement_status === 'signed' ? '已签' : '未签'}}</text>
-    </view>
-    <view class="pd-row pd-row-last">
-      <text class="pd-label">支付方式</text>
-      <text class="pd-value">{{item.payment_method || '-'}}</text>
     </view>
   </view>
 
