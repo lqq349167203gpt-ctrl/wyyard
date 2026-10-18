@@ -1,6 +1,6 @@
 const { paymentApi, organizationApi, PAYMENT_PROJECT_TYPES, downloadFile } = require('../../utils/api')
 const { canEditRecord } = require('../../utils/record-ownership')
-const { beginRead, disposeReads } = require('../../utils/read-scope')
+const { beginRead, disposeReads, invalidateRead } = require('../../utils/read-scope')
 
 const TABS = [
   PAYMENT_PROJECT_TYPES[0],
@@ -200,6 +200,10 @@ Page({
     subtypeField: '',
     subtypeList: [],
     selectedSubtypes: [],
+    organizationList: [],
+    selectedOrganizationId: '',
+    courseList: [],
+    selectedCourseKey: '',
     exporting: false,
     exportDialogVisible: false,
     exportRangeOptions: EXPORT_RANGE_OPTIONS,
@@ -271,6 +275,10 @@ Page({
       hasMore: false,
       showFilterPanel: false,
       selectedSubtypes: [],
+      selectedOrganizationId: '',
+      selectedCourseKey: '',
+      organizationList: [],
+      courseList: [],
       subtypeLabel: subtypeConfig ? subtypeConfig.label : '',
       subtypeField: subtypeConfig ? subtypeConfig.field : '',
       subtypeList: [],
@@ -293,18 +301,31 @@ Page({
     try {
       const type = TABS[this.data.activeTab].key
       if (type === 'coarse_door_card') {
+        const revealResults = !this.data.searchMode || Boolean(
+          this.data.keyword.trim() || this.data.selectedOrganizationId || this.data.selectedCourseKey
+        )
         await this.loadCoarseDoorData(reset)
-        if (requestVersion === this._loadRequestVersion) this.setData({ loading: false, loadingMore: false })
+        if (requestVersion === this._loadRequestVersion) {
+          this.setData({ loading: false, loadingMore: false, hasSearched: revealResults })
+        }
         return
       }
       const api = paymentApi.getByType(type)
-      const hasConditions = Boolean(this.data.keyword.trim() || this.data.selectedCreators.length || this.data.selectedSubtypes.length)
+      const hasConditions = Boolean(
+        this.data.keyword.trim()
+        || this.data.selectedCreators.length
+        || this.data.selectedSubtypes.length
+        || this.data.selectedOrganizationId
+        || this.data.selectedCourseKey
+      )
       const metadataOnly = this.data.searchMode && !hasConditions
       const [res, organizations] = await Promise.all([
         api.listPaginated(page, metadataOnly ? 1 : 20, {
           keyword: this.data.keyword.trim(),
           creator_names: JSON.stringify(this.data.selectedCreators),
           subtypes: JSON.stringify(this.data.selectedSubtypes),
+          organization_id: this.data.selectedOrganizationId,
+          deal_course_key: this.data.selectedCourseKey,
           include_filter_options: true,
         }),
         organizationApi.list(),
@@ -313,6 +334,7 @@ Page({
       const raw = res.items || res.data || res || []
       const sourceItems = decorateItems(Array.isArray(raw) ? raw : [], type, Array.isArray(organizations) ? organizations : (organizations.items || []))
       this._filterOptions = res
+      this._organizations = Array.isArray(organizations) ? organizations : (organizations.items || [])
       const items = metadataOnly ? [] : (reset ? sourceItems : Array.from(new Map(this.data.items.concat(sourceItems).map(item => [item.id, item])).values()))
       this._failedLoadReset = undefined
       this.setData({ items, total: metadataOnly ? 0 : res.total, page: res.page || page, hasMore: !metadataOnly && items.length < res.total, hasSearched: !metadataOnly, loading: false, loadingMore: false })
@@ -328,8 +350,19 @@ Page({
   async loadCoarseDoorData(reset = true) {
     const isCurrent = beginRead(this, 'coarseRecords', () => TABS[this.data.activeTab].key === 'coarse_door_card')
     const page = reset ? 1 : this.data.page + 1
-    const records = await paymentApi.deductions.list({ project_type: 'membership-cards', card_type: '粗门次卡', page, page_size: 20 })
+    const records = await paymentApi.deductions.list({
+      project_type: 'membership-cards',
+      card_type: '粗门次卡',
+      page,
+      page_size: 20,
+      include_filter_options: true,
+      nickname: this.data.keyword.trim(),
+      organization_id: this.data.selectedOrganizationId,
+      deal_course_key: this.data.selectedCourseKey,
+    })
     if (!isCurrent()) return
+    this._filterOptions = records
+    this.applyScopeOptions(records, false)
     const items = (records.items || []).map(record => Object.assign({}, record, { _canDelete: !record.cancelled && canEditRecord(record, 'payments') }))
     const coarseRecords = reset ? items : Array.from(new Map(this.data.coarseRecords.concat(items).map(item => [item.id, item])).values())
     this.setData({
@@ -421,6 +454,40 @@ Page({
       subtypeList,
       selectedSubtypes,
     }, () => {
+      this.applyScopeOptions(metadata, Boolean(this.data.keyword.trim()))
+    })
+  },
+
+  applyScopeOptions(metadata, freeze) {
+    if (freeze) {
+      this.refreshOptionSelections()
+      this.updateFilterCount()
+      return
+    }
+    const organizations = this._organizations || []
+    const organizationOptions = metadata.organization_options || []
+    let selectedOrganizationId = this.data.selectedOrganizationId
+    if (selectedOrganizationId && !organizationOptions.some(item => item.id === selectedOrganizationId)) {
+      selectedOrganizationId = ''
+    }
+    const organizationList = organizationOptions.map(item => ({
+      id: item.id,
+      name: item.name || (organizations.find(org => org.id === item.id) || {}).name || item.id,
+      selected: item.id === selectedOrganizationId,
+    }))
+    const courseOptions = metadata.deal_course_options || []
+    const courseKeys = courseOptions.map(item => item.key)
+    if (metadata.unassigned_course) courseKeys.push('__none__')
+    let selectedCourseKey = this.data.selectedCourseKey
+    if (selectedCourseKey && !courseKeys.includes(selectedCourseKey)) selectedCourseKey = ''
+    const courseList = []
+    if (metadata.unassigned_course) {
+      courseList.push({ key: '__none__', name: '无', selected: selectedCourseKey === '__none__' })
+    }
+    courseOptions.forEach(item => {
+      courseList.push({ key: item.key, name: item.name || item.key, selected: item.key === selectedCourseKey })
+    })
+    this.setData({ organizationList, selectedOrganizationId, courseList, selectedCourseKey }, () => {
       this.updateFilterCount()
     })
   },
@@ -431,13 +498,17 @@ Page({
     this.setData({
       creatorList: this.data.creatorList.map(item => Object.assign({}, item, { selected: selectedCreators.has(item.name) })),
       subtypeList: this.data.subtypeList.map(item => Object.assign({}, item, { selected: selectedSubtypes.has(item.name) })),
+      organizationList: this.data.organizationList.map(item => Object.assign({}, item, { selected: item.id === this.data.selectedOrganizationId })),
+      courseList: this.data.courseList.map(item => Object.assign({}, item, { selected: item.key === this.data.selectedCourseKey })),
     })
   },
 
   updateFilterCount() {
     let count = 0
-    if (this.data.selectedCreators.length) count++
-    if (this.data.selectedSubtypes.length) count++
+    if (!this.data.isCoarseDoorTab && this.data.selectedCreators.length) count++
+    if (!this.data.isCoarseDoorTab && this.data.selectedSubtypes.length) count++
+    if (this.data.selectedOrganizationId) count++
+    if (this.data.selectedCourseKey) count++
     this.setData({ filterCount: count })
   },
 
@@ -445,6 +516,7 @@ Page({
 
   onSearchInput(e) {
     this._loadRequestVersion = (this._loadRequestVersion || 0) + 1
+    invalidateRead(this, 'coarseRecords')
     this.setData({ keyword: e.detail.value })
     if (this._searchTimer) clearTimeout(this._searchTimer)
     this._searchTimer = setTimeout(() => this.applyFilters(), 300)
@@ -462,7 +534,7 @@ Page({
 
   onSearchTap() {
     const tab = TABS[this.data.activeTab]
-    if (!tab || tab.key === 'coarse_door_card') return
+    if (!tab) return
     wx.navigateTo({ url: `/pages/payment/index?search=1&type=${encodeURIComponent(tab.key)}` })
   },
 
@@ -474,6 +546,8 @@ Page({
     this._filterSnapshot = {
       selectedCreators: this.data.selectedCreators.slice(),
       selectedSubtypes: this.data.selectedSubtypes.slice(),
+      selectedOrganizationId: this.data.selectedOrganizationId,
+      selectedCourseKey: this.data.selectedCourseKey,
     }
     this.setData({ showFilterPanel: true })
   },
@@ -483,6 +557,8 @@ Page({
       this.setData({
         selectedCreators: this._filterSnapshot.selectedCreators,
         selectedSubtypes: this._filterSnapshot.selectedSubtypes,
+        selectedOrganizationId: this._filterSnapshot.selectedOrganizationId,
+        selectedCourseKey: this._filterSnapshot.selectedCourseKey,
         showFilterPanel: false,
       }, () => this.refreshOptionSelections())
     } else {
@@ -509,8 +585,23 @@ Page({
     this.setData({ selectedSubtypes }, () => this.refreshOptionSelections())
   },
 
+  onToggleOrganization(e) {
+    const id = e.currentTarget.dataset.id
+    this.setData({ selectedOrganizationId: this.data.selectedOrganizationId === id ? '' : id }, () => this.refreshOptionSelections())
+  },
+
+  onToggleCourse(e) {
+    const key = e.currentTarget.dataset.key
+    this.setData({ selectedCourseKey: this.data.selectedCourseKey === key ? '' : key }, () => this.refreshOptionSelections())
+  },
+
   onResetFilter() {
-    this.setData({ selectedCreators: [], selectedSubtypes: [] }, () => this.refreshOptionSelections())
+    this.setData({
+      selectedCreators: [],
+      selectedSubtypes: [],
+      selectedOrganizationId: '',
+      selectedCourseKey: '',
+    }, () => this.refreshOptionSelections())
   },
 
   onConfirmFilter() {

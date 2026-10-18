@@ -666,7 +666,7 @@ def create_coarse_door_course_deduction(
         if not option:
             raise ValueError("该课程不可抵扣，可能未到场、扣卡次数为0、已退课或已经抵扣")
         if course_organization_id not in option["organization_ids"]:
-            raise ValueError("所选课程不属于该课程所属，请重新选择")
+            raise ValueError("所选课程不属于该成交课程，请重新选择")
         from app.services import organization_service
 
         organizations = organization_service.list_organizations()
@@ -675,7 +675,7 @@ def create_coarse_door_course_deduction(
             None,
         )
         if not course_organization:
-            raise ValueError("所选课程所属不存在，请重新选择")
+            raise ValueError("所选成交课程不存在，请重新选择")
         settlement_organization = next(
             (item for item in organizations if item.id == settlement_organization_id),
             None,

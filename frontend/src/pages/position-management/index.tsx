@@ -978,7 +978,7 @@ export default function PositionManagementPage() {
                         <div className="flex min-h-[64px] items-center justify-between gap-6 px-4 py-3">
                           <div>
                             <div className="text-[13px] text-[#2b2f36]">数据范围</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">“与本人相关”可按引流关系和承接关系组合。</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">“与本人相关”可按引流关系和承接关系组合。勾选后同时包含本人自己的客户资料。</div>
                           </div>
                           <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
                             {([

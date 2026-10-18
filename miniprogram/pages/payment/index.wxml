@@ -26,7 +26,7 @@
     </view>
 
     <!-- 搜索与筛选 -->
-    <view class="search-bar" wx:if="{{!isCoarseDoorTab}}">
+    <view class="search-bar">
       <view class="search-input-wrap" wx:if="{{searchMode}}">
         <view class="search-symbol"></view>
         <input
@@ -53,7 +53,7 @@
     </view>
   </view>
 
-  <view class="coarse-door" wx:if="{{isCoarseDoorTab}}">
+  <view class="coarse-door" wx:if="{{isCoarseDoorTab && !(searchMode && !hasSearched)}}">
     <view class="coarse-toolbar">
       <text class="coarse-toolbar-caption">抵扣记录</text>
       <view class="coarse-toolbar-button" bindtap="onCoarseEntryOpen">
@@ -72,7 +72,7 @@
         </view>
       </view>
       <text class="coarse-record-course">{{item.source_activity_name || item.reason}}</text>
-      <text class="coarse-record-meta" style="color: #a8adb5;">课程所属：{{item.source_organization_name || '-'}}</text>
+      <text class="coarse-record-meta" style="color: #a8adb5;">成交课程：{{item.source_organization_name || '-'}}</text>
       <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}<text wx:if="{{item.source_activity_date}}"> · 课程日期：{{item.source_activity_date}}</text><text wx:if="{{item.organization_name}}"> · 成交归属：{{item.organization_name}}</text><text wx:if="{{item.created_by}}"> · {{item.created_by}}录入</text></text>
     </view>
     <view class="empty" wx:if="{{!loading && !loadError && coarseRecords.length === 0}}"><text class="empty-text">暂无粗门次卡抵扣记录</text></view>
@@ -101,7 +101,7 @@
     <view class="dropdown-content filter-dropdown">
       <scroll-view class="filter-scroll" scroll-y="{{true}}" enable-flex="{{true}}" show-scrollbar="{{false}}">
         <view class="filter-body">
-          <view class="filter-section">
+          <view class="filter-section" wx:if="{{!isCoarseDoorTab}}">
             <view class="filter-section-title">创建人</view>
             <view class="tags-wrap">
               <view
@@ -132,6 +132,38 @@
             </view>
             <view class="filter-section-empty" wx:if="{{subtypeList.length === 0}}">暂无{{subtypeLabel}}数据</view>
           </view>
+
+          <view class="filter-section">
+            <view class="filter-section-title">成交归属</view>
+            <view class="tags-wrap">
+              <view
+                class="tag-item {{item.selected ? 'active' : ''}}"
+                wx:for="{{organizationList}}"
+                wx:key="id"
+                bindtap="onToggleOrganization"
+                data-id="{{item.id}}"
+              >
+                <text>{{item.name}}</text>
+              </view>
+            </view>
+            <view class="filter-section-empty" wx:if="{{organizationList.length === 0}}">暂无成交归属</view>
+          </view>
+
+          <view class="filter-section">
+            <view class="filter-section-title">成交课程</view>
+            <view class="tags-wrap">
+              <view
+                class="tag-item {{item.selected ? 'active' : ''}}"
+                wx:for="{{courseList}}"
+                wx:key="key"
+                bindtap="onToggleCourse"
+                data-key="{{item.key}}"
+              >
+                <text>{{item.name}}</text>
+              </view>
+            </view>
+            <view class="filter-section-empty" wx:if="{{courseList.length === 0}}">暂无成交课程</view>
+          </view>
         </view>
       </scroll-view>
 
@@ -142,10 +174,10 @@
     </view>
   </view>
 
-  <view class="search-welcome" wx:if="{{!isCoarseDoorTab && searchMode && !hasSearched && !loading}}">
+  <view class="search-welcome" wx:if="{{searchMode && !hasSearched && !loading}}">
     <view class="search-welcome-icon"><view class="search-symbol large"></view></view>
     <text class="search-welcome-title">搜索付费记录</text>
-    <text class="search-welcome-hint">输入客户昵称，或点击右侧按创建人和项目类型筛选</text>
+    <text class="search-welcome-hint">输入客户昵称，或点击右侧按成交归属、成交课程筛选</text>
   </view>
 
   <view class="search-result-summary" wx:if="{{!isCoarseDoorTab && searchMode && hasSearched && !loading}}">
@@ -178,10 +210,10 @@
           <text class="stat-item stat-to" wx:if="{{item._expiry}}">至 {{item._expiry}}</text>
         </view>
         <view class="card-meta">
-          <text class="card-meta-item">成交课程：<text style="{{item.deal_course_name ? '' : 'color: #d0d3d6;'}}">{{item.deal_course_name || '-'}}</text></text>
+          <text class="card-meta-item">成交课程：<text style="{{item.deal_course_name ? '' : 'color: #d0d3d6;'}}">{{item.deal_course_name || '无'}}</text></text>
         </view>
         <view class="card-meta">
-          <text class="card-meta-item" style="color: #a8adb5;">课程所属：{{item.deal_course_organization_name || '-'}}</text>
+          <text class="card-meta-item" style="color: #a8adb5;">{{item.deal_course_organization_name || '-'}}</text>
         </view>
         <view class="card-row3" wx:if="{{item.notes}}">
           <text class="card-notes">备注：{{item.notes}}</text>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { MEMBERSHIP_CARD_DEFAULTS as MEMBERSHIP_CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES } from "@/lib/payment-types"
+import { MEMBERSHIP_CARD_DEFAULTS as MEMBERSHIP_CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES, offlineCourseDefaultMonths } from "@/lib/payment-types"
 import { LEARNING_PAYMENT_TYPES as COURSE_TYPES, LEARNING_PAYMENT_OPTIONS } from "@/lib/learning-course-types"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, CreditCard, X, Wallet, Heart, Layers, Zap, GraduationCap, Package, Coffee, BookOpen } from "lucide-react"
@@ -31,7 +31,8 @@ import { useServerPagination } from "@/hooks/use-server-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { CoarseDoorCardTab } from "@/pages/payment/coarse-door-card-tab"
-import { PaymentCourseSelect } from "@/components/payment-course-select"
+import { NO_DEAL_COURSE_LABEL, PaymentCourseSelect, UNSET_DEAL_COURSE } from "@/components/payment-course-select"
+import { PaymentScopeFilters, UNASSIGNED_COURSE } from "./payment-scope-filters"
 import { useReadResource } from "@/hooks/use-read-resource"
 import { LoadError } from "@/components/load-error"
 
@@ -78,6 +79,18 @@ function learningCourseExpiry(effectiveDate: string, months: number): string | n
   const expiry = new Date(Date.UTC(year, month - 1 + months, Math.min(day, lastDay)))
   expiry.setUTCDate(expiry.getUTCDate() - 1)
   return expiry.toISOString().slice(0, 10)
+}
+
+const LEARNING_DEFAULT_MONTHS = 12
+
+function learningValidityMonths(item: { validity_value?: number | null; effective_date?: string | null; expiry_date?: string | null }): string {
+  if (item.validity_value && item.validity_value > 0) return String(item.validity_value)
+  if (item.effective_date && item.expiry_date) {
+    for (let months = 1; months <= 120; months += 1) {
+      if (learningCourseExpiry(item.effective_date, months) === item.expiry_date) return String(months)
+    }
+  }
+  return String(LEARNING_DEFAULT_MONTHS)
 }
 
 /* ========== 统一数据结构 ========== */
@@ -176,7 +189,7 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
     case "energy_knot":
       return { ...base, detail: `${item.purchase_count} 次`, price: item.amount, purchase_count: item.purchase_count, amount: item.amount, effective_date: item.effective_date, expiry_date: item.expiry_date, effective_remaining: item.effective_remaining, notes: item.notes, created_by: item.created_by }
     case "internal_course":
-      return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, course_type: item.course_type, created_by: item.created_by, notes: item.notes }
+      return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, expiry_date: item.expiry_date, validity_value: item.validity_value, course_type: item.course_type, created_by: item.created_by, notes: item.notes }
     case "tea_seat_fee":
       return { ...base, detail: `${item.quantity || 1} 位`, price: item.amount, quantity: item.quantity, amount: item.amount, created_by: item.created_by, notes: item.notes }
     case "offline_course": {
@@ -268,7 +281,7 @@ export function UnifiedPaymentContent({
   const [formCustomerId, setFormCustomerId] = useState("")
   const [formNickname, setFormNickname] = useState("")
   const [formDealDate, setFormDealDate] = useState(today)
-  const [formDealCourse, setFormDealCourse] = useState("")
+  const [formDealCourse, setFormDealCourse] = useState(UNSET_DEAL_COURSE)
   const [formDealCourseName, setFormDealCourseName] = useState("")
   const [formClosers, setFormClosers] = useState<Closer[]>([])
   const [formOrganizationId, setFormOrganizationId] = useState("")
@@ -318,6 +331,7 @@ export function UnifiedPaymentContent({
   const [formCourseType, setFormCourseType] = useState("")
   const [formReadingType, setFormReadingType] = useState("")
   const [formCourseAmount, setFormCourseAmount] = useState<number>(0)
+  const [formLearningValidityValue, setFormLearningValidityValue] = useState(String(LEARNING_DEFAULT_MONTHS))
 
   // 其他项目表单
   const [formCategory, setFormCategory] = useState("")
@@ -338,6 +352,12 @@ export function UnifiedPaymentContent({
   // 搜索
   const [searchNickname, setSearchNickname] = useState("")
   const [searchCloserName, setSearchCloserName] = useState("")
+  const [organizationFilter, setOrganizationFilter] = useState("all")
+  const [courseFilter, setCourseFilter] = useState("all")
+  const [dealCourseOptions, setDealCourseOptions] = useState<{ key: string; name: string }[]>([])
+  const [organizationOptions, setOrganizationOptions] = useState<{ id: string; name: string }[]>([])
+  const [includeUnassignedCourse, setIncludeUnassignedCourse] = useState(false)
+  const [scopeOptionsReady, setScopeOptionsReady] = useState(false)
 
   // 客户
   const directory = useReadResource<CustomerLight[]>(customerApi.light, [])
@@ -357,9 +377,11 @@ export function UnifiedPaymentContent({
 
   // 分页数据获取
   const fetchFn = useCallback(async (page: number, pageSize: number) => {
-    const params: any = {}
+    const params: any = { include_filter_options: "true" }
     if (searchNickname) params.nickname = searchNickname
     if (searchCloserName) params.closer_name = searchCloserName
+    if (organizationFilter !== "all") params.organization_id = organizationFilter
+    if (courseFilter !== "all") params.deal_course_key = courseFilter
     const hasParams = Object.keys(params).length > 0
     const p = hasParams ? params : undefined
 
@@ -367,18 +389,44 @@ export function UnifiedPaymentContent({
       const pp = { ...p }
       if (subtypeFilter !== "all" && subtypeOptions.length) pp.subtypes = JSON.stringify([subtypeFilter])
       const res = await getApi(activeType).listPaginated(page, pageSize, pp)
+      if (!searchNickname && !searchCloserName) {
+        const page = res as {
+          deal_course_options?: { key: string; name: string }[]
+          organization_options?: { id: string; name: string }[]
+          unassigned_course?: boolean
+        }
+        if (page.deal_course_options) setDealCourseOptions(page.deal_course_options)
+        if (page.organization_options) setOrganizationOptions(page.organization_options)
+        if (typeof page.unassigned_course === "boolean") setIncludeUnassignedCourse(page.unassigned_course)
+        setScopeOptionsReady(true)
+      }
       return { ...res, items: res.items.map((i: any) => toUnified(i, activeType)) }
     }
 
     const result = await paymentExportApi.records(page, pageSize, searchNickname, searchCloserName)
     return { ...result, items: result.items.map(item => toUnified(item.record, item.type)) }
-  }, [activeType, subtypeFilter, subtypeOptions, searchNickname, searchCloserName])
+  }, [activeType, subtypeFilter, subtypeOptions, searchNickname, searchCloserName, organizationFilter, courseFilter])
 
   const { paginatedItems: rawItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex, loading, error, refresh } = useServerPagination(fetchFn, {
     enabled: !formOnly,
-    queryKey: JSON.stringify([activeType, subtypeFilter, searchNickname, searchCloserName]),
+    queryKey: JSON.stringify([activeType, subtypeFilter, searchNickname, searchCloserName, organizationFilter, courseFilter]),
   })
   const paginatedItems = rawItems as unknown as UnifiedItem[]
+  const scopeOrganizations = useMemo(() => organizationOptions.map(org => ({
+    id: org.id,
+    name: org.name || organizations.find(item => item.id === org.id)?.name || org.id,
+  })), [organizationOptions, organizations])
+
+  useEffect(() => {
+    if (!scopeOptionsReady) return
+    if (organizationFilter !== "all" && !scopeOrganizations.some(org => org.id === organizationFilter)) {
+      setOrganizationFilter("all")
+    }
+    if (courseFilter === UNASSIGNED_COURSE && !includeUnassignedCourse) setCourseFilter("all")
+    else if (courseFilter !== "all" && courseFilter !== UNASSIGNED_COURSE && !dealCourseOptions.some(course => course.key === courseFilter)) {
+      setCourseFilter("all")
+    }
+  }, [scopeOptionsReady, organizationFilter, courseFilter, scopeOrganizations, dealCourseOptions, includeUnassignedCourse])
 
   useEffect(() => {
     let current = true
@@ -408,6 +456,8 @@ export function UnifiedPaymentContent({
     setSearchNickname("")
     setSearchCloserName("")
     setSubtypeFilter("all")
+    setOrganizationFilter("all")
+    setCourseFilter("all")
   }
 
   // 会员卡类型选择
@@ -493,6 +543,7 @@ export function UnifiedPaymentContent({
     // 沙龙技能学习
     setFormCourseType("")
     setFormCourseAmount(0)
+    setFormLearningValidityValue(String(LEARNING_DEFAULT_MONTHS))
     // 其他项目
     setFormCategory("")
     setFormProjectName("")
@@ -510,7 +561,7 @@ export function UnifiedPaymentContent({
     setFormCustomerId("")
     setFormNickname("")
     setFormDealDate(today)
-    setFormDealCourse("")
+    setFormDealCourse(UNSET_DEAL_COURSE)
     setFormDealCourseName("")
     setFormClosers([])
     setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
@@ -546,6 +597,7 @@ export function UnifiedPaymentContent({
     // 沙龙技能学习
     setFormCourseType("")
     setFormCourseAmount(0)
+    setFormLearningValidityValue(String(LEARNING_DEFAULT_MONTHS))
     // 其他项目
     setFormCategory("")
     setFormProjectName("")
@@ -628,6 +680,7 @@ export function UnifiedPaymentContent({
         setFormCourseType(item.course_type || "")
         setFormCourseAmount(item.price)
         setFormEffectiveDate(item.effective_date || "")
+        setFormLearningValidityValue(learningValidityMonths(item))
         setFormNotes(item.notes || "")
         break
       case "tea_seat_fee":
@@ -684,6 +737,7 @@ export function UnifiedPaymentContent({
     if (formType === "membership_card" && formCardType === "定制化" && !editingItem && (!Number.isInteger(Number(formDurationValue)) || Number(formDurationValue) <= 0 || (!formUnlimited && (!Number.isInteger(Number(formRemainingCount)) || Number(formRemainingCount) <= 0)))) { window.alert("请填写定制化会员卡的次数和有效期，或明确选择不限次数"); return }
     if (needsAgreement && !formAgreementStatus) { setAgreementError(true); return }
     if (formType === "internal_course" && !formCourseType) return
+    if (formDealCourse === UNSET_DEAL_COURSE) { window.alert("请选择成交课程"); return }
     if (formType === "oh_card_reading" && !formReadingType && !editingItem) { window.alert("请选择诊断类型"); return }
     if (formType === "offline_course" && !formCourseType && !editingItem) { window.alert("请选择课程类型"); return }
     if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
@@ -770,12 +824,12 @@ export function UnifiedPaymentContent({
         }
       }
       case "internal_course": {
-        const cfg = COURSE_TYPES[formCourseType]
-        const expiry_date = cfg ? learningCourseExpiry(formEffectiveDate, cfg.duration_value) : null
+        const months = parseInt(formLearningValidityValue) || LEARNING_DEFAULT_MONTHS
+        const expiry_date = learningCourseExpiry(formEffectiveDate, months)
         return {
           customer_id: formCustomerId, nickname: formNickname,
           course_type: formCourseType, price: 0,
-          effective_date: formEffectiveDate, expiry_date,
+          effective_date: formEffectiveDate, validity_value: months, expiry_date,
           closer_id, closer_name, closers, organization_id, deal_date,
           payment_method: null,
           ...(!editingItem && { created_by: createdBy }),
@@ -805,7 +859,7 @@ export function UnifiedPaymentContent({
           customer_id: formCustomerId, nickname: formNickname,
           course_type: formCourseType,
           effective_date: formOfflineEffectiveDate || null,
-          validity_value: val || 1,
+          validity_value: val || offlineCourseDefaultMonths(formCourseType),
           validity_unit: "month",
           amount: 0,
           closer_id, closer_name, closers, organization_id, deal_date,
@@ -837,7 +891,7 @@ export function UnifiedPaymentContent({
     try {
       const api = getApi(formType)
       const data = buildPayload()
-      data.deal_course_key = formDealCourse
+      data.deal_course_key = formDealCourse === UNSET_DEAL_COURSE ? "" : formDealCourse
       if (editingItem) {
         // 隐藏的支付字段不代表清空：编辑旧记录时保留原始财务信息。
         for (const key of ["price", "amount", "fee", "payment_method"]) delete data[key]
@@ -917,6 +971,7 @@ export function UnifiedPaymentContent({
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "课程类型", key: "course_type", width: 24, example: "疗愈师课程：自爱力构建" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
+      { header: "有效期（月）", key: "validity_value", width: 10, example: "12" },
     ],
     tea_seat_fee: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
@@ -928,7 +983,7 @@ export function UnifiedPaymentContent({
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
       { header: "课程类型", key: "course_type", width: 22, example: "主理人训练" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
-      { header: "有效期（月）", key: "validity_value", width: 10, example: "1" },
+      { header: "有效期（月）", key: "validity_value", width: 10, example: "3" },
     ],
     other: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
@@ -1136,14 +1191,15 @@ export function UnifiedPaymentContent({
         break
       }
       case "offline_course": {
-        const vv = parseInt(get("有效期（月）")) || (get("课程类型") === "商业落地三个月" ? 3 : get("课程类型") === "商业落地一年" ? 12 : 1)
+        const vv = parseInt(get("有效期（月）")) || offlineCourseDefaultMonths(get("课程类型"))
         payload = { ...base, course_type: get("课程类型"), effective_date: get("生效日期") || today, validity_value: vv, amount }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${get("课程类型")}|${amount}`
         break
       }
       case "internal_course": {
         const courseType = get("课程类型")
-        payload = { ...base, course_type: courseType, price: amount, effective_date: get("生效日期") || today }
+        const months = parseInt(get("有效期（月）")) || LEARNING_DEFAULT_MONTHS
+        payload = { ...base, course_type: courseType, price: amount, effective_date: get("生效日期") || today, validity_value: months }
         dupKey = `${base.customer_id}|${type}|${dealDate}|${courseType}|${amount}`
         break
       }
@@ -1326,8 +1382,8 @@ export function UnifiedPaymentContent({
   const confirmContent = useMemo(() => {
     const rows: { label: string; value: string }[] = []
     rows.push({ label: "成交日期", value: formDealDate || "-" })
-    rows.push({ label: "成交课程", value: formDealCourseName || "与课程无关" })
     rows.push({ label: "用户", value: formNickname || "-" })
+    rows.push({ label: "成交课程", value: formDealCourse === UNSET_DEAL_COURSE ? "未填" : (formDealCourseName || NO_DEAL_COURSE_LABEL) })
     if (formType === "membership_card") {
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "会员卡", value: formCardType || "-" })
@@ -1353,16 +1409,11 @@ export function UnifiedPaymentContent({
         }
       }
     } else if (formType === "internal_course") {
+      const months = parseInt(formLearningValidityValue) || LEARNING_DEFAULT_MONTHS
       rows.push({ label: "生效日期", value: formEffectiveDate || "-" })
       rows.push({ label: "课程类型", value: formCourseType || "-" })
-      const config = COURSE_TYPES[formCourseType]
-      if (config) {
-        rows.push({ label: "有效期", value: config.duration })
-        const unchangedValidity = editingItem?.type === "internal_course"
-          && editingItem.course_type === formCourseType && editingItem.effective_date === formEffectiveDate
-        const expiryDate = unchangedValidity ? editingItem.expiry_date : learningCourseExpiry(formEffectiveDate, config.duration_value)
-        rows.push({ label: "结束日期", value: expiryDate || "-" })
-      }
+      rows.push({ label: "有效期", value: `${months} 个月` })
+      rows.push({ label: "结束日期", value: learningCourseExpiry(formEffectiveDate, months) || "-" })
       if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${(formCourseAmount || 0).toLocaleString()}` })
     } else if (formType === "other") {
       rows.push({ label: "项目名称", value: [formCategory, formProjectName].filter(Boolean).join(" / ") || "-" })
@@ -1386,7 +1437,7 @@ export function UnifiedPaymentContent({
     } else if (formType === "offline_course") {
       rows.push({ label: "课程类型", value: formCourseType || "-" })
       rows.push({ label: "生效日期", value: formOfflineEffectiveDate || "-" })
-      rows.push({ label: "有效期", value: `${formOfflineValidityValue || "1"} 个月` })
+      rows.push({ label: "有效期", value: `${formOfflineValidityValue || offlineCourseDefaultMonths(formCourseType)} 个月` })
       if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formOfflineAmount || "0").toLocaleString()}` })
     } else if (formType === "group_case" || formType === "emotional_release" || formType === "energy_knot") {
       const countLabel = formType === "energy_knot" ? "部位数" : "购买场次"
@@ -1428,7 +1479,7 @@ export function UnifiedPaymentContent({
     }
     rows.push({ label: "备注", value: formNotes || "-" })
     return rows
-  }, [needsAgreement, formAgreementStatus, formType, formDealDate, formDealCourseName, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formOhAmount, formDiagnosisTeacher, formReadingType, formDiagnosisDuration, formTeaQuantity, formTeaAmount, formOfflineEffectiveDate, formOfflineValidityValue, formOfflineAmount, formCourseType, formCourseAmount, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited, formNotes, formPaymentMethod, formProjectEffectiveDate, formProjectValidityValue, formProjectValidityUnit, editingItem])
+  }, [needsAgreement, formAgreementStatus, formType, formDealDate, formDealCourseName, formNickname, formEffectiveDate, formCardType, formPrice, formPurchaseCount, formAmount, formOhAmount, formDiagnosisTeacher, formReadingType, formDiagnosisDuration, formTeaQuantity, formTeaAmount, formOfflineEffectiveDate, formOfflineValidityValue, formOfflineAmount, formCourseType, formCourseAmount, formLearningValidityValue, formProjectName, formFee, formOtherEffectiveDate, formOtherDurationType, formOtherDurationValue, formOtherRemainingCount, formOtherUnlimited, formOrganizationId, formClosers, organizations, mcShowDurationInfo, formTotalCount, formDurationValue, formDurationType, formUnlimited, formNotes, formPaymentMethod, formProjectEffectiveDate, formProjectValidityValue, formProjectValidityUnit, editingItem])
 
   return (
     <>
@@ -1448,40 +1499,39 @@ export function UnifiedPaymentContent({
               rounded="7px"
             />
           </div>
-          <div className="w-[138px]">
-            {isMembershipOnly ? (
-              <SelectDropdown
-                className="w-[138px]"
-                buttonClassName="border-[#e1e4e7] bg-white px-2.5"
-                rounded="7px"
-                value={subtypeFilter}
-                options={[
-                  { value: "all", label: "全部卡类型" },
-                  ...subtypeOptions,
-                ]}
-                textColor={subtypeFilter !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
-                onChange={setSubtypeFilter}
-              />
-            ) : (
-              <SelectDropdown
-                className="w-[138px]"
-                buttonClassName="border-[#e1e4e7] bg-white px-2.5"
-                rounded="7px"
-                value={activeType}
-                options={filterTypes
-                  ? filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
-                  : [
-                      { value: "all", label: "全部类型" },
-                      ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
-                        value: key,
-                        label: PROJECT_TYPES[key].label,
-                      })),
-                    ]}
-                textColor={activeType && activeType !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
-                onChange={(v) => { setActiveType(v as ProjectTypeKey | "all"); setSubtypeFilter("all") }}
-              />
-            )}
-          </div>
+          {isMembershipOnly && <div className="w-[138px]">
+            <SelectDropdown
+              className="w-[138px]"
+              buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+              rounded="7px"
+              value={subtypeFilter}
+              options={[
+                { value: "all", label: "全部卡类型" },
+                ...subtypeOptions,
+              ]}
+              textColor={subtypeFilter !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+              onChange={setSubtypeFilter}
+            />
+          </div>}
+          {!isMembershipOnly && !(filterTypes && filterTypes.length === 1) && <div className="w-[138px]">
+            <SelectDropdown
+              className="w-[138px]"
+              buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+              rounded="7px"
+              value={activeType}
+              options={filterTypes
+                ? filterTypes.map(key => ({ value: key, label: PROJECT_TYPES[key].label }))
+                : [
+                    { value: "all", label: "全部类型" },
+                    ...(Object.keys(PROJECT_TYPES) as ProjectTypeKey[]).map(key => ({
+                      value: key,
+                      label: PROJECT_TYPES[key].label,
+                    })),
+                  ]}
+              textColor={activeType && activeType !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+              onChange={(v) => { setActiveType(v as ProjectTypeKey | "all"); setSubtypeFilter("all") }}
+            />
+          </div>}
           {!isMembershipOnly && subtypeOptions.length > 0 && <div className="w-[172px]">
             <SelectDropdown
               className="w-[172px]"
@@ -1494,6 +1544,15 @@ export function UnifiedPaymentContent({
               dropdownWidth={activeType === "internal_course" ? 310 : undefined}
             />
           </div>}
+          <PaymentScopeFilters
+            organizationId={organizationFilter}
+            courseKey={courseFilter}
+            organizations={scopeOrganizations}
+            courses={dealCourseOptions}
+            includeUnassignedCourse={includeUnassignedCourse}
+            onOrganizationChange={setOrganizationFilter}
+            onCourseChange={setCourseFilter}
+          />
           <div className="w-[172px]">
             <CustomerSearchInput
               customers={customers}
@@ -1722,14 +1781,10 @@ export function UnifiedPaymentContent({
             </div>
           ) : (
           <div className="px-6 py-5 space-y-4 max-h-[calc(65vh+120px)] overflow-y-auto" {...enterToNext}>
-            {/* 成交日期 + 成交归属（顶部） */}
+            {/* 成交日期、成交归属、成交课程 */}
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交日期</span>
-              <Input type="date" value={formDealDate} onChange={(e) => { setFormDealDate(e.target.value); setFormDealCourse(""); setFormDealCourseName("") }} />
-            </div>
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交课程</span>
-              <PaymentCourseSelect date={formDealDate} value={formDealCourse} name={formDealCourseName} onChange={(key, name) => { setFormDealCourse(key); setFormDealCourseName(name) }} />
+              <Input type="date" value={formDealDate} onChange={(e) => { setFormDealDate(e.target.value); setFormDealCourse(UNSET_DEAL_COURSE); setFormDealCourseName("") }} />
             </div>
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交归属</span>
@@ -1737,6 +1792,8 @@ export function UnifiedPaymentContent({
                 value={formOrganizationId}
                 options={organizations.map(o => ({ value: o.id, label: o.name }))}
                 placeholder="选择组织"
+                placeholderColor="text-[#a8b1bd]"
+                textColor={formOrganizationId ? "text-[#2b2f36]" : undefined}
                 onChange={setFormOrganizationId}
               />
             </div>
@@ -1763,7 +1820,7 @@ export function UnifiedPaymentContent({
                   value={formCourseType}
                   options={LEARNING_PAYMENT_OPTIONS}
                   placeholder="请选择课程"
-                  onChange={(v) => { setFormCourseType(v); setFormCourseAmount(COURSE_TYPES[v]?.price || 0) }}
+                  onChange={(v) => { setFormCourseType(v); setFormCourseAmount(COURSE_TYPES[v]?.price || 0); setFormLearningValidityValue(String(LEARNING_DEFAULT_MONTHS)) }}
                 />
               </div>
             )}
@@ -1777,13 +1834,19 @@ export function UnifiedPaymentContent({
                   value={formNickname || ""}
                   onChange={(v) => {
                     const name = typeof v === "string" ? v : v[0] || ""
-                    if (!name) { setFormNickname(""); setFormCustomerId("") }
+                    if (!name) { setFormNickname(""); setFormCustomerId(""); setFormDealCourse(UNSET_DEAL_COURSE); setFormDealCourseName("") }
                   }}
-                  onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
+                  onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id); setFormDealCourse(UNSET_DEAL_COURSE); setFormDealCourseName("") }}
                   disabled={!!editingItem || !!presetCustomer}
                   showClear={!editingItem && !presetCustomer}
                   placeholder="搜索姓名或昵称"
                 />
+              </div>
+            )}
+            {formType !== "other" && (
+              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交课程</span>
+                <PaymentCourseSelect date={formDealDate} customerId={formCustomerId} value={formDealCourse} name={formDealCourseName} onChange={(key, name) => { setFormDealCourse(key); setFormDealCourseName(name) }} />
               </div>
             )}
 
@@ -1889,8 +1952,14 @@ export function UnifiedPaymentContent({
             {formType === "oh_card_reading" && (
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-                  <span className="text-[12px] text-[#4e535a] font-light text-right">诊断类型</span>
-                  <SelectDropdown value={formReadingType} options={OH_READING_TYPES.map(value => ({ value, label: value }))} onChange={setFormReadingType} placeholder="选择诊断类型" />
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">诊断类型</span>
+                  <SelectDropdown value={formReadingType} options={OH_READING_TYPES.map(value => ({ value, label: value }))} onChange={(value) => {
+                    setFormReadingType(value)
+                    if (value === "余老师情感类" || value === "余老师商业梳理") {
+                      const teacher = courseTeachers.find(item => item.nickname === "余墨")
+                      if (teacher) setFormDiagnosisTeacher(teacher.nickname)
+                    }
+                  }} placeholder="选择诊断类型" />
                 </div>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">诊断老师</span>
@@ -1942,7 +2011,7 @@ export function UnifiedPaymentContent({
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">课程类型</span>
-                  <SelectDropdown value={formCourseType} options={OFFLINE_COURSE_TYPES.map(type => ({ value: type, label: type }))} onChange={value => { setFormCourseType(value); setFormOfflineValidityValue(value === "商业落地三个月" ? "3" : value === "商业落地一年" ? "12" : "1") }} placeholder="选择课程类型" />
+                  <SelectDropdown value={formCourseType} options={OFFLINE_COURSE_TYPES.map(type => ({ value: type, label: type }))} onChange={value => { setFormCourseType(value); setFormOfflineValidityValue(String(offlineCourseDefaultMonths(value))) }} placeholder="选择课程类型" />
                 </div>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
@@ -1969,6 +2038,13 @@ export function UnifiedPaymentContent({
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formEffectiveDate} onChange={(e) => setFormEffectiveDate(e.target.value)} className="h-8 text-xs" />
                 </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">有效期</span>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" value={formLearningValidityValue} onChange={(e) => setFormLearningValidityValue(e.target.value)} placeholder="12" min="1" step="1" className="h-8 text-xs w-20" />
+                    <span className="text-[12px] text-[#4e535a]">个月</span>
+                  </div>
+                </div>
                 {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">付费金额</span>
                   <Input type="number" value={formCourseAmount || ""} onChange={(e) => setFormCourseAmount(Number(e.target.value) || 0)} placeholder="输入金额" className="h-8 text-xs" />
@@ -1990,12 +2066,16 @@ export function UnifiedPaymentContent({
                     value={formNickname || ""}
                     onChange={(v) => {
                       const name = typeof v === "string" ? v : v[0] || ""
-                      if (!name) { setFormNickname(""); setFormCustomerId("") }
+                      if (!name) { setFormNickname(""); setFormCustomerId(""); setFormDealCourse(UNSET_DEAL_COURSE); setFormDealCourseName("") }
                     }}
-                    onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id) }}
+                    onSelectItem={(c) => { setFormNickname(c.nickname); setFormCustomerId(c.id); setFormDealCourse(UNSET_DEAL_COURSE); setFormDealCourseName("") }}
                     disabled={!!editingItem}
                     placeholder="搜索姓名或昵称"
                   />
+                </div>
+                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                  <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交课程</span>
+                  <PaymentCourseSelect date={formDealDate} customerId={formCustomerId} value={formDealCourse} name={formDealCourseName} onChange={(key, name) => { setFormDealCourse(key); setFormDealCourseName(name) }} />
                 </div>
                 {!hidePaymentDetails && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">费用</span>

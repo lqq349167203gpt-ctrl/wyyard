@@ -20,11 +20,13 @@ ExportRangeType = Literal["day", "month", "year", "custom"]
 
 
 @router.get("/course-options")
-def payment_course_options(request: Request, date: str):
+def payment_course_options(request: Request, date: str, customer_id: str = ""):
     from app.services.payment_course_service import course_options
 
     customer_access_service.require_transaction_access(request, detail=True)
-    return course_options(date, request)
+    if customer_id:
+        customer_access_service.require_customer_scope(request, customer_id)
+    return course_options(date, request, customer_id)
 
 
 @router.get("/records")

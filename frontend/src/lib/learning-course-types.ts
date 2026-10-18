@@ -14,6 +14,6 @@ export const LEARNING_PAYMENT_TYPES: Record<string, {
   duration_type: "month", duration_value: item.duration_months,
 }]))
 export const LEARNING_PAYMENT_OPTIONS = LEARNING_CATALOG.map((item, index) => ({
-  value: item.payment_name, label: `${item.payment_name}（${durationLabel(item.duration_months)}）`,
+  value: item.payment_name, label: item.payment_name,
   groupLabel: item.legacy && !LEARNING_CATALOG[index - 1]?.legacy ? BUSINESS_LABELS.legacy_learning : undefined,
 }))

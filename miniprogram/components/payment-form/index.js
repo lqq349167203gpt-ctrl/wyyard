@@ -1,6 +1,6 @@
 const { paymentApi, customerApi, organizationApi } = require('../../utils/api')
 const { beginRead, disposeReads } = require('../../utils/read-scope')
-const { CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES } = require('../../utils/payment-types')
+const { CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES, offlineCourseDefaultMonths } = require('../../utils/payment-types')
 
 const { LEARNING_PAYMENT_TYPES: COURSE_TYPES } = require('../../utils/learning-course-types')
 
@@ -71,6 +71,18 @@ function calculateExpiryDate(effectiveDate, durationType, durationValue) {
   return formatLocalDate(expiry)
 }
 
+function learningValidityMonths(effectiveDate, expiryDate, stored) {
+  const storedMonths = parseInt(stored)
+  if (Number.isFinite(storedMonths) && storedMonths > 0) return String(storedMonths)
+  const expiry = expiryDate ? String(expiryDate).slice(0, 10) : ''
+  if (effectiveDate && expiry) {
+    for (let months = 1; months <= 120; months += 1) {
+      if (calculateExpiryDate(effectiveDate, 'month', months) === expiry) return String(months)
+    }
+  }
+  return '12'
+}
+
 function getValidityDetails(type, formData) {
   let durationType = formData.duration_type || ''
   let durationValue = formData.duration_value
@@ -82,11 +94,8 @@ function getValidityDetails(type, formData) {
       durationValue = card.duration_value
     }
   } else if (type === 'internal_course') {
-    const course = COURSE_TYPES.find(item => item.key === formData.course_type)
-    if (course) {
-      durationType = course.duration_type
-      durationValue = course.duration_value
-    }
+    durationType = 'month'
+    durationValue = formData.validity_value || 12
   } else if (type === 'offline_course') {
     durationType = formData.validity_unit || 'month'
     durationValue = formData.validity_value || 1
@@ -124,8 +133,9 @@ Component({
     closerIdMap: {},
     hidePaymentDetails: true,
     formData: {},
-    dealCourseOptions: [{ key: '', name: '与课程无关' }],
+    dealCourseOptions: [{ key: '', name: '无' }],
     dealCourseIndex: 0,
+    dealCourseChosen: false,
     dealCourseLoading: false,
     dealCourseError: '',
     cardTypes: CARD_TYPES,
@@ -175,7 +185,7 @@ Component({
         this.setData({
           selectedCustomer: { id: customer.id, nickname: customer.nickname || '' },
           'formData.customer_id': customer.id,
-        })
+        }, () => this._loadDealCourses(this.data.formData.deal_date))
       }
     },
   },
@@ -201,14 +211,24 @@ Component({
   methods: {
     _loadDealCourses(date) {
       if (this.data.type === 'coarse_door_card') return
-      const isCurrent = beginRead(this, 'dealCourses', () => this.data.formData.deal_date === date)
-      this.setData({ dealCourseLoading: true, dealCourseError: '', dealCourseOptions: [{ key: '', name: '与课程无关' }], dealCourseIndex: 0 })
-      return paymentApi.courseOptions(date).then(items => {
+      const customerId = (this.data.selectedCustomer && this.data.selectedCustomer.id) || this.data.formData.customer_id || ''
+      const isCurrent = beginRead(this, 'dealCourses', () => this.data.formData.deal_date === date && ((this.data.selectedCustomer && this.data.selectedCustomer.id) || '') === customerId)
+      if (!customerId) {
+        this.setData({ dealCourseLoading: false, dealCourseError: '', dealCourseOptions: [{ key: '', name: '无' }] })
+        return
+      }
+      this.setData({ dealCourseLoading: true, dealCourseError: '', dealCourseOptions: [{ key: '', name: '无' }] })
+      return paymentApi.courseOptions(date, customerId).then(items => {
         if (!isCurrent()) return
-        const options = [{ key: '', name: '与课程无关' }].concat(items || [])
+        const options = [{ key: '', name: '无' }].concat(items || [])
         const key = this.data.formData.deal_course_key || ''
         if (key && !options.some(item => item.key === key)) options.push({ key, name: this.data.formData.deal_course_name || '原成交课程（可重新选择）' })
-        this.setData({ dealCourseOptions: options, dealCourseIndex: Math.max(0, options.findIndex(item => item.key === key)), dealCourseLoading: false })
+        const index = options.findIndex(item => item.key === key)
+        this.setData({
+          dealCourseOptions: options,
+          dealCourseIndex: this.data.dealCourseChosen ? Math.max(0, index) : 0,
+          dealCourseLoading: false,
+        })
       }).catch(error => {
         if (isCurrent()) this.setData({ dealCourseLoading: false, dealCourseError: error.message || '课程加载失败' })
       })
@@ -218,7 +238,7 @@ Component({
       const index = Number(e.detail.value)
       const item = this.data.dealCourseOptions[index]
       if (!item) return
-      this.setData({ dealCourseIndex: index, 'formData.deal_course_key': item.key, 'formData.deal_course_name': item.key ? item.name : '' })
+      this.setData({ dealCourseChosen: true, dealCourseIndex: index, 'formData.deal_course_key': item.key, 'formData.deal_course_name': item.key ? item.name : '' })
     },
     _applyTypeDefaults(type) {
       if (!type || this.data.isEdit || this._defaultTypeInitialized === type) return
@@ -233,7 +253,10 @@ Component({
         if (initData.amount === undefined || initData.amount === '') initData.amount = '68'
       } else if (type === 'offline_course') {
         if (!initData.effective_date) initData.effective_date = today()
-        if (!initData.validity_value) initData.validity_value = initData.course_type === '商业落地三个月' ? '3' : initData.course_type === '商业落地一年' ? '12' : '1'
+        if (!initData.validity_value) initData.validity_value = String(offlineCourseDefaultMonths(initData.course_type))
+      } else if (type === 'internal_course') {
+        if (!initData.effective_date) initData.effective_date = today()
+        if (!initData.validity_value) initData.validity_value = '12'
       } else if (!initData.effective_date) {
         initData.effective_date = today()
       }
@@ -263,7 +286,7 @@ Component({
         return [
           { label: '成交日期', value: formData.deal_date || '-' },
           { label: '用户', value: selectedCustomer ? selectedCustomer.nickname : '-' },
-          { label: '课程所属', value: courseOrganization ? courseOrganization.name : '-' },
+          { label: '成交课程', value: courseOrganization ? courseOrganization.name : '-' },
           { label: '所扣课程', value: course ? course._label : '-' },
           { label: '抵扣次数', value: course ? `${course.deduction_count}次` : '-' },
           { label: '成交归属', value: settlementOrganization ? settlementOrganization.name : '-' },
@@ -274,7 +297,7 @@ Component({
       const hidePaymentDetails = true
       const rows = [
         { label: '成交日期', value: formData.deal_date || '-' },
-        { label: '成交课程', value: formData.deal_course_name || '与课程无关' },
+        { label: '成交课程', value: this.data.dealCourseChosen ? (formData.deal_course_name || '无') : '未填' },
         { label: '用户', value: selectedCustomer ? selectedCustomer.nickname : '-' },
       ]
       let amountRow = { label: '付费金额', value: '¥' + formatMoney(this._getFeeAmount()) }
@@ -434,6 +457,8 @@ Component({
         notes: d.notes ?? '',
         diagnosis_duration: d.diagnosis_duration ?? 1,
         quantity: d.quantity ?? '1',
+        validity_value: d.validity_value ?? '',
+        validity_unit: d.validity_unit ?? 'month',
       }
       const type = this.data.type
       this.setData({ ohReadingTypeIndex: OH_READING_TYPES.indexOf(d.reading_type) })
@@ -453,6 +478,7 @@ Component({
           fd.price = fd.price ?? COURSE_TYPES[idx].price
           this.setData({ courseTypeIndex: idx })
         }
+        fd.validity_value = learningValidityMonths(fd.effective_date, d.expiry_date, fd.validity_value)
       }
       if (fd.duration_type) {
         const idx = DURATION_TYPES.findIndex(dt => dt.key === fd.duration_type)
@@ -507,7 +533,8 @@ Component({
 
       this.setData({
         formData: fd,
-        dealCourseIndex: Math.max(0, this.data.dealCourseOptions.findIndex(item => item.key === fd.deal_course_key)),
+        dealCourseChosen: true,
+        dealCourseIndex: Math.max(0, this.data.dealCourseOptions.findIndex(item => item.key === (fd.deal_course_key || ''))),
         selectedCustomer: d.nickname ? { id: d.customer_id, nickname: d.nickname } : null,
         closers,
         closerTotal,
@@ -556,7 +583,13 @@ Component({
       const { id, nickname } = e.currentTarget.dataset
       const field = this.data.pickerField
       if (field === 'customer') {
-        this.setData({ selectedCustomer: { id, nickname }, 'formData.customer_id': id })
+        this.setData({
+          selectedCustomer: { id, nickname },
+          'formData.customer_id': id,
+          dealCourseChosen: false,
+          'formData.deal_course_key': '',
+          'formData.deal_course_name': '',
+        }, () => this._loadDealCourses(this.data.formData.deal_date))
         this.onPickerClose()
         if (this.data.type === 'coarse_door_card') this._loadCoarseDoorOptions(id)
       } else {
@@ -604,6 +637,9 @@ Component({
           selectedCustomer: null,
           coarseOptionsLoading: false,
           'formData.customer_id': '',
+          dealCourseChosen: false,
+          'formData.deal_course_key': '',
+          'formData.deal_course_name': '',
           coarseCourseOrganizations: [],
           coarseCourseOrganizationIndex: -1,
           coarseCourses: [],
@@ -645,6 +681,7 @@ Component({
         updates['formData.deal_course_key'] = ''
         updates['formData.deal_course_name'] = ''
         updates.dealCourseIndex = 0
+        updates.dealCourseChosen = false
       }
       this.setData(updates)
     },
@@ -702,7 +739,7 @@ Component({
       this.setData({
         offlineCourseTypeIndex: index,
         'formData.course_type': courseType,
-        'formData.validity_value': courseType === '商业落地三个月' ? '3' : courseType === '商业落地一年' ? '12' : '1',
+        'formData.validity_value': String(offlineCourseDefaultMonths(courseType)),
       })
     },
 
@@ -717,8 +754,7 @@ Component({
         courseTypeIndex: idx,
         'formData.course_type': ct.key,
         'formData.price': ct.price,
-        'formData.duration_type': ct.duration_type,
-        'formData.duration_value': ct.duration_value,
+        'formData.validity_value': '12',
       })
       const dtIdx = DURATION_TYPES.findIndex(dt => dt.key === ct.duration_type)
       if (dtIdx >= 0) this.setData({ durationTypeIndex: dtIdx })
@@ -727,7 +763,16 @@ Component({
     onOhReadingTypeChange(e) {
       const index = Number(e.detail.value)
       if (!OH_READING_TYPES[index]) return
-      this.setData({ ohReadingTypeIndex: index, 'formData.reading_type': OH_READING_TYPES[index] })
+      const readingType = OH_READING_TYPES[index]
+      const updates = { ohReadingTypeIndex: index, 'formData.reading_type': readingType }
+      if (readingType === '余老师情感类' || readingType === '余老师商业梳理') {
+        const teacherIndex = this.data.diagnosisTeachers.findIndex(item => item.nickname === '余墨')
+        if (teacherIndex >= 0) {
+          updates.diagnosisTeacherIndex = teacherIndex
+          updates['formData.diagnosis_teacher'] = '余墨'
+        }
+      }
+      this.setData(updates)
     },
 
     onDurationTypeChange(e) {
@@ -803,6 +848,12 @@ Component({
           payload.validity_value,
         ) || undefined
       }
+      if (type === 'internal_course') {
+        payload.validity_value = parseInt(payload.validity_value) || 12
+        if (payload.effective_date) {
+          payload.expiry_date = calculateExpiryDate(payload.effective_date, 'month', payload.validity_value) || undefined
+        }
+      }
       if (isEdit) {
         if (type === 'membership_card' || type === 'other') {
           // 卡类型变更时保留 remaining_count（后端允许），否则删除（由流水派生）
@@ -816,7 +867,7 @@ Component({
         }
       }
       const floatFields = ['price', 'amount', 'fee']
-      const intFields = ['purchase_count', 'duration_value', 'remaining_count', 'total_count', 'diagnosis_duration']
+      const intFields = ['purchase_count', 'duration_value', 'remaining_count', 'total_count', 'diagnosis_duration', 'validity_value']
       floatFields.forEach(f => {
         if (payload[f] !== '' && payload[f] !== undefined && payload[f] !== null) {
           payload[f] = parseFloat(payload[f])
@@ -863,13 +914,17 @@ Component({
         wx.showToast({ title: '请选择用户', icon: 'none' })
         return
       }
+      if (type !== 'coarse_door_card' && !this.data.dealCourseChosen) {
+        wx.showToast({ title: '请选择成交课程', icon: 'none' })
+        return
+      }
       if (type === 'coarse_door_card') {
         if (this.data.orgIndex < 0) {
           wx.showToast({ title: '请选择成交归属', icon: 'none' })
           return
         }
         if (this.data.coarseCourseOrganizationIndex < 0) {
-          wx.showToast({ title: '请选择课程所属', icon: 'none' })
+          wx.showToast({ title: '请选择成交课程', icon: 'none' })
           return
         }
         if (this.data.coarseCourseIndex < 0) {

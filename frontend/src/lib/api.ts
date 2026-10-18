@@ -1643,9 +1643,32 @@ export interface GroupCaseCreate {
   expiry_date?: string | null
 }
 
+interface PaymentListParams {
+  customer_ids?: string
+  nickname?: string
+  closer_name?: string
+  organization_id?: string
+  deal_course_key?: string
+  include_filter_options?: string
+  subtypes?: string
+  card_type?: string
+  course_type?: string
+  reading_type?: string
+}
+
+function paymentListQuery(page: number, pageSize: number, params?: PaymentListParams) {
+  const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value) query.set(key, value)
+    }
+  }
+  return query
+}
+
 export const groupCaseApi = {
   list: () => request<GroupCase[]>("/api/group-cases"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<GroupCase>>(`/api/group-cases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<GroupCase>>(`/api/group-cases?${paymentListQuery(page, pageSize, params)}`),
   create: (data: GroupCaseCreate) => request<GroupCase>("/api/group-cases", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<GroupCaseCreate>) => request<GroupCase>(`/api/group-cases/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/group-cases/${id}`, { method: "DELETE" }),
@@ -1762,14 +1785,11 @@ export interface OhCardReadingCreate {
 
 export const ohCardReadingApi = {
   list: () => request<OhCardReading[]>("/api/oh-card-readings"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; reading_type?: string; subtypes?: string }) => {
-    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (params?.customer_ids) query.set("customer_ids", params.customer_ids)
-    if (params?.nickname) query.set("nickname", params.nickname)
-    if (params?.closer_name) query.set("closer_name", params.closer_name)
-    const subtypes = params?.subtypes || (params?.reading_type ? JSON.stringify([params.reading_type]) : "")
-    if (subtypes) query.set("subtypes", subtypes)
-    return request<PaginatedResponse<OhCardReading>>(`/api/oh-card-readings?${query}`)
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => {
+    const next: PaymentListParams = { ...params }
+    if (!next.subtypes && next.reading_type) next.subtypes = JSON.stringify([next.reading_type])
+    delete next.reading_type
+    return request<PaginatedResponse<OhCardReading>>(`/api/oh-card-readings?${paymentListQuery(page, pageSize, next)}`)
   },
   create: (data: OhCardReadingCreate) => request<OhCardReading>("/api/oh-card-readings", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<OhCardReadingCreate>) => request<OhCardReading>(`/api/oh-card-readings/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -1811,7 +1831,7 @@ export interface TeaSeatFeeCreate {
 
 export const teaSeatFeeApi = {
   list: () => request<TeaSeatFee[]>("/api/tea-seat-fees"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<TeaSeatFee>>(`/api/tea-seat-fees?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<TeaSeatFee>>(`/api/tea-seat-fees?${paymentListQuery(page, pageSize, params)}`),
   create: (data: TeaSeatFeeCreate) => request<TeaSeatFee>("/api/tea-seat-fees", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<TeaSeatFeeCreate>) => request<TeaSeatFee>(`/api/tea-seat-fees/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/tea-seat-fees/${id}`, { method: "DELETE" }),
@@ -1858,11 +1878,7 @@ export interface OfflineCourseCreate {
 
 export const offlineCourseApi = {
   list: () => request<OfflineCourse[]>("/api/offline-courses"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; course_type?: string; subtypes?: string }) => {
-    const qs = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (params) Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, v) })
-    return request<PaginatedResponse<OfflineCourse>>(`/api/offline-courses?${qs}`)
-  },
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<OfflineCourse>>(`/api/offline-courses?${paymentListQuery(page, pageSize, params)}`),
   create: (data: OfflineCourseCreate) =>
     request<OfflineCourse>("/api/offline-courses", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<OfflineCourseCreate>) =>
@@ -1907,7 +1923,7 @@ export interface EnergyKnotCreate {
 
 export const energyKnotApi = {
   list: () => request<EnergyKnot[]>("/api/energy-knots"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<EnergyKnot>>(`/api/energy-knots?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<EnergyKnot>>(`/api/energy-knots?${paymentListQuery(page, pageSize, params)}`),
   create: (data: EnergyKnotCreate) => request<EnergyKnot>("/api/energy-knots", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EnergyKnotCreate>) => request<EnergyKnot>(`/api/energy-knots/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/energy-knots/${id}`, { method: "DELETE" }),
@@ -1950,7 +1966,7 @@ export interface EmotionalReleaseCreate {
 
 export const emotionalReleaseApi = {
   list: () => request<EmotionalRelease[]>("/api/emotional-releases"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<EmotionalRelease>>(`/api/emotional-releases?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<EmotionalRelease>>(`/api/emotional-releases?${paymentListQuery(page, pageSize, params)}`),
   create: (data: EmotionalReleaseCreate) => request<EmotionalRelease>("/api/emotional-releases", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<EmotionalReleaseCreate>) => request<EmotionalRelease>(`/api/emotional-releases/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/emotional-releases/${id}`, { method: "DELETE" }),
@@ -2177,6 +2193,7 @@ export interface InternalCourse {
   course_type: string
   price: number
   effective_date: string
+  validity_value?: number | null
   expiry_date: string | null
   notes: string
   closer_id: string | null
@@ -2195,6 +2212,7 @@ export interface InternalCourseCreate {
   course_type: string
   price: number
   effective_date: string
+  validity_value?: number | null
   expiry_date?: string | null
   closer_id?: string | null
   closer_name?: string | null
@@ -2205,14 +2223,11 @@ export interface InternalCourseCreate {
 
 export const internalCourseApi = {
   list: () => request<InternalCourse[]>("/api/internal-courses"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; course_type?: string; subtypes?: string }) => {
-    const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (params?.customer_ids) query.set("customer_ids", params.customer_ids)
-    if (params?.nickname) query.set("nickname", params.nickname)
-    if (params?.closer_name) query.set("closer_name", params.closer_name)
-    const subtypes = params?.subtypes || (params?.course_type ? JSON.stringify([params.course_type]) : "")
-    if (subtypes) query.set("subtypes", subtypes)
-    return request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?${query}`)
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => {
+    const next: PaymentListParams = { ...params }
+    if (!next.subtypes && next.course_type) next.subtypes = JSON.stringify([next.course_type])
+    delete next.course_type
+    return request<PaginatedResponse<InternalCourse>>(`/api/internal-courses?${paymentListQuery(page, pageSize, next)}`)
   },
   create: (data: InternalCourseCreate) => request<InternalCourse>("/api/internal-courses", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<InternalCourseCreate>) => request<InternalCourse>(`/api/internal-courses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -2266,7 +2281,7 @@ export interface MembershipCardCreate {
 
 export const membershipCardApi = {
   list: () => request<MembershipCard[]>("/api/membership-cards"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string; card_type?: string; subtypes?: string }) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}${params?.card_type ? `&card_type=${encodeURIComponent(params.card_type)}` : ""}${params?.subtypes ? `&subtypes=${encodeURIComponent(params.subtypes)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<MembershipCard>>(`/api/membership-cards?${paymentListQuery(page, pageSize, params)}`),
   create: (data: MembershipCardCreate) => request<MembershipCard>("/api/membership-cards", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<MembershipCardCreate>) => request<MembershipCard>(`/api/membership-cards/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/membership-cards/${id}`, { method: "DELETE" }),
@@ -2340,7 +2355,7 @@ export interface OtherProjectCreate {
 
 export const otherProjectApi = {
   list: () => request<OtherProject[]>("/api/other-projects"),
-  listPaginated: (page: number, pageSize: number, params?: { customer_ids?: string; nickname?: string; closer_name?: string }) => request<PaginatedResponse<OtherProject>>(`/api/other-projects?page=${page}&page_size=${pageSize}${params?.customer_ids ? `&customer_ids=${params.customer_ids}` : ""}${params?.nickname ? `&nickname=${encodeURIComponent(params.nickname)}` : ""}${params?.closer_name ? `&closer_name=${encodeURIComponent(params.closer_name)}` : ""}`),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<OtherProject>>(`/api/other-projects?${paymentListQuery(page, pageSize, params)}`),
   create: (data: OtherProjectCreate) => request<OtherProject>("/api/other-projects", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<OtherProjectCreate>) => request<OtherProject>(`/api/other-projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/other-projects/${id}`, { method: "DELETE" }),
@@ -2504,7 +2519,7 @@ export interface PaymentExportParams {
 }
 
 export const paymentExportApi = {
-  courseOptions: (date: string) => request<Array<{ key: string; name: string; date: string }>>(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}`),
+  courseOptions: (date: string, customerId = "") => request<Array<{ key: string; name: string; date: string }>>(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}${customerId ? `&customer_id=${encodeURIComponent(customerId)}` : ""}`),
   records: (page: number, pageSize: number, nickname: string, closerName: string) =>
     request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
   download: async (params: PaymentExportParams) => {

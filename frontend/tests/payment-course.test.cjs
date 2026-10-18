@@ -15,8 +15,8 @@ function harness() {
         return new Promise((resolve, reject) => requests.push({ date, resolve, reject }))
       } } }
       if (name === '../../utils/read-scope') return require(path.join(root, 'miniprogram/utils/read-scope.js'))
-      if (name === '../../utils/payment-types') return { CARD_TYPES: [], OFFLINE_COURSE_TYPES: ['主理人训练', '商业落地三个月', '商业落地一年'], OH_READING_TYPES: [] }
-      if (name === '../../utils/learning-course-types') return { LEARNING_PAYMENT_TYPES: [] }
+      if (name === '../../utils/payment-types') return require(path.join(root, 'miniprogram/utils/payment-types.js'))
+      if (name === '../../utils/learning-course-types') return { LEARNING_PAYMENT_TYPES: [{ key: 'OH卡技能梳理', label: 'OH卡技能梳理', price: 0, duration_type: 'month', duration_value: 24 }] }
       throw new Error(name)
     },
   })
@@ -36,11 +36,28 @@ test('线下落地课程按类型带出默认月份，编辑已存有效期不�
   instance.onOfflineCourseTypeChange({ detail: { value: '2' } })
   assert.equal(instance.data.formData.validity_value, '12')
   instance.onOfflineCourseTypeChange({ detail: { value: '0' } })
-  assert.equal(instance.data.formData.validity_value, '1')
+  assert.equal(instance.data.formData.validity_value, '3')
+  instance.data.formData = { course_type: '主理人训练' }
+  instance._applyTypeDefaults('offline_course')
+  assert.equal(instance.data.formData.validity_value, '3')
   instance.data.isEdit = true
   instance.data.formData = { course_type: '商业落地一年', validity_value: 6 }
   instance._applyTypeDefaults('offline_course')
   assert.equal(instance.data.formData.validity_value, 6)
+})
+
+test('沙龙技能学习默认一年，填写的月数按落地课程同一算法得到结束日', () => {
+  const { instance } = harness()
+  instance.data.type = 'internal_course'
+  instance.onCourseTypeChange({ detail: { value: '0' } })
+  assert.equal(instance.data.formData.validity_value, '12')
+  instance.data.formData.effective_date = '2026-10-18'
+  instance.data.formData.validity_value = '3'
+  const rows = instance._buildConfirmRows()
+  assert.equal(rows.find(row => row.label === '有效期').value, '3个月')
+  assert.equal(rows.find(row => row.label === '结束日期').value, '2027-01-17')
+  instance._populateEditData({ course_type: 'OH卡技能梳理', effective_date: '2026-10-18', expiry_date: '2028-10-17', price: 0 })
+  assert.equal(instance.data.formData.validity_value, '24')
 })
 
 test('成交日期切换会清空旧选择；旧课程请求不能覆盖新日期', async () => {

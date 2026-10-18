@@ -1,7 +1,8 @@
 import pytest
+
 from app.models.custom_analysis import AnalysisCondition
 from app.models.member_identity import IdentityCondition
-from app.services import activity_permission_service, internal_course_service
+from app.services import activity_permission_service
 from app.utils.learning_course_types import LEARNING_COURSE_TYPES, LEGACY_PAYMENT_COURSE_TYPES
 from app.utils.payment_types import OH_READING_TYPES
 
@@ -21,10 +22,29 @@ def test_learning_course_default_year(client, created_customer, course_type):
     assert updated.json()["expiry_date"] == course["expiry_date"]
 
 
-def test_legacy_course_names_and_validity_unchanged():
-    assert [internal_course_service._calc_expiry("2026-10-18", name) for name in LEGACY_PAYMENT_COURSE_TYPES] == [
-        "2027-10-17", "2027-01-17", "2028-10-17",
-    ]
+def test_learning_validity_defaults_to_one_year_and_accepts_custom_months(client, created_customer):
+    created = []
+    for course_type in LEGACY_PAYMENT_COURSE_TYPES:
+        response = client.post("/api/internal-courses", json={
+            "customer_id": created_customer["id"], "nickname": created_customer["nickname"],
+            "course_type": course_type, "price": 0, "effective_date": "2026-10-18",
+        })
+        assert response.status_code == 200, response.text
+        created.append(response.json())
+        assert response.json()["validity_value"] == 12
+        assert response.json()["expiry_date"] == "2027-10-17"
+    custom = client.post("/api/internal-courses", json={
+        "customer_id": created_customer["id"], "nickname": created_customer["nickname"],
+        "course_type": LEGACY_PAYMENT_COURSE_TYPES[0], "price": 0,
+        "effective_date": "2026-10-18", "validity_value": 3,
+    })
+    assert custom.status_code == 200, custom.text
+    assert custom.json()["expiry_date"] == "2027-01-17"
+    shifted = client.patch(f"/api/internal-courses/{created[0]['id']}", json={"effective_date": "2026-11-18"})
+    assert shifted.status_code == 200, shifted.text
+    assert shifted.json()["validity_value"] == 12
+    assert shifted.json()["expiry_date"] == "2027-11-17"
+    assert client.patch(f"/api/internal-courses/{custom.json()['id']}", json={"validity_value": 0}).status_code == 400
 
 
 def test_old_permission_and_filter_names_compatible():

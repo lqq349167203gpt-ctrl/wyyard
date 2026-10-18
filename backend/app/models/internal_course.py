@@ -10,6 +10,7 @@ class InternalCourseBase(PaymentCourseFields):
     course_type: str
     price: float
     effective_date: str
+    validity_value: Optional[int] = None  # 有效期月数；历史记录为空时仍以到期日为准
     expiry_date: Optional[str] = None
     closer_id: Optional[str] = None
     closer_name: Optional[str] = None

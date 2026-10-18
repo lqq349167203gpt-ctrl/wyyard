@@ -64,7 +64,17 @@ def fill_course_organizations(items: list[dict]) -> None:
         item["deal_course_organization_name"] = resolved[key]
 
 
-def course_options(day: str, request=None) -> list[dict]:
+def _attended(row: dict, customer_id: str) -> bool:
+    """当天仍在参与名单里的人，退出的场次不算。"""
+    for participant in row.get("participants") or []:
+        if participant.get("id") == customer_id and not participant.get("withdrawn"):
+            return True
+    owner_id = str(row.get("owner_id") or "")
+    withdrawn = set(row.get("withdrawn_participant_ids") or [])
+    return bool(owner_id) and owner_id == customer_id and owner_id not in withdrawn
+
+
+def course_options(day: str, request=None, customer_id: str = "") -> list[dict]:
     from app.api.class_records import read_day_courses
 
     try:
@@ -80,6 +90,8 @@ def course_options(day: str, request=None) -> list[dict]:
     options = []
     for field, source, fallback in sources:
         for row in data.get(field, []):
+            if customer_id and not _attended(row, customer_id):
+                continue
             name = row.get("activity_name") or row.get("course_name") or row.get("name") or fallback
             label = " · ".join(str(value) for value in (row.get("start_time"), name, row.get("space_name"), row.get("room_name")) if value)
             options.append({"key": f"{source}:{row['id']}", "name": label, "date": day})
@@ -100,9 +112,10 @@ def normalize_course(data, existing=None, request=None) -> None:
     name = ""
     if key:
         day = incoming.get("deal_date", current.get("deal_date", current.get("deduction_date", "")))
-        option = next((item for item in course_options(day, request) if item["key"] == key), None)
+        customer_id = str(incoming.get("customer_id") or current.get("customer_id") or "")
+        option = next((item for item in course_options(day, request, customer_id) if item["key"] == key), None)
         if not option:
-            raise HTTPException(400, "成交课程不属于所选成交日期，请重新选择或选择与课程无关")
+            raise HTTPException(400, "请选择该用户当天参与的活动，或选择无")
         name = option["name"]
     for field, value in (("deal_course_key", key), ("deal_course_name", name)):
         if isinstance(data, dict):

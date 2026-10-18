@@ -119,6 +119,22 @@ def test_options_only_contain_deal_day_and_require_permission(client, deal_cours
     assert client.get("/api/payment-exports/course-options", params={"date": DAY}).status_code == 403
 
 
+def test_customer_course_options_only_include_attended_activities(monkeypatch):
+    from app.api import class_records
+
+    fields = ["class_records", "gcs_sessions", "ers_sessions", "eks_sessions", "ics_sessions"]
+    rows = {field: [] for field in fields}
+    rows["class_records"] = [
+        {"id": "joined", "name": "参加了", "start_time": "10:00", "participants": [{"id": "c1", "withdrawn": False}]},
+        {"id": "other", "name": "别人的", "start_time": "11:00", "participants": [{"id": "c2", "withdrawn": False}]},
+        {"id": "left", "name": "已退出", "start_time": "12:00", "participants": [{"id": "c1", "withdrawn": True}]},
+    ]
+    monkeypatch.setattr(class_records, "read_day_courses", lambda *args, **kwargs: (rows, set()))
+    attended = payment_course_service.course_options(DAY, customer_id="c1")
+    assert [item["key"] for item in attended] == ["class_record:joined"]
+    assert len(payment_course_service.course_options(DAY)) == 3
+
+
 def test_course_sources_with_same_id_are_distinct(monkeypatch):
     from app.api import class_records
 

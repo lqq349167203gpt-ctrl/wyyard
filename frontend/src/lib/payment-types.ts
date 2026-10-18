@@ -2,6 +2,12 @@ import { MEMBERSHIP_CATALOG } from "./business-catalog-data"
 
 export { OFFLINE_COURSE_TYPES, OH_READING_TYPES } from "./business-catalog-data"
 
+export function offlineCourseDefaultMonths(courseType: string): number {
+  if (courseType === "主理人训练" || courseType === "商业落地三个月") return 3
+  if (courseType === "商业落地一年") return 12
+  return 1
+}
+
 export function durationLabel(months: number): string {
   return months % 12 === 0 ? `${months / 12} 年` : `${months} 个月`
 }

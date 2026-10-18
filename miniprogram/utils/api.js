@@ -803,7 +803,7 @@ function _projectApi(basePath) {
 }
 
 const paymentApi = {
-  courseOptions: (date) => request(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}`),
+  courseOptions: (date, customerId) => request(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}${customerId ? `&customer_id=${encodeURIComponent(customerId)}` : ''}`),
   membershipCards: _projectApi('/api/membership-cards'),
   groupCases: _projectApi('/api/group-cases'),
   emotionalReleases: _projectApi('/api/emotional-releases'),

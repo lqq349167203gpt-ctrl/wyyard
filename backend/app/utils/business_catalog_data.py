@@ -4,8 +4,8 @@ BUSINESS_LABELS = {'learning': '沙龙技能学习', 'legacy_learning': '过往�
 
 MEMBERSHIP_CATALOG = [{'name': '次卡', 'price': 198, 'count': 1, 'duration_months': 1},
  {'name': '体验会员', 'price': 398, 'count': 4, 'duration_months': 1},
- {'name': '30次卡', 'price': 3999, 'count': 30, 'duration_months': 12},
- {'name': '60次卡', 'price': 5999, 'count': 60, 'duration_months': 12},
+ {'name': '30次卡', 'price': 3999, 'count': 30, 'duration_months': 1},
+ {'name': '60次卡', 'price': 5999, 'count': 60, 'duration_months': 6},
  {'name': '定制化', 'price': 0, 'count': None, 'duration_months': None}]
 
 LEARNING_CATALOG = [{'activity_name': 'OH卡技能梳理',

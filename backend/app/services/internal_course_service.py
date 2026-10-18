@@ -1,13 +1,15 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from dateutil.relativedelta import relativedelta
+from fastapi import HTTPException
 
 from app.models.internal_course import InternalCourse, InternalCourseCreate
 from app.services import customer_service
 from app.services.storage import load_data, save_data, save_item
-from app.utils.learning_course_types import COURSE_DURATION_MONTHS
+
+DEFAULT_LEARNING_MONTHS = 12
 
 FILENAME = "internal_courses.json"
 _courses: Dict[str, InternalCourse] = {}
@@ -40,17 +42,39 @@ def _save(item_id: str = ""):
 _load()
 
 
-def _calc_expiry(effective_date: str, course_type: str) -> Optional[str]:
-    """根据课程类型自动计算到期日期"""
-    months = COURSE_DURATION_MONTHS.get(course_type)
-    if not months:
+def _positive_months(value, fallback: int = DEFAULT_LEARNING_MONTHS) -> int:
+    if value is None or value == "":
+        return fallback
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise HTTPException(status_code=400, detail="有效期须为正整数月")
+    return value
+
+
+def _calc_expiry(effective_date: str, months: int) -> Optional[str]:
+    """按自然月计算到期日，与线下落地课程同一天算法：生效日加月数再减一天。"""
+    if not effective_date or not months or months <= 0:
         return None
     try:
         start = datetime.strptime(effective_date, "%Y-%m-%d")
-        end = start + relativedelta(months=months) - relativedelta(days=1)
-        return end.strftime("%Y-%m-%d")
     except ValueError:
         return None
+    end = start + relativedelta(months=months) - relativedelta(days=1)
+    return end.strftime("%Y-%m-%d")
+
+
+def _months_between(effective_date: str, expiry_date: str) -> Optional[int]:
+    """从已保存的起止日反推月数，避免旧记录在未改有效期时被默认成一年。"""
+    if not effective_date or not expiry_date:
+        return None
+    try:
+        start = datetime.strptime(effective_date, "%Y-%m-%d")
+        end = datetime.strptime(expiry_date, "%Y-%m-%d") + timedelta(days=1)
+    except ValueError:
+        return None
+    months = (end.year - start.year) * 12 + (end.month - start.month)
+    if months > 0 and start + relativedelta(months=months) == end:
+        return months
+    return None
 
 
 def list_courses() -> List[InternalCourse]:
@@ -90,9 +114,9 @@ def get_course(course_id: str) -> Optional[InternalCourse]:
 def create_course(data: InternalCourseCreate) -> InternalCourse:
     now = datetime.now(timezone.utc)
     course_data = data.model_dump()
-    course_data["expiry_date"] = _calc_expiry(
-        course_data["effective_date"], course_data["course_type"]
-    )
+    months = _positive_months(course_data.get("validity_value"))
+    course_data["validity_value"] = months
+    course_data["expiry_date"] = _calc_expiry(course_data["effective_date"], months)
     course = InternalCourse(
         id=str(uuid.uuid4())[:12],
         created_at=now,
@@ -110,12 +134,20 @@ def update_course(course_id: str, data: dict) -> Optional[InternalCourse]:
     course = _courses.get(course_id)
     if not course or course.is_deleted:
         return None
-    recalculate_expiry = any(key in data and data[key] != getattr(course, key) for key in ("effective_date", "course_type"))
+    previous_effective = course.effective_date
+    previous_expiry = course.expiry_date or ""
+    date_changed = "effective_date" in data and data["effective_date"] != course.effective_date
+    validity_changed = "validity_value" in data and data["validity_value"] != course.validity_value
     for key, value in data.items():
         if hasattr(course, key) and key not in ("id", "created_at", "created_by", "is_deleted", "deleted_at", "expiry_date"):
             setattr(course, key, value)
-    if recalculate_expiry:
-        course.expiry_date = _calc_expiry(course.effective_date, course.course_type)
+    if date_changed or validity_changed:
+        months = _positive_months(
+            course.validity_value,
+            _months_between(previous_effective, previous_expiry) or DEFAULT_LEARNING_MONTHS,
+        )
+        course.validity_value = months
+        course.expiry_date = _calc_expiry(course.effective_date, months)
     course.updated_at = datetime.now(timezone.utc)
     _courses[course_id] = course
     _save(course_id)

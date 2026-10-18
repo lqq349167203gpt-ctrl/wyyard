@@ -891,6 +891,76 @@ def test_unlimited_card_usage_keeps_card_name(client, created_customer):
     client.delete(f"/api/membership-cards/{card['id']}")
 
 
+def test_earlier_expiring_count_card_is_consumed_before_later_unlimited(client, created_customer):
+    """先到期的次数卡要先用完。后发生的活动不能占住它，把更早、只有这张卡能扣的活动留成欠卡。"""
+    from app.services import membership_card_service
+
+    count_card = client.post("/api/membership-cards", json={
+        "customer_id": created_customer["id"],
+        "nickname": created_customer["nickname"],
+        "card_type": "体验会员",
+        "price": 398,
+        "effective_date": "2026-10-01",
+        "duration_type": "month",
+        "duration_value": 1,
+        "total_count": 2,
+        "remaining_count": 2,
+    })
+    assert count_card.status_code == 200
+    unlimited_card = client.post("/api/membership-cards", json={
+        "customer_id": created_customer["id"],
+        "nickname": created_customer["nickname"],
+        "card_type": "测试不限次卡",
+        "price": 1000,
+        "effective_date": "2026-10-10",
+        "duration_type": "month",
+        "duration_value": 1,
+        "total_count": None,
+        "remaining_count": None,
+        "agreement_status": "unsigned",
+    })
+    assert unlimited_card.status_code == 200, unlimited_card.text
+
+    activities = []
+    for index, activity_date in enumerate(("2026-10-20", "2026-10-20", "2026-10-05")):
+        activity = client.post("/api/class-records", json={
+            "date": activity_date,
+            "course_id": f"test-expiry-order-{index}",
+            "course_name": f"到期顺序测试{index}",
+            "participant_ids": [created_customer["id"]],
+        })
+        assert activity.status_code == 200
+        activities.append(activity.json())
+    visits = []
+    for activity_date in ("2026-10-20", "2026-10-05"):
+        visit = client.post("/api/visits", json={
+            "visit_date": activity_date,
+            "customer_id": created_customer["id"],
+            "arrived": True,
+        })
+        assert visit.status_code == 200
+        visits.append(visit.json())
+
+    usage = {
+        item["key"]: item
+        for item in membership_card_service.list_activity_usage_records(created_customer["id"])
+    }
+    early = usage[f"class:{activities[2]['id']}"]
+    later = [usage[f"class:{activity['id']}"] for activity in activities[:2]]
+    assert early["card_id"] == count_card.json()["id"]
+    assert early["benefit_type"] == "count_card"
+    assert sum(item["card_id"] == count_card.json()["id"] for item in later) == 1
+    assert sum(item["card_id"] == unlimited_card.json()["id"] for item in later) == 1
+    assert membership_card_service.get_debt(created_customer["id"]) == 0
+
+    for visit in visits:
+        client.patch(f"/api/visits/{visit['id']}", json={"arrived": False})
+    for activity in activities:
+        client.delete(f"/api/class-records/{activity['id']}")
+    client.delete(f"/api/membership-cards/{count_card.json()['id']}")
+    client.delete(f"/api/membership-cards/{unlimited_card.json()['id']}")
+
+
 def test_membership_card_has_priority_over_internal_course(client, created_customer):
     from app.services import membership_card_service
 

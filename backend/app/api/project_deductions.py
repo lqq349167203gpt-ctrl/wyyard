@@ -5,6 +5,12 @@ from app.models.payment_course import PaymentCourseFields
 from app.models.project_deduction import ProjectDeductionCreate
 from app.services import customer_access_service, customer_service, project_deduction_service
 from app.utils.pagination import paginate
+from app.utils.payment_list import (
+    coarse_door_scope_filter_options,
+    matches_coarse_door_scope,
+    matches_payment_scope,
+    scope_filter_options,
+)
 from app.utils.record_ownership import ensure_payment_record_manager, get_request_actor
 
 router = APIRouter(prefix="/api/project-deductions", tags=["project-deductions"])
@@ -110,19 +116,35 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
 @router.get("")
 def list_deductions(request: Request, customer_id: str | None = Query(None), nickname: str | None = Query(None), project_type: str | None = Query(None), card_type: str | None = Query(None), page: int | None = Query(None, ge=1), page_size: int | None = Query(None, ge=1, le=100), manual_only: bool = Query(False)):
     customer_access_service.require_transaction_access(request, detail=True)
-    items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id, nickname, project_type, include_cancelled=True)]
+    # 昵称留到课程选项生成之后再筛，下拉框才能看到该卡类型下的全部成交课程。
+    items = [d.model_dump(mode="json") for d in project_deduction_service.list_deductions(customer_id, None, project_type, include_cancelled=True)]
     items = customer_access_service.filter_record_dicts(request, items)
     if manual_only:
         items = [i for i in items if i.get("project_name") != project_deduction_service.COARSE_DOOR_CARD_TYPE]
     if card_type:
         items = [i for i in items if i.get("project_name") == card_type]
+    coarse_door = card_type == project_deduction_service.COARSE_DOOR_CARD_TYPE
+    scope_options = None
+    if request.query_params.get("include_filter_options") == "true":
+        scope_options = coarse_door_scope_filter_options(items) if coarse_door else scope_filter_options(items)
+    if nickname:
+        keyword = nickname.lower()
+        items = [item for item in items if keyword in (item.get("nickname") or "").lower()]
+    organization_id = str(request.query_params.get("organization_id") or "").strip()
+    deal_course_key = str(request.query_params.get("deal_course_key") or "").strip()
+    if organization_id or deal_course_key:
+        matches = matches_coarse_door_scope if coarse_door else matches_payment_scope
+        items = [item for item in items if matches(item, organization_id, deal_course_key)]
     if card_type == project_deduction_service.COARSE_DOOR_CARD_TYPE:
         items.sort(
             key=lambda item: (item.get("deduction_date") or "", item.get("created_at") or ""),
             reverse=True,
         )
     if page is not None:
-        return paginate(items, page, page_size or 10)
+        result = paginate(items, page, page_size or 10)
+        if scope_options is not None:
+            result.update(scope_options)
+        return result
     return items
 
 

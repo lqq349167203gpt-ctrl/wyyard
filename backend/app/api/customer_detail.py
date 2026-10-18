@@ -990,6 +990,13 @@ def _build_activities(
     return activities
 
 
+def _times_text(count: int | None) -> str:
+    """交易记录的卡次数。没有次数表示不限次。"""
+    if count is None:
+        return "无限"
+    return f"{count}次"
+
+
 def _build_payment_records(customer_id: str, date: str | None = None) -> list:
     """构建收费记录: 返回扁平列表，每条记录包含类型、数量、价格、生效日期、到期日期、成交人"""
     records = []
@@ -1004,7 +1011,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": c.created_at.isoformat(),
             "type": "会员卡",
             "name": c.card_type,
-            "quantity": 1,
+            "quantity": _times_text(c.total_count),
             "amount": c.price,
             "deal_date": c.deal_date or "",
             "effective_date": c.effective_date,
@@ -1070,7 +1077,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": c.created_at.isoformat(),
             "type": "觉醒游戏",
             "name": "觉醒游戏",
-            "quantity": c.purchase_count,
+            "quantity": _times_text(c.purchase_count),
             "amount": c.amount,
             "deal_date": c.deal_date or "",
             "effective_date": c.effective_date or c.created_at.strftime("%Y-%m-%d"),
@@ -1090,7 +1097,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": r.created_at.isoformat(),
             "type": "情绪释放",
             "name": "情绪释放",
-            "quantity": r.purchase_count,
+            "quantity": _times_text(r.purchase_count),
             "amount": r.amount,
             "deal_date": r.deal_date or "",
             "effective_date": r.effective_date or r.created_at.strftime("%Y-%m-%d"),
@@ -1110,7 +1117,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": k.created_at.isoformat(),
             "type": "能量结",
             "name": "能量结",
-            "quantity": k.purchase_count,
+            "quantity": f"{k.purchase_count}个",
             "amount": k.amount,
             "deal_date": k.deal_date or "",
             "effective_date": k.effective_date or k.created_at.strftime("%Y-%m-%d"),
@@ -1130,7 +1137,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": c.created_at.isoformat(),
             "type": "沙龙技能学习",
             "name": c.course_type,
-            "quantity": 1,
+            "quantity": "无限",
             "amount": c.price,
             "deal_date": c.deal_date or "",
             "effective_date": c.effective_date,
@@ -1214,7 +1221,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "source_created_at": p.created_at.isoformat(),
             "type": "其他项目",
             "name": p.project_name,
-            "quantity": p.remaining_count if p.remaining_count is not None else "不限",
+            "quantity": _times_text(p.total_count if p.total_count is not None else p.remaining_count),
             "amount": p.fee,
             "deal_date": p.deal_date or "",
             "effective_date": p.effective_date,

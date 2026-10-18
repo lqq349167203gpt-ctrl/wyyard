@@ -47,11 +47,22 @@ def can_view_customer(role: str | Iterable[str], owner_name: str, customer: Any)
 
     owner = owner_name.strip()
     relations = permissions["relations"]
+    # 仅自己引流、仅自己承接都要能看到本人这条客户资料，不要求本人同时是自己的引流人或承接人。
+    if (relations["referrer"] or relations["referrer_handler"]) and _is_account_owner(owner, customer):
+        return True
     if relations["referrer"] and (getattr(customer, "referrer", "") or "").strip() == owner:
         return True
     if relations["referrer_handler"] and (getattr(customer, "referrer_handler", "") or "").strip() == owner:
         return True
     return False
+
+
+def _is_account_owner(owner: str, customer: Any) -> bool:
+    names = {
+        (getattr(customer, "nickname", "") or "").strip(),
+        (getattr(customer, "name", "") or "").strip(),
+    }
+    return owner in names
 
 
 def can_view_customer_for_request(request: Any, customer: Any) -> bool:

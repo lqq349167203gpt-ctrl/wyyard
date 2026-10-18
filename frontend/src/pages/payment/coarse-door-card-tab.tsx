@@ -27,6 +27,7 @@ import {
   type CustomerLight,
   type ProjectDeduction,
 } from "@/lib/api"
+import { PaymentScopeFilters, UNASSIGNED_COURSE } from "./payment-scope-filters"
 
 const EmptyValue = () => <span className="text-[#d0d3d6]">-</span>
 const today = new Date().toLocaleDateString("sv-SE")
@@ -60,6 +61,13 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
   const [courseOrganizations, setCourseOrganizations] = useState<{ id: string; name: string }[]>([])
   const [courses, setCourses] = useState<CoarseDoorCourseOption[]>([])
   const [records, setRecords] = useState<ProjectDeduction[]>([])
+  const [searchNickname, setSearchNickname] = useState("")
+  const [organizationFilter, setOrganizationFilter] = useState("all")
+  const [courseFilter, setCourseFilter] = useState("all")
+  const [dealCourseOptions, setDealCourseOptions] = useState<{ key: string; name: string }[]>([])
+  const [organizationOptions, setOrganizationOptions] = useState<{ id: string; name: string }[]>([])
+  const [includeUnassignedCourse, setIncludeUnassignedCourse] = useState(false)
+  const [listVersion, setListVersion] = useState(0)
   const [loadingOptions, setLoadingOptions] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
@@ -79,25 +87,51 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
     ))
   )
 
-  const loadRecords = async () => {
-    try {
-      const result = await projectDeductionApi.listPaginated(1, 100, {
-        project_type: "membership-cards",
-        card_type: "粗门次卡",
-      })
-      setRecords([...result.items].sort((a, b) => (
-        (b.deduction_date || b.created_at).localeCompare(a.deduction_date || a.created_at)
-        || b.created_at.localeCompare(a.created_at)
-      )))
-    } catch {
-      setRecords([])
-    }
-  }
-
   useEffect(() => {
     customerApi.light().then(setCustomers).catch(() => setCustomers([]))
-    if (!formOnly) loadRecords()
-  }, [formOnly])
+  }, [])
+
+  useEffect(() => {
+    if (formOnly) return
+    let active = true
+    const params: Record<string, string> = {
+      project_type: "membership-cards",
+      card_type: "粗门次卡",
+      include_filter_options: "true",
+    }
+    if (searchNickname) params.nickname = searchNickname
+    if (organizationFilter !== "all") params.organization_id = organizationFilter
+    if (courseFilter !== "all") params.deal_course_key = courseFilter
+    projectDeductionApi.listPaginated(1, 100, params)
+      .then(result => {
+        if (!active) return
+        const page = result as {
+          deal_course_options?: { key: string; name: string }[]
+          organization_options?: { id: string; name: string }[]
+          unassigned_course?: boolean
+        }
+        if (page.deal_course_options) setDealCourseOptions(page.deal_course_options)
+        if (page.organization_options) setOrganizationOptions(page.organization_options)
+        setIncludeUnassignedCourse(page.unassigned_course === true)
+        setRecords([...result.items].sort((a, b) => (
+          (b.deduction_date || b.created_at).localeCompare(a.deduction_date || a.created_at)
+          || b.created_at.localeCompare(a.created_at)
+        )))
+      })
+      .catch(() => { if (active) setRecords([]) })
+    return () => { active = false }
+  }, [formOnly, searchNickname, organizationFilter, courseFilter, listVersion])
+
+  useEffect(() => {
+    if (formOnly) return
+    if (organizationFilter !== "all" && !organizationOptions.some(org => org.id === organizationFilter)) {
+      setOrganizationFilter("all")
+    }
+    if (courseFilter === UNASSIGNED_COURSE && !includeUnassignedCourse) setCourseFilter("all")
+    else if (courseFilter !== "all" && courseFilter !== UNASSIGNED_COURSE && !dealCourseOptions.some(course => course.key === courseFilter)) {
+      setCourseFilter("all")
+    }
+  }, [formOnly, organizationFilter, courseFilter, organizationOptions, dealCourseOptions, includeUnassignedCourse])
 
   useEffect(() => {
     if (!presetCustomer) return
@@ -165,7 +199,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
       setClosers([])
       setNotes("")
       if (!nextCourseOrganizations.some(item => item.id === courseOrganizationId)) setCourseOrganizationId("")
-      if (!formOnly) await loadRecords()
+      if (!formOnly) setListVersion(version => version + 1)
       setMessage({ text: editRecord ? "修改已保存，课程抵扣已同步" : `已抵扣 ${selectedCourse.deduction_count} 次，原会员卡已返还对应次数`, error: false })
       onSaved?.()
     } catch (error) {
@@ -183,7 +217,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
     try {
       await projectDeductionApi.delete(deleteTarget.id)
       setDeleteTarget(null)
-      await loadRecords()
+      setListVersion(version => version + 1)
       if (customerId === deletedCustomerId) {
         const data = await projectDeductionApi.getCoarseDoorOptions(customerId)
         const nextCourseOrganizations = data.course_organizations || data.organizations
@@ -207,7 +241,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
           <DialogTitle className="text-base">{editRecord ? "编辑粗门次卡" : "新增粗门次卡"}</DialogTitle>
         </DialogHeader>}
         <div className="space-y-4 px-6 py-5">
-          <p className="text-[12px] text-[#8f959e]">成交归属记录本次结算归属，课程所属用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
+          <p className="text-[12px] text-[#8f959e]">成交归属记录本次结算归属，成交课程用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交日期</span>
             <Input type="date" value={dealDate} onChange={event => setDealDate(event.target.value)} className="h-8 text-[12px]" />
@@ -229,8 +263,8 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
             <CustomerSearchInput customers={customers} value={nickname} onChange={value => { const next = typeof value === "string" ? value : ""; setNickname(next); if (!next) setCustomerId("") }} onSelectItem={customer => { setNickname(customer.nickname); setCustomerId(customer.id) }} selectionOnly disabled={!!presetCustomer || !!editRecord} placeholder="搜索姓名或昵称" />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-            <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">课程所属</span>
-            <SelectDropdown value={courseOrganizationId} options={courseOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={value => { setCourseOrganizationId(value); setCourseKey("") }} disabled={!customerId || loadingOptions || courseOrganizations.length === 0} placeholder={loadingOptions ? "加载中" : "选择课程所属"} />
+            <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交课程</span>
+            <SelectDropdown value={courseOrganizationId} options={courseOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={value => { setCourseOrganizationId(value); setCourseKey("") }} disabled={!customerId || loadingOptions || courseOrganizations.length === 0} placeholder={loadingOptions ? "加载中" : "选择成交课程"} placeholderColor="text-[#a8b1bd]" textColor={courseOrganizationId ? "text-[#2b2f36]" : undefined} />
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">所扣课程</span>
@@ -255,7 +289,31 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
       </div>}
 
       {!formOnly && <div className="w-full min-w-0 max-w-full min-h-0 flex-1 overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
-        <div className="flex items-center justify-end border-b border-[#f0f0f0] px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#f0f0f0] px-4 py-2.5">
+          <div className="w-[172px]">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchNickname}
+              onChange={value => setSearchNickname(typeof value === "string" ? value : "")}
+              placeholder="搜索用户"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
+            />
+          </div>
+          <PaymentScopeFilters
+            organizationId={organizationFilter}
+            courseKey={courseFilter}
+            organizations={organizationOptions.map(org => ({
+              id: org.id,
+              name: org.name || settlementOrganizations.find(item => item.id === org.id)?.name || org.id,
+            }))}
+            courses={dealCourseOptions}
+            includeUnassignedCourse={includeUnassignedCourse}
+            onOrganizationChange={setOrganizationFilter}
+            onCourseChange={setCourseFilter}
+          />
+          <div className="flex-1" />
           <Button size="sm" className="h-8 bg-[#212631] text-[12px] font-normal hover:bg-[#303641]" onClick={() => setEntryOpen(true)}>
             <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" />新增
           </Button>
@@ -326,7 +384,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
             onSaved={() => {
               setEntryOpen(false)
               setEditTarget(null)
-              loadRecords()
+              setListVersion(version => version + 1)
               onSaved?.()
             }}
           />

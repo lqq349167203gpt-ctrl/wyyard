@@ -88,6 +88,67 @@ def test_payment_date_sort_ties_and_missing_dates():
     ]
 
 
+def test_payment_scope_filters_before_paging_and_keeps_every_course_option(monkeypatch):
+    from app.services import payment_course_service
+    monkeypatch.setattr(payment_course_service, "fill_course_organizations", lambda items: None)
+    items = [
+        {"id": "1", "customer_id": "c", "nickname": "甲", "organization_id": "org-a",
+         "deal_course_key": "class_record:1", "deal_course_name": "课程一", "deal_date": "2026-10-02", "created_at": "1"},
+        {"id": "2", "customer_id": "c", "nickname": "乙", "organization_id": "org-b",
+         "deal_course_key": "", "deal_course_name": "", "deal_date": "2026-10-03", "created_at": "2"},
+        {"id": "3", "customer_id": "c", "nickname": "丙", "organization_id": "org-a",
+         "deal_course_key": "class_record:2", "deal_course_name": "课程二", "deal_date": "2026-10-01", "created_at": "3"},
+    ]
+    result = payment_list_response(request("organization_id=org-a&include_filter_options=true"), items, 1, 1)
+    assert result["total"] == 2 and result["items"][0]["id"] == "1"
+    assert {row["key"] for row in result["deal_course_options"]} == {"class_record:1", "class_record:2"}
+    assert {row["id"] for row in result["organization_options"]} == {"org-a", "org-b"}
+    assert result["unassigned_course"] is True
+    unrelated = payment_list_response(request("deal_course_key=__none__"), items, 1, 20)
+    assert [row["id"] for row in unrelated["items"]] == ["2"]
+
+
+def test_coarse_door_list_filters_nickname_scope_without_shrinking_course_options(monkeypatch):
+    from app.api import project_deductions
+
+    class Deduction:
+        def __init__(self, data):
+            self.data = data
+
+        def model_dump(self, mode="json"):
+            return dict(self.data)
+
+    rows = [
+        Deduction({"id": "a", "customer_id": "c", "nickname": "小娜", "project_name": "粗门次卡",
+                   "organization_id": "org-a", "deal_course_key": "", "deal_course_name": "",
+                   "source_activity_type": "class_record", "source_activity_id": "1", "source_activity_name": "课程一",
+                   "deduction_date": "2026-10-02", "created_at": "1"}),
+        Deduction({"id": "b", "customer_id": "c", "nickname": "小白", "project_name": "粗门次卡",
+                   "organization_id": "org-b", "deal_course_key": "", "deal_course_name": "",
+                   "source_activity_type": "class_record", "source_activity_id": "2", "source_activity_name": "课程二",
+                   "deduction_date": "2026-10-03", "created_at": "2"}),
+    ]
+    monkeypatch.setattr(project_deductions.project_deduction_service, "list_deductions", lambda *args, **kwargs: rows)
+    monkeypatch.setattr(project_deductions.customer_access_service, "require_transaction_access", lambda *a, **k: None)
+    monkeypatch.setattr(project_deductions.customer_access_service, "filter_record_dicts", lambda req, items: items)
+    result = project_deductions.list_deductions(
+        request("include_filter_options=true&organization_id=org-a"),
+        customer_id=None, nickname="小娜", project_type="membership-cards", card_type="粗门次卡",
+        page=1, page_size=20, manual_only=False,
+    )
+    assert [row["id"] for row in result["items"]] == ["a"]
+    assert {row["key"] for row in result["deal_course_options"]} == {"class_record:1", "class_record:2"}
+    assert {row["name"] for row in result["deal_course_options"]} == {"课程一", "课程二"}
+    assert {row["id"] for row in result["organization_options"]} == {"org-a", "org-b"}
+    assert result["unassigned_course"] is False
+    by_course = project_deductions.list_deductions(
+        request("deal_course_key=class_record:1"),
+        customer_id=None, nickname=None, project_type="membership-cards", card_type="粗门次卡",
+        page=1, page_size=20, manual_only=False,
+    )
+    assert [row["id"] for row in by_course["items"]] == ["a"]
+
+
 def test_payment_invalid_multi_selection_fails_explicitly():
     from fastapi import HTTPException
     with pytest.raises(HTTPException) as error:

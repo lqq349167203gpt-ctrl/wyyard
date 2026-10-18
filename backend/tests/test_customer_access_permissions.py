@@ -131,6 +131,35 @@ def test_related_scope_can_be_configured_by_referrer_or_handler(monkeypatch):
     }
 
 
+def test_related_scope_includes_the_account_owner(monkeypatch):
+    current = _permissions(referrer=True, referrer_handler=False)
+    monkeypatch.setattr(customer_access_service, "get_customer_permissions", lambda _role: current)
+    request = _request()
+    owner = SimpleNamespace(id="self", nickname="引流员工", name="真名", referrer="其他人", referrer_handler="其他人")
+    named = SimpleNamespace(id="by-name", nickname="别名", name="引流员工", referrer="", referrer_handler="")
+    customers = [
+        owner,
+        named,
+        _customer("by-referrer", referrer="引流员工"),
+        _customer("unrelated", referrer="其他人", referrer_handler="其他人"),
+    ]
+
+    assert customer_access_service.visible_customer_ids(request, customers) == {
+        "self",
+        "by-name",
+        "by-referrer",
+    }
+
+    current = _permissions(referrer=False, referrer_handler=True)
+    assert "self" in customer_access_service.visible_customer_ids(request, customers)
+
+    current = _permissions(referrer=False, referrer_handler=False)
+    assert customer_access_service.visible_customer_ids(request, customers) == set()
+
+    current = _permissions(scope="none", referrer=True, referrer_handler=True)
+    assert customer_access_service.visible_customer_ids(request, customers) == set()
+
+
 def test_sensitive_fields_are_removed_as_configured(monkeypatch):
     monkeypatch.setattr(
         customer_access_service,

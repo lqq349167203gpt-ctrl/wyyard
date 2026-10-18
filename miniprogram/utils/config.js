@@ -3,7 +3,7 @@
 //   上线/提审前：DEV = false → 后端连生产 https://www.wyteahouse.cn，关闭全部调试逻辑
 // check-release.sh 在 DEV = true 时会直接拦截上传，防止测试地址进入提审包。
 const DEV = true
-const DEV_HOST = '192.168.31.131'
+const DEV_HOST = '192.168.1.55'
 
 const BASE_URL = DEV
   ? `http://${DEV_HOST}:8000`

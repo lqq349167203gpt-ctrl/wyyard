@@ -323,7 +323,7 @@ FIELD_NAMES = {
     "source_activity_key": "来源课程标识", "source_activity_name": "来源课程",
     "organization_name": "所属组织",
     "settlement_organization_id": "成交归属", "settlement_organization_name": "成交归属",
-    "source_organization_id": "课程所属 ID", "source_organization_name": "课程所属",
+    "source_organization_id": "成交课程 ID", "source_organization_name": "成交课程",
     "source_activity_date": "来源课程日期", "source_space_id": "来源空间编号",
     "source_space_name": "来源空间",
     "fee": "费用", "refund_amount": "退费金额", "payment_method": "支付方式",

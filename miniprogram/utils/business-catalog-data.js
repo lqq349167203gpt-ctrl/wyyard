@@ -22,13 +22,13 @@ const MEMBERSHIP_CATALOG = [
     "name": "30次卡",
     "price": 3999,
     "count": 30,
-    "duration_months": 12
+    "duration_months": 1
   },
   {
     "name": "60次卡",
     "price": 5999,
     "count": 60,
-    "duration_months": 12
+    "duration_months": 6
   },
   {
     "name": "定制化",

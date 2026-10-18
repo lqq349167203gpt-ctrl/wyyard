@@ -6,4 +6,3 @@ LEARNING_COURSE_TYPES = tuple(item["activity_name"] for item in LEARNING_CATALOG
 LEGACY_PAYMENT_COURSE_TYPES = tuple(item["payment_name"] for item in LEARNING_CATALOG if item["legacy"])
 PAYMENT_COURSE_TYPES = tuple(item["payment_name"] for item in LEARNING_CATALOG)
 ACTIVITY_COURSE_TYPES = tuple(item["activity_name"] for item in LEARNING_CATALOG)
-COURSE_DURATION_MONTHS = {item["payment_name"]: item["duration_months"] for item in LEARNING_CATALOG}

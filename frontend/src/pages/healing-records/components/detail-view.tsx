@@ -1470,7 +1470,7 @@ export default function DetailView({
                                 成交归属：{r.settlement_organization_name || "-"}
                               </span>
                               <span className="truncate" title={r.course_organization_name || ""}>
-                                课程所属：{r.course_organization_name || "-"}
+                                成交课程：{r.course_organization_name || "-"}
                               </span>
                             </div>
                           </div>
