@@ -176,7 +176,7 @@ Page({
     includeArchived: false, metadata: null, organizations: [{ id: '', name: '全部可见组织/俱乐部' }], orgIndex: 0,
     scopeTypes: ['组织/俱乐部', '个人'], scopeTypeIndex: 0, scopeTargetIndex: 0,
     scopeTargets: [{ id: '', name: '全部可见组织/俱乐部' }], referrers: [], minDate: MIN_DATE,
-    // 组织/俱乐部没有「课程记录/交易记录」这两个页面；转化分析按缓存的权限先挂上，接口回来再校正
+    // 数据统计没有「课程记录/交易记录」这两个页面；转化分析按缓存的权限先挂上，接口回来再校正
     tabs: initialTabs(),
     query: clampRange(Object.assign({ scope_type: 'organization', referrer_id: '', organization_id: '', tab: 'overview', product: '', order_filter: '', status: '', rule: clone(INITIAL_RULE) }, monthRange())),
     rules: [], ruleOptions: ['默认规则'], ruleIndex: 0, ruleId: '',
@@ -678,7 +678,7 @@ Page({
         help: '统计周期内邀约页面里的客户总数',
         sub: `取消 ${cancelled} · 未到场 ${noShow} · 已到场 ${arrived}` },
       { key: 'participation', title: '活动参与', value: summary['活动参与次数'] ?? 0, unit: '次',
-        help: `${this.data.query.scope_type === 'person' ? '按所选个人引流来的客户' : '按所选组织已配置成员'}统计实际到场的活动，包含跨组织活动。沙龙活动和沙龙技能学习只统计参与者。`,
+        help: `${this.data.query.scope_type === 'person' ? '按所选个人的全部引流客户' : '按所选组织所属引流人的全部客户'}统计所选时间内实际到场的活动，不限制客户引流日期，包含跨组织活动。沙龙活动和沙龙技能学习只统计参与者。`,
         sub: `案主 ${summary['活动案主次数'] ?? 0} 次 · 参与者 ${summary['活动参与者次数'] ?? 0} 次` },
       { key: 'courses', title: '课程数据', value: summary['课程数'] ?? 0, unit: '场',
         help: '', sub: `总 ${summary['课时数'] ?? 0} 课时` },

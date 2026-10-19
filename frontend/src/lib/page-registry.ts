@@ -11,10 +11,10 @@ interface PageDefinition {
   permissions?: { key: string; label: string }[]
 }
 export const PAGES: PageDefinition[] = [
+  { title: "数据统计", path: "/principal", permission: "principal", group: "data" },
   { title: "自定义筛选", path: "/custom-analysis", permission: "custom-analysis", group: "data" },
   { title: "服务老师", path: "/service-teachers", permission: "service-teacher", group: "data" },
   { title: "课程记录", path: "/course-statistics", permission: "course-statistics", group: "data" },
-  { title: "组织/俱乐部", path: "/principal", permission: "principal", group: "data" },
   { title: "每日报表", path: "/daily-report", permission: "daily-report", group: "data" },
   { title: "客户资料", path: "/healing-records", permission: "healing-records", group: "business" },
   { title: "邀约", path: "/courses/class-records", permission: "class-records", group: "business" },

@@ -42,7 +42,7 @@ def _analysis_log_type(log) -> str:
 
 
 def _conversion_log_type(log) -> str:
-    """转化分析（组织/俱乐部页面）的日志类型，和自定义筛选一套口径。"""
+    """转化分析（数据统计页面）的日志类型，和自定义筛选一套口径。"""
     path = log.path.rstrip("/")
     if path == "/api/principal/query" and log.method == "POST":
         return "analysis_executed"
@@ -70,12 +70,12 @@ def list_analysis_logs(
     page_size: int = Query(20, ge=1, le=100),
 ):
     all_logs = []
-    # kind=conversion：组织/俱乐部 → 转化分析；默认 custom：自定义筛选
-    section = "组织/俱乐部" if kind == "conversion" else "自定义筛选"
+    # kind=conversion：数据统计 → 转化分析；兼容旧页面名称的日志，不迁移原始记录。
+    section = "数据统计" if kind == "conversion" else "自定义筛选"
     resolve_type = _conversion_log_type if kind == "conversion" else _analysis_log_type
     for log in operation_log_service.list_logs(section=section):
         log_type = resolve_type(log)
-        # 组织/俱乐部里经营概况的导出不算转化分析记录（自定义筛选的导出不受影响）
+        # 数据统计里经营概况的导出不算转化分析记录（自定义筛选的导出不受影响）
         if kind == "conversion" and log_type == "analysis_exported" and "导出转化分析" not in (log.content or ""):
             log_type = ""
         if log_type:

@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
 from app.models.operation_log import OperationLog, OperationLogCreate
 from app.services.storage import load_data, save_data, save_item
+from app.utils.page_labels import canonical_page_name
 
 FILENAME = "operation_logs.json"
 _logs: Dict[str, OperationLog] = {}
@@ -50,7 +51,7 @@ def list_logs(
         owner_usernames = {a.username for a in accounts if a.owner == operator}
         logs = [log for log in logs if log.operator == operator or (owner_usernames and log.operator in owner_usernames)]
     if section:
-        logs = [log for log in logs if log.section == section]
+        logs = [log for log in logs if canonical_page_name(log.section) == canonical_page_name(section)]
     if method:
         if method == "UPDATE":
             logs = [log for log in logs if log.method in ("PUT", "PATCH")]

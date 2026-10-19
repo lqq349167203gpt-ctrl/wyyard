@@ -10,7 +10,7 @@ from app.services.operation_log_service import create_log
 from app.utils.request_context import get_client_ip
 
 SECTION_MAP = {
-    "/api/principal": "组织/俱乐部",
+    "/api/principal": "数据统计",
     "/api/system-helper-config": "AI 配置",
     "/api/customer-ai-config": "AI 配置",
     "/api/visit-ai-config": "AI 配置",
@@ -147,7 +147,7 @@ PAGE_LABELS: dict[str, str] = {
     "referral-statistics": "引流统计",
     "member-statistics": "会员情况",
     "course-statistics": "课程记录",
-    "principal": "组织/俱乐部",
+    "principal": "数据统计",
     "product-sales": "产品销售",
     "statistics": "服务数据",
     "daily-report": "每日报表",
@@ -636,11 +636,11 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
             before = (old_external.get(group) or {}).get(key) is True
             after = (new_external.get(group) or {}).get(key) is True
             if before != after:
-                changes.append(f"组织/俱乐部外部客户{label}查看权限({'开启' if after else '关闭'})")
+                changes.append(f"数据统计外部客户{label}查看权限({'开启' if after else '关闭'})")
     before = old_external.get("transaction_access", "none")
     after = new_external.get("transaction_access", "none")
     if before != after:
-        changes.append(f"组织/俱乐部外部客户交易权限({transaction_labels.get(before, before)}→{transaction_labels.get(after, after)})")
+        changes.append(f"数据统计外部客户交易权限({transaction_labels.get(before, before)}→{transaction_labels.get(after, after)})")
     return changes
 
 def _format_value(val, field_name: str = "") -> str:

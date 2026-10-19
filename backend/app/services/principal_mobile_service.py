@@ -1,4 +1,4 @@
-"""组织/俱乐部小程序视图：统计口径复用主理人分析，只向手机发送当前页。"""
+"""数据统计小程序视图：复用同一分析口径，只向手机发送当前页。"""
 
 from collections import Counter
 from math import ceil

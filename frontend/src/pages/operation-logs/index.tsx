@@ -36,7 +36,7 @@ const PAGE_LABELS: Record<string, string> = {
   "customer-follow-ups": "客户跟进",
   "audit-check": "信息核对",
   "agreement-signings": "协议签订",
-  "principal": "组织/俱乐部",
+  "principal": "数据统计",
   "product-sales": "产品销售",
   "statistics": "服务数据",
   "daily-report": "每日报表",
@@ -263,16 +263,16 @@ const API_PATH_LABELS: Array<[string, string]> = [
 ]
 
 const SECTION_OPTIONS = [
-  "组织/俱乐部",
+  "数据统计",
   "课程记录", "服务老师", "客户跟进",
   "自定义筛选", "客户资料", "邀约", "课表", "付费项目", "支出项", "分成", "人员福利", "活动配置", "会员身份", "客户标签",
   "疗愈老师", "组织信息", "空间配置", "提醒配置", "提醒",
   "账号管理", "密码修改", "AI 配置", "系统日志", "操作日志", "系统",
 ]
 
-// 主理人已更名为「组织/俱乐部」：历史日志里存的是旧名，显示时统一成新名
+// 历史日志保留原始名称，展示时统一使用当前页面名。
 const formatSectionLabel = (section: string) => (
-  section === "组织管理" ? "组织信息" : section === "主理人" ? "组织/俱乐部" : section
+  section === "组织管理" ? "组织信息" : ["主理人", "组织/俱乐部", "组织俱乐部"].includes(section) ? "数据统计" : section
 )
 
 const getOperationLocation = (path: string, section: string) => {

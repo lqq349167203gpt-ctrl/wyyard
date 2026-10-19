@@ -835,16 +835,16 @@ export default function PositionManagementPage() {
                   <div className="max-w-[860px] space-y-7">
                     <section>
                       <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">组织/俱乐部查看范围</div>
+                        <div className="text-[14px] font-medium text-[#1f2329]">数据统计查看范围</div>
                         <div className="mt-1 text-[12px] text-[#8f959e]">仅查看自己指账号归属人所属的组织；该页面不受客户资料可见范围限制。</div>
                       </div>
                       <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
                         <div className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
                           <div className="min-w-0">
                             <div className="text-[13px] font-medium text-[#2b2f36]">可查看组织</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">控制组织/俱乐部页面可以看到哪些组织的经营数据</div>
+                            <div className="mt-1 text-[12px] text-[#8f959e]">控制数据统计页面可以看到哪些组织的经营数据</div>
                             {!formPermissions.includes("principal") && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“组织/俱乐部”页面权限</div>
+                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“数据统计”页面权限</div>
                             )}
                           </div>
                           <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
@@ -1025,7 +1025,7 @@ export default function PositionManagementPage() {
                         )}
                       </div>
                       <p className="mt-2 text-[11px] leading-4 text-[#8f959e]">
-                        注意：「组织/俱乐部」与「组织信息」两个页面不受此范围限制，只按各自页面内的筛选条件和组织配置展示数据。
+                        注意：「数据统计」与「组织信息」两个页面不受此范围限制，只按各自页面内的筛选条件和组织配置展示数据。
                       </p>
                     </section>
 

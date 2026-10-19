@@ -140,7 +140,7 @@ def _activity_owner_ids(kind, activity) -> set[str]:
 
 
 def _member_participation_breakdown(member_ids: set[str], start: str, end: str, customers=None, picks=None) -> dict:
-    """成员跨组织参与统计，仅保留成员实际参与活动的名称、日期和身份等必要明细。"""
+    """指定客户跨组织参与统计，日期只约束活动发生时间，不约束客户引流时间。"""
     from app.api.statistics import (
         COURSE_ACTIVITY_TYPES,
         _course_activity_name,
@@ -1084,11 +1084,19 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         _, customers, _ = scope(request)
         if personal_scope:
             customers = personal_customers
-        member_ids = set(customers) if personal_scope else {
-            member_id for org in organizations if org.id in chosen for member_id in org.member_ids
-            if member_id in customers
-        }
-        participation = _member_participation_breakdown(member_ids, start, end, customers, query.breakdown)
+        # 活动参与与“本期引流效果”分开：组织内引流人的全部历史客户都可计入，
+        # 仅按活动发生日期筛选；组织成员本人不会因为成员身份自动计入。
+        if personal_scope:
+            participation_ids = set(customers)
+        else:
+            participation_referrers = set().union(*(
+                org_referrer_names(org, customers) for org in organizations if org.id in chosen
+            ))
+            participation_ids = {
+                customer.id for customer in customers.values()
+                if (getattr(customer, "referrer", "") or "").strip() in participation_referrers
+            }
+        participation = _member_participation_breakdown(participation_ids, start, end, customers, query.breakdown)
         breakdown["participation"] = participation
         participation_totals = participation["overall"]
         summary.update({"活动参与次数": participation_totals["count"], "活动案主次数": participation_totals["owner_count"],
@@ -1680,7 +1688,11 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
     safe_rows = customer_access_service.protect_note_payload(safe_rows, permissions=permissions.get("customer_access", {}))
     columns = [(key, label) for key, label in columns if key not in PARTICIPANT_FEEDBACK_FIELDS
                or customer_access_service.can_view_note((), key, permissions=permissions.get("customer_access", {}))]
-    participation_notice = ("个人范围的活动参与按其引流客户跨组织累计。" if personal_scope else "活动参与按所选组织已配置成员跨组织累计。") if "活动参与次数" in summary else ""
+    participation_notice = ""
+    if "活动参与次数" in summary:
+        participation_notice = ("活动参与按所选个人的全部引流客户统计。" if personal_scope
+                                else "活动参与按所选组织所属引流人的全部客户统计。")
+        participation_notice += "仅按活动日期筛选，不限制引流日期，包含跨组织活动。"
     return {"summary": summary, "breakdown": breakdown, "list_summary": picked_summary, "columns": [{"key": k, "label": label} for k, label in columns],
             "items": safe_rows, "teacher_group_totals": teacher_group_totals,
             "total": total, "page": page, "page_size": query.page_size, "total_pages": max(1, (total + query.page_size - 1) // query.page_size),

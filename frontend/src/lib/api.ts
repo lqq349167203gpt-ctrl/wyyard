@@ -3984,7 +3984,7 @@ export interface AnalysisLog {
     结果人数?: number
     结果数量?: number
     结果单位?: string
-    /** 转化分析（组织/俱乐部）：筛选范围、规则与结果 */
+    /** 转化分析（数据统计）：筛选范围、规则与结果 */
     "组织/俱乐部"?: string
     起点?: string
     目标?: string

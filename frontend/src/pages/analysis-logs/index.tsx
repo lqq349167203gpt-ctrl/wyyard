@@ -41,7 +41,7 @@ function isTemplateLog(log: AnalysisLog) {
   return log.log_type.startsWith("template_")
 }
 
-/** 转化分析（组织/俱乐部）记录：模板、范围、规则、结果都在 config 里 */
+/** 转化分析（数据统计）记录：模板、范围、规则、结果都在 config 里 */
 function isConversionLog(log: AnalysisLog) {
   return log.config.分析模式 === "转化分析"
 }

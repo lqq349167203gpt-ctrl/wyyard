@@ -87,5 +87,5 @@ def list_records(
     )
     if page_name:
         from app.services.usage_analytics_service import canonical_page
-        items = [item for item in items if canonical_page(item.get("page_name", "")) == page_name]
+        items = [item for item in items if canonical_page(item.get("page_name", "")) == canonical_page(page_name)]
     return paginate(items, page, page_size)

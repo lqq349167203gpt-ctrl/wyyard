@@ -1389,7 +1389,7 @@ export default function PrincipalPage() {
       help: <>统计周期内邀约页面里的客户总数</> },
     { id: "participation", group: "participation" as const, title: "活动参与", value: `${result?.summary["活动参与次数"] ?? "—"}`, unit: "次",
       sub: `案主 ${result?.summary["活动案主次数"] ?? "—"} 次 · 参与者 ${result?.summary["活动参与者次数"] ?? "—"} 次`,
-      help: <>{personalScope ? "按所选个人引流来的客户" : "按已配置成员"}统计所选时间内实际到场参与活动的次数，包含跨组织活动。沙龙活动、沙龙技能学习只统计参与者；其他活动区分案主与参与者。老师等其他身份不计入。多场逐场累计，重叠人员不重复计算。</> },
+      help: <>{personalScope ? "按所选个人的全部引流客户" : "按所选组织所属引流人的全部客户"}统计所选时间内实际到场参与活动的次数，不限制客户引流日期，包含跨组织活动。沙龙活动、沙龙技能学习只统计参与者；其他活动区分案主与参与者。老师等其他身份不计入。多场逐场累计，重叠人员不重复计算。</> },
     { id: "courses", group: "courses" as const, title: "课程数据", value: `${result?.summary["课程数"] ?? "—"}`, unit: "场",
       sub: `总 ${result?.summary["课时数"] ?? "—"} 课时`,
       help: personalScope ? <>统计所选时间内引流客户实际到场的课程。同一场课程有多位客户参加只计一场，人数、名单与成交仅统计这些引流客户。</> : null },

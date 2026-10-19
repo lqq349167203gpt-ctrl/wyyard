@@ -1,4 +1,4 @@
-"""组织成员的跨组织活动参与统计。"""
+"""组织所属引流人的全部客户，按活动发生日期统计跨组织参与情况。"""
 
 import json
 from datetime import date
@@ -7,10 +7,11 @@ from types import SimpleNamespace as NS
 import pytest
 from fastapi import HTTPException
 
+from app.api import principal as principal_api
 from app.api import statistics
 from app.models.principal import PrincipalQuery
 from app.services import principal_service as service
-from app.services.principal_mobile_service import compact_breakdown
+from app.services.principal_mobile_service import compact_breakdown, mobile_result
 from app.services.principal_response_service import detail_page
 
 
@@ -82,23 +83,27 @@ def test_empty_members_do_not_load_other_organizations_activities(monkeypatch):
     }
 
 
-@pytest.mark.parametrize("picks", [[], ["participation_type:gcs", "participation_person:shared"]])
+@pytest.mark.parametrize("picks", [[], ["participation_type:gcs", "participation_person:client-shared"]])
 @pytest.mark.parametrize("organization_id, expected_participants", [("a", 1), ("b", 1), ("", 2)])
-def test_overview_uses_only_selected_members_and_counts_activities_outside_visible_organizations(
+def test_overview_uses_referred_clients_of_selected_organizations_not_the_members_themselves(
     monkeypatch, organization_id, expected_participants, picks,
 ):
     orgs = [NS(id="a", name="甲", member_ids=["shared", "m1", "deleted"], referrer_mode="member"),
             NS(id="b", name="乙", member_ids=["shared", "m2"], referrer_mode="member")]
     people = {cid: NS(id=cid, nickname=cid, name="", referrer="其他引流人") for cid in ("shared", "m1", "m2")}
+    people.update({cid: NS(id=cid, nickname=cid, name="", referrer=referrer, referral_date=referral_date)
+                   for cid, referrer, referral_date in (("client-shared", "shared", "2025-01-01"),
+                                                       ("client-a", "m1", "2026-01-01"),
+                                                       ("client-b", "m2", ""))})
     permissions = {"customer_access": {"transaction_access": "none"}}
     monkeypatch.setattr(service, "collect_data", lambda _: (orgs, permissions, [], []))
     monkeypatch.setattr(service, "scope", lambda _: (orgs, people, permissions))
     monkeypatch.setattr(service.customer_service, "list_customers", lambda: list(people.values()))
     monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda _: [])
     install_activities(monkeypatch, {"gcs": [activity(
-        id="other-org-activity", organization_id="hidden", owner_id="shared",
-        participant_ids=["shared", "m1", "m2", "deleted", "guest"],
-    )]}, {"2026-01-15": {"shared", "m1", "m2", "deleted", "guest"}})
+        id="other-org-activity", organization_id="hidden", owner_id="client-shared",
+        participant_ids=["client-shared", "client-a", "client-b", "shared", "m1", "m2", "deleted", "guest"],
+    )]}, {"2026-01-15": set(people) | {"deleted", "guest"}})
 
     result = service.analyze(NS(state=NS(user_id="test", user_role="超级管理员")), PrincipalQuery(
         organization_id=organization_id, date_from=date(2026, 1, 1), date_to=date(2026, 1, 31), breakdown=picks,
@@ -113,6 +118,7 @@ def test_overview_uses_only_selected_members_and_counts_activities_outside_visib
     assert totals["people"] == (1 if picks else 1 + expected_participants)
     assert result["items"] == []
     assert "other-org-activity" not in json.dumps(result)
+    assert {row["id"] for row in result["breakdown"]["participation"]["members"]} <= {"client-shared", "client-a", "client-b"}
 
 
 def test_unavailable_organization_is_rejected_before_member_aggregation(monkeypatch):
@@ -121,6 +127,57 @@ def test_unavailable_organization_is_rejected_before_member_aggregation(monkeypa
     with pytest.raises(HTTPException) as error:
         service.analyze(NS(), PrincipalQuery(organization_id="hidden"))
     assert error.value.status_code == 403
+
+
+@pytest.mark.parametrize("referrer_mode", ["member", "selected", "all"])
+def test_participation_uses_activity_dates_for_all_historical_referred_clients_and_shares_detail_export(
+    monkeypatch, referrer_mode,
+):
+    people = {cid: NS(id=cid, nickname=name, name="", referrer=referrer, referral_date=day)
+              for cid, name, referrer, day in (
+                  ("ref", "所属引流人", "", ""), ("other-ref", "其他引流人", "", ""),
+                  ("old", "历史客户", "所属引流人", "2025-01-01"),
+                  ("new", "本期客户", "所属引流人", "2026-01-10"),
+                  ("undated", "未填引流日期客户", "所属引流人", ""),
+                  ("other", "其他范围客户", "其他引流人", "2026-01-01"),
+                  ("unassigned", "未配置引流人", "", "2026-01-01"),
+              )}
+    org = NS(id="org", name="所选组织", member_ids=["ref"], referrer_mode=referrer_mode,
+             referrer_ids=["ref"], include_unassigned_referrers=False)
+    permissions = {"principal_scope": "all", "customer_access": {"transaction_access": "none"}}
+    monkeypatch.setattr(service, "collect_data", lambda *_a, **_kw: ([org], permissions, [], []))
+    monkeypatch.setattr(service, "scope", lambda _: ([org], people, permissions))
+    monkeypatch.setattr(service.customer_service, "list_customers", lambda: list(people.values()))
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda _: [])
+    install_activities(monkeypatch, {"gcs": [
+        activity(id="start", date="2026-01-01", owner_id="old", participant_ids=["new", "ref", "unassigned", "other"]),
+        activity(id="end", date="2026-01-31", owner_id="new", participant_ids=["old", "undated"]),
+        activity(id="before", date="2025-12-31", owner_id="old"),
+        activity(id="after", date="2026-02-01", owner_id="old"),
+        activity(id="absent", date="2026-01-16", owner_id="old"),
+    ]}, {day: set(people) for day in ("2025-12-31", "2026-01-01", "2026-01-31", "2026-02-01")})
+    request = NS(state=NS(user_id="test", user_role="超级管理员"))
+    query = PrincipalQuery(organization_id="org", date_from=date(2026, 1, 1), date_to=date(2026, 1, 31))
+    result = service.analyze(request, query)
+    expected_ids = {"old", "new", "undated"} | ({"other"} if referrer_mode == "all" else set())
+    participation = result["breakdown"]["participation"]
+    assert {row["id"] for row in participation["members"]} == expected_ids
+    assert result["summary"]["活动参与次数"] == participation["overall"]["count"] == (6 if referrer_mode == "all" else 5)
+    assert participation["overall"]["people"] == len(expected_ids)
+    assert result["summary"]["引流人数"] == (2 if referrer_mode == "all" else 1)
+    old = next(row for row in participation["members"] if row["id"] == "old")
+    assert {row["date"] for row in old["activities"]} == {"2026-01-01", "2026-01-31"}
+    pc = detail_page(result["breakdown"], query.model_copy(update={"overview_detail": "participation"}))
+    mini = mobile_result(result, query.model_copy(update={"mobile_group": "participation"}))
+    assert {row["id"] for row in pc["items"]} == {row["id"] for row in mini["items"]} == expected_ids
+    assert sum(row["count"] for row in pc["items"]) == result["summary"]["活动参与次数"]
+    monkeypatch.setattr(principal_api, "audit", lambda *_a, **_kw: None)
+    monkeypatch.setattr(principal_api, "_xlsx_response", lambda _sheet, headers, rows, filename, **kw:
+                        {"headers": headers, "rows": rows, **kw})
+    exported = principal_api.export(query.model_copy(update={"export_group": "participation"}), request)
+    assert len(exported["rows"]) == result["summary"]["活动参与次数"]
+    assert {row[0] for row in exported["rows"]} == {people[cid].nickname for cid in expected_ids}
+    assert "不限制引流日期" in result["notice"]
 
 
 @pytest.fixture

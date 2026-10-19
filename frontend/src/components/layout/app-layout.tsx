@@ -41,7 +41,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/login-records": "无忧 - 使用统计",
   "/analysis-logs": "无忧 - 分析日志",
   "/course-statistics": "无忧 - 课程记录",
-  "/principal": "无忧 - 组织/俱乐部",
+  "/principal": "无忧 - 数据统计",
   "/communication-records": "无忧 - 沟通记录",
   "/followup-records": "无忧 - 回访记录",
   "/chat-history": "无忧 - 沟通记录",

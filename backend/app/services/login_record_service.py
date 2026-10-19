@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from app.models.login_record import LoginRecord
 from app.models.usage_session import UsageInterval, UsageSession
 from app.services.storage import load_data, load_item, save_item
+from app.utils.page_labels import canonical_page_name
 from app.utils.pagination import paginate
 
 FILENAME = "login_records.json"
@@ -30,8 +31,8 @@ def invalidate_activity_cache() -> None:
         _activity_cache.clear()
 
 PAGE_NAMES = {
-    "/principal": "组织/俱乐部",
-    "/pages/principal/index": "组织/俱乐部",
+    "/principal": "数据统计",
+    "/pages/principal/index": "数据统计",
     # PC 管理端
     "/custom-analysis": "自定义筛选",
     "/service-teachers": "服务老师",
@@ -326,7 +327,7 @@ def _usage_interval_indexes(
             if page_path:
                 path_index.setdefault((*account_source, page_path), []).append((interval_start, interval_end))
             if page_name:
-                name_index.setdefault((*account_source, page_name), []).append((interval_start, interval_end))
+                name_index.setdefault((*account_source, canonical_page_name(page_name)), []).append((interval_start, interval_end))
     return path_index, name_index
 
 
@@ -345,7 +346,7 @@ def _activity_page_duration(
     path_index, name_index = indexes
     groups = (
         path_index.get((account_id, source, page_path), []) if page_path else [],
-        name_index.get((account_id, source, page_name), []) if page_name else [],
+        name_index.get((account_id, source, canonical_page_name(page_name)), []) if page_name else [],
     )
     for intervals in groups:
         candidates: list[tuple[float, datetime, datetime]] = []
@@ -393,7 +394,7 @@ def list_operation_activity_paginated(
             continue
         if end and log.created_at > end:
             continue
-        if normalized_keyword and normalized_keyword not in f"{log.operator} {log.section} {log.content}".lower():
+        if normalized_keyword and normalized_keyword not in f"{log.operator} {canonical_page_name(log.section)} {log.content}".lower():
             continue
         filtered.append((log, account))
 
@@ -417,7 +418,7 @@ def list_operation_activity_paginated(
             "ip": log.ip,
             "device_info": "",
             "page_path": log.path,
-            "page_name": log.section,
+            "page_name": canonical_page_name(log.section),
             "content": log.content,
             "method": log.method,
             "created_at": log.created_at.isoformat(),
@@ -634,11 +635,13 @@ def _build_activity(
                 continue
             if end and record.created_at > end:
                 continue
-            content = record.content or ("登录系统" if record.event_type == "login" else f"访问{record.page_name}")
-            if keyword and keyword.lower() not in f"{record.owner} {record.username} {record.page_name} {content}".lower():
+            page_name = canonical_page_name(record.page_name)
+            content = record.content or ("登录系统" if record.event_type == "login" else f"访问{page_name}")
+            if keyword and keyword.lower() not in f"{record.owner} {record.username} {page_name} {content}".lower():
                 continue
             items.append({
                 **record.model_dump(mode="json"),
+                "page_name": page_name,
                 "content": content,
                 "method": "",
                 "duration_seconds": (
@@ -669,6 +672,7 @@ def _build_activity(
                 if clipped_end <= clipped_start:
                     continue
                 duration_seconds = round((clipped_end - clipped_start).total_seconds())
+                page_name = canonical_page_name(page_name)
                 content = f"使用{page_name}"
                 if keyword and keyword.lower() not in f"{session.owner} {session.username} {page_name} {content}".lower():
                     continue
@@ -700,7 +704,7 @@ def _build_activity(
                 continue
             if end and log.created_at > end:
                 continue
-            if keyword and keyword.lower() not in f"{log.operator} {log.section} {log.content}".lower():
+            if keyword and keyword.lower() not in f"{log.operator} {canonical_page_name(log.section)} {log.content}".lower():
                 continue
             items.append({
                 "id": f"operation-{log.id}",
@@ -713,7 +717,7 @@ def _build_activity(
                 "ip": log.ip,
                 "device_info": "",
                 "page_path": log.path,
-                "page_name": log.section,
+                "page_name": canonical_page_name(log.section),
                 "content": log.content,
                 "method": log.method,
                 "created_at": log.created_at.isoformat(),

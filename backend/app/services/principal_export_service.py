@@ -1,4 +1,4 @@
-"""组织/俱乐部导出汇总：复用页面统计，不接受客户端传入数量。"""
+"""数据统计导出汇总：复用页面统计，不接受客户端传入数量。"""
 
 from datetime import date, datetime
 from zoneinfo import ZoneInfo

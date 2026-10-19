@@ -7,6 +7,9 @@ from app.services import account_service, operation_log_service, position_permis
 from app.services import login_record_service as usage
 
 PAGE_ALIASES = {
+    "主理人": "数据统计",
+    "组织/俱乐部": "数据统计",
+    "组织俱乐部": "数据统计",
     "客户": "客户资料",
     "客户详情": "客户资料",
     "客户编辑": "客户资料",
@@ -28,7 +31,7 @@ PAGE_KEYS = {
     "服务老师": "service-teacher",
     "课程记录": "course-statistics",
     "客户跟进": "customer-follow-ups",
-    "组织/俱乐部": "principal",
+    "数据统计": "principal",
     "每日报表": "daily-report",
     "客户标签": "customer-tags",
     "沟通记录": "communication-records",

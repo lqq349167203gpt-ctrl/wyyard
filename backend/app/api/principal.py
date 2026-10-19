@@ -20,7 +20,7 @@ from app.services.storage import load_data, load_item, save_item
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
 
-router = APIRouter(prefix="/api/principal", tags=["组织/俱乐部"], dependencies=[Depends(require_page_permission("principal"))])
+router = APIRouter(prefix="/api/principal", tags=["数据统计"], dependencies=[Depends(require_page_permission("principal"))])
 RULES_FILE = "principal_rules.json"
 
 
@@ -33,7 +33,7 @@ def audit(request: Request, content: str, method: str, config: dict | None = Non
     }
     if config is not None:
         extra["after_data"] = config
-    operation_log_service.create_log(OperationLogCreate(section="组织/俱乐部", content=content), extra=extra)
+    operation_log_service.create_log(OperationLogCreate(section="数据统计", content=content), extra=extra)
 
 
 def _condition_rows(scope_name: str, conditions: list[dict]) -> list[dict]:
@@ -302,13 +302,13 @@ def export(data: PrincipalQuery, request: Request):
             for item in result["items"]]
     # 阻止用户文本在 Excel 中成为公式。
     rows = [["'" + value if isinstance(value, str) and value.startswith(("=", "+", "-", "@")) else value for value in row] for row in rows]
-    label = "导出引流客户" if data.export_view == "traffic" else "导出邀约到店" if data.export_view == "invite_arrivals" else "导出发起邀约" if data.export_view == "invite_initiated" else "导出转化分析" if data.tab == "conversion" else "导出组织/俱乐部"
+    label = "导出引流客户" if data.export_view == "traffic" else "导出邀约到店" if data.export_view == "invite_arrivals" else "导出发起邀约" if data.export_view == "invite_initiated" else "导出转化分析" if data.tab == "conversion" else "导出数据统计"
     suffix = f"，规则：{data.rule.name}" if data.tab == "conversion" else f"，{data.tab}"
     audit(request, f"{label}：{result['total']}条{suffix}", "EXPORT")
     # Excel 工作表名不允许包含 “/”，用去掉斜杠的名称
     headers = [c["label"] for c in columns] + (["关联明细"] if include_details else [])
     summary_rows = principal_export_service.summary_rows(result, data, export_group)
-    return _xlsx_response("组织俱乐部", headers, rows, principal_export_service.export_filename(result, data), summary_rows=summary_rows)
+    return _xlsx_response("数据统计", headers, rows, principal_export_service.export_filename(result, data), summary_rows=summary_rows)
 
 
 @router.get("/rules")
