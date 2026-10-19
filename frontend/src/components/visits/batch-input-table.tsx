@@ -34,6 +34,7 @@ interface Row {
   goal: string
   arrived: boolean
   cancelled: boolean
+  cancel_reason: string
   feedback: string
   healing_notes: string
   activities: string
@@ -42,7 +43,7 @@ interface Row {
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", receptionist: "", goal: "", arrived: false, cancelled: false, feedback: "", healing_notes: "", activities: "" }
+  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", receptionist: "", goal: "", arrived: false, cancelled: false, cancel_reason: "", feedback: "", healing_notes: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -131,6 +132,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
   const [deleteKey, setDeleteKey] = useState<number | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<Row | null>(null)
+  const [cancelReason, setCancelReason] = useState("")
+  const [cancelError, setCancelError] = useState("")
+  const [cancelSaving, setCancelSaving] = useState(false)
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({})
   const [notesByVisitId, setNotesByVisitId] = useState<Record<string, VisitNote[]>>({})
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
@@ -469,6 +474,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           goal: v.goal || "",
           arrived: v.arrived,
           cancelled: v.cancelled,
+          cancel_reason: v.cancel_reason || "",
           feedback: v.feedback || "",
           healing_notes: v.healing_notes || "",
           activities: (v.activities || []).map(a => `${a.name}${a.role ? `(${a.role})` : ""}`).join("、"),
@@ -623,29 +629,34 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
     scheduleSave(key)
   }, [rowStatus, scheduleSave, pushEditHistory, canEditField])
 
-  const cancelVisit = useCallback(async (row: Row) => {
+  const cancelVisit = useCallback(async (row: Row, reason: string) => {
     const visitId = savedVisitIds.current[row.key]
     if (!visitId || row.arrived || row.cancelled || isViewOnly || verified) return
     if (timersRef.current[row.key]) {
       clearTimeout(timersRef.current[row.key])
       delete timersRef.current[row.key]
     }
+    setCancelSaving(true)
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
-      await visitApi.update(visitId, { cancelled: true })
+      await visitApi.update(visitId, { cancelled: true, cancel_reason: reason })
       setRows(prev => {
         const updated = prev.map(item => item.key === row.key
-          ? { ...item, arrived: false, cancelled: true }
+          ? { ...item, arrived: false, cancelled: true, cancel_reason: reason }
           : item)
         // 已取消的行移到末尾，未取消保持相对顺序
         return [...updated.filter(r => !r.cancelled), ...updated.filter(r => r.cancelled)]
       })
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
-      pushHistory("取消了邀约", [row.key], `取消了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled"] }])
+      pushHistory("取消了邀约", [row.key], `取消了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled", "cancel_reason"] }])
+      setCancelTarget(null)
+      setCancelReason("")
       onSaved()
     } catch (error) {
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
-      window.alert(error instanceof Error ? error.message : "取消邀约失败")
+      setCancelError(error instanceof Error ? error.message : "取消邀约失败")
+    } finally {
+      setCancelSaving(false)
     }
   }, [onSaved, pushHistory, isViewOnly, verified])
 
@@ -1135,7 +1146,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                             <TooltipTrigger
                               render={
                                 <button
-                                  onClick={() => row.cancelled ? restoreVisit(row) : cancelVisit(row)}
+                                  onClick={() => {
+                                    if (row.cancelled) restoreVisit(row)
+                                    else { setCancelTarget(row); setCancelReason(""); setCancelError("") }
+                                  }}
                                   className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#3370ff]"
                                   aria-label={row.cancelled ? "恢复" : "取消"}
                                 >
@@ -1145,7 +1159,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                                 </button>
                               }
                             />
-                            <TooltipContent>{row.cancelled ? "恢复" : "取消"}</TooltipContent>
+                            <TooltipContent>{row.cancelled ? (row.cancel_reason ? `恢复｜取消原因：${row.cancel_reason}` : "恢复") : "取消"}</TooltipContent>
                           </Tooltip>
                           <span className="h-3 w-px shrink-0 bg-[#d0d3d6]" aria-hidden="true" />
                         </>
@@ -1213,6 +1227,36 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           添加一行
         </button>
       </div>}
+
+      <AlertDialog open={cancelTarget !== null} onOpenChange={(open) => {
+        if (!open && !cancelSaving) { setCancelTarget(null); setCancelReason(""); setCancelError("") }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>取消邀约</AlertDialogTitle>
+            <AlertDialogDescription>请输入取消原因，确认后保留这条邀约记录。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <textarea
+            value={cancelReason}
+            onChange={event => { setCancelReason(event.target.value); setCancelError("") }}
+            maxLength={200}
+            rows={3}
+            placeholder="填写取消原因"
+            aria-label="取消原因"
+            className="w-full resize-none rounded-[4px] border border-[#e1e4e7] px-3 py-2 text-[12px] leading-5 outline-none focus:border-[#3370ff]"
+          />
+          {cancelError && <p className="text-[12px] text-[#c4506a]">{cancelError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelSaving}>返回</AlertDialogCancel>
+            <AlertDialogAction disabled={cancelSaving} onClick={(event) => {
+              event.preventDefault()
+              const reason = cancelReason.trim()
+              if (!reason) { setCancelError("请输入取消原因"); return }
+              if (cancelTarget) void cancelVisit(cancelTarget, reason)
+            }}>{cancelSaving ? "保存中…" : "确认取消"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteKey !== null} onOpenChange={(open) => !open && setDeleteKey(null)}>
         <AlertDialogContent>

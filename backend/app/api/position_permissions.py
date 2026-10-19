@@ -65,7 +65,14 @@ class CustomerAccessPermissionUpdate(StrictBaseModel):
     transaction_access: Literal["none", "summary", "detail"] = "none"
 
 
+class PrincipalViewsUpdate(StrictBaseModel):
+    organization: bool = False
+    person: bool = False
+
+
 class EditPermissionUpdate(StrictBaseModel):
+    principal_views: PrincipalViewsUpdate | None = None
+    principal_person_scope: Literal["own", "all"] | None = None
     principal_external_access: CustomerAccessPermissionUpdate | None = None
     principal_scope: Literal["own", "all"] = "own"
     customers: Literal["view", "all"] = "all"

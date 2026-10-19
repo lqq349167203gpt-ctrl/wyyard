@@ -180,25 +180,40 @@ class TestVisitUpdate:
         """未到店邀约可取消，完整列表和轻量列表都持久返回取消状态"""
         vid = self._create(client, created_customer)
 
-        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True})
+        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "  客户临时有事  "})
         assert resp.status_code == 200
         assert resp.json()["cancelled"] is True
+        assert resp.json()["cancel_reason"] == "客户临时有事"
         assert resp.json()["arrived"] is False
         assert resp.json()["arrival_time"] == ""
 
         detail = client.get(f"/api/visits/{vid}")
         assert detail.status_code == 200
         assert detail.json()["cancelled"] is True
+        assert detail.json()["cancel_reason"] == "客户临时有事"
 
         light = client.get("/api/visits/light", params={"date": "2026-08-02"})
         assert light.status_code == 200
         item = next(row for row in light.json() if row["id"] == vid)
         assert item["cancelled"] is True
+        assert item["cancel_reason"] == "客户临时有事"
+
+    def test_cancel_requires_a_reason_and_does_not_change_the_visit_on_error(self, client, created_customer):
+        vid = self._create(client, created_customer)
+        for payload in (
+            {"cancelled": True},
+            {"cancelled": True, "cancel_reason": "   "},
+            {"cancelled": True, "cancel_reason": "x" * 201},
+            {"cancelled": True, "cancel_reason": "有事", "goal": "顺便修改"},
+        ):
+            response = client.patch(f"/api/visits/{vid}", json=payload)
+            assert response.status_code == 400
+            assert client.get(f"/api/visits/{vid}").json()["cancelled"] is False
 
     def test_cancelled_visit_is_locked_until_restored(self, client, created_customer):
         """已取消记录不可修改或勾选到店，恢复后才可继续编辑"""
         vid = self._create(client, created_customer)
-        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True}).status_code == 200
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "行程调整"}).status_code == 200
 
         edit = client.patch(f"/api/visits/{vid}", json={"needs": "不应保存"})
         assert edit.status_code == 400
@@ -214,6 +229,7 @@ class TestVisitUpdate:
         restored = client.patch(f"/api/visits/{vid}", json={"cancelled": False})
         assert restored.status_code == 200
         assert restored.json()["cancelled"] is False
+        assert restored.json()["cancel_reason"] == "行程调整"
 
         edited = client.patch(f"/api/visits/{vid}", json={"needs": "恢复后可编辑"})
         assert edited.status_code == 200
@@ -245,7 +261,7 @@ class TestVisitUpdate:
         assert before.status_code == 200
         assert before.json()["2026-08-02"] == 1
 
-        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True}).status_code == 200
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "行程调整"}).status_code == 200
         after = client.get(
             "/api/visits/counts",
             params={

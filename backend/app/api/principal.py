@@ -129,10 +129,12 @@ def conversion_log_snapshot(request: Request, data: PrincipalQuery, result: dict
 
 @router.get("/metadata")
 def metadata(request: Request, lite: bool = False):
-    if lite:
-        organizations, customers, permissions = principal_service.scope(request)
+    organizations, customers, permissions = principal_service.scope(request)
+    scope_types = [key for key, allowed in principal_service.position_edit_permission_service.principal_views(permissions).items() if allowed]
+    if lite or "organization" not in scope_types:
         return {"organizations": [{"id": o.id, "name": o.name, "status": getattr(o, "status", "active")} for o in organizations],
-                "referrers": principal_service.referrer_options(organizations, customers, own_scope=permissions["principal_scope"] == "own"),
+                "referrers": principal_service.permitted_referrers(request, organizations, customers, permissions),
+                "scope_types": scope_types,
                 "scope": permissions["principal_scope"], "products": [], "activity_types": [],
                 "transaction_access": permissions["customer_access"]["transaction_access"],
                 "can_view_follow_up": customer_access_service.can_view_any_note(permissions=permissions["customer_access"])}
@@ -142,11 +144,12 @@ def metadata(request: Request, lite: bool = False):
     for key, label, _, _field in principal_service.PRODUCTS:
         options.append({"key": key, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "purchase" and e["product"] == key and e["subtype"]})})
     return {"organizations": [{"id": o.id, "name": o.name, "status": getattr(o, "status", "active")} for o in organizations],
-            "referrers": principal_service.referrer_options(organizations, customers, own_scope=permissions["principal_scope"] == "own"),
+            "referrers": principal_service.permitted_referrers(request, organizations, customers, permissions),
+            "scope_types": scope_types,
             "scope": permissions["principal_scope"], "products": options,
             "transaction_access": permissions["customer_access"]["transaction_access"],
             "can_view_follow_up": customer_access_service.can_view_any_note(permissions=permissions["customer_access"]),
-            "activity_types": [{"key": k, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "attendance" and e["product"] == k and e["subtype"]})} for k, label in [("class", "沙龙活动"), ("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "能量结"), ("ics", "沙龙技能学习")]]}
+            "activity_types": [{"key": k, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "attendance" and e["product"] == k and e["subtype"]})} for k, label in [("class", "沙龙活动"), ("gcs", "觉醒游戏"), ("ers", "情绪释放"), ("eks", "深度情绪释放"), ("ics", "沙龙技能学习")]]}
 
 
 @router.get("/rule-fields")
@@ -155,6 +158,7 @@ def rule_fields(request: Request):
     from app.services import custom_analysis_service
 
     _, customers, permissions = principal_service.scope(request)
+    principal_service.require_statistics_view(permissions, "organization")
     access = permissions["customer_access"]["transaction_access"]
     meta = custom_analysis_service.metadata(
         getattr(request.state, "user_id", ""),

@@ -25,7 +25,7 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "membership-cards", label: "会员卡" },
   { value: "group-cases", label: "觉醒游戏" },
   { value: "emotional-releases", label: "情绪释放" },
-  { value: "energy-knots", label: "能量结" },
+  { value: "energy-knots", label: "深度情绪释放" },
   { value: "other-projects", label: "其他项目" },
 ]
 
@@ -33,7 +33,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
   "membership-cards": "会员卡",
   "group-cases": "觉醒游戏",
   "emotional-releases": "情绪释放",
-  "energy-knots": "能量结",
+  "energy-knots": "深度情绪释放",
   "internal-courses": "沙龙技能学习",
   "other-projects": "其他项目",
 }
@@ -313,7 +313,7 @@ export function ProjectDeductionTab() {
       }
     }
 
-    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡诊断/能量结）
+    // 疗愈项目 sheet（觉醒游戏/情绪释放/OH卡诊断/深度情绪释放）
     const HEALING_OPTIONS = PROJECT_TYPE_OPTIONS.filter(o => ["group-cases", "emotional-releases", "energy-knots"].includes(o.value))
     const wsHealing = wb.addWorksheet("疗愈项目")
     wsHealing.getColumn(1).width = 12
@@ -371,7 +371,8 @@ export function ProjectDeductionTab() {
     const HEALING_LABEL_MAP: Record<string, string> = {
       "觉醒游戏": "group-cases",
       "情绪释放": "emotional-releases",
-      "能量结": "energy-knots",
+      "深度情绪释放": "energy-knots",
+      "能量结": "energy-knots", // 兼容历史导入表
     }
 
     // 可用项目缓存：key = "customerId|projectType|nameFilter"

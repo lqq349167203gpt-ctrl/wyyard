@@ -646,23 +646,50 @@ Page({
   onCancelVisitTap(e) {
     const visit = e.detail.visit
     if (!visit || this.data.isViewOnly || this.data.isDayVerified) return
-    const cancelled = !visit.cancelled
+    if (visit.cancelled) {
+      this.updateCancelVisit(visit, false)
+      return
+    }
+    wx.showModal({
+      title: '取消邀约',
+      content: '请输入取消原因',
+      editable: true,
+      placeholderText: '填写取消原因',
+      confirmText: '确认取消',
+      success: (result) => {
+        if (!result.confirm) return
+        const reason = String(result.content || '').trim()
+        if (!reason) {
+          wx.showToast({ title: '请输入取消原因', icon: 'none' })
+          return
+        }
+        if (reason.length > 200) {
+          wx.showToast({ title: '取消原因不能超过200字', icon: 'none' })
+          return
+        }
+        this.updateCancelVisit(visit, true, reason)
+      },
+    })
+  },
 
-    visitApi.update(visit.id, { cancelled }).then(() => {
+  updateCancelVisit(visit, cancelled, reason = '') {
+    if (this._cancelUpdating) return
+    this._cancelUpdating = true
+    visitApi.update(visit.id, cancelled ? { cancelled: true, cancel_reason: reason } : { cancelled: false }).then((updated) => {
       wx.showToast({ title: cancelled ? '已取消邀约' : '已恢复邀约' })
-      // 就地更新当前项，避免 loadData() 触发整页刷新导致滚动位置丢失
-      const visits = this.data.visits.map(v => v.id === visit.id ? { ...v, cancelled } : v)
-      // 已取消的行移到末尾，未取消保持相对顺序
+      // 就地更新当前项，避免整页刷新导致滚动位置丢失
+      const visits = this.data.visits.map(v => v.id === visit.id ? { ...v, cancelled, cancel_reason: (updated && updated.cancel_reason) || reason || v.cancel_reason || '' } : v)
       const reordered = [...visits.filter(v => !v.cancelled), ...visits.filter(v => v.cancelled)]
       this._setVisits(reordered)
-      // 同步日历圆点计数（已取消的邀约不计入）
       const counts = { ...(this._calendarCounts || {}) }
       const date = visit.visit_date || this.data.currentDate
       counts[date] = Math.max(0, (counts[date] || 0) + (cancelled ? -1 : 1))
       this._calendarCounts = counts
       this.setData({ weekPages: buildWeekPages(this.data.currentDate, counts, this._verificationMap || {}) })
-    }).catch(() => {
-      wx.showToast({ title: '操作失败', icon: 'none' })
+    }).catch((error) => {
+      wx.showToast({ title: (error && error.message) || '操作失败', icon: 'none' })
+    }).finally(() => {
+      this._cancelUpdating = false
     })
   },
 

@@ -28,7 +28,7 @@ type ActivityType = "class" | "gcs" | "ers" | "eks" | "ics"
 const PARTICIPANT_DRAG_TYPE = "application/x-wyyard-participant"
 
 const TYPE_NAMES: Record<ActivityType, string> = {
-  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "沙龙技能学习",
+  class: "沙龙", gcs: "觉醒游戏", ers: "情绪释放", eks: "深度情绪释放", ics: "沙龙技能学习",
 }
 
 function parseEksDescription(desc: string): { id: string; name: string; count: number } {
@@ -641,7 +641,7 @@ export function ActivityBatchTable({
       { value: "class", label: "沙龙活动", children: classChildren },
       { value: "gcs", label: "觉醒游戏" },
       { value: "ers", label: "情绪释放" },
-      { value: "eks", label: "能量结" },
+      { value: "eks", label: "深度情绪释放" },
       { value: "ics", label: "沙龙技能学习", children: LEARNING_ACTIVITY_OPTIONS.map(option => ({ ...option, value: `ics:${option.value}` })) },
     ]
   }, [courseTypes, organizations])

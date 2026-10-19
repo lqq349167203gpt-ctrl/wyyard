@@ -18,7 +18,7 @@ const ACTION_LABELS: Record<string, string> = {
   create_membership_card: "会员卡购买",
   create_group_case: "觉醒游戏",
   create_emotional_release: "情绪释放",
-  create_energy_knot: "能量结",
+  create_energy_knot: "深度情绪释放",
   create_internal_course: "沙龙技能学习",
   create_other_project: "其他项目",
 }

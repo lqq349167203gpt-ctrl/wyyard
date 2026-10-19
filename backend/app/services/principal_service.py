@@ -46,7 +46,7 @@ PRODUCTS = (
     ("membership", "会员卡", payment_loader("membership-cards"), "card_type"),
     ("group_case", "觉醒游戏", payment_loader("group-cases"), ""),
     ("emotional", "情绪释放", payment_loader("emotional-releases"), ""),
-    ("energy", "能量结", payment_loader("energy-knots"), ""),
+    ("energy", "深度情绪释放", payment_loader("energy-knots"), ""),
     ("oh", "OH卡", payment_loader("oh-card-readings"), "reading_type"),
     ("internal", "沙龙技能学习", payment_loader("internal-courses"), "course_type"),
     ("other", "其他项目", payment_loader("other-projects"), "project_name"),
@@ -83,6 +83,14 @@ def require_participant_profile_access(request, customer_id: str, course_id: str
     roles = get_request_roles(request)
     if "超级管理员" in roles or customer_access_service.get_customer_permissions(roles).get("scope") == "all":
         return False
+    organizations, directory, permissions = scope(request)
+    views = position_edit_permission_service.principal_views(permissions)
+    if not views["organization"]:
+        require_statistics_view(permissions, "person")
+        names = {item["name"] for item in permitted_referrers(request, organizations, directory, permissions)}
+        customer = directory.get(customer_id)
+        if not customer or (getattr(customer, "referrer", "") or "").strip() not in names:
+            raise HTTPException(403, "没有查看该客户的权限")
     organizations, _, _, courses = collect_data(request)
     matched = [course for course in courses
                if customer_id in (course.get("participant_ids") or []) + (course.get("owner_ids") or [])
@@ -125,7 +133,7 @@ def valid_day(value) -> str:
 
 
 def _activity_owner_ids(kind, activity) -> set[str]:
-    """案主按活动身份去重，能量结的多个部位不重复计次。"""
+    """案主按活动身份去重，深度情绪释放的多个部位不重复计次。"""
     if kind not in {"gcs", "ers", "eks"}:
         return set()
     owner_ids = {getattr(activity, "owner_id", "")} - {""}
@@ -664,6 +672,25 @@ def referrer_options(organizations, customers, *, own_scope=False) -> list[dict]
     )
 
 
+
+def permitted_referrers(request, organizations, customers, permissions) -> list[dict]:
+    """个人列表沿用组织范围，再叠加仅自己限制。"""
+    if not position_edit_permission_service.principal_views(permissions)["person"]:
+        return []
+    options = referrer_options(organizations, customers, own_scope=permissions["principal_scope"] == "own")
+    if permissions.get("principal_person_scope", "all") == "own":
+        account = account_service.get_account(getattr(request.state, "user_id", ""))
+        owner = (getattr(account, "owner", "") or "").strip()
+        matches = [customer.id for customer in customers.values() if owner and owner in {customer.nickname, customer.name}]
+        own_id = matches[0] if len(matches) == 1 else None
+        options = [item for item in options if item["id"] == own_id]
+    return options
+
+
+def require_statistics_view(permissions, scope_type):
+    if not position_edit_permission_service.principal_views(permissions).get(scope_type, False):
+        raise HTTPException(403, "没有查看个人统计的权限" if scope_type == "person" else "没有查看组织/俱乐部统计的权限")
+
 def course_participant_rows(courses, organizations, participant_scope="", customers=None, history=None):
     """每人每课一行；被课程所属组织/俱乐部的引流人引流来的客户算内部。
 
@@ -907,7 +934,8 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
     personal_name = ""
     if personal_scope:
         organizations, directory, permissions = scope(request)
-        option = next((item for item in referrer_options(organizations, directory, own_scope=permissions["principal_scope"] == "own")
+        require_statistics_view(permissions, "person")
+        option = next((item for item in permitted_referrers(request, organizations, directory, permissions)
                        if item["id"] == query.referrer_id), None)
         if query.referrer_id and option is None:
             raise HTTPException(403, "无权查看该个人的经营数据，或该个人暂无引流客户")
@@ -921,6 +949,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         events = [event for event in events if event.get("customer_id") in personal_customers]
     else:
         organizations, permissions, events, courses = collect_data(request)
+        require_statistics_view(permissions, "organization")
     chosen = selected_orgs(organizations, query.organization_id)
     access = permissions["customer_access"]["transaction_access"]
     if query.tab in {"orders", "conversion"}:
@@ -1040,7 +1069,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         # 明细里先放一条课程本身，保证点任何一个数字都能看到这门课的信息
         course["details"] = [f'课程｜{course["name"]}｜{course["date"]}｜{course["organization"]}'] + list(course.get("details") or [])
         if course.get("activity_type") == "eks" and course.get("parts"):
-            # 能量结只结算部位数，没有课时；这里把部位数和案主写清楚
+            # 深度情绪释放只结算部位数，没有课时；这里把部位数和案主写清楚
             course["details"].append(f'部位数｜{course["parts"]} 处｜案主｜{course["owner"] or "—"}')
         course["new_count"] = sum(first_arrival.get(cid) == course["date"] for cid in ids)
         course["old_count"] = len(ids) - course["new_count"]

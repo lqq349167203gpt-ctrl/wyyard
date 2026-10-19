@@ -93,6 +93,7 @@ export interface PrincipalQuery {
 }
 export interface PrincipalOption { key: string; label: string; subtypes: string[] }
 export interface PrincipalMetadata {
+  scope_types?: ("organization" | "person")[]
   organizations: { id: string; name: string; status?: "active" | "archived" }[]
   referrers?: { id: string; name: string; count: number }[]
   products: PrincipalOption[]
@@ -1236,6 +1237,7 @@ export interface VisitRecord {
   arrived: boolean
   arrival_time?: string
   cancelled: boolean
+  cancel_reason: string
   visit_count: number
   arrived_count: number
   invitation_count: number
@@ -1268,6 +1270,7 @@ export interface VisitRecordCreate {
   arrived?: boolean
   arrival_time?: string
   cancelled?: boolean
+  cancel_reason?: string
   feedback?: string
   healing_notes?: string
 }
@@ -3196,6 +3199,8 @@ export interface CustomerAccessPermissions {
   transaction_access: TransactionAccess
 }
 export interface PositionEditPermissions {
+  principal_views?: { organization: boolean; person: boolean }
+  principal_person_scope?: "own" | "all"
   principal_external_access?: CustomerAccessPermissions
   principal_scope?: "own" | "all"
   customers: "view" | "all"
@@ -3474,6 +3479,7 @@ export interface AuditCheckVisitRow {
   creator: string
   created_by_id: string
   cancelled: boolean
+  cancel_reason: string
   kinds: string[]
 }
 

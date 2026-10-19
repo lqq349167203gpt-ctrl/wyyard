@@ -6,7 +6,7 @@ ACTIVITY_TYPE_NAMES = {
     "class": "沙龙活动",
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
-    "eks": "能量结",
+    "eks": "深度情绪释放",
     "ics": "沙龙技能学习",
 
 }

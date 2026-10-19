@@ -200,7 +200,7 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
             elif cid in s.participant_ids:
                 result[cid].append(ActivityInfo(name="情绪释放", role=_role(cid), type="情绪", owner_name=s.owner_name or ""))
 
-    # 4. 能量结（owner > teacher > participant）
+    # 4. 深度情绪释放（owner > teacher > participant）
     for s in energy_knot_session_service.list_sessions(date):
         all_ids = set()
         if s.owner_id:
@@ -209,11 +209,11 @@ def _build_all_activities(date: Optional[str] = None) -> dict[str, list[Activity
         all_ids.update(s.participant_ids)
         for cid in all_ids:
             if cid == s.owner_id:
-                result[cid].append(ActivityInfo(name="能量结", role="案主", type="能量结", owner_name=s.owner_name or ""))
+                result[cid].append(ActivityInfo(name="深度情绪释放", role="案主", type="深度情绪释放", owner_name=s.owner_name or ""))
             elif cid in s.teacher_ids:
-                result[cid].append(ActivityInfo(name="能量结", role="老师", type="能量结", owner_name=s.owner_name or ""))
+                result[cid].append(ActivityInfo(name="深度情绪释放", role="老师", type="深度情绪释放", owner_name=s.owner_name or ""))
             elif cid in s.participant_ids:
-                result[cid].append(ActivityInfo(name="能量结", role=_role(cid), type="能量结", owner_name=s.owner_name or ""))
+                result[cid].append(ActivityInfo(name="深度情绪释放", role=_role(cid), type="深度情绪释放", owner_name=s.owner_name or ""))
 
     # 5. 沙龙技能学习（teacher > participant）
     for s in internal_course_session_service.list_sessions(date):
@@ -624,6 +624,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "arrival_time": r.arrival_time or "",
                 "arrived_count": all_arrived_counts.get(r.customer_id, 0),
                 "cancelled": r.cancelled,
+                "cancel_reason": r.cancel_reason,
                 "is_leader": r.is_leader,
                 "space_id": r.space_id or "",
                 "member_type": member_type,
@@ -643,6 +644,8 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
 def create_visit(data: VisitRecordCreate) -> VisitRecord:
     if data.cancelled:
         raise ValueError("新建邀约不能直接设为已取消")
+    if data.cancel_reason:
+        raise ValueError("新建邀约不能填写取消原因")
     # 验证客户必须存在于系统中
     if data.customer_id:
         from app.services import customer_service
@@ -725,14 +728,22 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
             raise ValueError("取消状态必须为布尔值")
 
         requested_cancelled = data.get("cancelled")
+        if "cancel_reason" in data and requested_cancelled is not True:
+            raise ValueError("取消原因只能在取消邀约时填写")
         if record.cancelled:
             if set(data) != {"cancelled"} or requested_cancelled is not False:
                 raise ValueError("已取消的邀约已锁定，请先恢复邀约")
         elif requested_cancelled is True:
             if record.arrived:
                 raise ValueError("已到店的邀约不能取消")
-            if set(data) != {"cancelled"}:
-                raise ValueError("取消邀约时不能同时修改其他内容")
+            if set(data) != {"cancelled", "cancel_reason"}:
+                raise ValueError("取消邀约时只能提交取消状态和原因")
+            reason = data.get("cancel_reason")
+            if not isinstance(reason, str) or not reason.strip():
+                raise ValueError("请输入取消原因")
+            reason = reason.strip()
+            if len(reason) > 200:
+                raise ValueError("取消原因不能超过200字")
 
         if data.get("arrived") is True and (record.cancelled or requested_cancelled is True):
             raise ValueError("已取消的邀约不能确认到店")
@@ -759,7 +770,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
 
         old_arrived = record.arrived
         if requested_cancelled is True:
-            data = {"cancelled": True, "arrived": False, "arrival_time": ""}
+            data = {"cancelled": True, "cancel_reason": reason, "arrived": False, "arrival_time": ""}
         for key, value in data.items():
             if hasattr(record, key) and key not in ("id", "created_at", "created_by_id", "created_by"):
                 setattr(record, key, value)
@@ -838,7 +849,7 @@ def _deduct_for_arrival(visit):
                     membership_card_service.get_activity_deduction_count(s),
                 )
 
-        # 能量结和沙龙技能学习不产生会员卡扣卡，无需参与到店同步。
+        # 深度情绪释放和沙龙技能学习不产生会员卡扣卡，无需参与到店同步。
         for cr in class_record_service.list_records(date=date):
             if not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
@@ -874,7 +885,7 @@ def _restore_for_arrival(visit):
             if cid in chargeable:
                 membership_card_service._do_sync_activity_count(cid, f"ers:{s.id}", 0)
 
-        # 能量结和沙龙技能学习不产生会员卡扣卡，无需参与到店同步。
+        # 深度情绪释放和沙龙技能学习不产生会员卡扣卡，无需参与到店同步。
         for cr in class_record_service.list_records(date=date):
             if not cr.is_public_welfare:
                 chargeable = class_record_service._get_group_member_ids(cr)
@@ -976,7 +987,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
     except Exception:
         logger.exception("清理情绪释放记录失败 customer=%s date=%s", customer_id, date)
 
-    # 能量结：teacher_ids, participant_ids
+    # 深度情绪释放：teacher_ids, participant_ids
     try:
         for s in energy_knot_session_service.list_sessions(date=date):
             changed = False
@@ -991,7 +1002,7 @@ def _cleanup_activity_records(customer_id: str, date: str):
             if changed:
                 energy_knot_session_service._save(s.id)
     except Exception:
-        logger.exception("清理能量结记录失败 customer=%s date=%s", customer_id, date)
+        logger.exception("清理深度情绪释放记录失败 customer=%s date=%s", customer_id, date)
 
     # 沙龙技能学习：teacher_ids, participant_ids
     try:

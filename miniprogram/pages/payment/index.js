@@ -89,7 +89,7 @@ function buildDetail(item, type) {
   }
   // group_case, emotional_release, energy_knot
   const count = item.purchase_count
-  return count != null ? `${count}次` : ''
+  return count != null ? `${count}${type === 'energy_knot' ? '个' : '次'}` : ''
 }
 
 function buildPrice(item, type) {
@@ -164,6 +164,7 @@ function decorateItems(raw, type, organizations) {
       _expiry: (isOhCard || isTeaSeat) ? '' : expiry,
       _diagnosisTeacher: isOhCard ? (item.diagnosis_teacher || '') : '',
       _purchaseCount: isCountProject ? purchaseCount : '',
+      _countUnit: type === 'energy_knot' ? '个' : '次',
       _remaining: (isOhCard || isTeaSeat || isOffline || type === 'internal_course') ? '' : (isHealing
         ? (item.effective_remaining != null ? item.effective_remaining : '')
         : (item.remaining_count === null ? '不限' : (item.remaining_count != null ? item.remaining_count : ''))),

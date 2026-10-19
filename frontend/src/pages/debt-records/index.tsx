@@ -11,7 +11,7 @@ const TABS = [
   { key: "membership_card", label: "会员卡" },
   { key: "group_case", label: "觉醒游戏" },
   { key: "emotional_release", label: "情绪释放" },
-  { key: "energy_knot", label: "能量结" },
+  { key: "energy_knot", label: "深度情绪释放" },
 ]
 
 const FILTERS: Array<{ key: DebtCourseFilter; label: string }> = [

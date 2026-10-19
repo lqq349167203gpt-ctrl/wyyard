@@ -38,6 +38,10 @@
           <text class="needs-label">来访需求</text>
           <text class="needs-content {{visit.needs ? '' : 'empty'}}">{{visit.needs || '-'}}</text>
         </view>
+        <view class="needs-row" wx:if="{{visit.cancelled && visit.cancel_reason}}">
+          <text class="needs-label">取消原因</text>
+          <text class="needs-content">{{visit.cancel_reason}}</text>
+        </view>
         <view class="needs-row" wx:if="{{visit.receptionist}}">
           <text class="needs-label">接待人</text>
           <text class="needs-content {{visit.receptionist ? '' : 'empty'}}">{{visit.receptionist || '-'}}</text>

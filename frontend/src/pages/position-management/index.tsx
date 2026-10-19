@@ -11,25 +11,21 @@ import {
 } from "@/components/ui/alert-dialog"
 import { positionApi, positionPermissionApi, accountApi } from "@/lib/api"
 import type {
-  ContactAction,
-  ContactField,
-  CustomerDataScope,
   Position,
   Account,
   PositionEditPermissions,
-  TransactionAccess,
 } from "@/lib/api"
 import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
 import { refreshAccountPermissions } from "@/hooks/use-edit-permissions"
-import { NOTE_PERMISSION_OPTIONS } from "@/lib/note-permissions"
+import { PermissionWorkspace } from "./permission-workspace"
 import { AccountsContent } from "@/pages/accounts"
 
-import { PAGE_PERMISSIONS as ALL_PAGES, PERMISSION_GROUPS } from "@/lib/page-registry"
-
-const SUPERVISION_TAB_KEYS = ["audit-check", "debt-records", "agreement-signings"]
+import { PAGE_PERMISSIONS as ALL_PAGES } from "@/lib/page-registry"
 
 const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
   principal_scope: "own",
+  principal_views: { organization: true, person: true },
+  principal_person_scope: "all",
   customers: "all",
   visits: "own",
   activities: "own",
@@ -68,6 +64,8 @@ const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
 
 const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
   principal_scope: "all",
+  principal_views: { organization: true, person: true },
+  principal_person_scope: "all",
   customers: "all",
   visits: "all",
   activities: "all",
@@ -104,7 +102,6 @@ const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
   },
 }
 
-type PermissionSection = "pages" | "edit"
 type PendingNavigation =
   | { type: "position"; positionId: string }
   | { type: "tab"; tab: string }
@@ -129,18 +126,11 @@ export default function PositionManagementPage() {
   const [loadError, setLoadError] = useState("")
   const loadSequence = useRef(0)
 
-  // 左侧选中
+  // 当前选中角色
   const [selectedPositionId, setSelectedPositionId] = useState<string | null>(() => {
     try { return localStorage.getItem("selectedPositionId") || null } catch { return null }
   })
-  const [permissionSection, setPermissionSection] = useState<PermissionSection>(() => {
-    try {
-      const stored = localStorage.getItem("role_permission_section")
-      return stored === "edit" || stored === "business" || stored === "privacy" ? "edit" : "pages"
-    } catch {
-      return "pages"
-    }
-  })
+  const [roleManagementOpen, setRoleManagementOpen] = useState(false)
 
   // 权限编辑状态
   const [formPermissions, setFormPermissions] = useState<string[]>([])
@@ -230,20 +220,11 @@ export default function PositionManagementPage() {
       && savedPermissionSnapshot
       && permissionSnapshot(formPermissions, formEditPermissions) !== savedPermissionSnapshot
   )
-  const enabledContactPermissionCount = (["phone", "wechat"] as ContactField[]).reduce(
-    (total, field) => total + (["view", "copy", "edit"] as ContactAction[])
-      .filter(action => formEditPermissions.contacts[field][action]).length,
-    0,
-  )
 
   const getPersonCount = (positionName: string) => {
     return accounts.filter(a => (a.roles?.length ? a.roles : [a.role]).includes(positionName)).length
   }
 
-  const selectPermissionSection = (section: PermissionSection) => {
-    setPermissionSection(section)
-    try { localStorage.setItem("role_permission_section", section) } catch {}
-  }
 
   const performNavigation = (navigation: PendingNavigation) => {
     setSaveMessage("")
@@ -292,99 +273,20 @@ export default function PositionManagementPage() {
 
   const handleTogglePermission = (pageKey: string) => {
     if (isSystemRole) return
-    setFormPermissions(prev => {
-      const next = prev.includes(pageKey) ? removePagePermissions(prev, [pageKey]) : [...prev, pageKey]
-      if (pageKey === "offline-course-records" && !next.includes(pageKey)) {
-        return removePagePermissions(next, ["offline-course-types"])
+    let next = formPermissions.includes(pageKey) ? removePagePermissions(formPermissions, [pageKey]) : [...formPermissions, pageKey]
+    if (pageKey === "offline-course-records" && !next.includes(pageKey)) next = removePagePermissions(next, ["offline-course-types"])
+    setFormPermissions(next)
+    if (!next.includes(pageKey)) {
+      // 与原保存接口的关闭联动保持一致，共用权限和独立核销入口不跟随关闭。
+      const resets: Record<string, Partial<PositionEditPermissions>> = {
+        "healing-records": { customers: "all" },
+        "class-records": { visits: "own", visit_lock: false },
+        "daily-activities": { activities: "own", activity_teachers: "view", activity_participants: "view", activity_lock: false },
+        "payment": { payments: "own" },
+        "course-statistics": { course_records: "own" },
       }
-      if (!next.includes(pageKey)) {
-        if (pageKey === "healing-records") {
-          setFormEditPermissions(current => ({ ...current, customers: "all" }))
-        }
-        if (pageKey === "class-records") {
-          setFormEditPermissions(current => ({ ...current, visits: "own", visit_lock: false }))
-        }
-        if (pageKey === "daily-activities") {
-          setFormEditPermissions(current => ({ ...current, activities: "own", activity_teachers: "view", activity_participants: "view", activity_lock: false }))
-        }
-        if (pageKey === "payment") {
-          setFormEditPermissions(current => ({ ...current, payments: "own" }))
-        }
-      }
-      return next
-    })
-  }
-
-  const handleToggleContactPermission = (field: ContactField, action: ContactAction) => {
-    if (isSystemRole) return
-    setFormEditPermissions(current => ({
-      ...current,
-      contacts: {
-        ...current.contacts,
-        [field]: {
-          ...current.contacts[field],
-          [action]: !current.contacts[field][action],
-        },
-      },
-    }))
-  }
-
-  const handleCustomerScopeChange = (scope: CustomerDataScope) => {
-    if (isSystemRole) return
-    setFormEditPermissions(current => ({
-      ...current,
-      customer_access: { ...current.customer_access, scope },
-    }))
-  }
-
-  const handleToggleCustomerRelation = (key: "referrer" | "referrer_handler") => {
-    if (isSystemRole) return
-    setFormEditPermissions(current => ({
-      ...current,
-      customer_access: {
-        ...current.customer_access,
-        relations: {
-          ...current.customer_access.relations,
-          [key]: !current.customer_access.relations[key],
-        },
-      },
-    }))
-  }
-
-  const handleToggleSensitiveField = (key: keyof PositionEditPermissions["customer_access"]["sensitive_fields"]) => {
-    if (isSystemRole) return
-    setFormEditPermissions(current => ({
-      ...current,
-      customer_access: {
-        ...current.customer_access,
-        sensitive_fields: {
-          ...current.customer_access.sensitive_fields,
-          [key]: !current.customer_access.sensitive_fields[key],
-        },
-      },
-    }))
-  }
-
-  const handleToggleDetailTab = (key: keyof PositionEditPermissions["customer_access"]["detail_tabs"]) => {
-    if (isSystemRole) return
-    setFormEditPermissions(current => ({
-      ...current,
-      customer_access: {
-        ...current.customer_access,
-        detail_tabs: {
-          ...current.customer_access.detail_tabs,
-          [key]: !current.customer_access.detail_tabs[key],
-        },
-      },
-    }))
-  }
-
-  const handleTransactionAccessChange = (transactionAccess: TransactionAccess) => {
-    if (isSystemRole) return
-    setFormEditPermissions(current => ({
-      ...current,
-      customer_access: { ...current.customer_access, transaction_access: transactionAccess },
-    }))
+      if (resets[pageKey]) setFormEditPermissions(current => ({ ...current, ...resets[pageKey] }))
+    }
   }
 
   const handleCreate = async () => {
@@ -588,9 +490,42 @@ export default function PositionManagementPage() {
       {!loading && !loadError && activeTab === "accounts" && <AccountsContent embedded sharedAccounts={accounts} sharedPositions={positions} onAccountsChange={setAccounts} />}
 
       {!loading && !loadError && activeTab === "roles" && (
-        <div className="flex gap-3" style={{ height: "calc(100vh - 180px)" }}>
-          {/* 左侧角色列表 */}
-          <div className="flex w-[232px] shrink-0 flex-col overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-[#e8eaee] bg-white px-4 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <label className="flex min-w-0 items-center gap-3 text-[13px]">
+                <span className="shrink-0">角色身份</span>
+                <select aria-label="角色身份" value={selectedPositionId || ""} onChange={event => handlePositionChange(event.target.value)} disabled={saving || !positions.length}
+                  className="h-8 min-w-0 max-w-full rounded-[4px] border border-[#dee0e3] bg-white px-2 text-[13px] sm:min-w-[160px] sm:max-w-[240px]">
+                  {!positions.length && <option value="">暂无角色</option>}
+                  {positions.map(position => <option key={position.id} value={position.id}>{position.name}</option>)}
+                </select>
+              </label>
+              {selectedPosition && <span className="text-[12px] text-[#646a73]">{getPersonCount(selectedPosition.name)} 人{isSystemRole ? " · 系统角色" : ""}</span>}
+              <Button variant="ghost" size="sm" disabled={saving || hasUnsavedChanges} title={hasUnsavedChanges ? "请先保存或放弃当前权限修改" : "新增、改名、排序和删除角色"} onClick={() => setRoleManagementOpen(true)}>管理角色</Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3" aria-live="polite">
+              {hasUnsavedChanges && <span className="text-[12px] text-[#646a73]">有未保存修改</span>}
+              {saveMessage && (saveError || !hasUnsavedChanges) && <span className={`text-[12px] ${saveError ? "text-destructive" : "text-[#646a73]"}`}>{saveMessage}</span>}
+              {selectedPosition && !isSystemRole && <>
+                {hasUnsavedChanges && <Button variant="outline" size="sm" disabled={saving} onClick={resetCurrentPermissions}>放弃修改</Button>}
+                <Button size="sm" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>{saving ? "保存中…" : "保存修改"}</Button>
+              </>}
+            </div>
+          </div>
+          {selectedPosition?.description && <p className="px-1 text-[12px] text-[#646a73]">{selectedPosition.description}</p>}
+          {selectedPosition ? <fieldset disabled={saving} className="min-w-0">
+            <PermissionWorkspace roleName={selectedPosition.name} system={isSystemRole} pages={formPermissions} edit={formEditPermissions}
+              setEdit={setFormEditPermissions} togglePage={handleTogglePermission} savedSnapshot={savedPermissionSnapshot} emptyAccess={DEFAULT_EDIT_PERMISSIONS.customer_access} />
+          </fieldset> : <p className="py-10 text-center text-[13px] text-[#646a73]">暂无角色，可在“管理角色”中新增。</p>}
+        </div>
+      )}
+
+      <Dialog open={roleManagementOpen} onOpenChange={setRoleManagementOpen}>
+        <DialogContent className="max-w-md gap-0 p-0" initialFocus={false}>
+          <DialogHeader className="border-b border-[#f0f0f0] px-4 py-3"><DialogTitle className="text-[14px] font-normal">管理角色</DialogTitle></DialogHeader>
+          {/* 保留角色排序、改名和删除入口 */}
+          <div className="flex w-full flex-col overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">
             <div className="flex h-12 items-center justify-between border-b border-[#f0f0f0] px-4">
               <div className="flex items-baseline gap-2">
                 <span className="text-[13px] font-medium text-[#1f2329]">角色</span>
@@ -600,7 +535,7 @@ export default function PositionManagementPage() {
                 新增角色
               </Button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="max-h-[60vh] overflow-y-auto">
               {loading ? (
                 <div className="py-8 text-center text-[12px] text-[#8f959e]">加载中...</div>
               ) : positions.length === 0 ? (
@@ -634,16 +569,17 @@ export default function PositionManagementPage() {
                         >
                           <GripVertical className="h-3.5 w-3.5" />
                         </button>
-                        <div className={`min-w-0 truncate text-[13px] ${isSelected ? "font-medium" : ""}`}>{pos.name}</div>
+                        <button type="button" className={`min-w-0 truncate text-left text-[13px] ${isSelected ? "font-medium" : ""}`} onClick={event => { event.stopPropagation(); handlePositionChange(pos.id) }}>{pos.name}</button>
                       </div>
                       <div className="flex shrink-0 items-center gap-0.5">
-                        <span className={`mr-1 text-[12px] text-[#8f959e] ${!pos.is_system ? "group-hover:hidden" : ""}`}>
+                        <span className="mr-1 text-[12px] text-[#8f959e]">
                           {getPersonCount(pos.name)} 人
                         </span>
                         {!pos.is_system && (
-                          <div className="hidden items-center gap-0.5 group-hover:flex">
+                          <div className="flex items-center gap-0.5">
                             <button
-                              className="flex h-7 w-7 items-center justify-center rounded-[4px] opacity-0 transition-opacity hover:bg-[#f5f6f7] disabled:cursor-default disabled:text-[#c9cdd4] group-hover:opacity-100"
+                              className="flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-[#f5f6f7] disabled:cursor-default disabled:text-[#c9cdd4]"
+                              aria-label={`编辑${pos.name}角色名称`}
                               onClick={(e) => { e.stopPropagation(); setEditingPosition(pos); setEditName(pos.name) }}
                               disabled={isSelected && hasUnsavedChanges}
                               title={isSelected && hasUnsavedChanges ? "请先保存权限修改" : "编辑角色名称"}
@@ -651,7 +587,8 @@ export default function PositionManagementPage() {
                               <Edit className="h-3.5 w-3.5" />
                             </button>
                             <button
-                              className="flex h-7 w-7 items-center justify-center rounded-[4px] opacity-0 transition-opacity hover:bg-[#f5f6f7] disabled:cursor-default disabled:opacity-40 group-hover:opacity-100"
+                              className="flex h-7 w-7 items-center justify-center rounded-[4px] hover:bg-[#f5f6f7] disabled:cursor-default disabled:opacity-40"
+                              aria-label={`删除${pos.name}角色`}
                               onClick={(e) => { e.stopPropagation(); setDeletePosition(pos); setDeleteConfirmName("") }}
                               disabled={isSelected && hasUnsavedChanges}
                               title={isSelected && hasUnsavedChanges ? "请先保存权限修改" : "删除角色"}
@@ -667,647 +604,8 @@ export default function PositionManagementPage() {
               )}
             </div>
           </div>
-
-          {/* 右侧权限工作区 */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-[#f0f0f0] bg-white">
-            <div className="flex min-h-[60px] items-center justify-between px-5">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-[14px] font-medium text-[#1f2329]">{selectedPosition?.name || "角色权限"}</span>
-                  {selectedPosition && <span className="text-[12px] text-[#8f959e]">{getPersonCount(selectedPosition.name)} 人</span>}
-                  {selectedPosition && isSystemRole && (
-                    <span className="rounded-[4px] bg-[#f0f1f2] px-1.5 py-0.5 text-[12px] text-[#8f959e]">系统角色</span>
-                  )}
-                </div>
-                {selectedPosition && (
-                  <div className="mt-1 truncate text-[12px] text-[#8f959e]">
-                    {selectedPosition.description || "配置该角色可访问的页面和可操作的信息范围"}
-                  </div>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-3">
-                {hasUnsavedChanges && <span className="text-[12px] text-[#8f959e]">有未保存修改</span>}
-                {saveMessage && (saveError || !hasUnsavedChanges) && (
-                  <span className={`text-[12px] ${saveError ? "text-[#c4506a]" : "text-[#8f959e]"}`}>{saveMessage}</span>
-                )}
-                {selectedPosition && !isSystemRole && (
-                  <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !hasUnsavedChanges}>
-                    {saving ? "保存中..." : "保存修改"}
-                  </Button>
-                )}
-              </div>
-            </div>
-            {selectedPosition && (
-              <div className="flex h-10 shrink-0 items-end gap-6 border-b border-[#e8e8e8] px-5">
-                {([
-                  { key: "pages" as PermissionSection, label: "页面权限", summary: `${ALL_PAGES.filter(page => formPermissions.includes(page.key)).length}/${ALL_PAGES.length}` },
-                  { key: "edit" as PermissionSection, label: "信息权限", summary: "操作与范围" },
-                ]).map(section => {
-                  const selected = permissionSection === section.key
-                  return (
-                    <button
-                      key={section.key}
-                      type="button"
-                      onClick={() => selectPermissionSection(section.key)}
-                      className={`relative flex h-10 items-center gap-1.5 px-1 text-[14px] transition-colors ${
-                        selected ? "text-[#3370ff]" : "text-[#2b2f36] hover:text-[#4e535a]"
-                      }`}
-                    >
-                      <span>{section.label}</span>
-                      <span className={`text-[12px] tabular-nums ${selected ? "text-[#3370ff]" : "text-[#8f959e]"}`}>{section.summary}</span>
-                      {selected && <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-sm bg-[#3370ff]" />}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {!selectedPosition ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-[13px] text-[#8f959e]">请从左侧选择角色</p>
-                  <p className="mt-1 text-[12px] text-[#c9cdd4]">选择后可配置页面访问和信息权限</p>
-                </div>
-              </div>
-            ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-                {permissionSection === "pages" && (
-                  <div className="max-w-[980px]">
-                    <div className="mb-4 flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-[14px] font-medium text-[#1f2329]">页面权限</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">勾选该角色可以进入的页面；监管可按页签授权。</div>
-                      </div>
-                      <span className="shrink-0 text-[12px] text-[#8f959e]">已开启 {ALL_PAGES.filter(page => formPermissions.includes(page.key)).length} / {ALL_PAGES.length} 项</span>
-                    </div>
-                    <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
-                      {PERMISSION_GROUPS.map((group) => {
-                        const checkedCount = group.keys.filter(k => formPermissions.includes(k)).length
-                        return (
-                          <div key={group.label} className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                            <div className="flex h-10 items-center justify-between border-b border-[#f0f0f0] bg-[#f7f8fa] px-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[13px] font-medium text-[#2b2f36]">{group.label}</span>
-                                <span className="text-[12px] text-[#8f959e]">{checkedCount}/{group.keys.length}</span>
-                              </div>
-                              {!isSystemRole && (
-                                <label className="flex cursor-pointer items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={group.keys.every(k => formPermissions.includes(k))}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setFormPermissions(prev => [...new Set([...prev, ...group.keys])])
-                                    } else {
-                                      setFormPermissions(prev => removePagePermissions(prev, group.label === "业务" ? [...group.keys, "offline-course-types"] : group.keys))
-                                      if (group.keys.includes("class-records")) {
-                                        setFormEditPermissions(current => ({ ...current, visits: "own", visit_lock: false }))
-                                      }
-                                      if (group.keys.includes("daily-activities")) {
-                                        setFormEditPermissions(current => ({ ...current, activities: "own", activity_teachers: "view", activity_participants: "view", activity_lock: false }))
-                                      }
-                                      if (group.keys.includes("payment")) {
-                                        setFormEditPermissions(current => ({ ...current, payments: "own" }))
-                                      }
-                                      if (group.keys.includes("course-statistics")) {
-                                        setFormEditPermissions(current => ({ ...current, course_records: "own" }))
-                                      }
-                                      if (group.keys.includes("healing-records")) {
-                                        setFormEditPermissions(current => ({ ...current, customers: "all" }))
-                                      }
-                                    }
-                                  }}
-                                  className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                                />
-                                <span className="text-[12px] text-[#8f959e]">全选</span>
-                                </label>
-                              )}
-                            </div>
-                            <div className="grid min-h-[52px] grid-cols-2 content-start gap-x-4 gap-y-1 px-3 py-2.5">
-                              {group.keys.filter(key => group.label !== "业务" || !SUPERVISION_TAB_KEYS.includes(key)).map((key) => {
-                                const page = ALL_PAGES.find(p => p.key === key)
-                                return (
-                                  <label key={key} className={`flex items-center gap-3 rounded-[4px] py-1.5 ${isSystemRole ? "" : "cursor-pointer hover:bg-[#f7f8fa]"}`}>
-                                    <input
-                                      type="checkbox"
-                                      checked={formPermissions.includes(key)}
-                                      onChange={() => handleTogglePermission(key)}
-                                      disabled={isSystemRole}
-                                      className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                                    />
-                                    <span className="text-[13px] text-[#2b2f36]">{page?.label || key}</span>
-                                  </label>
-                                )
-                              })}
-                              {group.label === "业务" && (
-                                <div className="col-span-2 mt-1 border-t border-[#f0f0f0] pt-2">
-                                  <div className="mb-1 flex items-center gap-2 text-[13px] text-[#2b2f36]">
-                                    <span className="font-medium">监管</span>
-                                    <span className="text-[12px] text-[#8f959e]">按页签授权</span>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 pl-3">
-                                    {SUPERVISION_TAB_KEYS.map(key => {
-                                      const page = ALL_PAGES.find(item => item.key === key)
-                                      return (
-                                        <label key={key} className={`flex items-center gap-3 rounded-[4px] py-1.5 ${isSystemRole ? "" : "cursor-pointer hover:bg-[#f7f8fa]"}`}>
-                                          <input
-                                            type="checkbox"
-                                            checked={formPermissions.includes(key)}
-                                            onChange={() => handleTogglePermission(key)}
-                                            disabled={isSystemRole}
-                                            className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                                          />
-                                          <span className="text-[13px] text-[#2b2f36]">{page?.label || key}</span>
-                                        </label>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                          </div>
-                            </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {permissionSection === "edit" && (
-                  <div className="max-w-[860px] space-y-7">
-                    <section>
-                      <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">数据统计查看范围</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">仅查看自己指账号归属人所属的组织；该页面不受客户资料可见范围限制。</div>
-                      </div>
-                      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                        <div className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-medium text-[#2b2f36]">可查看组织</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">控制数据统计页面可以看到哪些组织的经营数据</div>
-                            {!formPermissions.includes("principal") && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“数据统计”页面权限</div>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
-                            {([
-                              { value: "own" as const, label: "仅查看自己" },
-                              { value: "all" as const, label: "查看所有" },
-                            ]).map(option => {
-                              const selected = (formEditPermissions.principal_scope || "own") === option.value
-                              return (
-                                <button
-                                  key={option.value}
-                                  type="button"
-                                  disabled={isSystemRole || !formPermissions.includes("principal")}
-                                  onClick={() => setFormEditPermissions(previous => ({ ...previous, principal_scope: option.value }))}
-                                  className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors disabled:cursor-default ${
-                                    selected
-                                      ? "bg-[#1f2329] text-white"
-                                      : "text-[#646a73] hover:bg-[#f5f6f7] disabled:text-[#c9cdd4] disabled:hover:bg-transparent"
-                                  }`}
-                                >
-                                  {option.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                        <div className="border-t border-[#f0f0f0] px-4 py-4">
-                      <div className="mb-3">
-                        <div className="text-[13px] font-medium text-[#2b2f36]">外部客户资料查看权限</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">仅用于组织课程中的外部参与者，不继承公共权限；未勾选不显示。内部参与者仍使用公共权限。</div>
-                      </div>
-                      {([
-                        { key: "sensitive_fields", title: "隐私信息查看", fields: { visit_purpose: "到访目的", trauma_history: "创伤经历", current_block: "当下卡点", work_info: "工作情况", other_info: "其他信息" } },
-                        { key: "detail_tabs", title: "详情内容查看", fields: { ...Object.fromEntries(NOTE_PERMISSION_OPTIONS.map(item => [item.key, item.label])), communication: "沟通记录", activities: "活动记录", card_statistics: "卡次统计", offline_courses: "技能训练课程" } },
-                      ] as const).map(group => (
-                        <div key={group.key} className="mb-4">
-                          <div className="mb-2 text-[13px] font-medium">{group.title}</div>
-                          <div className="grid grid-cols-2 rounded-[4px] border border-[#f0f0f0] md:grid-cols-3">
-                            {Object.entries(group.fields).map(([key, label]) => (
-                              <label key={key} className="flex min-h-12 items-center gap-2 px-4 text-[13px]">
-                                <input type="checkbox" disabled={isSystemRole || !formPermissions.includes("principal")}
-                                  checked={isSystemRole || ((formEditPermissions.principal_external_access || DEFAULT_EDIT_PERMISSIONS.customer_access)[group.key] as Record<string, boolean>)[key] === true}
-                                  onChange={event => setFormEditPermissions(current => {
-                                    const access = current.principal_external_access || DEFAULT_EDIT_PERMISSIONS.customer_access
-                                    return { ...current, principal_external_access: { ...access, [group.key]: { ...access[group.key], [key]: event.target.checked } } }
-                                  })} className="h-4 w-4 accent-[#3370ff]" />
-                                {label}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      <div className="flex flex-wrap items-center gap-4 text-[13px]">
-                        <span>交易数据查看</span>
-                        {([{ value: "none", label: "不可查看" }, { value: "summary", label: "仅汇总" }, { value: "detail", label: "汇总与明细" }] as const).map(option => (
-                          <label key={option.value} className="flex items-center gap-2">
-                            <input type="radio" name="principal-external-transactions" disabled={isSystemRole || !formPermissions.includes("principal")}
-                              checked={(isSystemRole ? "detail" : formEditPermissions.principal_external_access?.transaction_access || "none") === option.value}
-                              onChange={() => setFormEditPermissions(current => ({ ...current, principal_external_access: { ...(current.principal_external_access || DEFAULT_EDIT_PERMISSIONS.customer_access), transaction_access: option.value } }))} />
-                            {option.label}
-                          </label>
-                        ))}
-                      </div>
-                        </div>
-                      </div>
-                    </section>
-                    <section>
-                      <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">课程记录查看范围</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">页面与导出使用同一范围，不受客户可见范围影响。</div>
-                      </div>
-                      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                        <div className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-medium text-[#2b2f36]">可查看记录</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">“与本人相关”只显示本人作为老师或成就君的课程</div>
-                            {!formPermissions.includes("course-statistics") && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“课程记录”页面权限</div>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
-                            {([
-                              { value: "own" as const, label: "与本人相关" },
-                              { value: "all" as const, label: "全部记录" },
-                            ]).map(option => {
-                              const selected = (formEditPermissions.course_records || "all") === option.value
-                              return (
-                                <button
-                                  key={option.value}
-                                  type="button"
-                                  disabled={isSystemRole || !formPermissions.includes("course-statistics")}
-                                  onClick={() => setFormEditPermissions(previous => ({ ...previous, course_records: option.value }))}
-                                  className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors disabled:cursor-default ${
-                                    selected
-                                      ? "bg-[#1f2329] text-white"
-                                      : "text-[#646a73] hover:bg-[#f5f6f7] disabled:text-[#c9cdd4] disabled:hover:bg-transparent"
-                                  }`}
-                                >
-                                  {option.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-                    <section>
-                      <div className="mb-3 text-[14px] font-medium text-[#1f2329]">技能训练课程操作</div>
-                      <div className="rounded-[4px] border border-[#f0f0f0]">
-                        <label className={`flex min-h-[76px] items-center justify-between gap-6 px-4 py-3 ${isSystemRole || !formPermissions.includes("offline-course-records") ? "" : "cursor-pointer"}`}>
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-medium text-[#2b2f36]">管理课程类型</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">允许新增、修改和删除技能训练课程类型；这不是独立页面。</div>
-                            {!formPermissions.includes("offline-course-records") && !isSystemRole && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“技能训练课程”页面权限</div>
-                            )}
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={isSystemRole || formPermissions.includes("offline-course-types")}
-                            onChange={() => handleTogglePermission("offline-course-types")}
-                            disabled={isSystemRole || !formPermissions.includes("offline-course-records")}
-                            className="h-4 w-4 shrink-0 rounded border-[#dee0e3] accent-[#3370ff]"
-                          />
-                        </label>
-                      </div>
-                    </section>
-                    <section>
-                      <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">客户资料可见范围</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">先限制能看到哪些客户，再决定可查看的信息内容。</div>
-                      </div>
-                      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                        <div className="flex min-h-[64px] items-center justify-between gap-6 px-4 py-3">
-                          <div>
-                            <div className="text-[13px] text-[#2b2f36]">数据范围</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">“与本人相关”可按引流关系和承接关系组合。勾选后同时包含本人自己的客户资料。</div>
-                          </div>
-                          <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
-                            {([
-                              { value: "all" as CustomerDataScope, label: "全部客户" },
-                              { value: "related" as CustomerDataScope, label: "与本人相关" },
-                              { value: "none" as CustomerDataScope, label: "不可查看" },
-                            ]).map(option => {
-                              const selected = formEditPermissions.customer_access.scope === option.value
-                              return (
-                                <button
-                                  key={option.value}
-                                  type="button"
-                                  disabled={isSystemRole}
-                                  onClick={() => handleCustomerScopeChange(option.value)}
-                                  className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors ${selected ? "bg-[#1f2329] text-white" : "text-[#646a73] hover:bg-[#f5f6f7]"}`}
-                                >
-                                  {option.label}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                        {formEditPermissions.customer_access.scope === "related" && (
-                          <div className="flex min-h-[52px] items-center gap-8 border-t border-[#f0f0f0] bg-[#fafbfc] px-4">
-                            {([
-                              { key: "referrer" as const, label: "本人是引流人" },
-                              { key: "referrer_handler" as const, label: "本人是承接人" },
-                            ]).map(item => (
-                              <label key={item.key} className="flex cursor-pointer items-center gap-2 text-[13px] text-[#2b2f36]">
-                                <input
-                                  type="checkbox"
-                                  checked={formEditPermissions.customer_access.relations[item.key]}
-                                  disabled={isSystemRole}
-                                  onChange={() => handleToggleCustomerRelation(item.key)}
-                                  className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                                />
-                                {item.label}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <p className="mt-2 text-[11px] leading-4 text-[#8f959e]">
-                        注意：「数据统计」与「组织信息」两个页面不受此范围限制，只按各自页面内的筛选条件和组织配置展示数据。
-                      </p>
-                    </section>
-
-                    <section>
-                      <div className="mb-3 flex items-end justify-between gap-4">
-                        <div>
-                          <div className="text-[14px] font-medium text-[#1f2329]">业务操作范围</div>
-                          <div className="mt-1 text-[12px] text-[#8f959e]">分别设置各业务的操作范围；课表还可额外允许授课老师编辑本人授课的课程。</div>
-                        </div>
-                        <span className="shrink-0 text-[12px] text-[#8f959e]">页面权限控制入口，操作范围控制写入</span>
-                      </div>
-                      <div className="divide-y divide-[#f0f0f0] overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                        {([
-                          {
-                            key: "customers" as const,
-                            pageKey: "healing-records",
-                            label: "客户资料",
-                            description: "新增、编辑、停用、标签、跟进点及沟通记录",
-                            options: [
-                              { value: "view" as const, label: "仅浏览" },
-                              { value: "all" as const, label: "可编辑" },
-                            ],
-                          },
-                          {
-                            key: "visits" as const,
-                            pageKey: "class-records",
-                            label: "邀约",
-                            description: "客户、邀约人、时间及删除受创建人限制；取消/恢复可由非只读员工操作",
-                            options: [
-                              { value: "view" as const, label: "仅浏览" },
-                              { value: "own" as const, label: "仅本人录入" },
-                              { value: "all" as const, label: "全部记录" },
-                            ],
-                          },
-                          {
-                            key: "activities" as const,
-                            pageKey: "daily-activities",
-                            label: "课表",
-                            description: "课程、老师、时间、扣卡、案主、简介及删除",
-                            options: [
-                              { value: "view" as const, label: "仅浏览" },
-                              { value: "own" as const, label: "仅本人录入" },
-                              { value: "all" as const, label: "全部记录" },
-                            ],
-                          },
-                          {
-                            key: "activity_teachers" as const,
-                            pageKey: "daily-activities",
-                            label: "授课老师编辑",
-                            description: "开启后，该课已选择的老师对应账号可修改课程内容；删除仍仅限创建人",
-                            options: [
-                              { value: "view" as const, label: "关闭" },
-                              { value: "own" as const, label: "允许" },
-                            ],
-                          },
-                          {
-                            key: "activity_participants" as const,
-                            pageKey: "daily-activities",
-                            label: "课表人员配置",
-                            description: "控制老人、新人参与名单的拖入与移除，不影响课程内容编辑权限",
-                            options: [
-                              { value: "view" as const, label: "不可配置" },
-                              { value: "own" as const, label: "仅本人课表" },
-                              { value: "all" as const, label: "全部课表" },
-                            ],
-                          },
-                          {
-                            key: "payments" as const,
-                            pageKey: "payment",
-                            label: "付费项目",
-                            description: "控制已有付费记录的修改和删除；新增记录不受此项限制",
-                            options: [
-                              { value: "own" as const, label: "仅本人录入" },
-                              { value: "all" as const, label: "全部记录" },
-                            ],
-                          },
-                        ]).map((item) => {
-                          const pageEnabled = formPermissions.includes(item.pageKey)
-                          return (
-                            <div key={item.key} className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
-                              <div className="min-w-0">
-                                <div className="text-[13px] font-medium text-[#2b2f36]">{item.label}</div>
-                                <div className="mt-1 text-[12px] text-[#8f959e]">{item.description}</div>
-                                {!pageEnabled && (
-                                  <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“{item.label}”页面权限</div>
-                                )}
-                              </div>
-                              <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
-                                {item.options.map((option) => {
-                                  const selected = formEditPermissions[item.key] === option.value
-                                  return (
-                                    <button
-                                      key={option.value}
-                                      type="button"
-                                      disabled={isSystemRole || !pageEnabled}
-                                      onClick={() => setFormEditPermissions(current => ({ ...current, [item.key]: option.value }))}
-                                      className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors disabled:cursor-default ${
-                                        selected
-                                          ? "bg-[#1f2329] text-white"
-                                          : "text-[#646a73] hover:bg-[#f5f6f7] disabled:text-[#c9cdd4] disabled:hover:bg-transparent"
-                                      }`}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                        <div className="flex min-h-[76px] items-center justify-between gap-6 border-b border-[#f0f0f0] px-4 py-3">
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-medium text-[#2b2f36]">邀约核对与锁定</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">核对后仅保留来访需求、客户信息和跟进点可编辑</div>
-                            {!formPermissions.includes("class-records") && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“邀约”页面权限</div>
-                            )}
-                          </div>
-                          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[12px] text-[#646a73]">
-                            <input
-                              type="checkbox"
-                              checked={formEditPermissions.visit_lock}
-                              disabled={isSystemRole || !formPermissions.includes("class-records")}
-                              onChange={(event) => setFormEditPermissions(current => ({ ...current, visit_lock: event.target.checked }))}
-                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff] disabled:cursor-default"
-                            />
-                            允许核对与解锁
-                          </label>
-                        </div>
-                        <div className="flex min-h-[76px] items-center justify-between gap-6 px-4 py-3">
-                          <div className="min-w-0">
-                            <div className="text-[13px] font-medium text-[#2b2f36]">课表核对与锁定</div>
-                            <div className="mt-1 text-[12px] text-[#8f959e]">核对当天课程安排与参与人；周主题和每日主题不受锁定影响</div>
-                            {!formPermissions.includes("daily-activities") && (
-                              <div className="mt-1 text-[12px] text-[#c9cdd4]">请先开启“课表”页面权限</div>
-                            )}
-                          </div>
-                          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[12px] text-[#646a73]">
-                            <input
-                              type="checkbox"
-                              checked={formEditPermissions.activity_lock}
-                              disabled={isSystemRole || !formPermissions.includes("daily-activities")}
-                              onChange={(event) => setFormEditPermissions(current => ({ ...current, activity_lock: event.target.checked }))}
-                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff] disabled:cursor-default"
-                            />
-                            允许核对与解锁
-                          </label>
-                        </div>
-                      </div>
-                      <p className="mt-2.5 text-[12px] text-[#8f959e]">“仅浏览”会同时由后端拦截写操作；邀约和课表的“仅本人录入”仍按创建人控制受保护内容。</p>
-                    </section>
-
-                    <section>
-                      <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">隐私信息查看</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">未勾选的字段在客户列表、详情页和管理端小程序中都不返回内容。</div>
-                      </div>
-                      <div className="grid grid-cols-2 overflow-hidden rounded-[4px] border border-[#f0f0f0] md:grid-cols-3">
-                        {([
-                          { key: "visit_purpose" as const, label: "到访目的" },
-                          { key: "trauma_history" as const, label: "创伤经历" },
-                          { key: "current_block" as const, label: "当下卡点" },
-                          { key: "work_info" as const, label: "工作情况" },
-                          { key: "other_info" as const, label: "其他信息" },
-                        ]).map(item => (
-                          <label key={item.key} className="flex min-h-[48px] cursor-pointer items-center gap-2 border-b border-r border-[#f0f0f0] px-4 text-[13px] text-[#2b2f36] last:border-b-0">
-                            <input
-                              type="checkbox"
-                              checked={formEditPermissions.customer_access.sensitive_fields[item.key]}
-                              disabled={isSystemRole}
-                              onChange={() => handleToggleSensitiveField(item.key)}
-                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                            />
-                            {item.label}
-                          </label>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section>
-                      <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">详情内容查看</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">控制客户详情页下方各类记录；无权限的栏目不显示。</div>
-                      </div>
-                      <div className="grid grid-cols-2 overflow-hidden rounded-[4px] border border-[#f0f0f0] md:grid-cols-3">
-                        {([
-                          ...NOTE_PERMISSION_OPTIONS,
-                          { key: "communication" as const, label: "沟通记录" },
-                          { key: "activities" as const, label: "活动记录" },
-                          { key: "card_statistics" as const, label: "卡次统计" },
-                          { key: "offline_courses" as const, label: "技能训练课程" },
-                        ]).map(item => (
-                          <label key={item.key} className="flex min-h-[48px] cursor-pointer items-center gap-2 border-b border-r border-[#f0f0f0] px-4 text-[13px] text-[#2b2f36]">
-                            <input
-                              type="checkbox"
-                              checked={formEditPermissions.customer_access.detail_tabs[item.key]}
-                              disabled={isSystemRole}
-                              onChange={() => handleToggleDetailTab(item.key)}
-                              className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                            />
-                            {item.label}
-                          </label>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section>
-                      <div className="mb-3">
-                        <div className="text-[14px] font-medium text-[#1f2329]">交易数据查看</div>
-                        <div className="mt-1 text-[12px] text-[#8f959e]">与客户消费金额、产品销售和客户详情交易记录使用同一权限。</div>
-                      </div>
-                      <div className="flex min-h-[64px] items-center justify-between gap-6 rounded-[4px] border border-[#f0f0f0] px-4 py-3">
-                        <div className="text-[13px] text-[#2b2f36]">交易信息层级</div>
-                        <div className="flex shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
-                          {([
-                            { value: "none" as TransactionAccess, label: "不可查看" },
-                            { value: "summary" as TransactionAccess, label: "仅汇总" },
-                            { value: "detail" as TransactionAccess, label: "汇总与明细" },
-                          ]).map(option => {
-                            const selected = formEditPermissions.customer_access.transaction_access === option.value
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                disabled={isSystemRole}
-                                onClick={() => handleTransactionAccessChange(option.value)}
-                                className={`h-7 rounded-[3px] px-3 text-[12px] transition-colors ${selected ? "bg-[#1f2329] text-white" : "text-[#646a73] hover:bg-[#f5f6f7]"}`}
-                              >
-                                {option.label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </section>
-
-                    <section>
-                      <div className="mb-3 flex items-end justify-between gap-4">
-                        <div>
-                          <div className="text-[14px] font-medium text-[#1f2329]">联系方式权限</div>
-                          <div className="mt-1 text-[12px] text-[#8f959e]">控制已有客户手机号和微信号的查看、复制与修改权限。</div>
-                        </div>
-                        <span className="shrink-0 text-[12px] text-[#8f959e]">已开启 {enabledContactPermissionCount} / 6</span>
-                      </div>
-                      <div className="overflow-hidden rounded-[4px] border border-[#f0f0f0]">
-                        <div className="grid grid-cols-[minmax(120px,1fr)_96px_96px_96px] items-center bg-[#f7f8fa] px-4 py-2.5 text-[13px] text-[#8f959e]">
-                          <span>联系方式</span>
-                          <span className="text-center">查看明文</span>
-                          <span className="text-center">复制</span>
-                          <span className="text-center">修改</span>
-                        </div>
-                        {([
-                          { field: "phone" as ContactField, label: "手机号" },
-                          { field: "wechat" as ContactField, label: "微信号" },
-                        ]).map(item => (
-                          <div key={item.field} className="grid min-h-[52px] grid-cols-[minmax(120px,1fr)_96px_96px_96px] items-center border-t border-[#f0f0f0] px-4">
-                            <span className="text-[13px] text-[#2b2f36]">{item.label}</span>
-                            {(["view", "copy", "edit"] as ContactAction[]).map(action => (
-                              <label key={action} className={`flex h-full items-center justify-center ${isSystemRole ? "" : "cursor-pointer"}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={formEditPermissions.contacts[item.field][action]}
-                                  disabled={isSystemRole}
-                                  onChange={() => handleToggleContactPermission(item.field, action)}
-                                  className="h-4 w-4 rounded border-[#dee0e3] accent-[#3370ff]"
-                                />
-                              </label>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2.5 text-[12px] leading-5 text-[#8f959e]">
-                        新建客户时可正常录入。查看、复制和修改已有联系方式都会进入操作日志，日志不会保存联系方式明文。
-                      </div>
-                    </section>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* 新增角色 Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

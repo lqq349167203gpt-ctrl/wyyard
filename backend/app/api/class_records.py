@@ -41,7 +41,7 @@ ACTIVITY_NOTE_SOURCE_LABELS = {
     "class_record": "沙龙活动",
     "group_case": "觉醒游戏",
     "emotional_release": "情绪释放",
-    "energy_knot": "能量结",
+    "energy_knot": "深度情绪释放",
     "internal_course": "沙龙技能学习",
 }
 
@@ -298,7 +298,7 @@ def list_unified(
                         names = [d.get("name", "") for d in parsed if d.get("name")]
                 except Exception:
                     pass
-                title = f"能量结【{'丨'.join(names)}】" if names else f"能量结【{owner or '未分配'}】"
+                title = f"深度情绪释放【{'丨'.join(names)}】" if names else f"深度情绪释放【{owner or '未分配'}】"
             elif i["type"] == "ics":
                 title = i["data"].get("course_name", "") if isinstance(i["data"], dict) else getattr(i["data"], "course_name", "")
             if name_lower in title.lower():

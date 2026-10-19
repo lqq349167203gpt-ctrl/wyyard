@@ -20,7 +20,7 @@ class IdentityCondition(SafeBaseModel):
 
     @model_validator(mode="after")
     def normalize_card_items(self):
-        self.payment_categories = ["沙龙技能学习" if item == "内部课程" else item for item in self.payment_categories]
+        self.payment_categories = [{"内部课程": "沙龙技能学习", "能量结": "深度情绪释放"}.get(item, item) for item in self.payment_categories]
         if self.type == "card" or (self.type == "payment" and "会员卡" in self.payment_categories):
             legacy = {"月卡", "12次卡", "3月卡", "半年卡", "年卡", "常规通卡"}
             only_cards = self.type == "card" or set(self.payment_categories) == {"会员卡"}

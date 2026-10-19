@@ -46,7 +46,7 @@ TYPE_MAP = {
         "model_name": "EmotionalReleaseSessionCreate",
     },
     "eks": {
-        "label": "能量结",
+        "label": "深度情绪释放",
         "service": energy_knot_session_service,
         "model_module": "app.models.energy_knot_session",
         "model_name": "EnergyKnotSessionCreate",
@@ -131,13 +131,13 @@ def _find_all_activities(date: str, space_id: str = ""):
             "owner_name": r.owner_name,
         })
 
-    # 能量结
+    # 深度情绪释放
     for r in energy_knot_session_service.list_sessions(date=date):
         if sid and r.space_id and r.space_id != sid:
             continue
         results.append({
-            "type": "eks", "type_label": "能量结",
-            "id": r.id, "name": r.name or f"能量结·{r.owner_name}",
+            "type": "eks", "type_label": "深度情绪释放",
+            "id": r.id, "name": r.name or f"深度情绪释放·{r.owner_name}",
             "start_time": r.start_time, "end_time": r.end_time,
             "teacher_ids": r.teacher_ids, "participant_ids": r.participant_ids,
             "owner_name": r.owner_name,
@@ -298,13 +298,13 @@ def create_activity(
     """创建一个新的活动。注意：必须先确认活动类型和老师才能创建，不要自己猜测类型。
 
     Args:
-        activity_type: 一级分类，可选值：class(沙龙), gcs(觉醒游戏), ers(情绪释放), eks(能量结), ics(沙龙技能学习)
+        activity_type: 一级分类，可选值：class(沙龙), gcs(觉醒游戏), ers(情绪释放), eks(深度情绪释放), ics(沙龙技能学习)
         name: 活动名称（如"颂钵"、"读书会"）
         course_type: 具体子类型名称（如"颂钵"、"读书会"、"疗愈师课程"），class 和 ics 类型必须填
         start_time: 开始时间，格式 HH:MM（如"14:00"），必须提供
         end_time: 结束时间，格式 HH:MM（如"16:00"）
         teacher_name: 老师/主持人昵称（如"小明"），必须提供
-        owner_name: 案主昵称（觉醒、情绪释放、能量结类型需要）
+        owner_name: 案主昵称（觉醒、情绪释放、深度情绪释放类型需要）
         is_public_welfare: 是否公益（沙龙类型可选，默认否）
         activity_date: 活动日期，可传用户原话（如"上周五"）或 YYYY-MM-DD，不填则用当前选中日期
     """
@@ -429,8 +429,8 @@ def create_activity(
                     space_id=space_id, space_name=space_name,
                 )
             )
-            _log_activity(f"新增能量结 {name}", method="POST")
-            return json.dumps({"ok": True, "action": "create", "type": "能量结", "name": name, "id": record.id}, ensure_ascii=False)
+            _log_activity(f"新增深度情绪释放 {name}", method="POST")
+            return json.dumps({"ok": True, "action": "create", "type": "深度情绪释放", "name": name, "id": record.id}, ensure_ascii=False)
 
         elif activity_type == "ics":
             record = internal_course_session_service.create_session(

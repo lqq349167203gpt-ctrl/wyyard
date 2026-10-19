@@ -82,7 +82,7 @@ ACTIVITY_SUMMARY_TYPES = (
     ("class", "沙龙活动"),
     ("gcs", "觉醒游戏"),
     ("ers", "情绪释放"),
-    ("eks", "能量结"),
+    ("eks", "深度情绪释放"),
     ("ics", "沙龙技能学习"),
 )
 
@@ -258,7 +258,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
 
 
 def _parse_ek_names(desc) -> str:
-    """解析能量结 description JSON，提取案主名，用丨连接"""
+    """解析深度情绪释放 description JSON，提取案主名，用丨连接"""
     if not desc:
         return ""
     try:
@@ -570,7 +570,7 @@ def _build_purchase_summary(customer_id: str) -> list:
             ],
         })
 
-    # 能量结
+    # 深度情绪释放
     ek_knots = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
     ek_purchased = sum(k.purchase_count for k in ek_knots)
     ek_session_deds = energy_knot_session_service._get_session_deductions_for_customer(customer_id)
@@ -582,7 +582,7 @@ def _build_purchase_summary(customer_id: str) -> list:
     ek_earliest, ek_earliest_cnt = _earliest_expiry(ek_knots, "energy-knots")
     if ek_purchased > 0 or ek_session_used > 0:
         summary.append({
-            "type": "能量结",
+            "type": "深度情绪释放",
             "name": "",
             "total_purchased": ek_purchased,
             "total_amount": sum(k.amount for k in ek_knots),
@@ -890,9 +890,9 @@ def _build_activities(
                 ),
             })
 
-    # 能量结（必须实际到店）
+    # 深度情绪释放（必须实际到店）
     for s in energy_knot_session_service.list_sessions():
-        ek_name = _course_activity_name("eks", "能量结", s)
+        ek_name = _course_activity_name("eks", "深度情绪释放", s)
         host = ", ".join([customer_service.get_customer(tid).nickname if customer_service.get_customer(tid) else tid for tid in s.teacher_ids])
         role = _resolve_activity_role(
             customer_id,
@@ -907,7 +907,7 @@ def _build_activities(
             attended = s.date in arrived_dates and not withdrawn
             project_count = energy_knot_session_service.get_session_deduction_count(s, customer_id) if role == "案主" else 0
             activities.append({
-                "type": "能量结",
+                "type": "深度情绪释放",
                 "date": s.date,
                 "start_time": getattr(s, 'start_time', '') or '',
                 "end_time": getattr(s, 'end_time', '') or '',
@@ -922,7 +922,7 @@ def _build_activities(
                 "deduction_summary": deduction_summary(
                     attended=attended,
                     coarse_count=coarse_deduction_counts.get(f"eks:{s.id}", 0),
-                    project_label=f"能量结部位{project_count}个" if role == "案主" else "",
+                    project_label=f"深度情绪释放部位{project_count}个" if role == "案主" else "",
                     withdrawn=withdrawn,
                 ),
             })
@@ -965,7 +965,7 @@ def _build_activities(
         "沙龙类型": "class",
         "觉醒游戏": "gcs",
         "情绪释放": "ers",
-        "能量结": "eks",
+        "深度情绪释放": "eks",
         "沙龙技能学习": "ics",
     }
     for activity in activities:
@@ -1101,7 +1101,7 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "notes": r.notes or "",
         })
 
-    # 能量结
+    # 深度情绪释放
     ek = [k for k in energy_knot_service.list_knots() if k.customer_id == customer_id]
     for k in ek:
         if date and k.deal_date != date:
@@ -1109,8 +1109,8 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
         records.append({
             "source_id": k.id,
             "source_created_at": k.created_at.isoformat(),
-            "type": "能量结",
-            "name": "能量结",
+            "type": "深度情绪释放",
+            "name": "深度情绪释放",
             "quantity": f"{k.purchase_count}个",
             "amount": k.amount,
             "deal_date": k.deal_date or "",

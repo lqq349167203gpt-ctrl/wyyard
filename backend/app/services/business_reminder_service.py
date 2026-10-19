@@ -109,7 +109,7 @@ def _format_condition(condition) -> str:
     op_map = {"gt": "大于", "eq": "等于", "lt": "小于"}
     activity_map = {
         "membership": "会员卡", "emotional_release": "情绪释放",
-        "group_case": "觉醒游戏", "energy_knot": "能量结", "internal_course": "沙龙技能学习",
+        "group_case": "觉醒游戏", "energy_knot": "深度情绪释放", "internal_course": "沙龙技能学习",
     }
 
     if condition.type == "acquaintance_date":

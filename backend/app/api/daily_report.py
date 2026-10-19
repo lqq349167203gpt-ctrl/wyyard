@@ -73,7 +73,7 @@ def report_activities(course_data, arrived_by_date=None, coarse_customers=None):
         ("class_records", "class_record", "class", "沙龙活动"),
         ("gcs_sessions", "group_case", "gcs", "觉醒游戏"),
         ("ers_sessions", "emotional_release", "ers", "情绪释放"),
-        ("eks_sessions", "energy_knot", "eks", "能量结"),
+        ("eks_sessions", "energy_knot", "eks", "深度情绪释放"),
         ("ics_sessions", "internal_course", "ics", "沙龙技能学习"),
     )
     activities = []

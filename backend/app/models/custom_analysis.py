@@ -130,8 +130,12 @@ VALUELESS_OPERATORS = {"is_empty", "is_not_empty", *DAY_TYPE_OPERATORS}
 
 def _normalize_filter_label(value: Any, field: str, operator: str) -> Any:
     """旧模板只转换有明确分类含义的值，不修改原始存储和用户的模糊搜索词。"""
+    if isinstance(value, str) and field == "activity_names" and (value == "能量结" or value.startswith("能量结·")):
+        return "深度情绪释放" + value[len("能量结"):]
     if not isinstance(value, str) or field not in {"activity_types", "payment_categories", "purchased_projects"}:
         return value
+    if value == "能量结" or value.startswith("能量结·"):
+        value = "深度情绪释放" + value[len("能量结"):]
     if value == "内部课程" or value.startswith("内部课程·"):
         value = "沙龙技能学习" + value[len("内部课程"):]
     # OH卡梳理仍是活动类型；只有付费分类的旧名称改为OH卡诊断。

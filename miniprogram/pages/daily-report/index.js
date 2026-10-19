@@ -523,7 +523,7 @@ Page({
           amount = item.amount || 0
           break
         case 'energy_knot':
-          itemType = '能量结'
+          itemType = '深度情绪释放'
           amount = item.amount || 0
           purchaseCount = item.purchase_count || 0
           break
@@ -590,7 +590,7 @@ Page({
     const projectLabelMap = {
       "group-cases": "觉醒游戏",
       "emotional-releases": "情绪释放",
-      "energy-knots": "能量结",
+      "energy-knots": "深度情绪释放",
     }
 
     // 1. 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
@@ -634,7 +634,7 @@ Page({
         map[s.owner_id] = (map[s.owner_id] || 0) + 1
       }
     }
-    // 能量结：案主扣部位数（与后端 get_session_deduction_count 逻辑一致）
+    // 深度情绪释放：案主扣部位数（与后端 get_session_deduction_count 逻辑一致）
     for (const s of (dashboard.eks_sessions || [])) {
       if (!s.owner_id) continue
       const map = activityProjectDeductionMaps["energy-knots"] || (activityProjectDeductionMaps["energy-knots"] = {})
@@ -718,7 +718,7 @@ Page({
       })
     }
 
-    // 案主活动销卡行（觉醒游戏/情绪释放/能量结）
+    // 案主活动销卡行（觉醒游戏/情绪释放/深度情绪释放）
     for (const [projectType, dedupMap] of Object.entries(activityProjectDeductionMaps)) {
       for (const [cid, activityCount] of Object.entries(dedupMap)) {
         const customer = customerMap[cid]
@@ -892,7 +892,7 @@ Page({
         case 'oh_card_reading':
           c1 = 'OH卡诊断'; c2 = ohCardReadingName(item) || 'OH卡诊断'; quantity = ''; amount = item.amount || 0; break
         case 'energy_knot':
-          c1 = '能量结'; c2 = '能量结'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
+          c1 = '深度情绪释放'; c2 = '深度情绪释放'; quantity = item.purchase_count || 0; amount = item.amount || 0; break
         case 'internal_course':
           c1 = '沙龙技能学习'; c2 = item.course_type || ''; quantity = 1; amount = item.price || 0; break
         case 'tea_seat_fee':

@@ -9,7 +9,7 @@ from app.models.base import SafeBaseModel
 class ActivityInfo(SafeBaseModel):
     name: str = ""
     role: str = ""  # 组长 / 副组长 / 组员 / 空
-    type: str = ""  # 沙龙 / 觉醒 / 情绪 / 能量结 / 内部课
+    type: str = ""  # 沙龙 / 觉醒 / 情绪 / 深度情绪释放 / 内部课
     owner_name: str = ""  # 案主 / 课程老师 名称
     extra_badge: str = ""  # 附加标签，如 "成就君：xxx"
     is_welfare: bool = False  # 是否公益活动
@@ -30,6 +30,7 @@ class VisitRecordBase(SafeBaseModel):
     arrived: bool = False  # 是否到店
     arrival_time: str = ""  # 实际到场时间 HH:MM
     cancelled: bool = False  # 是否已取消邀约；取消后记录保留但锁定
+    cancel_reason: str = ""  # 最近一次取消原因；恢复后保留记录
     experience: str = ""  # 客户反馈
     feedback: str = ""  # 疗愈师回复
     healing_notes: str = ""  # 跟进记录
@@ -39,7 +40,7 @@ class VisitRecordBase(SafeBaseModel):
 
     @field_validator(
         "visit_time", "member_type", "needs", "referrer_handler", "receptionist", "goal",
-        "space_id", "arrival_time", "created_by_id", "created_by",
+        "space_id", "arrival_time", "cancel_reason", "created_by_id", "created_by",
         "experience", "feedback", "healing_notes",
         mode="before",
     )

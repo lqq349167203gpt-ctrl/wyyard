@@ -529,9 +529,9 @@ Page({
           const teacher = (r.teacher_names || [])[0] || ''
           rawMap[`energy_knot_${r.id}`] = r
           records.push({
-            id: r.id, badge: '能量结',
-            name: r.name || (teacher ? `能量结·${teacher}` : '能量结'),
-            color: BADGE_COLORS['能量结'],
+            id: r.id, badge: '深度情绪释放',
+            name: r.name || (teacher ? `深度情绪释放·${teacher}` : '深度情绪释放'),
+            color: BADGE_COLORS['深度情绪释放'],
             time: r.start_time && r.end_time ? `${r.start_time}-${r.end_time}` : r.start_time || '',
             teacher: (r.teacher_names || []).join('、'),
             deductionCount: r.membership_deduction_count,
@@ -608,7 +608,7 @@ Page({
         { recordType: 'class', typeLabel: '沙龙', records: dashboard.class_records || [], owner: false },
         { recordType: 'gcs', typeLabel: '觉醒游戏', records: dashboard.gcs_sessions || [], owner: true },
         { recordType: 'ers', typeLabel: '情绪释放', records: dashboard.ers_sessions || [], owner: true },
-        { recordType: 'eks', typeLabel: '能量结', records: dashboard.eks_sessions || [], owner: true },
+        { recordType: 'eks', typeLabel: '深度情绪释放', records: dashboard.eks_sessions || [], owner: true },
         { recordType: 'ics', typeLabel: '沙龙技能学习', records: dashboard.ics_sessions || [], owner: false },
       ]
       withdrawalSources.forEach(function(source) {

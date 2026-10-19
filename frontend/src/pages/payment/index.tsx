@@ -19,7 +19,7 @@ const TABS = [
   { key: "group_case", label: "觉醒游戏" },
   { key: "emotional_release", label: "情绪释放" },
   { key: "oh_card_reading", label: "OH卡诊断" },
-  { key: "energy_knot", label: "能量结" },
+  { key: "energy_knot", label: "深度情绪释放" },
   { key: "internal_course", label: "沙龙技能学习" },
   { key: "tea_seat_fee", label: "茶位费" },
   { key: "offline_course", label: "线下落地课程" },

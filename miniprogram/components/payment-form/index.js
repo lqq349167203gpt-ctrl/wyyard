@@ -328,7 +328,7 @@ Component({
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
         amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
       } else {
-        rows.push({ label: type === 'energy_knot' ? '购买部位' : '购买场次', value: (formData.purchase_count || '0') + (type === 'energy_knot' ? ' 个' : ' 次') })
+        rows.push({ label: type === 'energy_knot' ? '购买个数（部位）' : '购买场次', value: (formData.purchase_count || '0') + (type === 'energy_knot' ? ' 个' : ' 次') })
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
         amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
       }

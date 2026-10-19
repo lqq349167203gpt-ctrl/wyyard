@@ -54,22 +54,22 @@ def get_session(session_id: str) -> Optional[EnergyKnotSession]:
 
 
 def _get_chargeable_ids(session) -> set:
-    """能量结不产生参与者会员卡扣费；案主按专项次数单独计算。"""
+    """深度情绪释放不产生参与者会员卡扣费；案主按专项次数单独计算。"""
     return set()
 
 
 def _deduct_for_session(session):
-    """能量结不扣会员卡，无需写入会员卡扣卡与欠卡数据。"""
+    """深度情绪释放不扣会员卡，无需写入会员卡扣卡与欠卡数据。"""
     return None
 
 
 def _restore_for_session(session):
-    """能量结不扣会员卡，删除时无需恢复会员卡数据。"""
+    """深度情绪释放不扣会员卡，删除时无需恢复会员卡数据。"""
     return None
 
 
 def _sync_deduction(session, old_chargeable, new_chargeable):
-    """能量结不扣会员卡，参与人员变化无需同步会员卡数据。"""
+    """深度情绪释放不扣会员卡，参与人员变化无需同步会员卡数据。"""
     return None
 
 
@@ -193,7 +193,7 @@ def search_customers(keyword: str, date: str = "") -> list:
 
 
 def get_session_deduction_count(session, customer_id: str | None = None) -> int:
-    """读取单场能量结的实际销卡数，兼容历史记录中案主 ID 未写入详情的情况。"""
+    """读取单场深度情绪释放的实际销卡数，兼容历史记录中案主 ID 未写入详情的情况。"""
     if customer_id and customer_id in set(session.withdrawn_participant_ids or []):
         return 0
     try:
@@ -222,7 +222,7 @@ def get_session_deduction_count(session, customer_id: str | None = None) -> int:
 
 
 def get_remaining_count(customer_id: str) -> int:
-    """计算某用户的能量结剩余次数；仅已到场案主按部位数扣除。"""
+    """计算某用户的深度情绪释放剩余次数；仅已到场案主按部位数扣除。"""
     knots = exclude_refunded("energy-knots", energy_knot_service.list_knots())
     total_purchased = sum(k.purchase_count for k in knots if k.customer_id == customer_id)
     used = sum(item["count"] for item in _get_session_deductions_for_customer(customer_id))
@@ -266,7 +266,7 @@ def get_usable_remaining_count(customer_id: str, on_date: str = "") -> int:
 
 
 def get_debt_record(customer_id: str) -> dict:
-    """返回单个客户的能量结欠卡汇总。"""
+    """返回单个客户的深度情绪释放欠卡汇总。"""
     from app.services import project_deduction_service
 
     customer = customer_service.get_customer(customer_id)
@@ -296,7 +296,7 @@ def get_debt_record(customer_id: str) -> dict:
             continue
         debt_count = min(count, remaining_debt)
         activities.append({
-            "label": session.name or "能量结",
+            "label": session.name or "深度情绪释放",
             "date": session.date,
             "count": debt_count,
             "source_key": session.id,
@@ -319,7 +319,7 @@ def get_debt_record(customer_id: str) -> dict:
 
 
 def list_debt_customers() -> list:
-    """列出能量结欠卡客户，返回 [{customer_id, nickname, member_type, total_count, deducted_count, debt_count, activity_labels}]"""
+    """列出深度情绪释放欠卡客户，返回 [{customer_id, nickname, member_type, total_count, deducted_count, debt_count, activity_labels}]"""
     result = []
     for customer in customer_service.list_customers():
         record = get_debt_record(customer.id)
@@ -330,7 +330,7 @@ def list_debt_customers() -> list:
 
 
 def _get_session_deductions_for_customer(customer_id: str) -> list[dict]:
-    """该用户已到场能量结的逐次活动销卡信息。"""
+    """该用户已到场深度情绪释放的逐次活动销卡信息。"""
     from app.services import visit_service
 
     result = []
@@ -389,7 +389,7 @@ def _allocate_deductions_to_purchases(purchases, session_deductions, manual_by_p
 
 
 def get_purchase_remaining(purchase_id: str) -> int:
-    """返回单次能量结购买的剩余次数。"""
+    """返回单次深度情绪释放购买的剩余次数。"""
     purchase = energy_knot_service.get_knot(purchase_id)
     if not purchase:
         return 0

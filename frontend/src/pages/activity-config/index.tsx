@@ -108,7 +108,7 @@ export function ActivityConfigContent({ embedded }: { embedded?: boolean } = {})
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4 w-28 !h-auto" rowSpan={2}>会员身份</TableHead>
                 {ACTIVITY_TYPES.map(at => (
-                  <TableHead key={at} colSpan={2} className="text-center h-7 text-[12px]">{at}</TableHead>
+                  <TableHead key={at} colSpan={2} className="text-center h-7 text-[12px]">{at === "能量结" ? "深度情绪释放" : at}</TableHead>
                 ))}
                 <TableHead className="text-center w-16 !h-auto" rowSpan={2}>权限</TableHead>
               </TableRow>
@@ -165,7 +165,7 @@ export function ActivityConfigContent({ embedded }: { embedded?: boolean } = {})
                 const perms = editPerms[at] ?? { view: true, participate: true }
                 return (
                   <div key={at} className="flex items-center justify-between py-1">
-                    <span className="text-[13px] text-[#2b2f36]">{at}</span>
+                    <span className="text-[13px] text-[#2b2f36]">{at === "能量结" ? "深度情绪释放" : at}</span>
                     <div className="flex items-center gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input

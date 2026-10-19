@@ -114,6 +114,7 @@ export function AuditEditDrawer({
         receptionist: visit.receptionist,
         goal: visit.goal,
         cancelled: visit.cancelled,
+        cancel_reason: visit.cancel_reason || "",
       }
     }
     return {
@@ -186,7 +187,7 @@ export function AuditEditDrawer({
     const type = course?.activity_type || "class"
     const ownerId = customers.find(item => (item.nickname || "") === String(draft.owner_name || ""))?.id || ""
     const publicWelfare = Boolean(draft.public_welfare)
-    // 和课表页同一套规则：能量结/沙龙技能学习/公益都不扣卡
+    // 和课表页同一套规则：深度情绪释放/沙龙技能学习/公益都不扣卡
     const deduction = (type === "eks" || type === "ics" || publicWelfare)
       ? 0
       : Math.max(0, Number(draft.deduction_count) || 0)
@@ -215,7 +216,7 @@ export function AuditEditDrawer({
       base.owner_name = String(draft.owner_name || "")
       if (type === "eks") {
         base.course_description = String(draft.intro || "")
-        // 能量结的部位数存在 description 的 JSON 里（和课表页同一种写法）
+        // 深度情绪释放的部位数存在 description 的 JSON 里（和课表页同一种写法）
         base.description = JSON.stringify([{
           id: ownerId,
           name: String(draft.owner_name || ""),
@@ -250,18 +251,23 @@ export function AuditEditDrawer({
         // 后端要求取消/恢复必须单独提交，所以按方向决定先后顺序。
         const wantsCancelled = Boolean(draft.cancelled)
         const cancelledChanged = wantsCancelled !== visit.cancelled
+        const cancelReason = String(draft.cancel_reason || "").trim()
+        if (wantsCancelled && (!visit.cancelled || Object.keys(payload).length > 0 || cancelReason !== visit.cancel_reason) && !cancelReason) {
+          setError("请输入取消原因")
+          return
+        }
         const applyFields = async () => {
           if (Object.keys(payload).length > 0) await visitApi.update(visit.id, payload)
         }
-        if (visit.cancelled) {
+        if (visit.cancelled && (Object.keys(payload).length > 0 || cancelledChanged || cancelReason !== visit.cancel_reason)) {
           // 已取消的记录：先恢复 → 改内容 → 用户还要保持取消就再取消回去
           // （后端规定已取消的记录只允许「恢复」这一个动作）
           await visitApi.update(visit.id, { cancelled: false })
           await applyFields()
-          if (wantsCancelled) await visitApi.update(visit.id, { cancelled: true })
+          if (wantsCancelled) await visitApi.update(visit.id, { cancelled: true, cancel_reason: cancelReason })
         } else {
           await applyFields()
-          if (cancelledChanged) await visitApi.update(visit.id, { cancelled: wantsCancelled })
+          if (cancelledChanged) await visitApi.update(visit.id, wantsCancelled ? { cancelled: true, cancel_reason: cancelReason } : { cancelled: false })
         }
       } else if (course) {
         const recordId = course.id.split(":")[1] || ""
@@ -383,6 +389,19 @@ export function AuditEditDrawer({
                   已取消邀约
                 </label>
               </Field>
+              {Boolean(draft.cancelled) && (
+                <Field label="取消原因">
+                  <textarea
+                    value={String(draft.cancel_reason || "")}
+                    disabled={!canEdit("cancelled")}
+                    onChange={event => set("cancel_reason", event.target.value)}
+                    maxLength={200}
+                    rows={3}
+                    placeholder="请输入取消原因"
+                    className="w-full resize-none rounded-[4px] border-[0.5px] border-[#e1e4e7] px-2 py-1.5 text-[12px] leading-5 outline-none focus:border-[#b9cdf8]"
+                  />
+                </Field>
+              )}
             </>
           ) : course ? (
             <>
@@ -448,7 +467,7 @@ export function AuditEditDrawer({
                 </Field>
               )}
               {course.activity_type === "eks" && (
-                <Field label="部位数" hint="能量结按部位数销卡" disabledReason={disabledReason("deduction_count")}>
+                <Field label="部位数" hint="深度情绪释放按部位数销卡" disabledReason={disabledReason("deduction_count")}>
                   <input
                     type="number"
                     min={1}
@@ -477,7 +496,7 @@ export function AuditEditDrawer({
                 label="扣卡次数"
                 hint={course.activity_type === "eks" || course.activity_type === "ics" ? "这类活动不扣卡" : undefined}
                 disabledReason={course.activity_type === "eks" || course.activity_type === "ics"
-                  ? "能量结/沙龙技能学习不扣卡"
+                  ? "深度情绪释放/沙龙技能学习不扣卡"
                   : disabledReason("membership_deduction_count")}
               >
                 <input

@@ -24,3 +24,8 @@ export const ACTIVITY_POSITION_MAP: Record<string, string> = {
   eks: POSITION_ENERGY_TEACHER,
   ics: POSITION_COURSE_TEACHER,
 }
+
+/** 显示名称独立于历史身份键，避免影响老师归属与排序。 */
+export function positionLabel(value: string): string {
+  return value === POSITION_ENERGY_TEACHER ? "深度情绪释放老师" : value
+}

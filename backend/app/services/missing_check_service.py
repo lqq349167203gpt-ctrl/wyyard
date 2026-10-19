@@ -41,7 +41,7 @@ CHECK_ITEMS: list[dict] = [
 
 OWNER_ACTIVITY_TYPES = {"gcs", "ers", "eks"}
 
-# 这两类活动天生就是 0 次扣卡（能量结按部位数单独算、沙龙技能学习不扣卡），不算漏填
+# 这两类活动天生就是 0 次扣卡（深度情绪释放按部位数单独算、沙龙技能学习不扣卡），不算漏填
 DEDUCTION_EXEMPT_ACTIVITY_TYPES = {"eks", "ics"}
 
 # 核对（锁定）只从这天起算：之前的历史数据不参与核对，也不需要补锁
@@ -51,7 +51,7 @@ TYPE_LABELS = {
     "class": "沙龙",
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
-    "eks": "能量结",
+    "eks": "深度情绪释放",
     "ics": "沙龙技能学习",
 }
 
@@ -189,7 +189,7 @@ def _text(value) -> str:
 
 
 def _eks_body_parts(description: str) -> int:
-    """能量结的部位数存在 description 的 JSON 里。"""
+    """深度情绪释放的部位数存在 description 的 JSON 里。"""
     try:
         items = json.loads(description or "[]")
     except (TypeError, ValueError):
@@ -302,7 +302,7 @@ def _course_rows(
             "eks",
             title=_text(record.name),
             type_label=TYPE_LABELS["eks"],
-            # 能量结的 description 是部位 JSON，简介只取 course_description，别把 JSON 当简介显示
+            # 深度情绪释放的 description 是部位 JSON，简介只取 course_description，别把 JSON 当简介显示
             intro=record.course_description,
             body_parts=_eks_body_parts(record.description or ""),
         )
@@ -403,6 +403,7 @@ def _visit_rows(
             "creator": _text(record.created_by),
             "created_by_id": _text(getattr(record, "created_by_id", "")),
             "cancelled": bool(record.cancelled),
+            "cancel_reason": _text(getattr(record, "cancel_reason", "")),
             "kinds": [],
         })
         seen_leader = seen_leader or bool(record.is_leader)

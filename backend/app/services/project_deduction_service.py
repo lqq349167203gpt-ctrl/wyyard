@@ -251,7 +251,7 @@ def get_available_items(customer_id: str, project_type: str) -> list:
                 continue
             result.append({
                 "id": k.id,
-                "name": f"能量结（{k.purchase_count}个）",
+                "name": f"深度情绪释放（{k.purchase_count}个）",
                 "remaining_count": pr,
                 "detail": f"剩余 {pr} 个",
                 "purchase_count": k.purchase_count,
@@ -311,7 +311,7 @@ def auto_deduct(
             "group-cases": "觉醒游戏",
             "emotional-releases": "情绪释放",
             "oh-card-readings": "OH卡诊断",
-            "energy-knots": "能量结",
+            "energy-knots": "深度情绪释放",
             "other-projects": "其他项目",
         }
         raise ValueError(f'用户"{nickname}"没有可用的{type_labels.get(project_type, project_type)}')
@@ -437,7 +437,7 @@ def create_deduction(data: ProjectDeductionCreate) -> ProjectDeduction:
                 "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放",
                 "oh-card-readings": "OH卡诊断",
-                "energy-knots": "能量结",
+                "energy-knots": "深度情绪释放",
             }
             project_name = type_labels.get(data.project_type, data.project_type)
             remaining_after = remaining - data.count

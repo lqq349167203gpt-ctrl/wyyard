@@ -10,7 +10,7 @@ const PREVIEW_ACTIVITY_COUNT = 4
 
 type Activity = PrincipalParticipationMember["activities"][number]
 
-const ACTIVITY_TYPE_ORDER = ["沙龙活动", "觉醒游戏", "情绪释放", "能量结", "沙龙技能学习"]
+const ACTIVITY_TYPE_ORDER = ["沙龙活动", "觉醒游戏", "情绪释放", "深度情绪释放", "沙龙技能学习"]
 
 function participationTypeCounts(activities: Activity[]) {
   const byType = new Map<string, Map<string, number>>()

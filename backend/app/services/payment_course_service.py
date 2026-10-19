@@ -85,7 +85,7 @@ def course_options(day: str, request=None, customer_id: str = "") -> list[dict]:
     sources = (("class_records", "class_record", "沙龙活动"),
                ("gcs_sessions", "group_case", "觉醒游戏"),
                ("ers_sessions", "emotional_release", "情绪释放"),
-               ("eks_sessions", "energy_knot", "能量结"),
+               ("eks_sessions", "energy_knot", "深度情绪释放"),
                ("ics_sessions", "internal_course", "沙龙技能学习"))
     options = []
     for field, source, fallback in sources:

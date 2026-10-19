@@ -111,7 +111,7 @@ def pool_rows(summary: list[dict], today: str | None = None) -> list[list]:
 
 def participation_rows(activities: list[dict]) -> list[list]:
     """同一份完整活动清单分别按活动类型和身份统计，实际参与口径与详情页一致。"""
-    types = {key: [0, 0, 0, 0] for key in ("沙龙活动", "觉醒游戏", "情绪释放", "能量结", "沙龙技能学习")}
+    types = {key: [0, 0, 0, 0] for key in ("沙龙活动", "觉醒游戏", "情绪释放", "深度情绪释放", "沙龙技能学习")}
     roles = {key: [0, 0, 0, 0] for key in ("参与者", "案主", "老师", "成就君")}
     for item in activities:
         kind = "沙龙活动" if item.get("activity_type") == "class" else item.get("type") or "未分类"
@@ -156,7 +156,7 @@ def activity_rows(activities: list[dict], usage: list[dict], cards: dict, hours:
                 text = f"欠{abs(value)}次" if value < 0 else f"{value}次"
             balances[key] = {"label": label, "text": text, "value": value}
         if activity.get("role") == "案主" and activity.get("activity_type") in {"gcs", "ers", "eks"}:
-            label = {"gcs": "觉醒游戏", "ers": "情绪释放", "eks": "能量结"}[activity["activity_type"]]
+            label = {"gcs": "觉醒游戏", "ers": "情绪释放", "eks": "深度情绪释放"}[activity["activity_type"]]
             # 专项案主目前只有按活动计算的销卡，没有逐场余额快照，不能以今天的余额冒充。
             balances.setdefault(label, {"label": label, "text": "历史余额未记录"})
         labels = [item["label"] for item in balances.values()]

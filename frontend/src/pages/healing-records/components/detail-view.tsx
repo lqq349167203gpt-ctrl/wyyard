@@ -870,7 +870,7 @@ export default function DetailView({
               { key: "class", label: "沙龙活动" },
               { key: "gcs", label: "觉醒游戏" },
               { key: "ers", label: "情绪释放" },
-              { key: "eks", label: "能量结" },
+              { key: "eks", label: "深度情绪释放" },
               { key: "ics", label: "沙龙技能学习" },
               { key: "withdrawn", label: "退课" },
             ]

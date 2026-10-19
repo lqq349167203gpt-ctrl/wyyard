@@ -153,7 +153,7 @@ def _build_payment_totals() -> dict[str, float]:
     # 情绪释放
     for r in emotional_release_service.list_releases():
         payment_map[r.customer_id] += r.amount
-    # 能量结
+    # 深度情绪释放
     for k in energy_knot_service.list_knots():
         payment_map[k.customer_id] += k.amount
     # 沙龙技能学习

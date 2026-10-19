@@ -321,7 +321,7 @@ def list_course_participants(
 
     def same_course_key(row: dict) -> str:
         """同类活动的口径：沙龙活动/沙龙技能学习有二级分类（按具体课程算），
-        觉醒游戏、情绪释放、能量结没有二级（按整个活动类型算）。"""
+        觉醒游戏、情绪释放、深度情绪释放没有二级（按整个活动类型算）。"""
         if row.get("activity_type") in ("class", "ics"):
             name = str(row.get("course_subtype") or row.get("course_name") or "")
             # 课程名写法不统一（空格、《》书名号、连接符号），归一化后再比

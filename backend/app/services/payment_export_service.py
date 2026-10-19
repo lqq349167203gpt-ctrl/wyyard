@@ -16,7 +16,7 @@ PROJECT_SOURCES = (
     ("group_case", "觉醒游戏", payment_loader("group-cases")),
     ("emotional_release", "情绪释放", payment_loader("emotional-releases")),
     ("oh_card_reading", "OH卡诊断", payment_loader("oh-card-readings")),
-    ("energy_knot", "能量结", payment_loader("energy-knots")),
+    ("energy_knot", "深度情绪释放", payment_loader("energy-knots")),
     ("internal_course", "沙龙技能学习", payment_loader("internal-courses")),
     ("tea_seat_fee", "茶位费", payment_loader("tea-seat-fees")),
     ("offline_course", "线下落地课程", payment_loader("offline-courses")),

@@ -453,7 +453,7 @@ export default function DailyReportPage() {
           }
         }
       }
-      // 案主活动销卡：session 的 owner 扣对应项目类型（觉醒游戏/情绪释放/能量结）
+      // 案主活动销卡：session 的 owner 扣对应项目类型（觉醒游戏/情绪释放/深度情绪释放）
       const activityProjectDeductionMaps: Record<string, Record<string, number>> = {}
       // 觉醒游戏、情绪释放：案主每次扣 1
       for (const [sessions, projectType] of [[gcsSessions as any[], "group-cases"], [ersSessions as any[], "emotional-releases"]] as const) {
@@ -463,7 +463,7 @@ export default function DailyReportPage() {
           map[s.owner_id] = (map[s.owner_id] || 0) + 1
         }
       }
-      // 能量结：案主扣部位数（与后端 get_session_deduction_count 逻辑一致）
+      // 深度情绪释放：案主扣部位数（与后端 get_session_deduction_count 逻辑一致）
       for (const s of eksSessions as any[]) {
         if (!s.owner_id) continue
         const map = activityProjectDeductionMaps["energy-knots"] || (activityProjectDeductionMaps["energy-knots"] = {})
@@ -521,7 +521,7 @@ export default function DailyReportPage() {
             expiryDate = ""
             break
           case "energy_knot":
-            itemType = "能量结"
+            itemType = "深度情绪释放"
             itemName = "-"
             amount = item.amount || 0
             purchaseCount = item.purchase_count || 0
@@ -602,7 +602,7 @@ export default function DailyReportPage() {
       const projectLabelMap: Record<string, string> = {
         "group-cases": "觉醒游戏",
         "emotional-releases": "情绪释放",
-        "energy-knots": "能量结",
+        "energy-knots": "深度情绪释放",
       }
       const projectDataMap: Record<string, Record<string, { purchase_count: number; id: string }>> = {}
       for (const item of groups as any[]) {
@@ -631,7 +631,7 @@ export default function DailyReportPage() {
       const typeLabels: Record<string, string> = {
         "group-cases": "觉醒游戏",
         "emotional-releases": "情绪释放",
-        "energy-knots": "能量结",
+        "energy-knots": "深度情绪释放",
       }
       const dRows: DeductionRow[] = []
 
@@ -667,7 +667,7 @@ export default function DailyReportPage() {
         })
       }
 
-      // 案主活动销卡行（觉醒游戏/情绪释放/能量结）
+      // 案主活动销卡行（觉醒游戏/情绪释放/深度情绪释放）
       for (const [projectType, dedupMap] of Object.entries(activityProjectDeductionMaps)) {
         for (const [cid, activityCount] of Object.entries(dedupMap)) {
           const customer = customerMap[cid]

@@ -20,7 +20,7 @@ import { POSITION_ACHIEVER, POSITION_ENERGY_TEACHER, POSITION_COURSE_TEACHER } f
 
 const HEALING_POSITIONS = [
   { key: POSITION_ACHIEVER, label: POSITION_ACHIEVER, icon: Users, desc: "负责成就达成" },
-  { key: POSITION_ENERGY_TEACHER, label: POSITION_ENERGY_TEACHER, icon: Zap, desc: "负责能量结活动的课程老师" },
+  { key: POSITION_ENERGY_TEACHER, label: "深度情绪释放老师", icon: Zap, desc: "负责深度情绪释放活动的课程老师" },
   { key: POSITION_COURSE_TEACHER, label: POSITION_COURSE_TEACHER, icon: Users, desc: "负责沙龙活动的课程老师" },
 ] as const
 

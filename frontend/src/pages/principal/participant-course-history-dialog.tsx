@@ -40,7 +40,7 @@ export function ParticipantCourseHistoryDialog({ customer, customerId, organizat
   const ready = resultKey === queryKey && !pagination.loading && !pagination.error
   const period = allHistory ? "2026-01-01 至今"
     : `${query.date_from || "最早"} 至 ${query.date_to || "今天"}`
-  const type = allHistory ? "全部课程类型" : query.course_subtype || query.activity_type && ({ class: "沙龙活动", gcs: "觉醒游戏", ers: "情绪释放", eks: "能量结", ics: "沙龙技能学习" }[query.activity_type] || query.activity_type) || "全部课程类型"
+  const type = allHistory ? "全部课程类型" : query.course_subtype || query.activity_type && ({ class: "沙龙活动", gcs: "觉醒游戏", ers: "情绪释放", eks: "深度情绪释放", ics: "沙龙技能学习" }[query.activity_type] || query.activity_type) || "全部课程类型"
 
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>

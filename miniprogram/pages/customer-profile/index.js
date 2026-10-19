@@ -25,7 +25,7 @@ const ACTIVITY_SUMMARY_TYPES = [
   { key: 'class', label: '沙龙活动' },
   { key: 'gcs', label: '觉醒游戏' },
   { key: 'ers', label: '情绪释放' },
-  { key: 'eks', label: '能量结' },
+  { key: 'eks', label: '深度情绪释放' },
   { key: 'ics', label: '沙龙技能学习' },
 ]
 
@@ -218,6 +218,7 @@ Page({
       // 疗愈老师
       const healerIdentityText = (c.positions || [])
         .filter(p => ['成就君', '能量结老师', '课程老师'].includes(p))
+        .map(p => p === '能量结老师' ? '深度情绪释放老师' : p)
         .join('、')
       const healerText = c.service_teacher || healerIdentityText
 

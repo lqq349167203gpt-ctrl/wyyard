@@ -142,6 +142,19 @@ class PrincipalQuery(StrictBaseModel):
     mobile_quick_filter: str = Field(default="", max_length=80)
     mobile_detail_key: str = Field(default="", max_length=120)
 
+    @field_validator("breakdown", "detail_picks")
+    @classmethod
+    def normalize_activity_picks(cls, values: list[str]) -> list[str]:
+        normalized = []
+        for value in values:
+            kind, separator, label = value.partition(":")
+            if kind in {"type", "course", "participation_type", "participation_course"} and (
+                label == "能量结" or label.startswith("能量结｜") or label.startswith("能量结·")
+            ):
+                label = "深度情绪释放" + label[len("能量结"):]
+            normalized.append(kind + separator + label)
+        return normalized
+
     @model_validator(mode="after")
     def validate_range(self):
         if self.participant_history_organization_id and (self.tab != "courses" or self.course_view != "participant" or not self.customer_id or self.participant_layout != "rows"):

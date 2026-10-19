@@ -272,7 +272,7 @@ FIELD_NAMES = {
     "cost_category": "成本分类", "expense_type": "支出类型", "month": "分成月份",
     "person_name": "人员", "benefit_date": "福利日期",
     "sort_order": "排序", "is_public_welfare": "公益",
-    "arrived": "到店状态", "cancelled": "邀约状态", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "深度需求",
+    "arrived": "到店状态", "cancelled": "邀约状态", "cancel_reason": "取消原因", "arrival_time": "到店时间", "experience": "客户反馈", "feedback": "深度需求",
     "needs": "来访需求", "receptionist": "接待人", "goal": "目标", "visit_date": "到访日期",
     "visit_time": "预计时间", "customer_id": "客户",
     "space_id": "空间", "room_id": "房间", "room_name": "房间名", "position": "职位", "role": "主要角色", "roles": "角色身份", "permissions": "权限",
@@ -531,7 +531,7 @@ VALUE_LABELS = {
     "true": "是", "false": "否",
     "offline": "线下", "online": "线上",
     "view": "仅浏览", "own": "仅本人录入", "all": "全部记录",
-    "class": "沙龙", "gcs": "觉醒游戏", "ers": "情绪释放", "eks": "能量结", "ics": "沙龙技能学习",
+    "class": "沙龙", "gcs": "觉醒游戏", "ers": "情绪释放", "eks": "深度情绪释放", "ics": "沙龙技能学习",
 }
 
 EDIT_PERMISSION_LABELS = {
@@ -574,6 +574,19 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
             new_scope = "可编辑" if key == "customers" and new_value == "all" else VALUE_LABELS.get(new_value, VALUE_LABELS[default_scope])
         if old_scope != new_scope:
             changes.append(f"{label}({old_scope}→{new_scope})")
+    for key, label, labels, default in (
+        ("principal_scope", "数据统计组织范围", {"own": "本人所属组织", "all": "所有组织"}, "own"),
+        ("principal_person_scope", "数据统计个人范围", {"own": "仅自己", "all": "所有人"}, "all"),
+    ):
+        before, after = old_permissions.get(key, default), new_permissions.get(key, default)
+        if before != after:
+            changes.append(f"{label}({labels.get(before, before)}→{labels.get(after, after)})")
+    for key, label in (("organization", "组织/俱乐部"), ("person", "个人")):
+        before = (old_permissions.get("principal_views") or {"organization": True, "person": True}).get(key, False)
+        after = (new_permissions.get("principal_views") or {"organization": True, "person": True}).get(key, False)
+        if before != after:
+            changes.append(f"数据统计{label}范围({'开启' if after else '关闭'})")
+
     old_contacts = old_permissions.get("contacts") if isinstance(old_permissions.get("contacts"), dict) else {}
     new_contacts = new_permissions.get("contacts") if isinstance(new_permissions.get("contacts"), dict) else {}
     for field, field_label in (("phone", "手机号"), ("wechat", "微信号")):
@@ -1176,7 +1189,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         if not project_name:
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
-                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "能量结",
+                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "深度情绪释放",
                 "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
@@ -1241,7 +1254,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
         if not project_name:
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
-                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "能量结",
+                "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "深度情绪释放",
                 "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }

@@ -218,3 +218,119 @@ def test_person_course_history_is_limited_to_referred_clients_and_visible_organi
     with pytest.raises(HTTPException) as error:
         service.analyze(personal_courses, history.model_copy(update={"participant_history_organization_id": "hidden"}))
     assert error.value.status_code == 403
+
+
+def test_person_own_only_limits_metadata_queries_and_export(personal_data, monkeypatch):
+    request, _, permissions = personal_data
+    permissions.update(principal_person_scope="own", principal_views={"organization": False, "person": True})
+    monkeypatch.setattr(service.account_service, "get_account", lambda _: NS(owner="引流甲", roles=["超级管理员"], role="超级管理员"))
+    for lite in (True, False):
+        meta = api.metadata(request, lite=lite)
+        assert meta["scope_types"] == ["person"]
+        assert [row["id"] for row in meta["referrers"]] == ["a"]
+    assert service.analyze(request, query())["summary"]["引流人数"] == 1
+    for export in (False, True):
+        with pytest.raises(HTTPException) as error:
+            service.analyze(request, query().model_copy(update={"referrer_id": "b"}), export=export)
+        assert error.value.status_code == 403
+    with pytest.raises(HTTPException) as error:
+        service.analyze(request, PrincipalQuery())
+    assert error.value.status_code == 403
+
+
+def test_all_people_still_follows_organization_scope(personal_data, monkeypatch):
+    request, _, permissions = personal_data
+    permissions.update(principal_scope="own", principal_person_scope="all")
+    assert [row["id"] for row in api.metadata(request, lite=True)["referrers"]] == ["a"]
+    # 本人为乙但不在可见组织的引流范围，“仅自己”不会越过组织授权。
+    permissions["principal_person_scope"] = "own"
+    monkeypatch.setattr(service.account_service, "get_account", lambda _: NS(owner="引流乙"))
+    assert api.metadata(request, lite=True)["referrers"] == []
+    with pytest.raises(HTTPException):
+        service.analyze(request, query().model_copy(update={"referrer_id": "b"}))
+
+
+@pytest.mark.parametrize("owner", ["", "不存在"])
+def test_own_person_without_matching_account_never_falls_back_to_all(personal_data, monkeypatch, owner):
+    request, _, permissions = personal_data
+    permissions["principal_person_scope"] = "own"
+    monkeypatch.setattr(service.account_service, "get_account", lambda _: NS(owner=owner))
+    assert api.metadata(request, lite=True)["referrers"] == []
+    with pytest.raises(HTTPException):
+        service.analyze(request, query())
+
+
+def test_disabled_person_is_hidden_and_rejected_for_query_and_export(personal_data):
+    request, _, permissions = personal_data
+    permissions["principal_views"] = {"organization": True, "person": False}
+    assert api.metadata(request, lite=True)["scope_types"] == ["organization"]
+    assert api.metadata(request, lite=True)["referrers"] == []
+    for export in (False, True):
+        with pytest.raises(HTTPException) as error:
+            service.analyze(request, query(), export=export)
+        assert error.value.status_code == 403
+    assert service.analyze(request, PrincipalQuery())["summary"]
+
+
+def test_no_scope_cannot_query_either_view(personal_data):
+    request, _, permissions = personal_data
+    permissions["principal_views"] = {"organization": False, "person": False}
+    assert api.metadata(request, lite=True)["scope_types"] == []
+    for candidate in (query(), PrincipalQuery()):
+        with pytest.raises(HTTPException) as error:
+            service.analyze(request, candidate)
+        assert error.value.status_code == 403
+
+
+def test_statistics_permissions_preserve_legacy_and_old_client_saves(monkeypatch):
+    from app.api.position_permissions import EditPermissionUpdate
+    from app.services import position_edit_permission_service as permissions
+    from app.services import position_permission_service as pages
+
+    monkeypatch.setattr(pages, "_permissions", {role: ["principal"] for role in ("统计测试", "仅组织", "个人全部")})
+    monkeypatch.setattr(permissions, "_permissions", {})
+    saved = {}
+    monkeypatch.setattr(permissions, "save_item", lambda _file, key, value: saved.update({key: value}))
+    legacy = permissions._normalize_permissions({"principal_scope": "own"})
+    assert legacy["principal_views"] == {"organization": True, "person": True}
+    assert legacy["principal_person_scope"] == "all"
+    configured = permissions.set_permissions("统计测试", {"principal_views": {"organization": False, "person": True}, "principal_person_scope": "own"})
+    assert saved["统计测试"] == configured
+    old_payload = EditPermissionUpdate(principal_scope="own").model_dump(exclude_none=True)
+    updated = permissions.set_permissions("统计测试", old_payload)
+    assert updated["principal_views"] == configured["principal_views"]
+    assert updated["principal_person_scope"] == "own"
+    permissions.set_permissions("仅组织", {"principal_views": {"organization": True, "person": False}, "principal_person_scope": "all"})
+    merged = permissions.get_permissions(["统计测试", "仅组织"])
+    assert merged["principal_views"] == {"organization": True, "person": True}
+    assert merged["principal_person_scope"] == "own"
+    # 未开通统计页面的角色，保留的默认配置不能放大当前角色的本人限制。
+    permissions.set_permissions("无统计页面", {})
+    limited = permissions.get_permissions(["统计测试", "无统计页面"])
+    assert limited["principal_person_scope"] == "own"
+    assert limited["principal_views"] == {"organization": False, "person": True}
+    permissions.set_permissions("个人全部", {"principal_person_scope": "all"})
+    assert permissions.get_permissions(["统计测试", "个人全部"])["principal_person_scope"] == "all"
+    assert permissions.get_permissions("超级管理员")["principal_views"] == {"organization": True, "person": True}
+
+
+def test_own_person_with_ambiguous_owner_is_denied(personal_data, monkeypatch):
+    request, people, permissions = personal_data
+    permissions["principal_person_scope"] = "own"
+    people["duplicate"] = person("duplicate", "同名昵称")
+    people["duplicate"].name = people["a"].name = "同名归属人"
+    monkeypatch.setattr(service.account_service, "get_account", lambda _: NS(owner="同名归属人"))
+    assert api.metadata(request, lite=True)["referrers"] == []
+    with pytest.raises(HTTPException):
+        api.export(query(), request)
+
+
+def test_statistics_permission_audit_uses_readable_labels():
+    from app.middleware.operation_logging import _format_edit_permission_changes
+
+    changes = _format_edit_permission_changes({}, {
+        "principal_scope": "own", "principal_person_scope": "own",
+        "principal_views": {"organization": False, "person": True},
+    })
+    assert "数据统计个人范围(所有人→仅自己)" in changes
+    assert "数据统计组织/俱乐部范围(关闭)" in changes

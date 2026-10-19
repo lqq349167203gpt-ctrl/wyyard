@@ -13,7 +13,7 @@ const TYPE_LABELS = {
   'group-cases': '觉醒游戏',
   'emotional-releases': '情绪释放',
   'oh-card-readings': 'OH卡诊断',
-  'energy-knots': '能量结',
+  'energy-knots': '深度情绪释放',
   'internal-courses': '沙龙技能学习',
   'other-projects': '其他项目',
 }

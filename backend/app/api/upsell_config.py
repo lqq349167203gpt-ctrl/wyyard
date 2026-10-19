@@ -27,7 +27,7 @@ PAYMENT_ITEMS = (
     ("group_case", "觉醒游戏", ""),
     ("emotional", "情绪释放", ""),
     ("oh", "OH卡诊断", "oh"),
-    ("energy", "能量结", ""),
+    ("energy", "深度情绪释放", ""),
     ("internal", "沙龙技能学习", "internal"),
     ("tea", "茶位费", ""),
     ("offline", "线下落地课程", "offline"),

@@ -244,7 +244,7 @@ def _check_condition(condition, customer_id: str,
                 total = sum(c.purchase_count for c in customer_emotional_releases)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
-            elif cat == "能量结":
+            elif cat == "深度情绪释放":
                 total = sum(c.purchase_count for c in customer_energy_knots)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True

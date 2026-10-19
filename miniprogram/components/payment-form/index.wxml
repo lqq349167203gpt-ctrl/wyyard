@@ -105,8 +105,8 @@
     </view>
     <view wx:if="{{dealCourseError}}" class="pf-placeholder" bindtap="onDealCourseRetry">{{dealCourseError}}，点击重试</view>
     <view class="pf-row">
-      <text class="pf-label">购买次数（次）</text>
-      <input class="pf-input" type="number" placeholder="次数" placeholder-class="pf-placeholder" value="{{formData.purchase_count}}" bindinput="onFieldInput" data-field="purchase_count" />
+      <text class="pf-label">{{type === 'energy_knot' ? '购买个数（部位）' : '购买次数（次）'}}</text>
+      <input class="pf-input" type="number" placeholder="{{type === 'energy_knot' ? '个数' : '次数'}}" placeholder-class="pf-placeholder" value="{{formData.purchase_count}}" bindinput="onFieldInput" data-field="purchase_count" />
     </view>
     <view class="pf-row">
       <text class="pf-label">生效日期</text>

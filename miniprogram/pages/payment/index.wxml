@@ -209,8 +209,8 @@
           <text class="card-meta-item" wx:if="{{item._creator}}">创建人 {{item._creator}}</text>
         </view>
         <view class="card-stat-strip" wx:if="{{item._purchaseCount !== '' || item._remaining !== '' || item._expiry}}">
-          <text class="stat-item" wx:if="{{item._purchaseCount !== ''}}">购买<text class="stat-num">{{item._purchaseCount}}</text>次</text>
-          <text class="stat-item" wx:if="{{item._remaining !== '' && item._remaining !== '不限'}}">剩余<text class="stat-num {{item._remaining === 0 || item._remaining === '0' ? 'danger' : ''}}">{{item._remaining}}</text>次</text>
+          <text class="stat-item" wx:if="{{item._purchaseCount !== ''}}">购买<text class="stat-num">{{item._purchaseCount}}</text>{{item._countUnit}}</text>
+          <text class="stat-item" wx:if="{{item._remaining !== '' && item._remaining !== '不限'}}">剩余<text class="stat-num {{item._remaining === 0 || item._remaining === '0' ? 'danger' : ''}}">{{item._remaining}}</text>{{item._countUnit}}</text>
           <text class="stat-item" wx:if="{{item._remaining === '不限'}}">剩余<text class="stat-num">不限</text></text>
           <text class="stat-item stat-to" wx:if="{{item._expiry}}">至 {{item._expiry}}</text>
         </view>

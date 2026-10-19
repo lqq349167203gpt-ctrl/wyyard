@@ -40,6 +40,6 @@ def test_cancel_api_triggers_group_cleanup(client, created_customer, monkeypatch
     assert response.status_code == 200
     calls = []
     monkeypatch.setattr(grouping_service, "remove_cancelled_customer", lambda *args: calls.append(args))
-    response = client.patch(f"/api/visits/{response.json()['id']}", json={"cancelled": True})
+    response = client.patch(f"/api/visits/{response.json()['id']}", json={"cancelled": True, "cancel_reason": "客户临时有事"})
     assert response.status_code == 200
     assert calls == [("2026-09-01", created_customer["id"])]

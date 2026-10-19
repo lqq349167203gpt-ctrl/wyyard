@@ -64,6 +64,8 @@ class CustomerAccessPermissions(TypedDict):
 class PositionEditPermissions(TypedDict):
     principal_external_access: CustomerAccessPermissions
     principal_scope: Literal["own", "all"]
+    principal_views: dict[str, bool]
+    principal_person_scope: Literal["own", "all"]
     customers: EditScope
     visits: EditScope
     activities: EditScope
@@ -148,6 +150,8 @@ def _full_customer_access() -> CustomerAccessPermissions:
 DEFAULT_PERMISSIONS: PositionEditPermissions = {
     "principal_external_access": _empty_customer_access(),
     "principal_scope": "own",
+    "principal_views": {"organization": True, "person": True},
+    "principal_person_scope": "all",
     # 兼容已有角色：客户资料在新增“仅浏览”权限前默认可编辑。
     "customers": "all",
     "visits": "own",
@@ -166,6 +170,8 @@ DEFAULT_PERMISSIONS: PositionEditPermissions = {
 SUPER_ADMIN_PERMISSIONS: PositionEditPermissions = {
     "principal_external_access": _full_customer_access(),
     "principal_scope": "all",
+    "principal_views": {"organization": True, "person": True},
+    "principal_person_scope": "all",
     "customers": "all",
     "visits": "all",
     "activities": "all",
@@ -255,11 +261,21 @@ def _normalize_customer_access(value: object, *, legacy_default: bool = False) -
     }
 
 
+def principal_views(permissions: dict) -> dict[str, bool]:
+    # 旧角色保留原先的两种统计方式；缺失单项按关闭处理。
+    raw = permissions.get("principal_views")
+    if not isinstance(raw, dict):
+        return {"organization": True, "person": True}
+    return {key: raw.get(key) is True for key in ("organization", "person")}
+
+
 def _normalize_permissions(value: object) -> PositionEditPermissions:
     raw = value if isinstance(value, dict) else {}
     return {
         "principal_external_access": _normalize_customer_access(raw.get("principal_external_access")),
         "principal_scope": "all" if raw.get("principal_scope") == "all" else "own",
+        "principal_views": principal_views(raw),
+        "principal_person_scope": "own" if raw.get("principal_person_scope") == "own" else "all",
         "customers": _normalize_customer_edit_scope(raw.get("customers")),
         "visits": _normalize_scope(raw.get("visits")),
         "activities": _normalize_scope(raw.get("activities")),
@@ -303,6 +319,19 @@ def _merge_permissions(roles: list[str]) -> PositionEditPermissions:
     transaction_rank = {"none": 0, "summary": 1, "detail": 2}
     merged = deepcopy(values[0])
     merged["principal_scope"] = "all" if any(value.get("principal_scope") == "all" for value in values) else "own"
+
+    statistics_values = values
+    if len(roles) > 1:
+        from app.services import position_permission_service
+
+        statistics_values = [value for role, value in zip(roles, values)
+                             if "principal" in position_permission_service.get_permissions(role)]
+    merged["principal_views"] = {key: any(principal_views(value)[key] for value in statistics_values)
+                                 for key in ("organization", "person")}
+    # 没有个人查看权限的角色不能通过默认 all 放大另一个角色的“仅自己”。
+    personal_values = [value for value in statistics_values if principal_views(value)["person"]]
+    merged["principal_person_scope"] = "all" if any(value.get("principal_person_scope", "all") == "all"
+                                                   for value in personal_values) else "own"
 
     for key in (
         "customers",
@@ -363,6 +392,9 @@ def set_permissions(position: str, permissions: object) -> PositionEditPermissio
     # 旧客户端未认识的细分字段保留既有值，避免保存其他权限时扩大查看范围。
     if isinstance(permissions, dict):
         permissions = deepcopy(permissions)
+        for key in ("principal_views", "principal_person_scope"):
+            if key not in permissions and key in _permissions.get(position, {}):
+                permissions[key] = deepcopy(_permissions[position][key])
         for group in ("customer_access", "principal_external_access"):
             access = permissions.get(group)
             previous = _permissions.get(position, {}).get(group, {})

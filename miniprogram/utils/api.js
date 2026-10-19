@@ -632,7 +632,7 @@ const emotionalReleaseSessionApi = {
   delete: (id) => request(`/api/emotional-release-sessions/${id}`, { method: 'DELETE' }),
 }
 
-// 能量结 API
+// 深度情绪释放 API
 const energyKnotSessionApi = {
   create: (data) => request('/api/energy-knot-sessions', { method: 'POST', data }),
   update: (id, data) => request(`/api/energy-knot-sessions/${id}`, { method: 'PATCH', data }),
@@ -781,7 +781,7 @@ const PAYMENT_PROJECT_TYPES = [
   { key: 'group_case', label: '觉醒游戏', apiPath: 'group-cases' },
   { key: 'emotional_release', label: '情绪释放', apiPath: 'emotional-releases' },
   { key: 'oh_card_reading', label: 'OH卡诊断', apiPath: 'oh-card-readings' },
-  { key: 'energy_knot', label: '能量结', apiPath: 'energy-knots' },
+  { key: 'energy_knot', label: '深度情绪释放', apiPath: 'energy-knots' },
   { key: 'internal_course', label: '沙龙技能学习', apiPath: 'internal-courses' },
   { key: 'tea_seat_fee', label: '茶位费', apiPath: 'tea-seat-fees' },
   { key: 'offline_course', label: '线下落地课程', apiPath: 'offline-courses' },

@@ -280,7 +280,7 @@ def test_project_owner_must_be_invited_and_deducts_only_after_arrival(client, cr
     before_detail = client.get(f"/api/customer-detail/{customer_id}").json()
     project_rows = [
         row for row in before_detail["activities"]
-        if row["type"] in {"觉醒游戏", "情绪释放", "能量结"}
+        if row["type"] in {"觉醒游戏", "情绪释放", "深度情绪释放"}
         and row["date"] == activity_date
     ]
     assert {row["deduction_summary"] for row in project_rows} == {"未参与"}
@@ -295,12 +295,12 @@ def test_project_owner_must_be_invited_and_deducts_only_after_arrival(client, cr
     purchase_summaries = {
         row["type"]: row
         for row in after_detail["purchase_summary"]
-        if row["type"] in {"觉醒游戏", "情绪释放", "能量结"}
+        if row["type"] in {"觉醒游戏", "情绪释放", "深度情绪释放"}
     }
     search_configs = [
         ("group-case-sessions", "觉醒游戏", -1),
         ("emotional-release-sessions", "情绪释放", -1),
-        ("energy-knot-sessions", "能量结", -2),
+        ("energy-knot-sessions", "深度情绪释放", -2),
     ]
     for endpoint, type_label, expected in search_configs:
         search_result = client.get(
@@ -321,13 +321,13 @@ def test_project_owner_must_be_invited_and_deducts_only_after_arrival(client, cr
     summaries = {
         row["type"]: row["deduction_summary"]
         for row in after_detail["activities"]
-        if row["type"] in {"觉醒游戏", "情绪释放", "能量结"}
+        if row["type"] in {"觉醒游戏", "情绪释放", "深度情绪释放"}
         and row["date"] == activity_date
     }
     assert summaries == {
         "觉醒游戏": "觉醒游戏扣卡1次",
         "情绪释放": "情绪释放扣卡1次",
-        "能量结": "能量结部位2个",
+        "深度情绪释放": "深度情绪释放部位2个",
     }
 
     client.patch(f"/api/visits/{visit.json()['id']}", json={"arrived": False})
@@ -346,7 +346,7 @@ def test_project_owner_remaining_ignores_expired_and_future_purchases(client, cr
     configs = [
         ("group-cases", "group-case-sessions", "觉醒游戏"),
         ("emotional-releases", "emotional-release-sessions", "情绪释放"),
-        ("energy-knots", "energy-knot-sessions", "能量结"),
+        ("energy-knots", "energy-knot-sessions", "深度情绪释放"),
     ]
     purchase_ids = []
 

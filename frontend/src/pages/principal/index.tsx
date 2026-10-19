@@ -652,8 +652,11 @@ export default function PrincipalPage() {
   const [result, setResult] = useState<PrincipalResult | null>(null)
   const [overviewScopeType, setOverviewScopeType] = useState<"organization" | "person">("organization")
   const [selectedReferrerId, setSelectedReferrerId] = useState("")
-  const personalScope = query.tab === "overview" && overviewScopeType === "person"
-  const organizationOptions = [{ value: "", label: "全部可见组织/俱乐部" }, ...(metadata?.organizations || [])
+  const scopeTypes = metadata?.scope_types ?? ["organization", "person"]
+  const effectiveScope = scopeTypes.includes(overviewScopeType) ? overviewScopeType : scopeTypes[0]
+  const personalScope = query.tab === "overview" && effectiveScope === "person"
+  const statisticsReady = !!metadata && scopeTypes.includes(query.tab === "overview" ? effectiveScope : "organization")
+  const organizationOptions = [{ value: "", label: "全部" }, ...(metadata?.organizations || [])
     .filter(org => includeArchived || org.status !== "archived" || org.id === query.organization_id)
     .map(org => ({ value: org.id, label: org.name + (org.status === "archived" ? "（已归档）" : "") }))]
   const archivedScopeControl = <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-[#8f959e]">
@@ -860,7 +863,7 @@ export default function PrincipalPage() {
       }
     }
     return resolved
-  }, { pageSize: PAGE_SIZE })
+  }, { pageSize: PAGE_SIZE, enabled: statisticsReady })
   const quickFilterKey = trafficQuickFilter
     ? [trafficQuickFilter.kind, trafficQuickFilter.value].filter(Boolean).join(":") : ""
   const detailQuery = { ...listQuery, detail_picks: breakdownPicks,
@@ -868,11 +871,11 @@ export default function PrincipalPage() {
   const trafficDetails = useServerPagination<OverviewCustomerRow>((page, size) =>
     principalApi.details({ ...detailQuery, overview_detail: "traffic", detail_quick_filter: quickFilterKey }, page, size),
   { pageSize: PAGE_SIZE, queryKey: JSON.stringify([resultKey, breakdownPicks, trafficSortBy, trafficSortOrder, quickFilterKey]),
-    enabled: query.tab === "overview" && overviewGroup === "traffic" })
+    enabled: statisticsReady && query.tab === "overview" && overviewGroup === "traffic" })
   const arrivalDetails = useServerPagination<OverviewCustomerRow>((page, size) =>
     principalApi.details({ ...detailQuery, overview_detail: "invite_arrivals", arrival_view: inviteArriveView }, page, size),
   { pageSize: PAGE_SIZE, queryKey: JSON.stringify([resultKey, breakdownPicks, trafficSortBy, trafficSortOrder, inviteArriveView]),
-    enabled: query.tab === "overview" && overviewGroup === "invite" && query.invite_view !== "initiated" && inviteArriveView !== "date" })
+    enabled: statisticsReady && query.tab === "overview" && overviewGroup === "invite" && query.invite_view !== "initiated" && inviteArriveView !== "date" })
   const inviteDetails = useServerPagination<InviteInitiatedRecord>((page, size) =>
     principalApi.details({ ...listQuery, overview_detail: "invite_initiated", overview_detail_key: inviteDetail!.key,
       detail_sort_by: inviteDetailSort.field, detail_sort_order: inviteDetailSort.order }, page, size),
@@ -1695,12 +1698,13 @@ export default function PrincipalPage() {
     }
   })()
   const canViewDetailTabs = metadata ? metadata.transaction_access === "detail" : cachedTransactionAccess === "detail"
-  const visibleTabs = TABS.filter(t => canViewDetailTabs || !["orders", "conversion"].includes(t.key))
+  const visibleTabs = TABS.filter(t => t.key === "overview" || (canViewDetailTabs && scopeTypes.includes("organization")))
   // 别人共享的规则可以选用，但不能更新/删除
   const selectedRule = rules.find(item => item.id === ruleId)
   const canManageSelectedRule = !!selectedRule && selectedRule.can_manage !== false
   return (
     <div className="min-h-full bg-[#f4f5f6] p-4 pb-6">
+      {metadata && !scopeTypes.length && <p className="mb-3 rounded bg-white p-4 text-[13px] text-[#646a73]">未开通统计范围，请联系管理员。</p>}
       {/* 与「付费项目」一致的顶部 tab 栏：白条 + 3px 蓝色下划线贴底 */}
       <div className="mb-3 flex h-[52px] items-center rounded-xl bg-white px-5 shadow-[0_1px_3px_rgba(33,38,49,.06)]">
         <div className="flex h-full min-w-0 flex-1 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1793,8 +1797,10 @@ export default function PrincipalPage() {
                 {query.tab === "overview" && <SelectDropdown
                   size="sm"
                   className="w-[130px]"
-                  value={overviewScopeType}
-                  options={[{ value: "organization", label: "组织/俱乐部" }, { value: "person", label: "个人" }]}
+                  value={effectiveScope || ""}
+                  disabled={!metadata || !scopeTypes.length}
+                  placeholder="未开通统计范围"
+                  options={[{ value: "organization", label: "组织/俱乐部" }, { value: "person", label: "个人" }].filter(item => scopeTypes.includes(item.value as "organization" | "person"))}
                   onChange={updateOverviewScope}
                   buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2 !text-[11px] !shadow-none"
                 />}

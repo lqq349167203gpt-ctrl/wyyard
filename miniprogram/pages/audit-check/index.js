@@ -135,7 +135,7 @@ Page({
         titleMissing: !isCourse && has("visit_nickname") ? "缺昵称" : "",
         missingTags,
         title: (isCourse ? (row.title || row.type_label || "未命名活动") : (row.nickname || "未命名客户")),
-        // 只有 PC 判定为「缺」的项才显示成未填（比如能量结才检查部位、沙龙没有案主就不提示）；
+        // 只有 PC 判定为「缺」的项才显示成未填（比如深度情绪释放才检查部位、沙龙没有案主就不提示）；
         // 简介等没有检查项的字段，空着就整行不显示
         fields: fields
           .filter(item => item.value || (item.kind && has(item.kind)) || item.alwaysShow)

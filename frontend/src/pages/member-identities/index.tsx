@@ -16,14 +16,14 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { usePagination } from "@/hooks/use-pagination"
 import { PaginationBar } from "@/components/pagination-bar"
-import { HEALING_POSITIONS } from "@/lib/positions"
+import { HEALING_POSITIONS, positionLabel } from "@/lib/positions"
 import { MEMBERSHIP_CARD_NAMES } from "@/lib/payment-types"
 import { LEARNING_PAYMENT_TYPES } from "@/lib/learning-course-types"
 
 // 与 membership_card.card_type 实际值对齐；新增卡类型时需同步更新
 const CARD_TYPES = MEMBERSHIP_CARD_NAMES
 const COURSE_TYPES = Object.keys(LEARNING_PAYMENT_TYPES)
-const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "能量结", "OH卡梳理", "沙龙技能学习", "茶位费", "线下课程", "其他项目"]
+const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "深度情绪释放", "OH卡梳理", "沙龙技能学习", "茶位费", "线下课程", "其他项目"]
 
 const TYPE_LABELS: Record<string, string> = {
   invitation: "邀约情况",
@@ -40,14 +40,14 @@ const TYPE_LABELS: Record<string, string> = {
 const TEACHER_POSITIONS = [...HEALING_POSITIONS]
 
 const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于", ">=": "不少于", "<=": "不超过" }
-const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "能量结", "OH卡诊断", "OH卡梳理", "其他项目", "粗门次卡", "茶位费", "线下课程"]
+const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "深度情绪释放", "OH卡诊断", "OH卡梳理", "其他项目", "粗门次卡", "茶位费", "线下课程"]
 const RECORD_CATEGORIES = ["粗门次卡", "茶位费", "线下课程", "其他项目"]
 const COUNT_OPTIONS = Object.entries(COUNT_OP_LABELS).map(([value, label]) => ({ value, label }))
 
 function getPaymentCategories(c: IdentityCondition): string[] {
   if (c.type === "card") return ["会员卡"]
   if (c.type === "course") return ["沙龙技能学习"]
-  return (c.payment_categories || []).map(category => category === "OH卡诊断" ? "OH卡梳理" : category === "会员活动" ? "会员卡" : category)
+  return (c.payment_categories || []).map(category => category === "能量结" ? "深度情绪释放" : category === "OH卡诊断" ? "OH卡梳理" : category === "会员活动" ? "会员卡" : category)
 }
 
 function conditionSummary(c: IdentityCondition): string {
@@ -67,7 +67,7 @@ function conditionSummary(c: IdentityCondition): string {
   }
   if (c.type === "teacher") {
     if (!c.items || c.items.length === 0) return "疗愈老师（未选择）"
-    return `疗愈老师：${c.items.join("或")}`
+    return `疗愈老师：${c.items.map(positionLabel).join("或")}`
   }
   if (c.type === "fixed") {
     if (!c.items || c.items.length === 0) return "固定人员（未选择）"
@@ -540,7 +540,7 @@ export default function MemberIdentitiesPage() {
                           <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">身份</span>
                           <SelectDropdown
                             value={cond.items[0] || ""}
-                            options={TEACHER_POSITIONS.map(p => ({value: p, label: p}))}
+                            options={TEACHER_POSITIONS.map(p => ({value: p, label: positionLabel(p)}))}
                             placeholder="请选择身份"
                             onChange={(v) => updateCondition(ci, { items: v ? [v] : [] })}
                           />
@@ -611,7 +611,7 @@ export default function MemberIdentitiesPage() {
                             </div>
                           )}
 
-                          {/* 觉醒游戏/情绪释放/能量结 → 购买场次 */}
+                          {/* 觉醒游戏/情绪释放/深度情绪释放 → 购买场次 */}
                           {getPaymentCategories(cond).some((cat: string) => COUNT_CATEGORIES.includes(cat)) && (
                             <div className="flex items-center gap-2">
                               <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">{getPaymentCategories(cond).some(cat => RECORD_CATEGORIES.includes(cat)) ? "交易笔数" : "购买场次"}</span>

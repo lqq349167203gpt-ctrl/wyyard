@@ -58,7 +58,7 @@
       <text class="pd-value">{{item._totalCount || '-'}}</text>
     </view>
     <view class="pd-row">
-      <text class="pd-label">剩余次数</text>
+      <text class="pd-label">{{type === 'energy_knot' ? '剩余个数' : '剩余次数'}}</text>
       <text class="pd-value">{{item._remaining || '-'}}</text>
     </view>
     <view class="pd-row pd-row-last" wx:if="{{item.notes}}">
@@ -70,8 +70,8 @@
   <!-- 觉醒/情绪/能量 -->
   <view class="pd-card" wx:if="{{type === 'group_case' || type === 'emotional_release' || type === 'energy_knot'}}">
     <view class="pd-row">
-      <text class="pd-label">购买次数</text>
-      <text class="pd-value">{{item.purchase_count || '-'}}次</text>
+      <text class="pd-label">{{type === 'energy_knot' ? '购买个数（部位）' : '购买次数'}}</text>
+      <text class="pd-value">{{item.purchase_count || '-'}}{{type === 'energy_knot' ? '个' : '次'}}</text>
     </view>
     <view class="pd-row">
       <text class="pd-label">剩余次数</text>

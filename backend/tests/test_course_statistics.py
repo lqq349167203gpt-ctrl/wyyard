@@ -191,7 +191,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         ("class", "沙龙活动", lambda **_kwargs: [salon]),
         ("gcs", "觉醒游戏", lambda **_kwargs: [awakening]),
         ("ers", "情绪释放", empty_loader),
-        ("eks", "能量结", empty_loader),
+        ("eks", "深度情绪释放", empty_loader),
         ("ics", "内部课程", empty_loader),
     ))
     monkeypatch.setattr(
@@ -465,7 +465,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
         description='[{"id":"","name":"","count":4}]',
     )
     monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", (
-        ("eks", "能量结", lambda **_kwargs: [energy_knot]),
+        ("eks", "深度情绪释放", lambda **_kwargs: [energy_knot]),
     ))
 
     energy_result = statistics.get_course_statistics(
@@ -481,7 +481,7 @@ def test_course_statistics_counts_hours_and_participant_roles(monkeypatch):
     # 能量结没有课时，只结算部位数：课时一律为 0，部位数单独出列
     assert energy_result["statistics"] == [{
         "type": "eks",
-        "label": "能量结",
+        "label": "深度情绪释放",
         "course_count": 1,
         "class_hours": 0,
         "participant_count": 1,

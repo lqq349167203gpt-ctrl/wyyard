@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.models.base import SafeBaseModel
 from app.models.class_record import CourseWithdrawalEntry
@@ -30,6 +30,13 @@ class EnergyKnotSessionBase(SafeBaseModel):
     space_name: str = ""
     created_by_id: str = ""
     created_by: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def normalize_default_name(cls, value: str) -> str:
+        if value == "能量结" or value.startswith("能量结·"):
+            return "深度情绪释放" + value[len("能量结"):]
+        return value
 
 
 class EnergyKnotSessionCreate(EnergyKnotSessionBase):

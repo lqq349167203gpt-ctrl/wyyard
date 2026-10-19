@@ -41,7 +41,7 @@ def get_daily_payment_totals(request: Request, date: str = Query(...)):
         if r.deal_date == date:
             totals[r.customer_id] = totals.get(r.customer_id, 0) + r.amount
 
-    # 能量结
+    # 深度情绪释放
     for k in energy_knot_service.list_knots():
         if k.deal_date == date:
             totals[k.customer_id] = totals.get(k.customer_id, 0) + k.amount
@@ -91,7 +91,7 @@ TYPE_LABELS = {
     "group-cases": "觉醒游戏",
     "emotional-releases": "情绪释放",
     "oh-card-readings": "OH卡诊断",
-    "energy-knots": "能量结",
+    "energy-knots": "深度情绪释放",
 }
 
 
@@ -154,14 +154,14 @@ def list_payment_records(
             "customer_id": r.customer_id,
         })
 
-    # 能量结
+    # 深度情绪释放
     for k in energy_knot_service.list_knots():
         created = k.created_at.strftime("%Y-%m-%d") if hasattr(k.created_at, "strftime") else str(k.created_at)
         records.append({
             "date": k.deal_date or "",
             "nickname": "",
-            "type": "能量结",
-            "name": "能量结",
+            "type": "深度情绪释放",
+            "name": "深度情绪释放",
             "quantity": k.purchase_count,
             "amount": k.amount,
             "effective_date": created,

@@ -14,7 +14,7 @@ ACTIVITY_TYPE_LABELS: dict[ActivityRecordType, str] = {
     "class": "沙龙",
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
-    "eks": "能量结",
+    "eks": "深度情绪释放",
     "ics": "沙龙技能学习",
 }
 

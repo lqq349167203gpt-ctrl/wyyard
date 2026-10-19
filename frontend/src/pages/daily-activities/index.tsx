@@ -767,7 +767,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-sm p-0 gap-0" initialFocus={false}>
         <DialogHeader className="px-6 pt-5 pb-4 border-b">
-          <DialogTitle className="text-[15px]">{editingRecord ? "编辑能量结" : "新增能量结"}</DialogTitle>
+          <DialogTitle className="text-[15px]">{editingRecord ? "编辑深度情绪释放" : "新增深度情绪释放"}</DialogTitle>
         </DialogHeader>
         <div className="px-6 py-5 space-y-5" {...enterToNext}>
           <div className="grid grid-cols-[70px_1fr] items-center gap-3">
@@ -915,11 +915,11 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
             </div>
           )}
           <div className="grid grid-cols-[70px_1fr] items-start gap-3">
-            <span className="text-[12px] text-[#8f959e] text-right pt-2">能量结老师</span>
+            <span className="text-[12px] text-[#8f959e] text-right pt-2">深度情绪释放老师</span>
             <SelectDropdown rounded="[2px]"
               value={formHostIds}
               options={hostCustomers.map(c => ({value: c.id, label: c.nickname || c.name || ""}))}
-              placeholder="选择能量结老师"
+              placeholder="选择深度情绪释放老师"
               onChange={(v) => {
                 const ids = Array.isArray(v) ? v : [v]
                 setFormHostIds(ids)
@@ -2672,7 +2672,7 @@ export default function DailyActivitiesPage() {
       "ers", "情绪释放", record, record.name || "情绪释放", [record.owner_id, ...(record.participant_ids || [])],
     ))
     detailEksSessions.forEach(record => append(
-      "eks", "能量结", record, record.name || "能量结", [record.owner_id, ...(record.participant_ids || [])],
+      "eks", "深度情绪释放", record, record.name || "深度情绪释放", [record.owner_id, ...(record.participant_ids || [])],
     ))
     detailIcsSessions.forEach(record => append(
       "ics", "沙龙技能学习", record, record.course_name || "沙龙技能学习", record.participant_ids || [],
@@ -3257,8 +3257,8 @@ export default function DailyActivitiesPage() {
       <AlertDialog open={!!eksDeleteId} onOpenChange={(open) => !open && setEksDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除能量结</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除这条能量结记录吗？此操作不可撤销。</AlertDialogDescription>
+            <AlertDialogTitle>删除深度情绪释放</AlertDialogTitle>
+            <AlertDialogDescription>确定要删除这条深度情绪释放记录吗？此操作不可撤销。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>

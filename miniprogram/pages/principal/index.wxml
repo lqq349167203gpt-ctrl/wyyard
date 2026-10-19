@@ -8,8 +8,8 @@
   <view class="card filter-card">
     <view class="filter-row range-filter-row">
       <text class="filter-label">范围</text>
-      <picker class="scope-type-picker" range="{{scopeTypes}}" value="{{scopeTypeIndex}}" bindchange="onScopeType">
-        <view class="control scope-control"><text class="control-text">{{scopeTypes[scopeTypeIndex]}}</text><view class="course-picker-arrow"></view></view>
+      <picker class="scope-type-picker" range="{{scopeTypes}}" disabled="{{!scopeTypes.length}}" value="{{scopeTypeIndex}}" bindchange="onScopeType">
+        <view class="control scope-control"><text class="control-text">{{scopeTypes[scopeTypeIndex] || "未开通统计范围"}}</text><view class="course-picker-arrow"></view></view>
       </picker>
       <picker class="filter-control" range="{{scopeTargets}}" range-key="name" value="{{scopeTargetIndex}}" bindchange="onScopeTarget">
         <view class="control scope-control"><text class="control-text">{{scopeTargets[scopeTargetIndex].name}}</text><view class="course-picker-arrow"></view></view>

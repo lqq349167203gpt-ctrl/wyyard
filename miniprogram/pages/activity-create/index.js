@@ -38,7 +38,7 @@ Page({
     // 活动方式（沙龙/沙龙技能学习）
     activityModes: ['线下', '线上'],
     activityModeIndex: 0,
-    // 案主（觉醒/情绪释放/能量结）
+    // 案主（觉醒/情绪释放/深度情绪释放）
     ownerId: '',
     ownerName: '',
     // 老师（多选，class/eks/ics）

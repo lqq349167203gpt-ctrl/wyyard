@@ -2,7 +2,7 @@
 
 const BADGE_COLORS = {
   '沙龙': '#bfa060', '觉醒': '#7c5cfc', '觉醒游戏': '#8b72c7',
-  '情绪释放': '#d97070', '能量结': '#d9944a', '沙龙技能学习': '#5ba88a',
+  '情绪释放': '#d97070', '深度情绪释放': '#d9944a', '沙龙技能学习': '#5ba88a',
   '呼吸禅茶': '#5ba88a', 'AB情景剧': '#d9944a',
   '沙盘疗愈': '#8b72c7', '身体课': '#d97070', '颂钵': '#c772a0',
   '艺术疗愈': '#bfa060', '疗愈行业分享会': '#4a90d9',
@@ -12,13 +12,13 @@ const ACTIVITY_TYPES = [
   { value: 'class', label: '沙龙活动' },
   { value: 'gcs', label: '觉醒游戏' },
   { value: 'ers', label: '情绪释放' },
-  { value: 'eks', label: '能量结' },
+  { value: 'eks', label: '深度情绪释放' },
   { value: 'ics', label: '沙龙技能学习' },
 ]
 
 const TYPE_LABELS = {
   class: '沙龙', gcs: '觉醒', ers: '情绪释放',
-  eks: '能量结', ics: '沙龙技能学习',
+  eks: '深度情绪释放', ics: '沙龙技能学习',
 }
 
 const TEACHER_POSITION = {

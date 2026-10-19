@@ -35,7 +35,7 @@ ACTION_LABELS = {
     "create_membership_card": "会员卡购买",
     "create_group_case": "觉醒游戏",
     "create_emotional_release": "情绪释放",
-    "create_energy_knot": "能量结",
+    "create_energy_knot": "深度情绪释放",
     "create_internal_course": "沙龙技能学习",
     "create_other_project": "其他项目",
 }
@@ -126,8 +126,8 @@ ENTRY_PROMPT = """你是"无忧茶院"后台管理系统的 AI 数据录入助�
 - amount（可选）— 金额
 - closer_name（可选）— 成交人
 
-### 6. create_energy_knot — 能量结
-识别关键词：能量结、买了能量
+### 6. create_energy_knot — 深度情绪释放
+识别关键词：深度情绪释放、能量结、买了能量。深度情绪释放使用 create_energy_knot，不使用 create_emotional_release。
 字段：
 - customer_id（必填）— 客户ID
 - nickname（必填）— 客户昵称
@@ -445,7 +445,7 @@ def _execute_create_energy_knot(data: Dict[str, Any]) -> Dict[str, Any]:
     knot = energy_knot_service.create_knot(create_data)
     return {
         "success": True,
-        "message": f"已录入能量结：{knot.nickname}",
+        "message": f"已录入深度情绪释放：{knot.nickname}",
         "id": knot.id,
     }
 

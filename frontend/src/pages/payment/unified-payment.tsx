@@ -43,7 +43,7 @@ const PROJECT_TYPES = {
   group_case:        { label: "觉醒游戏", color: "#7b61ff", icon: Wallet, api: groupCaseApi },
   emotional_release: { label: "情绪释放", color: "#00b2a9", icon: Heart, api: emotionalReleaseApi },
   oh_card_reading:   { label: "OH卡诊断", color: "#f5a623", icon: Layers, api: ohCardReadingApi },
-  energy_knot:       { label: "能量结", color: "#e02020", icon: Zap, api: energyKnotApi },
+  energy_knot:       { label: "深度情绪释放", color: "#e02020", icon: Zap, api: energyKnotApi },
   internal_course:   { label: "沙龙技能学习", color: "#34c724", icon: GraduationCap, api: internalCourseApi },
   tea_seat_fee:      { label: "茶位费", color: "#c8a96e", icon: Coffee, api: teaSeatFeeApi },
   offline_course:    { label: "线下落地课程", color: "#e8794a", icon: BookOpen, api: offlineCourseApi },
@@ -1850,7 +1850,7 @@ export function UnifiedPaymentContent({
               </div>
             )}
 
-            {/* ===== 觉醒游戏/情绪释放/能量结专属字段 ===== */}
+            {/* ===== 觉醒游戏/情绪释放/深度情绪释放专属字段 ===== */}
             {(formType === "group_case" || formType === "emotional_release" || formType === "energy_knot") && (
               <>
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">

@@ -174,7 +174,7 @@ Page({
     ruleSentence: '',
     canManageRule: false,
     includeArchived: false, metadata: null, organizations: [{ id: '', name: '全部可见组织/俱乐部' }], orgIndex: 0,
-    scopeTypes: ['组织/俱乐部', '个人'], scopeTypeIndex: 0, scopeTargetIndex: 0,
+    scopeTypes: ['组织/俱乐部', '个人'], scopeTypeKeys: ['organization', 'person'], scopeTypeIndex: 0, scopeTargetIndex: 0,
     scopeTargets: [{ id: '', name: '全部可见组织/俱乐部' }], referrers: [], minDate: MIN_DATE,
     // 数据统计没有「课程记录/交易记录」这两个页面；转化分析按缓存的权限先挂上，接口回来再校正
     tabs: initialTabs(),
@@ -230,15 +230,13 @@ Page({
   },
   async initialize() {
     try {
-      // 首屏统计和轻量组织目录同时加载；规则和具体卡种在进入转化分析时再取。
+      // 先取得可用范围再查询，避免仅个人权限的账号先请求组织统计。
       const conversion = this.data.query.tab === 'conversion'
-      const dataPromise = this.loadData(true)
       const [metadata, rules] = await Promise.all([
         principalApi.metadata(!conversion), conversion ? principalApi.rules() : Promise.resolve(this.data.rules),
       ])
       if (this.data.query.tab !== (conversion ? 'conversion' : 'overview')) {
         this.setData({ organizations: organizationScopeOptions(metadata.organizations, this.data.includeArchived, this.data.query.organization_id) })
-        await dataPromise
         return
       }
       this.setData({ ruleSentence: describeRule(this.data.query.rule, metadata) })
@@ -246,19 +244,24 @@ Page({
       this.setData({ ruleIndex: selectedIndex + 1, ruleId: selectedIndex >= 0 ? rules[selectedIndex].id : '', canManageRule: selectedIndex >= 0 && rules[selectedIndex].can_manage === true })
       // 与 PC 一致：只保留「经营概况」和「转化分析」（课程记录/交易记录已下线，明细都在经营概况的卡片里）；
       // 接口没带回权限时沿用缓存判断，不能把已经显示的这一栏又拿掉
+      const scopeTypeKeys = metadata.scope_types || ['organization', 'person']
+      const scopeType = scopeTypeKeys.includes(this.data.query.scope_type) ? this.data.query.scope_type : scopeTypeKeys[0]
+      const personal = scopeType === 'person'
+      const nextQuery = { ...this.data.query, scope_type: scopeType || 'organization',
+        tab: !scopeTypeKeys.includes('organization') ? 'overview' : this.data.query.tab,
+        organization_id: personal ? '' : this.data.query.organization_id, referrer_id: personal ? this.data.query.referrer_id : '' }
       const tabs = [OVERVIEW_TAB]
       const transactionAccess = metadata.transaction_access || ((wx.getStorageSync('userEditPermissions') || {}).customer_access || {}).transaction_access
-      if (transactionAccess === 'detail' && this.data.query.scope_type !== 'person') tabs.push(CONVERSION_TAB)
+      if (transactionAccess === 'detail' && !personal && scopeTypeKeys.includes('organization')) tabs.push(CONVERSION_TAB)
       const includeArchived = this.data.includeArchived || (metadata.organizations || []).some(org => org.id === this.data.query.organization_id && org.status === 'archived')
       const organizations = organizationScopeOptions(metadata.organizations, includeArchived)
       const referrers = (metadata.referrers || []).filter(item => item.count > 0)
-      const personal = this.data.query.scope_type === 'person'
       const scopeTargets = personal ? (referrers.length ? referrers : [{ id: '', name: '暂无有引流客户的个人' }]) : organizations
-      const selectedId = personal ? this.data.query.referrer_id : this.data.query.organization_id
+      const selectedId = personal ? nextQuery.referrer_id : nextQuery.organization_id
       const scopeTargetIndex = Math.max(0, scopeTargets.findIndex(item => item.id === selectedId))
-      this.setData({ metadata, includeArchived, tabs, rules, ruleOptions: ['默认规则', ...rules.map(ruleLabel)], organizations, referrers, scopeTargets, scopeTargetIndex })
-      await dataPromise
-      if (personal && !selectedId && scopeTargets[0].id) this.applyFilters({ referrer_id: scopeTargets[0].id })
+      if (personal) nextQuery.referrer_id = scopeTargets[scopeTargetIndex].id
+      this.setData({ query: nextQuery, scopeTypeKeys, scopeTypes: scopeTypeKeys.map(key => key === 'person' ? '个人' : '组织/俱乐部'), scopeTypeIndex: Math.max(0, scopeTypeKeys.indexOf(scopeType)), metadata, includeArchived, tabs, rules, ruleOptions: ['默认规则', ...rules.map(ruleLabel)], organizations, referrers, scopeTargets, scopeTargetIndex })
+      await this.loadData(true)
       if (conversion) this.ensureRuleFields()
     } catch (e) {
       // 数据源错配是最常见的失败原因，直接把当前数据源写在提示里，省得来回猜
@@ -276,6 +279,12 @@ Page({
     } catch (e) { /* 拉不到就当没有附加条件可用，不影响规则本身 */ }
   },
   async loadData(reset, options = {}) {
+    const allowed = this.data.metadata?.scope_types
+    if (allowed && !allowed.includes(this.data.query.scope_type)) {
+      this._sequence = (this._sequence || 0) + 1
+      this.setData({ loading: false, list: [], summary: [], cards: [], error: '未开通统计范围，请联系管理员。' })
+      return
+    }
     const preserveContent = !!options.preserveContent
     const preserveCards = !!options.preserveCards
     const sequence = this._sequence = (this._sequence || 0) + 1
@@ -1173,19 +1182,22 @@ Page({
   },
   onOrg(e) { const i = Number(e.detail.value); this.setData({ orgIndex: i }); this.applyFilters({ organization_id: this.data.organizations[i].id }) },
   onScopeType(e) {
-    const personal = Number(e.detail.value) === 1
+    const scopeTypeIndex = Number(e.detail.value)
+    const scopeType = this.data.scopeTypeKeys[scopeTypeIndex]
+    if (!scopeType) return
+    const personal = scopeType === 'person'
     const targets = personal ? (this.data.referrers.length ? this.data.referrers : [{ id: '', name: '暂无有引流客户的个人' }]) : this.data.organizations
     const tabs = [OVERVIEW_TAB]
-    if (!personal && (this.data.metadata?.transaction_access === 'detail' || initialTabs().length > 1)) tabs.push(CONVERSION_TAB)
-    this.setData({ scopeTypeIndex: personal ? 1 : 0, scopeTargets: targets, scopeTargetIndex: 0, tabs, overviewGroup: 'traffic' })
+    if (!personal && this.data.scopeTypeKeys.includes('organization') && (this.data.metadata?.transaction_access === 'detail' || initialTabs().length > 1)) tabs.push(CONVERSION_TAB)
+    this.setData({ scopeTypeIndex, scopeTargets: targets, scopeTargetIndex: 0, tabs, overviewGroup: 'traffic' })
     this.applyFilters({ scope_type: personal ? 'person' : 'organization', referrer_id: personal ? targets[0].id : '', organization_id: personal ? '' : targets[0].id, tab: 'overview', course_view: 'course', participant_scope: '', course_deal: '' })
   },
   onScopeTarget(e) {
     const index = Number(e.detail.value)
     const target = this.data.scopeTargets[index]
     if (!target) return
-    this.setData({ scopeTargetIndex: index, orgIndex: this.data.scopeTypeIndex ? 0 : index })
-    this.applyFilters(this.data.scopeTypeIndex ? { referrer_id: target.id, organization_id: '' } : { organization_id: target.id, referrer_id: '' })
+    this.setData({ scopeTargetIndex: index, orgIndex: this.data.query.scope_type === 'person' ? 0 : index })
+    this.applyFilters(this.data.query.scope_type === 'person' ? { referrer_id: target.id, organization_id: '' } : { organization_id: target.id, referrer_id: '' })
   },
   onCourseView(e) {
     const view = e.currentTarget.dataset.view
@@ -1231,7 +1243,7 @@ Page({
   },
   onTab(e) {
     const tab = e.currentTarget.dataset.key
-    if (this.data.query.scope_type === 'person' && tab === 'conversion') return
+    if (tab === 'conversion' && (this.data.query.scope_type === 'person' || !this.data.scopeTypeKeys.includes('organization'))) return
     this.setData({ overviewGroup: tab === 'overview' ? 'traffic' : '', picks: [], inviteToolMenuOpen: false })
     this.updateQuery({ tab, product: '', course_view: 'course', participant_scope: '' })
     if (tab === 'conversion') this.loadConversionSetup()

@@ -44,7 +44,7 @@ const DEFAULT_ACTIVITY_TYPES = [
   { value: "class", label: "沙龙活动" },
   { value: "gcs", label: "觉醒游戏" },
   { value: "ers", label: "情绪释放" },
-  { value: "eks", label: "能量结" },
+  { value: "eks", label: "深度情绪释放" },
   { value: "ics", label: "沙龙技能学习" },
 ]
 type ServiceTeacherTab = "courses" | "follow-ups"

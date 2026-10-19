@@ -106,3 +106,15 @@ test('编辑保留已保存课程；读取失败可以重试', async () => {
   assert.equal(instance.data.dealCourseError, '')
   assert.equal(instance.data.dealCourseIndex, 1)
 })
+
+test('深度情绪释放确认页按部位个数显示，原始购买数量字段保持不变', () => {
+  const { instance } = harness()
+  instance.data.type = 'energy_knot'
+  instance.data.formData = { purchase_count: 3, effective_date: '2026-10-19', amount: 600 }
+  const rows = instance._buildConfirmRows()
+  assert.equal(rows.find(row => row.label === '购买个数（部位）').value, '3 个')
+  assert.equal(instance.data.formData.purchase_count, 3)
+  instance.data.type = 'emotional_release'
+  const emotionalRows = instance._buildConfirmRows()
+  assert.equal(emotionalRows.find(row => row.label === '购买场次').value, '3 次')
+})

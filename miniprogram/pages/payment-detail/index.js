@@ -111,7 +111,7 @@ Page({
         item._expiryDate = calcOfflineExpiry(item)
         item._remaining = ''
       } else if (isHealing) {
-        item._remaining = item.effective_remaining != null ? `${item.effective_remaining}次` : ''
+        item._remaining = item.effective_remaining != null ? `${item.effective_remaining}${type === 'energy_knot' ? '个' : '次'}` : ''
       } else {
         item._remaining = item.remaining_count === null ? '不限次' : (item.remaining_count != null ? `${item.remaining_count}次` : '')
       }

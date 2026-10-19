@@ -449,7 +449,7 @@ def get_details(
         "membership-cards": "会员卡",
         "group-cases": "觉醒游戏",
         "emotional-releases": "情绪释放",
-        "energy-knots": "能量结",
+        "energy-knots": "深度情绪释放",
         "internal-courses": "沙龙技能学习",
         "oh-card-readings": "OH卡诊断",
         "other-projects": "其他项目",
@@ -641,7 +641,7 @@ PRODUCT_TYPE_MAP = {
     "group-cases": "觉醒游戏",
     "emotional-releases": "情绪释放",
     "oh-card-readings": "OH卡诊断",
-    "energy-knots": "能量结",
+    "energy-knots": "深度情绪释放",
     "internal-courses": "沙龙技能学习",
     "offline-courses": "落地课程",
     "other-projects": "其他项目",
@@ -795,7 +795,7 @@ def get_products(
                 total_amount += amount
                 type_counts[label] += 1
                 total_count += 1
-                # 购买次数（觉醒游戏、情绪释放、能量结有 purchase_count 字段；OH卡诊断用 diagnosis_duration；其他项目用 total_count，null 记为 1）
+                # 购买次数（觉醒游戏、情绪释放、深度情绪释放有 purchase_count 字段；OH卡诊断用 diagnosis_duration；其他项目用 total_count，null 记为 1）
                 if type_name in ("group-cases", "emotional-releases", "energy-knots"):
                     pc = getattr(r, "purchase_count", 0) or 0
                     total_purchase_count += pc
@@ -1119,7 +1119,7 @@ def get_product_details(
             "group-cases": "觉醒游戏",
             "emotional-releases": "情绪释放",
             "oh-card-readings": "OH卡诊断",
-            "energy-knots": "能量结",
+            "energy-knots": "深度情绪释放",
             "internal-courses": "沙龙技能学习",
             "offline-courses": "落地课程",
             "other-projects": "其他项目",
@@ -1574,7 +1574,7 @@ COURSE_ACTIVITY_TYPES = (
     ("class", "沙龙活动", class_record_service.list_records),
     ("gcs", "觉醒游戏", group_case_session_service.list_sessions),
     ("ers", "情绪释放", emotional_release_session_service.list_sessions),
-    ("eks", "能量结", energy_knot_session_service.list_sessions),
+    ("eks", "深度情绪释放", energy_knot_session_service.list_sessions),
     ("ics", "沙龙技能学习", internal_course_session_service.list_sessions),
 )
 
@@ -1608,7 +1608,7 @@ def _course_participant_ids(activity_type: str, activity) -> set[str]:
         if special_id:
             participant_ids.discard(special_id)
     if activity_type == "eks":
-        # 能量结的案主可能记在 description 里（可能多个），同样不算到场人数与新人/老人名单
+        # 深度情绪释放的案主可能记在 description 里（可能多个），同样不算到场人数与新人/老人名单
         try:
             details = json.loads(getattr(activity, "description", "") or "[]")
         except (ValueError, TypeError):
@@ -1840,7 +1840,7 @@ def _course_activity_name(activity_type: str, label: str, activity) -> str:
 
 
 def _course_activity_hours(activity_type: str, activity) -> int:
-    """课程课时：其他活动按会员扣卡次数；能量结没有课时，它只结算部位数（部位数单独出列）。"""
+    """课程课时：其他活动按会员扣卡次数；深度情绪释放没有课时，它只结算部位数（部位数单独出列）。"""
     if activity_type == "eks":
         return 0
     try:
@@ -1850,7 +1850,7 @@ def _course_activity_hours(activity_type: str, activity) -> int:
 
 
 def _course_owner_records(activity_type, activity):
-    """读取活动案主配置；能量结兼容多案主及历史部位记录。"""
+    """读取活动案主配置；深度情绪释放兼容多案主及历史部位记录。"""
     if activity_type not in {"gcs", "ers", "eks"}:
         return []
     owners = []
@@ -1867,7 +1867,7 @@ def _course_owner_records(activity_type, activity):
 
 
 def _course_owner_details(activity_type, activity, customer_map, visible_customer_ids):
-    """案主沿用客户可见范围；能量结兼容多案主及历史部位记录。"""
+    """案主沿用客户可见范围；深度情绪释放兼容多案主及历史部位记录。"""
     if activity_type not in {"gcs", "ers", "eks"}:
         return {"owner_name": "", "body_part_count": None, "owner_count": 0}
     owners = _course_owner_records(activity_type, activity)
@@ -1887,7 +1887,7 @@ def _course_owner_details(activity_type, activity, customer_map, visible_custome
     return {
         "owner_name": "、".join(names),
         "body_part_count": count if activity_type == "eks" else None,
-        # 案主人次：按可见的案主去重计数（能量结支持多案主）
+        # 案主人次：按可见的案主去重计数（深度情绪释放支持多案主）
         "owner_count": len(names),
     }
 

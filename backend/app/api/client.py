@@ -69,7 +69,7 @@ SIGNUPS_FILE = "client_signups.json"
 OTHER_ACTIVITY_SERVICES = {
     "觉醒游戏": ("gcs", group_case_session_service),
     "情绪释放": ("ers", emotional_release_session_service),
-    "能量结": ("eks", energy_knot_session_service),
+    "深度情绪释放": ("eks", energy_knot_session_service),
 }
 
 SESSION_SERVICES = {
@@ -83,7 +83,7 @@ ACTIVITY_KEY_LABELS = {
     "class": "活动",
     "gcs": "觉醒游戏",
     "ers": "情绪释放",
-    "eks": "能量结",
+    "eks": "深度情绪释放",
     "ics": "沙龙技能学习",
 }
 
@@ -210,7 +210,7 @@ def _format_activity(item: dict, customer_map: dict, space_map: dict, room_map: 
             leader_role_label = "成就君" if activity_type in achiever_activity_types else "老师"
     teacher_names = [profile["name"] for profile in teacher_profiles]
 
-    # 觉醒游戏、情绪释放、能量结详情单独展示案主
+    # 觉醒游戏、情绪释放、深度情绪释放详情单独展示案主
     owner_name = ""
     if activity_type in {"gcs", "ers", "eks"}:
         owner_id = d.get("owner_id", "")
@@ -949,7 +949,8 @@ def _enrich_activity_time(act: dict):
         service_map = {
             "觉醒游戏": "group_case_session_service",
             "情绪释放": "emotional_release_session_service",
-            "能量结": "energy_knot_session_service",
+            "深度情绪释放": "energy_knot_session_service",
+            "能量结": "energy_knot_session_service",  # 兼容旧报名记录的活动名称
             "沙龙技能学习": "internal_course_session_service",
         }
         svc_name = service_map.get(act_type)
@@ -1140,7 +1141,7 @@ def _build_special_project_usage_records(customer_id: str) -> list[dict]:
     configs = [
         ("group-cases", "觉醒游戏", group_case_session_service),
         ("emotional-releases", "情绪释放", emotional_release_session_service),
-        ("energy-knots", "能量结", energy_knot_session_service),
+        ("energy-knots", "深度情绪释放", energy_knot_session_service),
     ]
     purchased_counts = {
         item.get("type"): item.get("total_purchased", 0)

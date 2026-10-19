@@ -24,7 +24,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/payment/membership-cards": "无忧 - 会员卡",
   "/payment/group-cases": "无忧 - 觉醒游戏",
   "/payment/emotional-releases": "无忧 - 情绪释放",
-  "/payment/energy-knots": "无忧 - 能量结",
+  "/payment/energy-knots": "无忧 - 深度情绪释放",
   "/payment/internal-courses": "无忧 - 沙龙技能学习",
   "/agents": "无忧 - AI配置",
 

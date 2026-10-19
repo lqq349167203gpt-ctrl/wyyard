@@ -131,7 +131,7 @@ def get_available_items(customer_id: str, project_type: str) -> list:
         items = [k for k in knots if k.customer_id == customer_id and not k.is_deleted]
         return [{
             "id": k.id,
-            "name": f"能量结（{k.purchase_count}次）",
+            "name": f"深度情绪释放（{k.purchase_count}次）",
             "paid_amount": k.amount,
             "detail": f"¥{k.amount}",
         } for k in items if not is_project_refunded("energy-knots", k.id)]
@@ -218,7 +218,7 @@ def create_refund(data: ProjectRefundCreate) -> ProjectRefund:
                 "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放",
                 "oh-card-readings": "OH卡诊断",
-                "energy-knots": "能量结",
+                "energy-knots": "深度情绪释放",
                 "tea-seat-fees": "茶位费",
             }
             project_name = type_labels.get(data.project_type, data.project_type)
