@@ -28,6 +28,7 @@ const DEFAULT_PERMISSIONS: PositionEditPermissions = {
       other_info: false,
     },
     detail_tabs: {
+      visit_need_tags: false, visit_need_detail: false, customer_info: false, customer_feedback: false,
       follow_up: false,
       communication: false,
       activities: false,
@@ -80,6 +81,9 @@ function normalizeEditPermissions(permissions?: Partial<PositionEditPermissions>
         other_info: permissions?.customer_access?.sensitive_fields?.other_info === true,
       },
       detail_tabs: {
+        ...Object.fromEntries(["visit_need_tags", "visit_need_detail", "customer_info", "customer_feedback"].map(key => [key,
+          permissions?.customer_access?.detail_tabs?.[key as keyof typeof DEFAULT_PERMISSIONS.customer_access.detail_tabs]
+            ?? (permissions?.customer_access?.detail_tabs?.follow_up === true)])),
         follow_up: permissions?.customer_access?.detail_tabs?.follow_up === true,
         communication: permissions?.customer_access?.detail_tabs?.communication === true,
         activities: permissions?.customer_access?.detail_tabs?.activities === true,

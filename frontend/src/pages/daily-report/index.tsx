@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import DetailView from "@/pages/healing-records/components/detail-view"
 import { useOrganizations } from "@/hooks/use-organizations"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { canViewNote } from "@/lib/note-permissions"
 import { CourseRosterNames, type CourseRosterPerson } from "@/components/course-roster-names"
 import { followUpPlanText, NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
 
@@ -216,9 +217,11 @@ export default function DailyReportPage() {
     </style>`
     let html = `<html><head><meta charset="utf-8">${style}</head><body>`
     // 第一部分：当日客户
-    html += `<table><colgroup><col width="60"><col width="50"><col width="80"><col width="60"><col width="50"><col width="50"><col width="50"><col width="50"><col width="50"><col width="60"><col width="120"><col width="120"><col width="100"><col width="100"><col width="70"><col width="50"><col width="40"></colgroup>`
-    html += `<tr class="section"><td colspan="17">当日客户（${sortedVisits.length}人）</td></tr>`
-    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th><th>来访需求</th><th>深度需求</th><th>跟进点</th><th>客户反馈</th><th>今日成交</th><th>邀约</th><th>到场</th></tr>`
+    const widths = [60, 50, 80, 60, 50, 50, 50, 50, 50, 60, 120, 120, 100, 100, 70, 50, 40]
+      .filter((_, index) => index < 10 || index > 13 || canViewNote(permissions.customer_access, (["visit_need", "customer_info", "follow_up", "customer_feedback"] as const)[index - 10]))
+    html += `<table><colgroup>${widths.map(width => `<col width="${width}">`).join("")}</colgroup>`
+    html += `<tr class="section"><td colspan="${widths.length}">当日客户（${sortedVisits.length}人）</td></tr>`
+    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th>${canViewNote(permissions.customer_access, "visit_need") ? "<th>来访需求</th>" : ""}${canViewNote(permissions.customer_access, "customer_info") ? "<th>深度需求</th>" : ""}${canViewNote(permissions.customer_access, "follow_up") ? "<th>跟进点</th>" : ""}${canViewNote(permissions.customer_access, "customer_feedback") ? "<th>客户反馈</th>" : ""}<th>今日成交</th><th>邀约</th><th>到场</th></tr>`
     for (const v of sortedVisits) {
       html += `<tr>
         <td>${esc(v.referrer || "-")}</td>
@@ -231,10 +234,10 @@ export default function DailyReportPage() {
         <td>${v.activity_count}场</td>
         <td>${todayActivityCountMap[v.customer_id] || 0}场</td>
         <td>${!financeReady ? "-" : !hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
-        <td class="wrap">${esc(v.needs || "-")}</td>
-        <td class="wrap">${esc(v.feedback || "-")}</td>
-        <td class="wrap">${esc(reportFollowUpText(v) || "-")}</td>
-        <td class="wrap">${esc(v.experience || "-")}</td>
+        ${canViewNote(permissions.customer_access, "visit_need") ? `<td class="wrap">${esc(v.needs || "-")}</td>` : ""}
+        ${canViewNote(permissions.customer_access, "customer_info") ? `<td class="wrap">${esc(v.feedback || "-")}</td>` : ""}
+        ${canViewNote(permissions.customer_access, "follow_up") ? `<td class="wrap">${esc(reportFollowUpText(v) || "-")}</td>` : ""}
+        ${canViewNote(permissions.customer_access, "customer_feedback") ? `<td class="wrap">${esc(v.experience || "-")}</td>` : ""}
         <td>${(transactionCounts[v.customer_id] || 0) > 0 ? transactionCounts[v.customer_id] + "笔" : "-"}</td>
         <td>${esc(v.referrer_handler || "-")}</td>
         <td>${v.arrived ? "✓" : "✗"}</td>
@@ -412,6 +415,7 @@ export default function DailyReportPage() {
       // 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
       const manualDeductionMap = new Map<string, { customer_id: string; nickname: string; project_type: string; project_id: string; project_name: string; count: number; remaining_after: number | null }>()
       for (const d of deductions as any[]) {
+        if (d.is_deleted || d.cancelled) continue
         if (d.deduction_date !== detailDate) continue
         const key = `${d.customer_id}|${d.project_type}|${d.project_id}`
         const existing = manualDeductionMap.get(key)
@@ -425,7 +429,7 @@ export default function DailyReportPage() {
             project_id: d.project_id,
             project_name: d.project_name,
             count: d.count || 1,
-            remaining_after: d.remaining_after ?? null,
+            remaining_after: d.current_remaining === undefined ? (d.remaining_after ?? null) : d.current_remaining,
           })
         }
       }
@@ -659,7 +663,7 @@ export default function DailyReportPage() {
           deduction_type: "活动销卡",
           has_card: hasCard,
           count: activityCount,
-          remaining_count: card?.remaining_count ?? null,
+          remaining_count: finance.remaining_by_customer["membership-cards"]?.[cid] ?? null,
         })
       }
 
@@ -681,7 +685,8 @@ export default function DailyReportPage() {
             deduction_type: projectLabelMap[projectType] || projectType,
             has_card: !!projData,
             count: activityCount,
-            remaining_count: remaining,
+            remaining_count: finance.remaining_by_customer[projectType]?.[cid] === undefined
+              ? remaining : finance.remaining_by_customer[projectType][cid],
           })
         }
       }
@@ -782,10 +787,10 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-center font-normal w-[50px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("activity_count")}><span className="inline-flex items-center gap-0">总参与<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "activity_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "activity_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("today_activity")}><span className="inline-flex items-center gap-0">今日<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "today_activity" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "today_activity" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[57px] border-b-[0.5px] border-[#e8eaed]">剩余次数</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">来访需求</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">深度需求</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">跟进点</th>
-                  <th className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户反馈</th>
+                  <th hidden={!canViewNote(permissions.customer_access, "visit_need")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">来访需求</th>
+                  <th hidden={!canViewNote(permissions.customer_access, "customer_info")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">深度需求</th>
+                  <th hidden={!canViewNote(permissions.customer_access, "follow_up")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">跟进点</th>
+                  <th hidden={!canViewNote(permissions.customer_access, "customer_feedback")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户反馈</th>
                   <th className="px-[5px] py-2 text-left font-normal w-[74px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("daily_amount")}><span className="inline-flex items-center gap-0">今日成交<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "daily_amount" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "daily_amount" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="pl-[5px] pr-0 py-2 text-left font-normal w-[36px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("referrer_handler")}><span className="inline-flex items-center gap-0">邀约<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "referrer_handler" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "referrer_handler" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="pl-0 pr-[5px] py-2 text-center font-normal w-[56px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("arrived")}><span className="inline-flex items-center gap-0">到场<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "arrived" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "arrived" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
@@ -804,10 +809,10 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_all", v.customer_id, v.nickname)}>{v.activity_count}场</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
                     <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!financeReady ? <EmptyDash /> : !hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}><ReportFollowUp visit={v} /></td>
-                    <td className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.experience || <EmptyDash />}</td>
+                    <td hidden={!canViewNote(permissions.customer_access, "visit_need")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td hidden={!canViewNote(permissions.customer_access, "customer_info")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td hidden={!canViewNote(permissions.customer_access, "follow_up")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}><ReportFollowUp visit={v} /></td>
+                    <td hidden={!canViewNote(permissions.customer_access, "customer_feedback")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.experience || <EmptyDash />}</td>
                     <td className="px-[5px] py-2 text-[#1f2329] border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => (transactionCounts[v.customer_id] || 0) > 0 && openDetail("payment", v.customer_id, v.nickname)}>{(transactionCounts[v.customer_id] || 0) > 0 ? `${transactionCounts[v.customer_id]}笔` : <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[5px] pr-[1px] py-2 text-[#6b7178] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer_handler || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[1px] pr-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">

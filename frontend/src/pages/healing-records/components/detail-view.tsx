@@ -16,6 +16,7 @@ import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { UnifiedPaymentContent } from "@/pages/payment/unified-payment"
 import { CUSTOMER_INCOME_FIELDS } from "@/lib/customer-income"
 import { formatNoteTime } from "@/lib/note-time"
+import { canViewAnyNote, canViewNote } from "@/lib/note-permissions"
 
 interface HealingRec {
   id: string
@@ -59,7 +60,7 @@ function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
           >
             {visitNoteAuthorName(note)}<span className="ml-1 font-normal text-[#c0c4cc]">反馈</span>
           </span>
-          <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{note.content}</span>
+          <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{[(note.need_tags || []).map(tag => tag.name).join("、"), note.content].filter(Boolean).join("\n")}</span>
           <span className="ml-auto shrink-0 text-right text-[11px] text-[#8f959e]"><span className="mr-2 tabular-nums">{formatNoteTime(note.updated_at || note.created_at)}</span>{note.created_by || "未知"}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>
         </div>
       ))}
@@ -194,7 +195,7 @@ export default function DetailView({
       const access = data.customer?.customer_access_permissions
       const communicationAllowed = !access || access.detail_tabs.communication
       const availableTabs = [
-        access?.detail_tabs.follow_up !== false && "healing",
+        canViewAnyNote(access) && "healing",
         communicationAllowed && "communication",
         access?.detail_tabs.activities !== false && "activities",
         access?.detail_tabs.card_statistics !== false && "purchase",
@@ -524,7 +525,7 @@ export default function DetailView({
               </div>
               <div className="flex items-baseline justify-between">
                 <span>首次到访</span>
-                <b className="text-[#212631] font-semibold tabular-nums">{access?.detail_tabs.follow_up === false ? <DvEmpty /> : (firstVisit || <DvEmpty />)}</b>
+                <b className="text-[#212631] font-semibold tabular-nums">{!canViewAnyNote(access) ? <DvEmpty /> : (firstVisit || <DvEmpty />)}</b>
               </div>
             </div>
           </div>
@@ -665,7 +666,7 @@ export default function DetailView({
                 { key: "payment" as const, label: "交易记录", cnt: (detail?.payment_records || []).length },
               ].filter(tab => {
                 if (!access) return true
-                if (tab.key === "healing") return access.detail_tabs.follow_up
+                if (tab.key === "healing") return canViewAnyNote(access)
                 if (tab.key === "communication") return access.detail_tabs.communication
                 if (tab.key === "activities") return access.detail_tabs.activities
                 if (tab.key === "purchase") return access.detail_tabs.card_statistics
@@ -777,14 +778,10 @@ export default function DetailView({
                       )}
                     </div>
                     <div className="grid grid-cols-[64px_1fr] gap-x-3 gap-y-1.5">
-                      <span className="text-[12px] text-[#a8b1bd] pt-px">来访需求</span>
-                      <VisitNoteRows notes={visitNeedNotes} />
-                      <span className="text-[12px] text-[#a8b1bd] pt-px">深度需求</span>
-                      <VisitNoteRows notes={customerInfoNotes} />
-                      <span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span>
-                      <VisitNoteRows notes={followUpNotes} />
-                      <span className="pt-px text-[12px] text-[#a8b1bd]">客户反馈</span>
-                      <VisitNoteRows notes={customerFeedbackNotes} />
+                      {canViewNote(access, "visit_need") && <><span className="text-[12px] text-[#a8b1bd] pt-px">来访需求</span><VisitNoteRows notes={visitNeedNotes} /></>}
+                      {canViewNote(access, "customer_info") && <><span className="text-[12px] text-[#a8b1bd] pt-px">深度需求</span><VisitNoteRows notes={customerInfoNotes} /></>}
+                      {canViewNote(access, "follow_up") && <><span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span><VisitNoteRows notes={followUpNotes} /></>}
+                      {canViewNote(access, "customer_feedback") && <><span className="pt-px text-[12px] text-[#a8b1bd]">客户反馈</span><VisitNoteRows notes={customerFeedbackNotes} /></>}
                     </div>
                   </div>
                   )

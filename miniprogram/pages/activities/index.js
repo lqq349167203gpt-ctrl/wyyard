@@ -240,6 +240,7 @@ Page({
 
   async onLoad(options) {
     if (!getApp().checkLogin()) return
+    this.setData({ noteVisibility: require('../../utils/note-permissions').noteVisibility() })
     if (!getApp().checkPagePermission('daily-activities')) {
       this.setData({ hasPagePermission: false })
       return
@@ -785,6 +786,7 @@ Page({
   },
 
   async _saveParticipantNoteCategory(participant, category) {
+    if (!this.data.noteVisibility[category]) return
     const record = this._participantSheetRecord
     const isCustomerInfo = category === 'customer_info'
     const valueField = isCustomerInfo ? 'customerInfoValue' : 'followUpValue'

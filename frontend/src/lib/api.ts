@@ -1139,6 +1139,7 @@ export interface NextFollowUpPlan {
 export interface FollowUpPerson { id: string; nickname: string; name: string }
 
 export interface VisitNoteSummary extends NextFollowUpPlan {
+  need_tags?: Array<{ id: string; name: string }>
   id: string
   category: VisitNoteCategory
   content: string
@@ -3116,6 +3117,10 @@ export interface CustomerAccessPermissions {
     other_info: boolean
   }
   detail_tabs: {
+    visit_need_tags?: boolean
+    visit_need_detail?: boolean
+    customer_info?: boolean
+    customer_feedback?: boolean
     follow_up: boolean
     communication: boolean
     activities: boolean
@@ -4070,7 +4075,7 @@ export type DailyReportActivity = Pick<ClassRecord, 'id' | 'date' | 'course_name
 
 export const dailyReportApi = {
   read: (date: string) => request<{ date: string; visits: VisitRecord[]; customers: CustomerLight[]; activities: DailyReportActivity[]; dashboard: { class_records: ClassRecord[] }; identities: MemberIdentity[] }>(`/api/daily-report?date=${encodeURIComponent(date)}`),
-  finance: (date: string) => request<{ sources: Record<string, Record<string, unknown>[]>; sessions: Record<string, Record<string, unknown>[]>; deductions: Record<string, unknown>[] }>(`/api/daily-report/finance-sources?date=${encodeURIComponent(date)}`),
+  finance: (date: string) => request<{ sources: Record<string, Record<string, unknown>[]>; sessions: Record<string, Record<string, unknown>[]>; deductions: Record<string, unknown>[]; remaining_by_customer: Record<string, Record<string, number | null>> }>(`/api/daily-report/finance-sources?date=${encodeURIComponent(date)}`),
 }
 
 export const followupRecordApi = {

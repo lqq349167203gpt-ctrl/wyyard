@@ -187,19 +187,19 @@
               <text class="p-identity" wx:if="{{item.identityText}}">{{item.identityText}}</text>
             </view>
           </view>
-          <view class="p-field {{!item.visit_need ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
+          <view wx:if="{{noteVisibility.visit_need}}" class="p-field {{!item.visit_need ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="visit_need" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">来访需求</text>
             <template is="participant-note-field" data="{{mine: item.visit_need_mine, others: item.visit_need_others, hasEntries: item.visit_need_entries.length, fallback: item.visit_need}}" />
           </view>
-          <view class="p-field {{!item.customer_info ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
+          <view wx:if="{{noteVisibility.customer_info}}" class="p-field {{!item.customer_info ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_info" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">深度需求</text>
             <template is="participant-note-field" data="{{mine: item.customer_info_mine, others: item.customer_info_others, hasEntries: item.customer_info_entries.length, fallback: item.customer_info}}" />
           </view>
-          <view class="p-field {{!item.follow_up ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
+          <view wx:if="{{noteVisibility.follow_up}}" class="p-field {{!item.follow_up ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="follow_up" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">跟进点</text>
             <template is="participant-note-field" data="{{mine: item.follow_up_mine, others: item.follow_up_others, hasEntries: item.follow_up_entries.length, fallback: item.follow_up}}" />
           </view>
-          <view class="p-field {{!item.customer_feedback ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_feedback" bindtap="onParticipantOpenEdit">
+          <view wx:if="{{noteVisibility.customer_feedback}}" class="p-field {{!item.customer_feedback ? 'p-field-empty' : ''}}" data-group="{{gi}}" data-index="{{index}}" data-field="customer_feedback" bindtap="onParticipantOpenEdit">
             <text class="p-field-label">客户反馈</text>
             <template is="participant-note-field" data="{{mine: item.customer_feedback_mine, others: item.customer_feedback_others, hasEntries: item.customer_feedback_entries.length, fallback: item.customer_feedback}}" />
           </view>
@@ -258,7 +258,7 @@
           <text class="distance {{item.isActive ? '' : 'overdue'}}">{{item.distanceText}}</text>
         </view>
         <view class="record-meta"><text>{{item.member_type || '—'}}</text><text>{{item.follow_up_status || '未配置'}}</text><text>{{item.lastAtText || '暂无录入'}}</text></view>
-        <view class="note-block">
+        <view wx:if="{{noteVisibility.customer_info}}" class="note-block">
           <text class="note-title">最近深度需求</text>
           <view class="note-entry" wx:if="{{item.latest_customer_info_content}}">
             <text class="note-author">{{item.customerInfoAttribution || '未知'}}</text>
@@ -267,7 +267,7 @@
           <text class="empty-dash" wx:else>—</text>
           <text class="note-time" wx:if="{{item.customerInfoAtText}}">{{item.customerInfoAtText}}</text>
         </view>
-        <view class="note-block">
+        <view wx:if="{{noteVisibility.follow_up}}" class="note-block">
           <text class="note-title">最近跟进点</text>
           <view class="note-entry" wx:if="{{item.latest_follow_up_content}}">
             <text class="note-author">{{item.followUpAttribution || '未知'}}</text>
@@ -291,13 +291,13 @@
     </view>
     <scroll-view class="edit-body" scroll-y>
       <text class="edit-subtitle">{{participantEditing.dateText}} · {{participantEditing.nickname}} · {{participantEditing.courseName}}</text>
-      <view class="participant-tags" wx:if="{{participantEditing.field === 'visit_need'}}">
+      <view class="participant-tags" wx:if="{{participantEditing.field === 'visit_need' && noteVisibility.visit_need_tags}}">
         <text class="participant-tag {{item.selected ? 'selected' : ''}}" wx:for="{{participantNeedTags}}" wx:key="id" data-id="{{item.id}}" bindtap="onParticipantNeedTag">{{item.name}}</text>
         <text class="p-note-others-title" wx:if="{{!participantNeedTags.length}}">暂无公共来访需求标签，可在客户标签中配置</text>
       </view>
       <text class="edit-label">我填写的内容</text>
       <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
-      <textarea class="edit-input" value="{{participantDraft}}" maxlength="5000" placeholder="{{participantEditing.placeholder}}" placeholder-class="edit-input-placeholder" adjust-position="{{true}}" cursor-spacing="20" fixed="{{true}}" bindinput="onParticipantDraft" />
+      <textarea wx:if="{{participantEditing.field !== 'visit_need' || noteVisibility.visit_need_detail}}" class="edit-input" value="{{participantDraft}}" maxlength="5000" placeholder="{{participantEditing.placeholder}}" placeholder-class="edit-input-placeholder" adjust-position="{{true}}" cursor-spacing="20" fixed="{{true}}" bindinput="onParticipantDraft" />
       <view wx:if="{{participantEditing.field === 'follow_up'}}">
         <view class="feedback-field"><text class="feedback-label">下次跟进人</text><picker range="{{participantPlanPeople}}" range-key="nickname" value="{{participantPlanIndex}}" bindchange="onParticipantPlanPerson"><view class="feedback-picker">{{participantPlanPeople[participantPlanIndex].nickname || '不指定'}}</view></picker></view>
         <view class="feedback-field"><text class="feedback-label">下次跟进时间</text><picker mode="date" value="{{participantPlan.next_follow_up_date}}" bindchange="onParticipantPlanDate"><view class="feedback-picker">{{participantPlan.next_follow_up_date || '选择日期'}}</view></picker><text wx:if="{{participantPlan.next_follow_up_date}}" bindtap="onParticipantClearPlanDate" class="p-note-others-title">清空</text></view>

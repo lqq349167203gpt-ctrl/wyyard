@@ -26,7 +26,7 @@ Component({
       } else if (count !== null && count !== undefined) {
         remainingText = '剩余' + count + '次'
       }
-      this.setData({ remainingText })
+      this.setData({ remainingText, noteVisibility: require('../../utils/note-permissions').noteVisibility() })
     },
   },
 

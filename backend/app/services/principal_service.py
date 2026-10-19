@@ -597,7 +597,7 @@ def analyze(request, query: PrincipalQuery, *, export=False):
     access = permissions["customer_access"]["transaction_access"]
     if query.tab in {"orders", "conversion"}:
         customer_access_service.require_transaction_access(request, detail=True)
-    if query.course_view == "teacher_follow_up" and not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
+    if query.course_view == "teacher_follow_up" and not customer_access_service.can_view_any_note(get_request_roles(request)):
         raise HTTPException(403, "没有查看跟进点的权限")
     start = query.date_from.isoformat() if query.date_from else "0001-01-01"
     today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
@@ -1250,6 +1250,9 @@ def analyze(request, query: PrincipalQuery, *, export=False):
     # 内部关联字段不出 API；金额、支付方式以及客户隐私字段从未加入输出。
     page_rows = rows if export else rows[(page - 1) * query.page_size:page * query.page_size]
     safe_rows = _public_rows(page_rows, columns, teacher_feedback=query.tab in {"courses", "overview"} and query.course_view == "teacher_follow_up")
+    safe_rows = customer_access_service.protect_note_payload(safe_rows, permissions=permissions.get("customer_access", {}))
+    columns = [(key, label) for key, label in columns if key not in ("visit_need", "customer_info", "follow_up", "customer_feedback")
+               or customer_access_service.can_view_note((), key, permissions=permissions.get("customer_access", {}))]
     return {"summary": summary, "breakdown": breakdown, "list_summary": picked_summary, "columns": [{"key": k, "label": label} for k, label in columns],
             "items": safe_rows, "teacher_group_totals": teacher_group_totals,
             "total": total, "page": page, "page_size": query.page_size, "total_pages": max(1, (total + query.page_size - 1) // query.page_size),

@@ -53,7 +53,7 @@ Page({
       wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/visits/index' }) })
       return
     }
-    this.setData({ customerViewOnly: isAreaViewOnly('customers') })
+    this.setData({ customerViewOnly: isAreaViewOnly('customers'), noteVisibility: require('../../utils/note-permissions').noteVisibility() })
     if (options.date) this.setData({ date: options.date })
     if (options.spaceId) this.setData({ _spaceId: options.spaceId })
     this.loadSpaces()

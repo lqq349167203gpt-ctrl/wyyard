@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { canViewNote, canViewNotePart } from "@/lib/note-permissions"
 import { Download } from "lucide-react"
 import { CourseRosterNames } from "@/components/course-roster-names"
 import { NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
@@ -251,6 +253,9 @@ export default function ServiceTeachersPage() {
 }
 
 export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
+  const noteAccess = useEditPermissions().customer_access
+  const participantColumns = PARTICIPANT_COLUMNS.filter(column => !["visit_need", "customer_info", "follow_up", "customer_feedback"].includes(column.key)
+    || canViewNote(noteAccess, column.key as "visit_need" | "customer_info" | "follow_up" | "customer_feedback"))
   const initialRange = useMemo(initialCourseRange, [])
   const activeTab = mode
   const [teacher, setTeacher] = useState(currentOwner)
@@ -497,7 +502,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         customerFollowUpApi.myNote(row.visit_id, field),
         customerFollowUpApi.feedbackPeople(),
         field === "follow_up" ? customerFollowUpApi.followUpPeople() : Promise.resolve([]),
-        field === "visit_need" ? customerFollowUpApi.needTags() : Promise.resolve([]),
+        field === "visit_need" && canViewNotePart(noteAccess, "visit_need_tags") ? customerFollowUpApi.needTags() : Promise.resolve([]),
       ])
       if (sequence !== participantEditorSequence.current) return
       if (mineResult.status !== "fulfilled") {
@@ -710,7 +715,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         { header: "跟进点录入时间", key: "followUpAt", width: 22 },
         { header: "包含内容", key: "definition", width: 22 },
         { header: "当前状态", key: "status", width: 18 },
-      ]
+      ].filter(column => column.key.startsWith("customerInfo") ? canViewNote(noteAccess, "customer_info") : ["followUp", "followUpBy", "followUpCreatedBy", "followUpAt"].includes(column.key) ? canViewNote(noteAccess, "follow_up") : true)
       rows.forEach(item => worksheet.addRow({
         teacher,
         nickname: item.nickname || item.name || "-",
@@ -1046,10 +1051,10 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 <div className="space-y-3 px-4 py-3">
                   {/* 列标题只在最上面出现一次，每堂课一张卡片，卡片内是极浅的分隔线 */}
                   <table className="w-full table-fixed border-collapse text-[11px] text-[#9aa1a9]">
-                    <colgroup>{PARTICIPANT_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
+                    <colgroup>{participantColumns.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
                     <thead>
                       <tr>
-                        {PARTICIPANT_COLUMNS.map((column, index) => (
+                        {participantColumns.map((column, index) => (
                           <th key={column.key} className={`px-3 py-2 text-left font-normal ${index === 0 ? "pl-3" : ""}`}>{column.label}</th>
                         ))}
                       </tr>
@@ -1064,7 +1069,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                         <span className="shrink-0 text-[11px] text-[#9aa1a9]">{group.participants.filter(row => row.arrived).length} 人</span>
                       </div>
                       <table className="w-full table-fixed border-collapse">
-                        <colgroup>{PARTICIPANT_COLUMNS.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
+                        <colgroup>{participantColumns.map(column => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
                         <tbody>
                           {group.participants.map(row => (
                             <tr key={row.id} className="border-t border-[#f5f6f7] align-top">
@@ -1078,7 +1083,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                               </td>
                               <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</td>
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
-                              {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).map(field => {
+                              {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).filter(field => canViewNote(noteAccess, field)).map(field => {
                                 const entries = row[`${field}_entries`] || []
                                 const mine = entries.filter(isOwnParticipantNote)
                                 const others = entries.filter(entry => !isOwnParticipantNote(entry))
@@ -1397,8 +1402,8 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 <TableHead className="h-9 w-[110px] px-3 pl-4 text-[11px] font-normal">客户昵称</TableHead>
                 <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">会员身份</TableHead>
                 <TableHead className="h-9 w-[120px] px-3 text-[11px] font-normal">跟进阶段</TableHead>
-                <TableHead className="h-9 px-3 text-[11px] font-normal">最近深度需求</TableHead>
-                <TableHead className="h-9 px-3 text-[11px] font-normal">最近跟进点</TableHead>
+                <TableHead hidden={!canViewNote(noteAccess, "customer_info")} className="h-9 px-3 text-[11px] font-normal">最近深度需求</TableHead>
+                <TableHead hidden={!canViewNote(noteAccess, "follow_up")} className="h-9 px-3 text-[11px] font-normal">最近跟进点</TableHead>
                 <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">最近录入时间</TableHead>
                 <TableHead className="h-9 w-[80px] px-3 pr-4 text-right text-[11px] font-normal">距今</TableHead>
               </TableRow>
@@ -1413,10 +1418,10 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                   </TableCell>
                   <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.member_type || undefined}>{item.member_type || <EmptyDash />}</TableCell>
                   <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.follow_up_status || undefined}>{item.follow_up_status || <EmptyDash />}</TableCell>
-                  <TableCell className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
+                  <TableCell hidden={!canViewNote(noteAccess, "customer_info")} className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
                     <NoteContent author={item.latest_customer_info_by} content={item.latest_customer_info_content} expanded={followUpContentExpanded} />
                   </TableCell>
-                  <TableCell className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
+                  <TableCell hidden={!canViewNote(noteAccess, "follow_up")} className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
                     <NoteContent author={item.latest_follow_up_by} content={item.latest_follow_up_content} expanded={followUpContentExpanded} />
                   </TableCell>
                   <TableCell className="h-11 px-3 py-0 text-[12px] text-[#8f959e]">{item.last_follow_up_at ? formatDateTime(item.last_follow_up_at) : <EmptyDash />}</TableCell>
@@ -1460,7 +1465,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
               {participantEditing?.row.course_date} · {participantEditing?.row.nickname} · {participantEditing?.row.course_name}
             </p>
             <div>
-              {participantEditing?.field === "visit_need" && <div className="mb-3 flex flex-wrap gap-2">
+              {participantEditing?.field === "visit_need" && canViewNotePart(noteAccess, "visit_need_tags") && <div className="mb-3 flex flex-wrap gap-2">
                 {participantNeedTags.length ? participantNeedTags.map(tag => <button key={tag.id} type="button"
                   disabled={participantEditorLoading || participantEditorReadFailed}
                   onClick={() => setParticipantNeedTagIds(ids => ids.includes(tag.id) ? ids.filter(id => id !== tag.id) : [...ids, tag.id])}
@@ -1473,6 +1478,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 <FeedbackPersonSelect options={participantFeedbackPeople} value={participantFeedbackPerson} onChange={setParticipantFeedbackPerson} />
               </div>
               <textarea
+                hidden={participantEditing?.field === "visit_need" && !canViewNotePart(noteAccess, "visit_need_detail")}
                 value={participantDraft}
                 onChange={event => setParticipantDraft(event.target.value)}
                 disabled={participantEditorLoading || participantEditorReadFailed}

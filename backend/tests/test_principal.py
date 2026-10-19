@@ -2,12 +2,13 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace as NS
 
 import pytest
+from fastapi import HTTPException
+
 from app.api import principal as principal_api
 from app.models.custom_analysis import AnalysisCondition
 from app.models.principal import ConversionAction, ConversionRule, PrincipalQuery
 from app.services import principal_service as service
 from app.services.principal_conversion_service import calculate_conversion
-from fastapi import HTTPException
 
 
 def event(eid, day, customer="c1", org="a", kind="purchase", product="membership", subtype="398会员"):
@@ -46,7 +47,7 @@ def test_teacher_follow_up_matches_feedback_person_and_course_day(monkeypatch):
     assert first["visit_need"] == "改善睡眠"
     assert first["customer_info"] == "睡眠不稳\n工作压力"
     assert first["customer_info_creators"] == "潘潘、娟娟"
-    assert first["customer_info_entries"] == [
+    assert [{key: entry[key] for key in ("content", "author", "at", "created_by")} for entry in first["customer_info_entries"]] == [
         {"content": "睡眠不稳", "author": "老师甲", "at": when.isoformat(), "created_by": "潘潘"},
         {"content": "工作压力", "author": "老师甲", "at": "", "created_by": "娟娟"},
     ]

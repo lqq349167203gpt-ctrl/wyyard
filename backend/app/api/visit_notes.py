@@ -51,7 +51,9 @@ def _actor(request: Request) -> tuple[str, str, str]:
 
 def _response(note, request: Request) -> dict:
     account_id, owner_name, username = _actor(request)
-    result = note.model_dump(mode="json")
+    result = customer_access_service.protect_note(note.model_dump(mode="json"), get_request_roles(request))
+    if result is None:
+        raise HTTPException(403, "没有查看该类信息的权限")
     can_manage = visit_note_service.can_manage_note(
         note, account_id, owner_name, username
     )
@@ -284,6 +286,7 @@ def create_visit_note(data: VisitNoteCreate, request: Request):
     if data.feedback_person_id or data.feedback_person:
         feedback_person_id, feedback_person = _resolve_feedback_person(request, data.feedback_person_id, data.feedback_person)
     existing = visit_note_service._find_creator_note(data.visit_id, data.category, account_id, owner_name or username)
+    data = customer_access_service.prepare_note_write(request, data, data.category, existing)
     plan = _follow_up_plan(request, data, data.category, existing)
     try:
         note = visit_note_service.create_note(
@@ -313,6 +316,7 @@ def update_visit_note(note_id: str, data: VisitNoteUpdate, request: Request):
     if not existing:
         raise HTTPException(status_code=404, detail="记录不存在")
     _require_visit_customer_scope(request, existing.visit_id, action="修改")
+    data = customer_access_service.prepare_note_write(request, data, existing.category, existing)
     account_id, owner_name, username = _actor(request)
     if not visit_note_service.can_manage_note(existing, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能修改自己录入的信息")
@@ -351,9 +355,20 @@ def delete_visit_note(note_id: str, request: Request):
     if not note:
         raise HTTPException(status_code=404, detail="记录不存在")
     _require_visit_customer_scope(request, note.visit_id, action="删除")
+    customer_access_service.require_note_access(request, note.category)
     account_id, owner_name, username = _actor(request)
     if not visit_note_service.can_manage_note(note, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能删除自己录入的信息")
+    if note.category == "visit_need":
+        tabs = customer_access_service.get_customer_permissions(get_request_roles(request))["detail_tabs"]
+        content = "" if tabs["visit_need_detail"] else note.content
+        tags = [] if tabs["visit_need_tags"] else note.need_tags
+        if content or tags:
+            before = _snapshot(note)
+            visit_note_service.update_note(note.id, content, need_tag_ids=[] if tabs["visit_need_tags"] else None)
+            request.state.operation_log_context = {"content": _log_content("清空可见部分", note),
+                "entity_id": note.id, "before_data": before, "after_data": _snapshot(note)}
+            return {"ok": True}
     request.state.operation_log_context = {
         "content": _log_content("删除", note),
         "entity_id": note.id,

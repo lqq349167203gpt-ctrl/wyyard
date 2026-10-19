@@ -88,11 +88,11 @@
             <view class="arrow {{item.open ? 'up' : ''}}"></view>
           </view>
         </view>
-        <view class="c-l3"><text class="k">来访需求</text><text class="v">{{item.needText || ''}}<text class="dash" wx:if="{{!item.needText}}">-</text></text></view>
+        <view wx:if="{{noteVisibility.visit_need}}" class="c-l3"><text class="k">来访需求</text><text class="v">{{item.needText || ''}}<text class="dash" wx:if="{{!item.needText}}">-</text></text></view>
         <view class="c-detail">
-          <view class="d-row"><text class="d-label">深度需求</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
-          <view class="d-row"><text class="d-label">跟进点</text><view class="d-val" wx:if="{{item.followEntries.length}}"><view class="note-feedback-entry" wx:for="{{item.followEntries}}" wx:for-item="note" wx:key="id"><template is="note-feedback-meta" data="{{author: note.author, nextFollowUpText: note.nextFollowUpText, inline: true}}" /><text class="note-feedback-content">{{note.content}}</text></view></view><text class="d-val" wx:else>{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>
-          <view class="d-row"><text class="d-label">客户反馈</text><text class="d-val">{{item.feedbackText || ''}}<text class="dash" wx:if="{{!item.feedbackText}}">-</text></text></view>
+          <view wx:if="{{noteVisibility.customer_info}}" class="d-row"><text class="d-label">深度需求</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
+          <view wx:if="{{noteVisibility.follow_up}}" class="d-row"><text class="d-label">跟进点</text><view class="d-val" wx:if="{{item.followEntries.length}}"><view class="note-feedback-entry" wx:for="{{item.followEntries}}" wx:for-item="note" wx:key="id"><template is="note-feedback-meta" data="{{author: note.author, nextFollowUpText: note.nextFollowUpText, inline: true}}" /><text class="note-feedback-content">{{note.content}}</text></view></view><text class="d-val" wx:else>{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>
+          <view wx:if="{{noteVisibility.customer_feedback}}" class="d-row"><text class="d-label">客户反馈</text><text class="d-val">{{item.feedbackText || ''}}<text class="dash" wx:if="{{!item.feedbackText}}">-</text></text></view>
           <view class="d-divider"></view>
           <view class="d-row"><text class="d-label">引流</text><text class="d-val">{{item.refText || '自然到店'}}</text></view>
           <view class="d-row"><text class="d-label">邀约</text><text class="d-val">{{item.refHandlerText || ''}}<text class="dash" wx:if="{{!item.refHandlerText}}">-</text></text></view>

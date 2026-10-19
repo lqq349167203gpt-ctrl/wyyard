@@ -13,6 +13,8 @@ import {
 } from "@/components/visits/feedback-person-select"
 import { customerApi, customerTagApi, visitNoteApi, type CustomerTag, type FollowUpPerson, type NextFollowUpPlan, type PreviousVisitNeed, type VisitNote, type VisitNoteCategory } from "@/lib/api"
 import { formatNoteTime } from "@/lib/note-time"
+import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { canViewNote, canViewNotePart } from "@/lib/note-permissions"
 
 interface VisitNoteCellProps {
   visitId: string
@@ -56,6 +58,9 @@ function followUpPlan(note: VisitNote | undefined, currentName: string): NextFol
 }
 
 export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickname, title, category, notes, disabled, expanded = false, privateToCreator = false, onNotesChange }: VisitNoteCellProps) {
+  const access = useEditPermissions().customer_access
+  const showTags = canViewNotePart(access, "visit_need_tags")
+  const showDetail = category !== "visit_need" || canViewNotePart(access, "visit_need_detail")
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState("")
   const [savedValue, setSavedValue] = useState("")
@@ -140,7 +145,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
           options: currentActorName ? [{ customer_id: "", name: currentActorName }] : [],
         })),
         category === "follow_up" ? visitNoteApi.followUpPeople() : Promise.resolve([]),
-        category === "visit_need" ? customerTagApi.list(false, "visit_need") : Promise.resolve([]),
+        category === "visit_need" && showTags ? customerTagApi.list(false, "visit_need") : Promise.resolve([]),
       ])
       const latestMine = latestNotes.find((note) => note.category === category && note.can_edit)
       const nextValue = latestMine?.content || ""
@@ -335,6 +340,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
     </button>
   )
 
+  if (!canViewNote(access, category)) return null
   return (
     <>
       {categoryNotes.length > 0 && !disabled && !privateToCreator ? (
@@ -375,7 +381,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
           </DialogHeader>
 
           <div className="max-h-[70vh] overflow-y-auto px-[18px] pb-4 pt-3.5">
-            {category === "visit_need" && <div className="mb-4">
+            {category === "visit_need" && showTags && <div className="mb-4">
               <div className="mb-2 text-[12px] text-[#646a73]">来访需求 <span className="text-[11px] text-[#a8b1bd]">（可多选）</span></div>
               <div className="flex flex-wrap gap-2">
                 {[...needOptions, ...(myNote?.need_tags || []).filter(tag => !needOptions.some(option => option.id === tag.id))].map(tag => <button key={tag.id} type="button" aria-pressed={needTagIds.includes(tag.id)} disabled={saving} className={`rounded-[4px] border px-2.5 py-1 text-[12px] ${needTagIds.includes(tag.id) ? "border-[#adc4f5] bg-[#f2f6ff] text-[#3370ff]" : "border-[#e5e7eb] bg-white text-[#646a73]"}`} onClick={() => { const next = needTagIds.includes(tag.id) ? needTagIds.filter(id => id !== tag.id) : [...needTagIds, tag.id]; setNeedTagIds(next); void persistDraft(undefined, next) }}>{tag.name}</button>)}
@@ -400,7 +406,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
                   </>
                 )}
               </span>
-              {category === "visit_need" && customerId && (
+              {category === "visit_need" && showDetail && customerId && (
                 <div className="ml-auto flex shrink-0 items-center gap-3">
                   <button
                     type="button"
@@ -493,7 +499,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
                 )}
               </div>
             )}
-            <textarea
+            {showDetail && <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onBlur={() => void persistDraft()}
@@ -505,7 +511,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
               }}
               className="min-h-[64px] w-full resize-none rounded-[4px] border-[0.5px] border-[#d3d6db] bg-white px-2.5 py-2 text-[13px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#c0c4cc] focus:border-[#3370ff]"
               placeholder={privateToCreator ? `填写${title}…` : `写下你观察到的${title}…`}
-            />
+            />}
             {error && <div className="mt-1.5 text-[11px] text-[#c4506a]">{error}</div>}
 
             {colleagueNotes.length > 0 && (

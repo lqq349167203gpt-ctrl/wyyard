@@ -41,6 +41,7 @@ def fill_effective_remaining(item: dict, project_type: str) -> None:
         "group_case": ("group_case_session_service", "get_purchase_remaining"),
         "emotional_release": ("emotional_release_session_service", "get_purchase_remaining"),
         "energy_knot": ("energy_knot_session_service", "get_purchase_remaining"),
+        "oh_card_reading": ("oh_card_reading_session_service", "get_purchase_remaining"),
         "other": ("other_project_service", "get_effective_remaining"),
     }
     calculator = calculators.get(project_type)

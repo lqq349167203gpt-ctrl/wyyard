@@ -67,8 +67,8 @@
   </view>
 
   <!-- 记录 -->
-  <view class="form-card">
-    <view class="form-item column textarea-row">
+  <view wx:if="{{noteVisibility.visit_need_detail || noteVisibility.customer_info || noteVisibility.follow_up}}" class="form-card">
+    <view wx:if="{{noteVisibility.visit_need_detail}}" class="form-item column textarea-row">
       <view class="need-heading">
         <text class="form-label">来访需求</text>
         <view class="need-reference-actions" wx:if="{{customerId}}">
@@ -112,7 +112,7 @@
         <text class="text-preview-count">{{needs.length}} 字</text>
       </view>
     </view>
-    <view class="form-item column textarea-row">
+    <view wx:if="{{noteVisibility.customer_info}}" class="form-item column textarea-row">
       <text class="form-label" style="margin-bottom: 8rpx;">客户信息</text>
       <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{infoFeedbackIndex}}" data-field="feedback" bindchange="onFeedbackPersonChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[infoFeedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
       <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="客户信息">
@@ -120,7 +120,7 @@
         <text class="text-preview-count">{{feedback.length}} 字</text>
       </view>
     </view>
-    <view class="form-item column textarea-row last">
+    <view wx:if="{{noteVisibility.follow_up}}" class="form-item column textarea-row last">
       <text class="form-label" style="margin-bottom: 8rpx;">跟进点</text>
       <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{followFeedbackIndex}}" data-field="healingNotes" bindchange="onFeedbackPersonChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[followFeedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
       <view class="text-preview" bindtap="onOpenEditor" data-field="healingNotes" data-label="跟进点">

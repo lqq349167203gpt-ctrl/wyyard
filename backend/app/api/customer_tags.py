@@ -98,7 +98,7 @@ def list_tags(request: Request, include_disabled: bool = False, category: Litera
             from app.api.visit_notes import _require_visit_permission
 
             _require_visit_permission(request)
-            if not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
+            if not customer_access_service.can_view_detail_tab(get_request_roles(request), "visit_need_tags"):
                 raise HTTPException(403, "没有查看来访需求的权限")
             include_disabled = False
     else:

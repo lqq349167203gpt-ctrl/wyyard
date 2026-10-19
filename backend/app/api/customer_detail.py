@@ -136,7 +136,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     if external_participant:
         from app.services import position_edit_permission_service
         permissions = position_edit_permission_service.get_permissions(user_roles)["principal_external_access"]
-    can_follow_up = is_customer_self or bool(permissions["detail_tabs"]["follow_up"])
+    can_follow_up = is_customer_self or customer_access_service.can_view_any_note(permissions=permissions)
     can_view_activities = is_customer_self or bool(permissions["detail_tabs"]["activities"])
     can_view_followups = is_customer_self or bool(permissions["detail_tabs"]["customer_followups"])
     can_view_cards = is_customer_self or bool(permissions["detail_tabs"]["card_statistics"])
@@ -171,7 +171,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     healing_records = [
         r.model_dump(mode="json")
         for r in healing_record_service.list_records(customer_id)
-    ] if can_follow_up and include('healing') else []
+    ] if (is_customer_self or permissions["detail_tabs"]["follow_up"]) and include('healing') else []
     all_payment_records = _build_payment_records(customer_id, date) if transaction_level != "none" and (include('basic') or include('payment')) else []
     if include('basic'):
         basic["total_payment"] = (
@@ -190,25 +190,18 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
     if include('basic'):
         basic['first_visit'] = min((v.visit_date for v in visits if v.arrived), default='')
     notes_by_visit: dict[str, list[dict]] = {visit.id: [] for visit in visits}
-    actor_id = getattr(request.state, "user_id", "") or ""
-    actor_owner = getattr(request.state, "user_owner", "") or ""
-    actor_username = getattr(request.state, "user_name", "") or ""
     visible_visit_notes = (
-        visit_note_service.list_visible_notes(
-            notes_by_visit,
-            actor_id,
-            actor_owner,
-            actor_username,
-        )
-        if can_follow_up and include('healing')
-        else []
-    )
+        [visible for note in visit_note_service.list_notes(notes_by_visit)
+         if (visible := customer_access_service.protect_note(note, permissions=permissions)) is not None]
+        if not is_customer_self else visit_note_service.list_notes(notes_by_visit)
+    ) if can_follow_up and include('healing') else []
     for note in visible_visit_notes:
         notes_by_visit.setdefault(note.visit_id, []).append(
             {
                 "id": note.id,
                 "category": note.category,
-                "content": visit_note_service.display_content(note),
+                "content": note.content,
+                "need_tags": getattr(note, "need_tags", []),
                 "created_by_id": note.created_by_id,
                 "created_by": note.created_by,
                 "created_at": note.created_at,
@@ -231,7 +224,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             ),
             "",
         )
-        visit_records.append(record)
+        visit_records.append(customer_access_service.protect_note_fields(record, permissions=permissions) if not is_customer_self else record)
 
     communication_records = []
     if principal_participant and not is_customer_self and permissions["detail_tabs"]["communication"] and include('communication'):
@@ -253,8 +246,9 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
             for record in activity_followup_service.list_followups(customer_id)
         ] if can_view_followups and include('customer_followups') else [],
         "activity_participant_notes": [
-            record.model_dump(mode="json")
+            visible
             for record in activity_participant_note_service.list_customer_notes(customer_id)
+            if (visible := customer_access_service.protect_note(record.model_dump(mode="json"), permissions=permissions)) is not None
         ] if can_follow_up and not is_customer_self and include('healing') else [],
         "healing_records": healing_records,
         "payment_records": payment_records,

@@ -12,6 +12,7 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { HorizontalScrollbar } from "@/components/horizontal-scrollbar"
 import { VisitNoteCell } from "@/components/visits/visit-note-cell"
+import { canViewNote } from "@/lib/note-permissions"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { createTableDragPreview } from "@/lib/table-drag-preview"
 
@@ -150,6 +151,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const currentActorId = String(currentUser.id || "")
   const currentActorName = String(currentUser.owner || currentUser.username || "")
   const editPermissions = useEditPermissions()
+  const noteVisible = (index: number) => index < 7 || index > 10 || canViewNote(editPermissions.customer_access, (["visit_need", "customer_info", "follow_up", "customer_feedback"] as const)[index - 7])
   const isViewOnly = currentUser.role !== "超级管理员" && editPermissions.visits === "view"
   const canEditAllVisits = currentUser.role === "超级管理员" || editPermissions.visits === "all"
   const [viewSegment, setViewSegment] = useState<ViewSegment>(() => {
@@ -873,7 +875,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <div className="min-w-[1935px]">
             <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
               <colgroup>
-                {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
+                {VISIT_COLUMN_WIDTHS.map((width, index) => noteVisible(index) && <col key={index} style={{ width }} />)}
               </colgroup>
           <thead className="bg-[#f7f8fa]">
             <tr className="bg-[#f7f8fa] text-[#8f959e]">
@@ -884,10 +886,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               <th className="bg-[#f7f8fa] py-2 pl-0 pr-1.5 text-left font-normal">昵称</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">会员身份</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">剩余次数</th>
-              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">来访需求</th>
-              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">深度需求</th>
-              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">跟进点</th>
-              <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">客户反馈</th>
+              <th hidden={!canViewNote(editPermissions.customer_access, "visit_need")} className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">来访需求</th>
+              <th hidden={!canViewNote(editPermissions.customer_access, "customer_info")} className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">深度需求</th>
+              <th hidden={!canViewNote(editPermissions.customer_access, "follow_up")} className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">跟进点</th>
+              <th hidden={!canViewNote(editPermissions.customer_access, "customer_feedback")} className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">客户反馈</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">参与活动</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">今日成交</th>
               <th className="bg-[#f7f8fa] px-1.5 py-2 text-left font-normal">邀约人</th>
@@ -905,7 +907,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <div className="min-w-[1935px]">
             <table className="w-full text-[12px]" style={{ tableLayout: "fixed" }}>
               <colgroup>
-                {VISIT_COLUMN_WIDTHS.map((width, index) => <col key={index} style={{ width }} />)}
+                {VISIT_COLUMN_WIDTHS.map((width, index) => noteVisible(index) && <col key={index} style={{ width }} />)}
               </colgroup>
           <tbody className="[&_tr:first-child>td]:pt-[12px] [&_tr:last-child>td]:pb-[6px]">
             {displayRows.map((row, idx) => {
@@ -918,7 +920,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
               const group = timeGroups.find(item => item.rows[0]?.key === row.key)
               return (
                 <Fragment key={row.key}>
-                {group && <tr><td colSpan={VISIT_COLUMN_WIDTHS.length} className="border-y border-[#f0f0f0] bg-white px-3 py-2"><div className="flex items-center gap-3 text-[12px]"><span className="text-[#2b2f36]">{group.label} · {group.rows.filter(item => item.customer_id).length}人</span><span className="text-[#8f959e]">新人{group.rows.filter(item => item.customer_id && item.is_new_customer === true).length} / 老人{group.rows.filter(item => item.customer_id && item.is_new_customer === false).length}</span></div></td></tr>}
+                {group && <tr><td colSpan={VISIT_COLUMN_WIDTHS.filter((_, index) => noteVisible(index)).length} className="border-y border-[#f0f0f0] bg-white px-3 py-2"><div className="flex items-center gap-3 text-[12px]"><span className="text-[#2b2f36]">{group.label} · {group.rows.filter(item => item.customer_id).length}人</span><span className="text-[#8f959e]">新人{group.rows.filter(item => item.customer_id && item.is_new_customer === true).length} / 老人{group.rows.filter(item => item.customer_id && item.is_new_customer === false).length}</span></div></td></tr>}
                 <tr
                   key={row.key}
                   className={`hover:bg-[#fafbfc] ${dragOverKey === row.key ? "[&>td]:shadow-[inset_0_2px_0_#3370ff]" : ""} ${draggingKey === row.key ? "bg-[#f7f8fa] opacity-60" : ""} ${isChanged ? "bg-[#fff8e6]" : ""} ${row.cancelled ? "[&>td:not(:last-child)]:opacity-55 bg-[#fafbfc]" : ""} transition-opacity`}
@@ -1008,7 +1010,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                   <td className="px-1.5 py-1.5">
                     <span className="text-[12px] text-[#4e535a]">{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
                   </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
+                  <td hidden={!canViewNote(editPermissions.customer_access, "visit_need")} className={`px-1.5 py-1.5 ${isCellChanged(row.key, "needs") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <VisitNoteCell
                       visitId={row.visit_id}
                       customerId={row.customer_id}
@@ -1022,7 +1024,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
                   </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
+                  <td hidden={!canViewNote(editPermissions.customer_access, "customer_info")} className={`px-1.5 py-1.5 ${isCellChanged(row.key, "feedback") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <VisitNoteCell
                       visitId={row.visit_id}
                       nickname={row.nickname}
@@ -1034,7 +1036,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
                   </td>
-                  <td className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
+                  <td hidden={!canViewNote(editPermissions.customer_access, "follow_up")} className={`px-1.5 py-1.5 ${isCellChanged(row.key, "healing_notes") ? "bg-[#f5eeff] rounded" : ""}`}>
                     <VisitNoteCell
                       visitId={row.visit_id}
                       nickname={row.nickname}
@@ -1046,7 +1048,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                       onNotesChange={(notes) => setNotesByVisitId((previous) => ({ ...previous, [row.visit_id]: notes }))}
                     />
                   </td>
-                  <td className="px-1.5 py-1.5">
+                  <td hidden={!canViewNote(editPermissions.customer_access, "customer_feedback")} className="px-1.5 py-1.5">
                     <VisitNoteCell visitId={row.visit_id} nickname={row.nickname} title="客户反馈" category="customer_feedback" notes={notesByVisitId[row.visit_id] || []} disabled={row.cancelled || isViewOnly} expanded={needsExpanded} onNotesChange={notes => setNotesByVisitId(previous => ({ ...previous, [row.visit_id]: notes }))} />
                   </td>
                   <td className="px-1.5 py-1.5 text-left">

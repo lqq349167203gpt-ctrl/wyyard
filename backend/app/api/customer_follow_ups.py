@@ -62,8 +62,7 @@ def _actor(request: Request) -> tuple[str, str, str]:
 
 
 def _require_category_access(request: Request, category: str):
-    if category == "visit_need" and not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
-        raise HTTPException(403, "没有来访需求的查看权限")
+    customer_access_service.require_note_access(request, category)
 
 
 def _build_rows(notes: list, actor: tuple[str, str, str]) -> list[dict]:
@@ -134,8 +133,7 @@ def list_customer_follow_ups(
     notes = visit_note_service.list_notes_for_follow_up(
         account_id, owner_name, username, request_actor_customer_ids(request)
     )
-    if not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
-        notes = [note for note in notes if note.category != "visit_need"]
+    notes = [visible for note in notes if (visible := customer_access_service.protect_note(note, get_request_roles(request))) is not None]
     rows = _build_rows(notes, (account_id, owner_name, username))
     needle = keyword.strip().casefold()
     if needle:
@@ -180,7 +178,7 @@ def get_follow_up_people_for_participants():
 def get_need_tags_for_participants(request: Request):
     from app.services import customer_tag_service
 
-    if not customer_access_service.can_view_detail_tab(get_request_roles(request), "follow_up"):
+    if not customer_access_service.can_view_detail_tab(get_request_roles(request), "visit_need_tags"):
         raise HTTPException(403, "没有来访需求的查看权限")
     return customer_tag_service.list_visible_tags(_actor(request)[0], category="visit_need")
 
@@ -190,6 +188,8 @@ def create_customer_follow_up(data: CustomerFollowUpCreate, request: Request):
     _require_category_access(request, data.category)
     """自己那边空着的位置直接补填一条（同一场邀约同一类只有一条）。"""
     account_id, owner_name, username = _actor(request)
+    existing = visit_note_service._find_creator_note(data.visit_id, data.category, account_id, owner_name or username)
+    data = customer_access_service.prepare_note_write(request, data, data.category, existing)
     visit = visit_service.get_visit_without_metrics(data.visit_id)
     if not visit:
         raise HTTPException(status_code=404, detail="邀约记录不存在")
@@ -238,6 +238,7 @@ def update_customer_follow_up(note_id: str, data: CustomerFollowUpUpdate, reques
     if not visit_note_service.can_manage_note(note, account_id, owner_name, username):
         raise HTTPException(status_code=403, detail="只能修改自己填写的记录")
     _require_category_access(request, note.category)
+    data = customer_access_service.prepare_note_write(request, data, note.category, note)
     before = note.model_dump(mode="json")
     visit = visit_service.get_visit_without_metrics(note.visit_id)
     if not visit:

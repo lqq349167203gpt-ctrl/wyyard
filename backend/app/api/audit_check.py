@@ -56,9 +56,9 @@ def check_missing(
         if request is not None
         else None
     )
-    # 来访需求按邀约页同一口径：没有「跟进点」查看权限的账号只核对是否填写，不看内容
+    # 与邀约页同一口径：是否填写可供核对，实际内容按五项信息权限分别过滤。
     roles = get_request_roles(request) if request is not None else []
-    can_view_visit_need = "超级管理员" in roles or customer_access_service.can_view_detail_tab(roles, "follow_up")
+    can_view_visit_need = customer_access_service.can_view_note(roles, "visit_need")
     result = missing_check_service.check(
         start_date=start_date,
         end_date=end_date,
@@ -82,4 +82,11 @@ def check_missing(
         result["page"] = current
         result["page_size"] = page_size
         result["total_pages"] = total_pages
-    return result
+    if request is not None:
+        from app.api.visits import _visit_note_maps
+
+        rows = [row for day in result.get("days", []) for row in (day.get("visit") or {}).get("rows", [])]
+        _, notes = _visit_note_maps(request, [row["id"] for row in rows])
+        for row in rows:
+            row["visit_notes"] = notes.get(row["id"], [])
+    return customer_access_service.protect_note_payload(result, roles)

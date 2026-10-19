@@ -2,6 +2,7 @@ const { visitNoteApi, customerApi, customerTagApi } = require('../../utils/api')
 const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
 const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
 const { formatNoteTime } = require('../../utils/note-feedback-meta')
+const { noteVisibility } = require('../../utils/note-permissions')
 
 function formatPlanDate(value) {
   return String(value || '').replace(/^\d{4}-(\d{2})-(\d{2})$/, '$1/$2')
@@ -57,6 +58,9 @@ Component({
 
   observers: {
     'visitId, category': function onSourceChange(visitId, category) {
+      const visibility = noteVisibility()
+      this.setData({ canView: !!visibility[category], showNeedTags: visibility.visit_need_tags,
+        showDetail: category !== 'visit_need' || visibility.visit_need_detail })
       invalidateRead(this, 'notes')
       invalidateRead(this, 'previousNeed')
       invalidateRead(this, 'visitPurpose')
@@ -66,7 +70,7 @@ Component({
       this.setData({ nextFollowUpPersonId: '', nextFollowUpPerson: '', nextFollowUpDate: '', nextFollowUpDateText: '', followUpPeople: [],
         followUpMatches: [], followUpMatchCount: 0, followUpSearch: '', followUpSearchOpen: false,
         followUpPeopleLoading: false, followUpPeopleError: '' })
-      if (visitId && category) this.loadNotes()
+      if (visitId && category && visibility[category]) this.loadNotes()
     },
   },
 
@@ -172,7 +176,7 @@ Component({
         visitPurposeError: '',
       })
       this.loadFeedbackPeople()
-      if (this.properties.category === 'visit_need') this.loadNeedTags()
+      if (this.properties.category === 'visit_need' && this.data.showNeedTags) this.loadNeedTags()
       if (this.properties.category === 'follow_up') this.loadFollowUpPeople()
     },
 

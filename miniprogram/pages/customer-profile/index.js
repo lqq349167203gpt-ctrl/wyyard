@@ -5,13 +5,13 @@ const { CUSTOMER_INCOME_FIELDS } = require('../../utils/customer-income')
 const { formatNoteTime } = require('../../utils/note-feedback-meta')
 function visitNoteRows(visit, category) {
   return (visit.visit_notes || [])
-    .filter(note => note.category === category && note.content)
+    .filter(note => note.category === category && (note.content || (note.need_tags || []).length))
     .map(note => ({
       id: note.id,
       feedbackText: note.feedback_person || note.created_by || '未知',
       creatorText: note.created_by || '未知',
       timeText: formatNoteTime(note.updated_at || note.created_at),
-      content: note.content,
+      content: [(note.need_tags || []).map(tag => tag.name).join('、'), note.content].filter(Boolean).join('\n'),
     }))
 }
 
@@ -342,8 +342,10 @@ Page({
   updateTabCounts() {
     const { healingRecords, courseParticipantNotes, commRecords, activities, activityFollowups, purchaseSummary, offlineCourseRecords, paymentRecords, customerAccessPermissions } = this.data
     const access = customerAccessPermissions
+    const visibility = require('../../utils/note-permissions').noteVisibility(access)
+    this.setData({ noteVisibility: visibility })
     const tabs = [
-      (!access || access.detail_tabs.follow_up) && { key: 'healing', label: '跟进', count: healingRecords.length + courseParticipantNotes.length },
+      (!access || visibility.any) && { key: 'healing', label: '跟进', count: healingRecords.length + courseParticipantNotes.length },
       (!access || access.detail_tabs.communication) && { key: 'communication', label: '沟通', count: this.data.communicationLoading || this.data.communicationError ? null : commRecords.length },
       (!access || access.detail_tabs.activities) && { key: 'activities', label: '活动', count: activities.length },
       (!access || access.detail_tabs.card_statistics) && { key: 'purchase', label: '卡次', count: purchaseSummary.length },

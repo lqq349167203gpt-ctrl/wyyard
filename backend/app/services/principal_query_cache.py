@@ -14,6 +14,7 @@ from math import ceil
 from zoneinfo import ZoneInfo
 
 from app.services import (
+    customer_access_service,
     position_edit_permission_service,
     principal_mobile_service,
     principal_response_service,
@@ -76,11 +77,13 @@ def query_result(request, query):
     response = {**result, "items": result["items"][(page - 1) * query.page_size:page * query.page_size]}
     if query.overview_detail:
         # 明细独立响应，不连带返回其他板块的列表和卡片。
-        return {"overview_detail": deepcopy(principal_response_service.detail_page(result.get("breakdown", {}), query))}
+        return customer_access_service.protect_note_payload(
+            {"overview_detail": deepcopy(principal_response_service.detail_page(result.get("breakdown", {}), query))},
+            permissions=permissions.get("customer_access", {}))
     if query.compact_overview and not query.mobile_group:
         breakdown = result.get("breakdown", {})
         response["breakdown"] = principal_mobile_service.compact_breakdown(breakdown)
         response["overview_metrics"] = principal_mobile_service.overview_metrics(breakdown, query.detail_picks)
     result = deepcopy(response)
     result.update(page=page, page_size=query.page_size, total_pages=pages)
-    return result
+    return customer_access_service.protect_note_payload(result, permissions=permissions.get("customer_access", {}))

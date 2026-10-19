@@ -128,6 +128,7 @@ Page({
     const editPermissions = wx.getStorageSync('userEditPermissions') || getApp().globalData.editPermissions || {}
     this.setData({
       isViewOnly: isAreaViewOnly('visits'),
+      noteVisibility: require('../../utils/note-permissions').noteVisibility(),
       canManageVisitVerification: currentUser.role === '超级管理员' || editPermissions.visit_lock === true,
     })
     const now = new Date()

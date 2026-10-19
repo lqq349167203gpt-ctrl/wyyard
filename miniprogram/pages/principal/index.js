@@ -817,7 +817,8 @@ Page({
     const row = (this._sourceRows || []).find(item => item.id === e.currentTarget.dataset.id)
     if (!row) return
     const fields = [ ['visit_need', '来访需求'], ['customer_info', '深度需求'], ['follow_up', '跟进点'], ['customer_feedback', '客户反馈'] ]
-    const sections = fields.map(([key, label]) => ({
+    const visibility = require('../../utils/note-permissions').noteVisibility((wx.getStorageSync('userEditPermissions') || {}).customer_access || { detail_tabs: {} })
+    const sections = fields.filter(([key]) => visibility[key]).map(([key, label]) => ({
       label,
       entries: (row[`${key}_entries`] || []).map(entry => ({
         ...entry, atText: shanghaiDateTime(entry.at), nextFollowUpText: followUpPlanText(entry),

@@ -45,6 +45,10 @@ class SensitiveFieldPermissionUpdate(StrictBaseModel):
 
 
 class CustomerDetailTabPermissionUpdate(StrictBaseModel):
+    visit_need_tags: bool | None = None
+    visit_need_detail: bool | None = None
+    customer_info: bool | None = None
+    customer_feedback: bool | None = None
     follow_up: bool = False
     communication: bool = False
     activities: bool = False

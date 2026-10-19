@@ -41,6 +41,10 @@ class SensitiveFieldPermissions(TypedDict):
 
 
 class CustomerDetailTabPermissions(TypedDict):
+    visit_need_tags: bool
+    visit_need_detail: bool
+    customer_info: bool
+    customer_feedback: bool
     follow_up: bool
     communication: bool
     activities: bool
@@ -99,6 +103,10 @@ def _empty_customer_access() -> CustomerAccessPermissions:
             "other_info": False,
         },
         "detail_tabs": {
+            "visit_need_tags": False,
+            "visit_need_detail": False,
+            "customer_info": False,
+            "customer_feedback": False,
             "follow_up": False,
             "communication": False,
             "activities": False,
@@ -122,6 +130,10 @@ def _full_customer_access() -> CustomerAccessPermissions:
             "other_info": True,
         },
         "detail_tabs": {
+            "visit_need_tags": True,
+            "visit_need_detail": True,
+            "customer_info": True,
+            "customer_feedback": True,
             "follow_up": True,
             "communication": True,
             "activities": True,
@@ -228,6 +240,8 @@ def _normalize_customer_access(value: object, *, legacy_default: bool = False) -
             "other_info": sensitive.get("other_info") is True,
         },
         "detail_tabs": {
+            **{key: tabs.get(key, tabs.get("follow_up")) is True
+               for key in ("visit_need_tags", "visit_need_detail", "customer_info", "customer_feedback")},
             "follow_up": tabs.get("follow_up") is True,
             "communication": tabs.get("communication") is True,
             "activities": tabs.get("activities") is True,
@@ -317,7 +331,7 @@ def _merge_permissions(roles: list[str]) -> PositionEditPermissions:
         merged["customer_access"]["sensitive_fields"][field] = any(
             value["customer_access"]["sensitive_fields"][field] for value in values
         )
-    for tab in ("follow_up", "communication", "activities", "customer_followups", "card_statistics", "offline_courses"):
+    for tab in merged["customer_access"]["detail_tabs"]:
         merged["customer_access"]["detail_tabs"][tab] = any(
             value["customer_access"]["detail_tabs"][tab] for value in values
         )
@@ -346,6 +360,16 @@ def get_all() -> dict[str, PositionEditPermissions]:
 
 
 def set_permissions(position: str, permissions: object) -> PositionEditPermissions:
+    # 旧客户端未认识的细分字段保留既有值，避免保存其他权限时扩大查看范围。
+    if isinstance(permissions, dict):
+        permissions = deepcopy(permissions)
+        for group in ("customer_access", "principal_external_access"):
+            access = permissions.get(group)
+            previous = _permissions.get(position, {}).get(group, {})
+            if isinstance(access, dict) and isinstance(access.get("detail_tabs"), dict):
+                for key in ("visit_need_tags", "visit_need_detail", "customer_info", "customer_feedback"):
+                    if key not in access["detail_tabs"] and key in previous.get("detail_tabs", {}):
+                        access["detail_tabs"][key] = previous["detail_tabs"][key]
     # 旧客户端没有此字段时保留已配置的独立权限，不因保存其他设置而清空。
     if isinstance(permissions, dict) and "principal_external_access" not in permissions:
         permissions = {**permissions, "principal_external_access": _permissions.get(position, {}).get("principal_external_access")}

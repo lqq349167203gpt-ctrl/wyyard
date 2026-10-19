@@ -21,6 +21,7 @@ import type {
 } from "@/lib/api"
 import { normalizePagePermissions, removePagePermissions } from "@/lib/page-permissions"
 import { refreshAccountPermissions } from "@/hooks/use-edit-permissions"
+import { NOTE_PERMISSION_OPTIONS } from "@/lib/note-permissions"
 import { AccountsContent } from "@/pages/accounts"
 
 import { PAGE_PERMISSIONS as ALL_PAGES, PERMISSION_GROUPS } from "@/lib/page-registry"
@@ -53,6 +54,7 @@ const DEFAULT_EDIT_PERMISSIONS: PositionEditPermissions = {
       other_info: false,
     },
     detail_tabs: {
+      visit_need_tags: false, visit_need_detail: false, customer_info: false, customer_feedback: false,
       follow_up: false,
       communication: false,
       activities: false,
@@ -90,6 +92,7 @@ const FULL_EDIT_PERMISSIONS: PositionEditPermissions = {
       other_info: true,
     },
     detail_tabs: {
+      visit_need_tags: true, visit_need_detail: true, customer_info: true, customer_feedback: true,
       follow_up: true,
       communication: true,
       activities: true,
@@ -875,7 +878,7 @@ export default function PositionManagementPage() {
                       </div>
                       {([
                         { key: "sensitive_fields", title: "隐私信息查看", fields: { visit_purpose: "到访目的", trauma_history: "创伤经历", current_block: "当下卡点", work_info: "工作情况", other_info: "其他信息" } },
-                        { key: "detail_tabs", title: "详情内容查看", fields: { follow_up: "跟进点", communication: "沟通记录", activities: "活动记录", card_statistics: "卡次统计", offline_courses: "技能训练课程" } },
+                        { key: "detail_tabs", title: "详情内容查看", fields: { ...Object.fromEntries(NOTE_PERMISSION_OPTIONS.map(item => [item.key, item.label])), communication: "沟通记录", activities: "活动记录", card_statistics: "卡次统计", offline_courses: "技能训练课程" } },
                       ] as const).map(group => (
                         <div key={group.key} className="mb-4">
                           <div className="mb-2 text-[13px] font-medium">{group.title}</div>
@@ -1209,7 +1212,7 @@ export default function PositionManagementPage() {
                       </div>
                       <div className="grid grid-cols-2 overflow-hidden rounded-[4px] border border-[#f0f0f0] md:grid-cols-3">
                         {([
-                          { key: "follow_up" as const, label: "跟进点" },
+                          ...NOTE_PERMISSION_OPTIONS,
                           { key: "communication" as const, label: "沟通记录" },
                           { key: "activities" as const, label: "活动记录" },
                           { key: "card_statistics" as const, label: "卡次统计" },

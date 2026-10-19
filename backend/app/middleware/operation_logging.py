@@ -629,7 +629,7 @@ def _format_edit_permission_changes(old_value: object, new_value: object) -> lis
     new_external = new_permissions.get("principal_external_access") or {}
     for group, labels in {
         "sensitive_fields": {"visit_purpose": "到访目的", "trauma_history": "创伤经历", "current_block": "当下卡点", "work_info": "工作情况", "other_info": "其他信息"},
-        "detail_tabs": {"follow_up": "跟进点", "communication": "沟通记录", "activities": "活动记录", "customer_followups": "客户回访", "card_statistics": "卡次统计", "offline_courses": "线下落地课程"},
+        "detail_tabs": {"visit_need_tags": "来访需求标签", "visit_need_detail": "来访需求详情", "customer_info": "深度需求", "customer_feedback": "客户反馈", "follow_up": "跟进点", "communication": "沟通记录", "activities": "活动记录", "customer_followups": "客户回访", "card_statistics": "卡次统计", "offline_courses": "线下落地课程"},
     }.items():
         for key, label in labels.items():
             before = (old_external.get(group) or {}).get(key) is True

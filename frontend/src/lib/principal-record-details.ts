@@ -1,11 +1,12 @@
 import type { CustomerDetail } from "./api"
+import { canViewAnyNote } from "./note-permissions"
 
 export type PrincipalRecordType = "invited" | "cancelled" | "arrived" | "activity"
 
 /** 明细与列表共用统计区间，活动只展示后端实际计入次数的课程。 */
 export function principalRecordRows(detail: CustomerDetail, type: PrincipalRecordType, from: string | null, to: string | null, activityKeys?: string[]): Array<Record<string, unknown>> {
   const permissions = detail.customer.customer_access_permissions
-  if (permissions && !permissions.detail_tabs[type === "activity" ? "activities" : "follow_up"]) {
+  if (permissions && !(type === "activity" ? permissions.detail_tabs.activities : canViewAnyNote(permissions))) {
     throw new Error(type === "activity" ? "没有查看活动记录的权限" : "没有查看跟进点的权限")
   }
   const inPeriod = (date: string) => !!date && (!from || date >= from) && (!to || date <= to)

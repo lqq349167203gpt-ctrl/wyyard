@@ -166,6 +166,7 @@ def export_follow_ups(
         page=1,
         page_size=max(1, len(customers)),
     )
+    result = customer_access_service.protect_note_payload(result, get_request_roles(request))
     rows = [
         [
             teacher,
@@ -193,9 +194,16 @@ def export_follow_ups(
     normalized_filter = {"inactive_30": "inactive", "active_30": "active"}.get(follow_up_filter, follow_up_filter)
     filter_label = {"inactive": f"近{follow_up_days}天未录入", "active": f"近{follow_up_days}天已录入", "all": "全部客户"}[normalized_filter]
     record_service_teacher_action(request, f"导出跟进记录：服务老师 {teacher}；{definition_label}；{filter_label}；共{len(rows)}人", export=True)
+    headers = ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近深度需求", "深度需求反馈人", "深度需求创建人", "深度需求录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"]
+    hidden = set()
+    for category, indexes in (("customer_info", range(4, 8)), ("follow_up", range(8, 12))):
+        if not customer_access_service.can_view_note(get_request_roles(request), category):
+            hidden.update(indexes)
+    headers = [value for index, value in enumerate(headers) if index not in hidden]
+    rows = [[value for index, value in enumerate(row) if index not in hidden] for row in rows]
     return _xlsx_response(
         "跟进记录",
-        ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近深度需求", "深度需求反馈人", "深度需求创建人", "深度需求录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"],
+        headers,
         rows,
         f"服务老师跟进记录_{teacher or '未选择'}.xlsx",
     )
@@ -366,7 +374,7 @@ def list_course_participants(
             "participants": members,
         })
     return {
-        "items": groups,
+        "items": customer_access_service.protect_note_payload(groups, get_request_roles(request)),
         "total": len(selected_courses),
         "total_participants": total_participants,
         "page": current,
@@ -461,7 +469,7 @@ def list_customers(
     normalized_filter = {"inactive_30": "inactive", "active_30": "active"}.get(follow_up_filter, follow_up_filter)
     filters = {"inactive": f"近{follow_up_days}天未录入", "active": f"近{follow_up_days}天已录入", "all": "全部客户"}
     record_service_teacher_action(request, f"查询跟进记录：服务老师 {teacher}；包含 {definitions[follow_up_definition]}；{filters[normalized_filter]}；第{page}页")
-    return service_teacher_customer_service.list_teacher_customers(
+    result = service_teacher_customer_service.list_teacher_customers(
         customers,
         teacher,
         follow_up_filter=follow_up_filter,
@@ -471,3 +479,4 @@ def list_customers(
         page=page,
         page_size=page_size,
     )
+    return customer_access_service.protect_note_payload(result, get_request_roles(request))

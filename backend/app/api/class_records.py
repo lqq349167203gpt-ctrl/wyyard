@@ -361,7 +361,8 @@ def list_activity_participant_notes(
         session_id,
         allowed_ids,
     )
-    return [_activity_note_response(note, request) for note in notes]
+    return [_activity_note_response(note, request) for note in notes
+            if customer_access_service.can_view_note(roles, note.category)]
 
 
 @router.post("/participant-notes")
@@ -370,6 +371,7 @@ def save_activity_participant_note(
     request: Request,
 ):
     _ensure_activity_note_editable(request)
+    customer_access_service.require_note_access(request, data.category)
     context = _activity_note_context(data.activity_source, data.session_id)
     if data.customer_id not in context["participant_ids"]:
         raise HTTPException(status_code=400, detail="该客户不在本场课程参与名单中")
@@ -415,6 +417,7 @@ def delete_activity_participant_note(note_id: str, request: Request):
     if not note:
         raise HTTPException(status_code=404, detail="记录不存在")
     _activity_note_context(note.activity_source, note.session_id)
+    customer_access_service.require_note_access(request, note.category)
     customer_access_service.require_customer_scope(
         request,
         note.customer_id,

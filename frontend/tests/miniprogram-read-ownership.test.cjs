@@ -157,7 +157,7 @@ test('协作信息组件换来源不能让旧记录与旧 finally 覆盖新状�
   const calls = []
   const p = fixture('miniprogram/components/visit-note-section/index.js', { visitNoteApi: {
     list: id => { const d = deferred(); calls.push({ ...d, id }); return d.promise },
-  } })
+  } }, { wx: { getStorageSync: () => ({ customer_access: { detail_tabs: { customer_info: true } } }) } })
   p.properties = { visitId: 'a', category: 'customer_info' }
   const old = p.loadNotes()
   p.properties.visitId = 'b'; p.observers['visitId, category'].call(p, 'b', 'customer_info')

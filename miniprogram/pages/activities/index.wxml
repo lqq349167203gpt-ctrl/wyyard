@@ -240,8 +240,8 @@
               <text class="participant-needs-value">{{item.needs}}</text>
             </view>
             <view class="participant-note-statuses">
-              <text class="participant-note-status {{item.hasCustomerInfo ? 'filled' : ''}}">客户信息 · {{item.hasCustomerInfo ? '已填' : '未填'}}</text>
-              <text class="participant-note-status {{item.hasFollowUp ? 'filled' : ''}}">跟进点 · {{item.hasFollowUp ? '已填' : '未填'}}</text>
+              <text wx:if="{{noteVisibility.customer_info}}" class="participant-note-status {{item.hasCustomerInfo ? 'filled' : ''}}">客户信息 · {{item.hasCustomerInfo ? '已填' : '未填'}}</text>
+              <text wx:if="{{noteVisibility.follow_up}}" class="participant-note-status {{item.hasFollowUp ? 'filled' : ''}}">跟进点 · {{item.hasFollowUp ? '已填' : '未填'}}</text>
               <view class="participant-item-actions">
                 <text class="participant-action participant-action-outline" catchtap="onParticipantProfileTap" data-id="{{item.id}}">资料</text>
                 <text
@@ -254,7 +254,7 @@
           </view>
         </view>
         <view class="participant-note-editor" wx:if="{{participantSheetExpandedId === item.id && !item.withdrawn}}">
-          <view class="participant-note-field">
+          <view wx:if="{{noteVisibility.customer_info}}" class="participant-note-field">
             <view class="participant-note-field-head">
               <text class="participant-note-field-label">客户信息</text>
               <text class="participant-note-field-count" wx:if="{{item.customerInfoOtherNotes.length}}">另有 {{item.customerInfoOtherNotes.length}} 人填写</text>
@@ -277,7 +277,7 @@
               </view>
             </view>
           </view>
-          <view class="participant-note-field">
+          <view wx:if="{{noteVisibility.follow_up}}" class="participant-note-field">
             <view class="participant-note-field-head">
               <text class="participant-note-field-label">跟进点</text>
               <text class="participant-note-field-count" wx:if="{{item.followUpOtherNotes.length}}">另有 {{item.followUpOtherNotes.length}} 人填写</text>

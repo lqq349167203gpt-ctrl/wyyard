@@ -2458,7 +2458,7 @@ def get_course_statistics(
         } for course in selected[(page - 1) * page_size:page * page_size]]
         response["trend"] = []
         response["teacher_statistics"] = []
-    return response
+    return customer_access_service.protect_note_payload(response, get_request_roles(request) if request else ["超级管理员"])
 
 
 @router.get("/referrals")

@@ -157,6 +157,7 @@ module.exports = function createRecordsPage(mode) { return {
   },
 
   async onLoad() {
+    this.setData({ noteVisibility: require('./note-permissions').noteVisibility() })
     if (!getApp().checkLogin()) return
     if (!getApp().checkPagePermission(mode === 'courses' ? 'course-statistics' : 'service-teacher')) {
       wx.showToast({ title: '暂无页面权限', icon: 'none' })
@@ -609,7 +610,7 @@ module.exports = function createRecordsPage(mode) { return {
         customerFollowUpApi.myNote(row.visit_id, field),
         customerFollowUpApi.feedbackPeople(),
         field === 'follow_up' ? customerFollowUpApi.followUpPeople() : Promise.resolve([]),
-        field === 'visit_need' ? customerFollowUpApi.needTags() : Promise.resolve([]),
+        field === 'visit_need' && this.data.noteVisibility.visit_need_tags ? customerFollowUpApi.needTags() : Promise.resolve([]),
       ])
       if (!isCurrent() || !this.data.participantEditing || this.data.participantEditing.visitId !== row.visit_id || this.data.participantEditing.field !== field) return
       const picked = pickerData(people, mine)

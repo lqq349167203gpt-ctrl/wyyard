@@ -194,6 +194,7 @@ async def list_visits(
     for record in records:
         item = _fill_member_type(record, need_map.get(record.id, ""), shared_summary=summaries.get(record.id, {}), first_arrivals=first_arrivals)
         item["visit_notes"] = note_map.get(record.id, [])
+        item = customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"])
         items.append(item)
     role = get_request_roles(request) if request else ["超级管理员"]
     if date and customer_access_service.can_view_transaction_summary(role):
@@ -219,7 +220,7 @@ async def list_visits_light(
 
         visit_ids = [str(item.get("id") or "") for item in items]
         notes = visit_note_service.list_notes(visit_ids, ensure_legacy=request is not None)
-        need_map = _private_need_map(request, visit_ids, notes=notes)
+        need_map, note_map = _visit_note_maps(request, visit_ids, notes=notes)
         summaries = daily_customer_note_service.visit_summaries(visit_ids, notes=notes)
         first_arrivals = visit_service.first_arrival_dates({item["customer_id"] for item in items})
         for item in items:
@@ -227,7 +228,11 @@ async def list_visits_light(
             item["is_new_customer"] = not first_arrival or first_arrival >= item["visit_date"]
             item["needs"] = need_map.get(str(item.get("id") or ""), "")
             item.update(summaries.get(str(item.get("id") or ""), {}))
-        return items
+            item["visit_notes"] = note_map.get(str(item.get("id") or ""), [])
+        protected = [customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"]) for item in items]
+        for item in protected:
+            item.pop("visit_notes", None)
+        return protected
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -306,9 +311,11 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         visit_service.list_visits(date, space_id=space_id),
     )
     active_records = [record for record in records if not record.cancelled]
-    need_map = _private_need_map(request, [record.id for record in active_records])
+    need_map, note_map = _visit_note_maps(request, [record.id for record in active_records])
     first_arrivals = visit_service.first_arrival_dates({record.customer_id for record in active_records})
     items = [_fill_member_type(record, need_map.get(record.id, ""), first_arrivals=first_arrivals) for record in active_records]
+    items = [customer_access_service.protect_note_fields({**item, "visit_notes": note_map.get(item["id"], [])},
+              get_request_roles(request) if request else ["超级管理员"]) for item in items]
 
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
@@ -337,6 +344,10 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
 
     headers = ["引流人", "客户昵称", "预计时间", "会员身份", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
     col_widths = [10, 12, 10, 12, 40, 10, 10, 10, 20]
+    if not customer_access_service.can_view_note(get_request_roles(request) if request else ["超级管理员"], "visit_need"):
+        hidden_index = headers.index("来访需求")
+        headers.pop(hidden_index)
+        col_widths.pop(hidden_index)
 
     wb = Workbook()
     ws = wb.active
@@ -409,15 +420,20 @@ async def get_visit(visit_id: str, request: Request):
     need_map, note_map = _visit_note_maps(request, [record.id])
     item = _fill_member_type(record, need_map.get(record.id, ""), refresh_remaining=True)
     item["visit_notes"] = note_map.get(record.id, [])
-    return item
+    return customer_access_service.protect_note_fields(item, get_request_roles(request))
 
 
 @router.post("")
 async def create_visit(data: VisitRecordCreate, request: Request):
     customer_access_service.require_customer_scope(request, data.customer_id, action="邀约")
+    for field, category in (("feedback", "customer_info"), ("healing_notes", "follow_up"), ("experience", "customer_feedback")):
+        if getattr(data, field, ""):
+            customer_access_service.require_note_access(request, category)
     visit_verification_service.ensure_scope_unverified(data.visit_date, data.space_id or "")
     try:
         initial_need = str(data.needs or "").strip()
+        if initial_need and not customer_access_service.can_view_detail_tab(get_request_roles(request), "visit_need_detail"):
+            raise HTTPException(403, "没有来访需求详情的查看权限")
         create_data = data.model_copy(update={"needs": ""}) if initial_need else data
         record = visit_service.create_visit(stamp_creator(create_data, request))
         if initial_need:
@@ -434,7 +450,7 @@ async def create_visit(data: VisitRecordCreate, request: Request):
                     or ""
                 ),
             )
-        return _fill_member_type(record, initial_need, refresh_remaining=True)
+        return customer_access_service.protect_note_fields(_fill_member_type(record, initial_need, refresh_remaining=True), get_request_roles(request))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -482,6 +498,9 @@ async def update_visit(visit_id: str, data: dict, request: Request):
         content = str(data.pop(field) or "").strip()
         current = str(getattr(old_record, field, "") or "").strip() if old_record else ""
         if content and content != current:
+            customer_access_service.require_note_access(request, category)
+            if category == "visit_need" and not customer_access_service.can_view_detail_tab(get_request_roles(request), "visit_need_detail"):
+                raise HTTPException(403, "没有来访需求详情的查看权限")
             collaboration_updates.append((category, content))
 
     try:
@@ -527,7 +546,7 @@ async def update_visit(visit_id: str, data: dict, request: Request):
             )
 
     need_map = _private_need_map(request, [record.id])
-    return _fill_member_type(record, need_map.get(record.id, ""), refresh_remaining=True)
+    return customer_access_service.protect_note_fields(_fill_member_type(record, need_map.get(record.id, ""), refresh_remaining=True), get_request_roles(request))
 
 
 @router.delete("/{visit_id}")

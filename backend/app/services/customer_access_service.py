@@ -17,6 +17,131 @@ SENSITIVE_FIELD_MAP = {
     "other_info": ("other_info",),
 }
 
+NOTE_PERMISSION_KEYS = ("visit_need_tags", "visit_need_detail", "customer_info", "follow_up", "customer_feedback")
+NOTE_FIELD_MAP = {"needs": "visit_need", "feedback": "customer_info", "healing_notes": "follow_up", "experience": "customer_feedback",
+                  "customer_info": "customer_info", "visit_need": "visit_need", "follow_up": "follow_up",
+                  "customer_feedback": "customer_feedback"}
+
+
+def _note_access(roles, permissions):
+    value = permissions if permissions is not None else get_customer_permissions(roles)
+    return position_edit_permission_service._normalize_customer_access(value)
+
+
+def can_view_note(roles, category: str, *, permissions=None) -> bool:
+    tabs = _note_access(roles, permissions)["detail_tabs"]
+    if category == "visit_need":
+        return tabs.get("visit_need_tags", False) or tabs.get("visit_need_detail", False)
+    return tabs.get(category, False) is True
+
+
+def can_view_any_note(roles=(), *, permissions=None) -> bool:
+    tabs = _note_access(roles, permissions)["detail_tabs"]
+    return any(tabs.get(key) for key in NOTE_PERMISSION_KEYS)
+
+
+def protect_note(note, roles=(), *, permissions=None):
+    """返回脱敏副本；标签和文字独立控制，绝不修改原始记录。"""
+    access = _note_access(roles, permissions)
+    category = note.get("category") if isinstance(note, dict) else note.category
+    if not can_view_note(roles, category, permissions=access):
+        return None
+    hidden = {}
+    if category == "visit_need":
+        if not access["detail_tabs"].get("visit_need_tags"):
+            hidden["need_tags"] = []
+        if not access["detail_tabs"].get("visit_need_detail"):
+            hidden["content"] = ""
+        if isinstance(note, dict) and "detail_content" in note:
+            from app.services import visit_note_service
+            hidden["detail_content"] = note["detail_content"] if access["detail_tabs"].get("visit_need_detail") else ""
+            hidden["content"] = visit_note_service.display_content_dict({
+                "content": hidden["detail_content"],
+                "need_tags": note.get("need_tags", []) if access["detail_tabs"].get("visit_need_tags") else [],
+            })
+    return {**note, **hidden} if isinstance(note, dict) else note.model_copy(update=hidden)
+
+
+def protect_note_fields(data: dict, roles=(), *, permissions=None) -> dict:
+    """兼容汇总文字与备注明细；所有入口共享相同字段权限。"""
+    access = _note_access(roles, permissions)
+    result = dict(data)
+    for field, category in NOTE_FIELD_MAP.items():
+        if field in result and not can_view_note(roles, category, permissions=access):
+            result[field] = ""
+    # 来访需求汇总混合标签和文字，必须由已过滤的备注重新生成。
+    if "visit_notes" in result:
+        notes = [visible for note in result["visit_notes"] if (visible := protect_note(note, permissions=access)) is not None]
+        result["visit_notes"] = notes
+        from app.services import visit_note_service
+        result["needs"] = "\n".join(
+            f"{note.get('feedback_person') or note.get('created_by') or '历史记录'}：{visit_note_service.display_content_dict(note)}"
+            for note in notes if note["category"] == "visit_need" and visit_note_service.display_content_dict(note))
+    elif not access["detail_tabs"].get("visit_need_detail") and "needs" in result:
+        result["needs"] = ""
+    if not access["detail_tabs"].get("visit_need_detail") and "visit_need" in result and "visit_need_entries" not in result:
+        result["visit_need"] = ""
+    return result
+
+
+def protect_note_payload(data, roles=(), *, permissions=None):
+    """过滤课程、报表和导出的嵌套汇总；共享字段映射避免各入口自行脱敏。"""
+    access = _note_access(roles, permissions)
+    if isinstance(data, list):
+        return [visible for item in data if (visible := protect_note_payload(item, permissions=access)) is not None]
+    if not isinstance(data, dict):
+        return data
+    if data.get("category") in {"visit_need", "customer_info", "follow_up", "customer_feedback"} and "content" in data:
+        return protect_note(data, permissions=access)
+    result = {key: protect_note_payload(value, permissions=access) for key, value in data.items()}
+    result = protect_note_fields(result, permissions=access)
+    for category in ("visit_need", "customer_info", "follow_up", "customer_feedback"):
+        allowed = can_view_note(roles, category, permissions=access)
+        entry_key = f"{category}_entries"
+        if entry_key in data:
+            result[entry_key] = [visible for entry in data[entry_key] or []
+                                 if (visible := protect_note({**entry, "category": category}, permissions=access)) is not None]
+            for entry in result[entry_key]:
+                entry.pop("category", None)
+            result[category] = "\n".join(entry.get("content", "") for entry in result[entry_key])
+        for key in data:
+            if key.startswith(f"latest_{category}_") or key == f"daily_{category}" or key == f"{category}_creators":
+                if not allowed:
+                    result[key] = ""
+        if category == "visit_need" and not access["detail_tabs"].get("visit_need_detail"):
+            for key in ("daily_need", "daily_visit_need"):
+                if key in result:
+                    result[key] = ""
+    if "columns" in result:
+        result["columns"] = [column for column in result["columns"]
+                             if column.get("key") not in ("visit_need", "customer_info", "follow_up", "customer_feedback")
+                             or can_view_note(roles, column["key"], permissions=access)]
+    return result
+
+
+def require_note_access(request, category: str) -> None:
+    if not can_view_note(get_request_roles(request), category):
+        raise HTTPException(403, "没有查看该类信息的权限")
+
+
+def prepare_note_write(request, data, category: str, existing=None):
+    """部分查看权限编辑需求时保留不可见部分，防止空文本覆盖隐藏内容。"""
+    roles = get_request_roles(request)
+    require_note_access(request, category)
+    if category != "visit_need":
+        return data
+    tabs = get_customer_permissions(roles)["detail_tabs"]
+    updates = {}
+    if not tabs["visit_need_detail"]:
+        if data.content.strip():
+            raise HTTPException(403, "没有来访需求详情的查看权限")
+        updates["content"] = existing.content if existing else ""
+    if not tabs["visit_need_tags"]:
+        if data.need_tag_ids:
+            raise HTTPException(403, "没有来访需求标签的查看权限")
+        updates["need_tag_ids"] = None
+    return data.model_copy(update=updates)
+
 
 def actor_name(request: Any) -> str:
     return (
@@ -31,7 +156,7 @@ def role_name(request: Any) -> str:
 
 
 def get_customer_permissions(role: str | Iterable[str]) -> dict:
-    return position_edit_permission_service.get_permissions(role)["customer_access"]
+    return position_edit_permission_service.get_permissions(role).get("customer_access", position_edit_permission_service.DEFAULT_PERMISSIONS["customer_access"])
 
 
 def can_view_customer(role: str | Iterable[str], owner_name: str, customer: Any) -> bool:

@@ -58,6 +58,11 @@ def display_content(note: VisitNote) -> str:
     return "\n".join(value for value in (labels, note.content) if value)
 
 
+def display_content_dict(note: dict) -> str:
+    labels = "、".join(tag.get("name", "") for tag in note.get("need_tags", []) if tag.get("name"))
+    return "\n".join(value for value in (labels, note.get("content", "")) if value)
+
+
 def _resolve_need_tags(category, tag_ids, previous=()):
     from app.services import customer_tag_service
 
@@ -167,6 +172,8 @@ def note_entry(note) -> dict:
         "content": display_content(note),
         "at": timestamp.isoformat() if timestamp else "",
     }
+    if note.category == "visit_need":
+        entry.update(detail_content=note.content, need_tags=getattr(note, "need_tags", []))
     if note.category == "follow_up":
         entry.update({key: getattr(note, key, "") or "" for key in (
             "next_follow_up_person_id", "next_follow_up_person", "next_follow_up_date",
@@ -236,7 +243,7 @@ def list_visible_notes(
     owner_name: str = "",
     username: str = "",
 ) -> list[VisitNote]:
-    """来访需求共享可见，但必须具备角色的跟进点查看权限。"""
+    """共享记录按分类查看权限过滤；来访需求的标签和详情分别保护。"""
     return filter_visible_notes(list_notes(visit_ids), account_id, owner_name, username)
 
 
@@ -251,8 +258,7 @@ def filter_visible_notes(
 
     account = account_service.get_account(account_id) if account_id else None
     roles = (account.roles or [account.role]) if account else []
-    can_view_need = customer_access_service.can_view_detail_tab(roles, "follow_up")
-    return [note for note in notes if note.category != "visit_need" or can_view_need]
+    return [visible for note in notes if (visible := customer_access_service.protect_note(note, roles)) is not None]
 
 
 def get_previous_visit_need(

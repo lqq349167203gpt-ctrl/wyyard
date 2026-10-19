@@ -323,7 +323,7 @@ export default function HealingRecordsPage() {
               rounded="7px"
             />
           </div>
-          <SelectDropdown value={searchQuality} options={[{ value: "", label: "全部质量" }, { value: "正常", label: "正常" }, { value: "忽视", label: "忽视" }]} onChange={setSearchQuality} placeholder="全部质量" triggerLabel={searchQuality ? `客户质量：${searchQuality}` : "全部质量"} className="w-[141px] shrink-0" buttonClassName="!h-8 !rounded-[7px] !border-[#e1e4e7] !text-[12px]" />
+          <SelectDropdown value={searchQuality} options={[{ value: "", label: "全部质量" }, { value: "正常", label: "正常" }, { value: "忽视", label: "忽视" }]} onChange={setSearchQuality} placeholder="全部质量" triggerLabel={searchQuality ? `客户质量：${searchQuality}` : "全部质量"} hideSelectedStyle className="w-[141px] shrink-0" buttonClassName="!h-8 !rounded-[7px] !border-[#e1e4e7] !text-[12px] [&>span:first-of-type]:!text-[#2b2f36]" />
           <button
             onClick={handleClear}
             className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
@@ -331,20 +331,17 @@ export default function HealingRecordsPage() {
             <X className="h-3.5 w-3.5" />
             清空
           </button>
-          <div className="flex-1" />
-          {!isViewOnly && <div className="flex shrink-0 items-center gap-2">
+          {!isViewOnly && <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
           {canManageTags && (
             <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => navigate("/config/customer-tags")}>
               <Tags className="mr-1 h-3.5 w-3.5" /> 标签管理
             </Button>
           )}
           <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => { setSelectionMode(value => !value); setSelectedIds([]); setBulkError("") }}>{selectionMode ? "退出批量" : "批量操作"}</Button>
-          </div>}
-          {!isViewOnly && (
             <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
               <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新建客户
             </Button>
-          )}
+          </div>}
         </div>
 
         {selectionMode && <div className="mb-2 flex flex-wrap items-center gap-3 rounded border border-[#eef0f2] bg-[#fafbfc] px-3 py-2 text-[12px] text-[#646a73]">

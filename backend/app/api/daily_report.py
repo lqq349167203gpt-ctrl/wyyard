@@ -27,6 +27,46 @@ from app.utils.request_roles import get_request_roles
 router = APIRouter(prefix="/api/daily-report", tags=["daily-report"], dependencies=[Depends(require_page_permission("daily-report"))])
 
 
+def report_remaining(sources, deductions):
+    """报表显示当前实余，不把历史扣卡快照或购买次数当作余额。"""
+    from app.services import membership_card_service
+
+    calculators = {"membership-cards": "membership_card", "group-cases": "group_case",
+                   "emotional-releases": "emotional_release", "energy-knots": "energy_knot",
+                   "oh-card-readings": "oh_card_reading", "other-projects": "other"}
+    balances = {}
+    by_project = {}
+    for kind, calculator in calculators.items():
+        totals = balances.setdefault(kind, {})
+        for original in sources.get(kind, []):
+            if original.get("is_deleted") or original.get("voided") or original.get("cancelled"):
+                continue
+            item = dict(original)
+            fill_effective_remaining(item, calculator)
+            remaining = item.get("remaining_count" if calculator == "other" else "effective_remaining")
+            by_project[(kind, item["id"])] = remaining
+            cid = item["customer_id"]
+            if cid not in totals:
+                totals[cid] = remaining
+            elif totals[cid] is None or remaining is None:
+                totals[cid] = None
+            else:
+                totals[cid] += remaining
+    for cid in balances["membership-cards"]:
+        balances["membership-cards"][cid] = membership_card_service.get_effective_remaining(cid)
+    for item in sources.get("internal-courses", []):
+        if not item.get("is_deleted") and not item.get("voided"):
+            cid = item["customer_id"]
+            if cid not in balances["membership-cards"]:
+                balances["membership-cards"][cid] = membership_card_service.get_effective_remaining(cid)
+    for item in deductions:
+        key = (item["project_type"], item["project_id"])
+        if key in by_project:
+            # 只改报表响应副本，保留持久化流水的历史快照。
+            item["current_remaining"] = by_project[key]
+    return balances
+
+
 def report_activities(course_data, arrived_by_date=None, coarse_customers=None):
     """五类课程统一成报表展示字段；来源保留，避免与销卡来源混用。"""
     types = (
@@ -121,7 +161,9 @@ def read_finance_sources(request: Request, date: date, mobile: bool = False):
         # 原手机端其他项目列表已包含派生余量，合并入口不能改变该字段含义。
         for item in sources["other-projects"]:
             fill_effective_remaining(item, "other")
+    deductions = [i for i in deductions if i["customer_id"] in relevant_ids]
+    remaining_by_customer = report_remaining(sources, deductions)
     return {
         "sources": sources, "sessions": session_sources,
-        "deductions": [i for i in deductions if i["customer_id"] in relevant_ids],
+        "deductions": deductions, "remaining_by_customer": remaining_by_customer,
     }

@@ -12,6 +12,7 @@ function reportFollowUpText(visit) {
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const { noteVisibility } = require('../../utils/note-permissions')
 
 function pad(n) { return n < 10 ? '0' + n : '' + n }
 
@@ -153,7 +154,7 @@ Page({
   _paymentData: null,
 
   onLoad() {
-    if (!getApp().checkLogin()) return
+    if (!getApp().checkLogin()) return; this.setData({ noteVisibility: noteVisibility() })
     if (!getApp().checkPagePermission('daily-report')) {
       this.setData({ hasPagePermission: false })
       return
@@ -333,7 +334,7 @@ Page({
         emotions: sources['emotional-releases'] || [], ohs: sources['oh-card-readings'] || [],
         energies: sources['energy-knots'] || [], courses: sources['internal-courses'] || [],
         others: sources['other-projects'] || [], teaFees: sources['tea-seat-fees'] || [],
-        offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [] }
+        offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [], remainingByCustomer: result.remaining_by_customer || {} }
       const assembled = this._assemble(this._report, date)
       for (const key of ['visits', 'activities']) {
         const opened = new Set(this.data[key].filter(row => row.open).map(row => row.id))
@@ -595,6 +596,7 @@ Page({
     // 1. 人工销卡：按 (customer_id, project_type, project_id) 分组，所有项目类型
     const manualDeductionMap = {}
     for (const d of payment.deductions || []) {
+      if (d.is_deleted || d.cancelled) continue
       if (d.deduction_date !== date) continue
       const key = `${d.customer_id}|${d.project_type}|${d.project_id}`
       const existing = manualDeductionMap[key]
@@ -608,7 +610,7 @@ Page({
           project_id: d.project_id,
           project_name: d.project_name,
           count: d.count || 1,
-          remaining_after: d.remaining_after != null ? d.remaining_after : null,
+          remaining_after: d.current_remaining === undefined ? (d.remaining_after ?? null) : d.current_remaining,
         }
       }
     }
@@ -712,7 +714,7 @@ Page({
         deduction_type: "活动销卡",
         has_card: hasCard,
         count: activityCount,
-        remaining_count: card ? card.remaining_count : null,
+        remaining_count: (payment.remainingByCustomer || {})['membership-cards']?.[cid] ?? null,
       })
     }
 
@@ -734,7 +736,8 @@ Page({
           deduction_type: projectLabelMap[projectType] || projectType,
           has_card: !!projData,
           count: activityCount,
-          remaining_count: remaining,
+          remaining_count: (payment.remainingByCustomer || {})[projectType]?.[cid] === undefined
+            ? remaining : payment.remainingByCustomer[projectType][cid],
         })
       }
     }
