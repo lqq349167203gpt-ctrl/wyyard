@@ -1,6 +1,6 @@
 <import src="../../templates/note-feedback-meta.wxml" />
 <!-- 弹层打开时锁住页面滚动，避免上下滑动带动背景 -->
-<page-meta page-style="{{condSheet || showSaveRule || detail || teacherDetail || columnSheetOpen || sortSheetOpen || dealSheet || panelSheet || recordSheet ? 'overflow:hidden;height:100vh;' : ''}}" />
+<page-meta page-style="{{condSheet || showSaveRule || detail || teacherDetail || columnSheetOpen || sortSheetOpen || dealSheet || panelSheet || recordSheet || historySheet ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="invite-tools-overlay" wx:if="{{inviteToolMenuOpen}}" catchtap="closeInviteToolMenu" catchtouchmove="noop"></view>
 <view class="page {{query.tab === 'conversion' ? 'conversion-compact' : ''}} {{query.tab === 'overview' ? 'overview-page' : ''}}" bindtap="closeInviteToolMenu">
   <!-- 顶部 tab：白条 + 蓝字下划线（和课表/付费项目一致），放在筛选项上面 -->
@@ -8,9 +8,15 @@
   <view class="card filter-card">
     <view class="filter-row range-filter-row">
       <text class="filter-label">范围</text>
-      <picker class="filter-control" range="{{organizations}}" range-key="name" value="{{orgIndex}}" bindchange="onOrg">
-        <view class="control scope-control"><text class="control-text">{{organizations[orgIndex].name}}</text><view class="course-picker-arrow"></view></view>
+      <picker class="scope-type-picker" range="{{scopeTypes}}" value="{{scopeTypeIndex}}" bindchange="onScopeType">
+        <view class="control scope-control"><text class="control-text">{{scopeTypes[scopeTypeIndex]}}</text><view class="course-picker-arrow"></view></view>
       </picker>
+      <picker class="filter-control" range="{{scopeTargets}}" range-key="name" value="{{scopeTargetIndex}}" bindchange="onScopeTarget">
+        <view class="control scope-control"><text class="control-text">{{scopeTargets[scopeTargetIndex].name}}</text><view class="course-picker-arrow"></view></view>
+      </picker>
+    </view>
+    <view wx:if="{{query.scope_type !== 'person'}}" class="archive-scope-control" bindtap="toggleArchivedOrganizations" role="checkbox" aria-checked="{{includeArchived}}">
+      <text class="archive-checkbox {{includeArchived ? 'checked' : ''}}">{{includeArchived ? '✓' : ''}}</text><text>包含已归档</text>
     </view>
     <view class="filter-row range-filter-row">
       <text class="filter-label">周期</text>
@@ -21,11 +27,11 @@
     <view class="filter-row range-filter-row">
       <text class="filter-label">自定义</text>
       <view class="date-range course-date-range">
-        <picker class="date-picker" mode="date" value="{{query.date_from}}" data-field="date_from" bindchange="onDate">
+        <picker class="date-picker" mode="date" start="{{minDate}}" value="{{query.date_from}}" data-field="date_from" bindchange="onDate">
           <view class="date-value course-date-value {{query.date_from ? '' : 'placeholder'}}"><text class="date-text">{{query.date_from || '开始日期'}}</text><view class="course-picker-arrow"></view></view>
         </picker>
         <text class="date-separator">至</text>
-        <picker class="date-picker" mode="date" value="{{query.date_to}}" data-field="date_to" bindchange="onDate">
+        <picker class="date-picker" mode="date" start="{{query.date_from || minDate}}" value="{{query.date_to}}" data-field="date_to" bindchange="onDate">
           <view class="date-value course-date-value {{query.date_to ? '' : 'placeholder'}}"><text class="date-text">{{query.date_to || '结束日期'}}</text><view class="course-picker-arrow"></view></view>
         </picker>
       </view>
@@ -150,7 +156,7 @@
   <view wx:if="{{error}}" class="error" bindtap="retryLoad">{{error}} · 点击重试</view>
   <view wx:if="{{metadata && !metadata.organizations.length}}" class="muted empty">暂无可查看组织，请检查账号归属人和组织成员配置。同名归属人需先消除歧义。</view>
 
-  <!-- 经营概况：四张卡点开看二级明细（与 PC 一致） -->
+  <!-- 经营概况：五张卡与 PC 使用相同口径 -->
   <block wx:if="{{query.tab === 'overview' && cards.length}}">
     <view class="cards">
       <view wx:for="{{cards}}" wx:key="key" class="card {{overviewGroup === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onOverviewCard">
@@ -171,9 +177,9 @@
         <view class="panel-grid">
           <view class="panel-cell" wx:for="{{panelSelects}}" wx:key="label" wx:for-item="sel" wx:for-index="si">
             <text class="panel-cell-label">{{sel.label}}</text>
-            <view class="control {{overviewGroup === 'traffic' || overviewGroup === 'courses' || overviewGroup === 'deals' || overviewGroup === 'invite' ? 'traffic-panel-control' : ''}}" data-index="{{si}}" bindtap="openPanelSelect">
+            <view class="control {{overviewGroup === 'traffic' || overviewGroup === 'courses' || overviewGroup === 'deals' || overviewGroup === 'invite' || overviewGroup === 'participation' ? 'traffic-panel-control' : ''}}" data-index="{{si}}" bindtap="openPanelSelect">
               <text class="control-text">{{sel.multi ? sel.displayValue : sel.options[sel.index].label}}</text>
-              <view class="chevron {{overviewGroup === 'traffic' || overviewGroup === 'courses' || overviewGroup === 'deals' || overviewGroup === 'invite' ? 'course-picker-arrow' : ''}}"></view>
+              <view class="chevron {{overviewGroup === 'traffic' || overviewGroup === 'courses' || overviewGroup === 'deals' || overviewGroup === 'invite' || overviewGroup === 'participation' ? 'course-picker-arrow' : ''}}"></view>
             </view>
           </view>
         </view>
@@ -215,7 +221,7 @@
       <view class="course-view-tab {{query.course_view === 'teacher_follow_up' ? 'active' : ''}}" wx:if="{{metadata.can_view_follow_up}}" data-view="teacher_follow_up" bindtap="onCourseView"><text>老师跟进</text><text class="invite-tab-count" wx:if="{{query.course_view === 'teacher_follow_up' && !loading}}">{{total}}</text></view>
     </view>
     <view class="course-toolbar-actions">
-      <text class="tool-btn" wx:if="{{query.course_view === 'teacher_follow_up'}}" bindtap="toggleExpandCells">{{expandCells ? '缩略' : '展开'}}</text>
+      <text class="tool-btn" wx:if="{{query.course_view === 'teacher_follow_up' || (query.course_view === 'participant' && metadata.can_view_follow_up)}}" bindtap="toggleExpandCells">{{expandCells ? '缩略' : '展开'}}</text>
       <text class="tool-btn" bindtap="openSortSheet">排序</text>
       <text class="tool-btn" bindtap="exportData">{{busy ? '导出中' : '导出'}}</text>
     </view>
@@ -251,7 +257,45 @@
       </view>
     </view>
   </view>
-  <view class="record-card {{query.tab === 'overview' && overviewGroup === 'courses' ? 'course-result-card' : ''}}" wx:if="{{(list.length || (query.tab === 'overview' && (overviewGroup === 'invite' || overviewGroup === 'courses'))) && !(query.tab === 'overview' && overviewGroup === 'courses' && renderCourseView === 'teacher_follow_up')}}">
+  <view class="participation-list" wx:if="{{query.tab === 'overview' && overviewGroup === 'participation'}}">
+    <view class="mobile-list-count">共 {{total}} 人 · 按参与次数从多到少</view>
+    <view class="participation-card" wx:for="{{list}}" wx:for-item="member" wx:key="id">
+      <view class="participation-person-head"><text class="participation-person-name">{{member.name}}</text><text class="participation-total">参与 {{member.count}} 次</text></view>
+      <text class="participation-type-summary">{{member.typeText}}</text>
+      <view class="participation-roles"><text wx:if="{{showParticipationOwners}}">案主 {{member.owner_count}} 次</text><text>参与者 {{member.participant_count}} 次</text></view>
+      <view class="participation-group" wx:for="{{member.visibleGroups}}" wx:for-item="group" wx:key="type">
+        <text class="participation-type-title">{{group.type}} · {{group.count}} 次</text>
+        <view class="participation-activity" wx:for="{{group.records}}" wx:for-item="activity" wx:key="id">
+          <text class="participation-date">{{activity.date}}</text>
+          <view class="participation-activity-main"><text class="participation-activity-name">{{activity.name}}</text><text class="participation-activity-meta">{{activity.role}} · {{activity.teachers || '老师未记录'}}</text></view>
+        </view>
+      </view>
+      <text class="mobile-expand" wx:if="{{member.hiddenCount}}" data-id="{{member.id}}" bindtap="toggleParticipation">{{member.open ? '收起' : '展开全部 ' + member.count + ' 次参与'}}</text>
+    </view>
+    <view wx:if="{{!list.length && !loading && !error}}" class="empty muted">暂无符合条件的活动参与记录</view>
+  </view>
+  <view class="participant-course-list" wx:if="{{query.tab === 'overview' && overviewGroup === 'courses' && participantCards && renderCourseView === 'participant'}}">
+    <view class="participant-course-card" wx:for="{{list}}" wx:for-item="course" wx:key="id">
+      <view class="participant-course-head"><text class="participant-course-name">{{course.name}}</text><text class="participant-course-date">{{course.date}} · {{course.count}} 人</text></view>
+      <text class="participant-course-meta">{{course.typeLabel}} · {{course.organization}} · {{course.teachers || '老师未记录'}} · {{course.hours || 0}} 课时</text>
+      <view class="participant-person" wx:for="{{course.visiblePeople}}" wx:for-item="person" wx:key="id">
+        <view class="participant-person-head"><text class="participant-person-name" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openParticipantProfile">{{person.customer}}</text><text class="participant-person-identity">{{person.member_type || '—'}}</text><text class="participant-person-role">{{person.participant_role}}</text></view>
+        <view class="participant-totals"><text>累计课程 <text class="participant-total-link" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openHistory">{{person.org_participation_count || 0}}</text></text><text>累计课时 {{person.org_participation_hours || 0}} 课时</text></view>
+        <view class="participant-feedback" wx:for="{{person.feedback}}" wx:for-item="field" wx:key="key" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openTeacherDetail">
+          <view class="participant-feedback-label"><text>{{field.label}}</text><text wx:if="{{field.count}}">{{field.count}}条</text></view>
+          <view class="participant-feedback-body">
+            <block wx:for="{{field.entries}}" wx:for-item="entry" wx:for-index="entryIndex" wx:key="id">
+              <view class="participant-note-entry" wx:if="{{expandCells || entryIndex === 0}}"><text class="participant-note-text {{expandCells ? 'expanded' : ''}}">{{entry.author}}：{{entry.content}}</text><text wx:if="{{entry.nextFollowUpText}}" class="participant-next-plan">下次跟进：{{entry.nextFollowUpText}}</text></view>
+            </block>
+            <text class="teacher-empty-dash" wx:if="{{!field.count}}">—</text>
+          </view>
+        </view>
+      </view>
+      <text class="mobile-expand" wx:if="{{course.hiddenCount}}" data-course="{{course.course_id}}" bindtap="toggleCoursePeople">{{course.open ? '收起' : '展开其余 ' + course.hiddenCount + ' 人'}}</text>
+    </view>
+    <view wx:if="{{!list.length && !loading && !error}}" class="empty muted">暂无符合条件的用户</view>
+  </view>
+  <view class="record-card {{query.tab === 'overview' && overviewGroup === 'courses' ? 'course-result-card' : ''}}" wx:if="{{overviewGroup !== 'participation' && (list.length || (query.tab === 'overview' && (overviewGroup === 'invite' || overviewGroup === 'courses'))) && !(query.tab === 'overview' && overviewGroup === 'courses' && (renderCourseView === 'teacher_follow_up' || participantCards))}}">
     <block wx:if="{{query.tab === 'overview' && overviewGroup === 'invite'}}">
       <view class="invite-toolbar" catchtap="noop">
         <view class="invite-toolbar-tabs">
@@ -266,9 +310,9 @@
           <picker wx:if="{{inviteView === 'arrive'}}" range="{{arrivalViewOptions}}" value="{{arrivalView === 'date' ? 1 : 0}}" bindchange="onArrivalView">
             <view class="invite-tools-menu-item invite-display-mode"><text>显示方式</text><text class="invite-display-value">{{arrivalView === 'date' ? '按日期显示每条邀约记录' : '单个客户仅显示一次'}}</text></view>
           </picker>
-          <view class="invite-tools-menu-item" data-action="columns" bindtap="onInviteToolAction">列表设置</view>
-          <view class="invite-tools-menu-item" data-action="expand" bindtap="onInviteToolAction">{{expandCells ? '缩略' : '展开'}}</view>
-          <view class="invite-tools-menu-item" wx:if="{{sortFields.length}}" data-action="sort" bindtap="onInviteToolAction">排序</view>
+          <view class="invite-tools-menu-item" wx:if="{{arrivalView !== 'date'}}" data-action="columns" bindtap="onInviteToolAction">列表设置</view>
+          <view class="invite-tools-menu-item" wx:if="{{arrivalView !== 'date'}}" data-action="expand" bindtap="onInviteToolAction">{{expandCells ? '缩略' : '展开'}}</view>
+          <view class="invite-tools-menu-item" wx:if="{{arrivalView !== 'date' && sortFields.length}}" data-action="sort" bindtap="onInviteToolAction">排序</view>
         </view>
       </view>
     </block>
@@ -282,12 +326,37 @@
         <text class="tool-btn" bindtap="exportData">{{busy ? '导出中' : '导出'}}</text>
       </view>
     </view>
+    <block wx:if="{{showArrivalDateCards}}">
+      <view class="arrival-day" wx:for="{{list}}" wx:key="id">
+        <view class="arrival-day-head">
+          <text class="arrival-day-date">{{item.date}}</text>
+          <text class="arrival-day-count">共 {{item.people}} 人</text>
+        </view>
+        <view class="arrival-visit" wx:for="{{item.visibleRecords}}" wx:for-item="visit" wx:key="id">
+          <view class="arrival-visit-top">
+            <text class="arrival-time">{{visit.arrive_time || '—'}}</text>
+            <text class="arrival-name" wx:if="{{visit.customer_id}}" data-id="{{visit.customer_id}}" catchtap="openCustomerProfile">{{visit.name}}</text>
+            <text class="arrival-name" wx:else>{{visit.name}}</text>
+            <text class="arrival-status {{visit.arrived ? 'arrived' : ''}}">{{visit.status_label}}</text>
+          </view>
+          <view class="arrival-line"><text class="arrival-label">邀约人</text><text class="arrival-value">{{visit.arrive_inviter || '—'}}</text></view>
+          <view class="arrival-line"><text class="arrival-label">来访需求</text><text class="arrival-value">{{visit.needs || '—'}}</text></view>
+          <view class="arrival-line"><text class="arrival-label">当日参加活动</text><text class="arrival-value">{{visit.same_day_activities || '—'}}</text></view>
+          <view class="arrival-line"><text class="arrival-label">当日成交</text><text class="arrival-value">{{visit.same_day_deal_text || '—'}}</text></view>
+        </view>
+        <view wx:if="{{item.hiddenCount}}" class="arrival-more" data-id="{{item.id}}" catchtap="toggleArrivalDay">{{item.open ? '收起' : '展开其余 ' + item.hiddenCount + ' 条'}}</view>
+      </view>
+    </block>
+    <block wx:else>
     <view wx:for="{{list}}" wx:key="id" class="record-row" data-index="{{index}}" bindtap="showDetails">
       <view class="record-main">
-        <view class="record-top">
-          <text class="record-title" wx:if="{{item.rowLinkId && query.tab === 'overview' && overviewGroup === 'courses' && (renderCourseView === 'participant' || renderCourseView === 'teacher_follow_up')}}" data-id="{{item.rowLinkId}}" data-course="{{item.course_id}}" catchtap="openParticipantProfile">{{item.rowTitle}}</text>
-          <text class="record-title" wx:elif="{{item.rowLinkId}}" data-id="{{item.rowLinkId}}" catchtap="openCustomerProfile">{{item.rowTitle}}</text>
-          <text class="record-title" wx:else>{{item.rowTitle}}</text>
+        <view class="record-top {{item.rowSubtitle ? 'has-subtitle' : ''}}">
+          <view class="record-title-wrap">
+            <text class="record-title" wx:if="{{item.rowLinkId && query.tab === 'overview' && overviewGroup === 'courses' && (renderCourseView === 'participant' || renderCourseView === 'teacher_follow_up')}}" data-id="{{item.rowLinkId}}" data-course="{{item.course_id}}" catchtap="openParticipantProfile">{{item.rowTitle}}</text>
+            <text class="record-title" wx:elif="{{item.rowLinkId}}" data-id="{{item.rowLinkId}}" catchtap="openCustomerProfile">{{item.rowTitle}}</text>
+            <text class="record-title" wx:else>{{item.rowTitle}}</text>
+            <text class="record-subtitle" wx:if="{{item.rowSubtitle}}">{{item.rowSubtitle}}</text>
+          </view>
           <text class="record-identity" wx:if="{{item.rowIdentity}}">{{item.rowIdentity}}</text>
         </view>
         <!-- 分类值做成小标签 -->
@@ -312,6 +381,7 @@
         <text class="record-right" wx:if="{{item.rowRight}}">{{item.rowRight}}</text>
       </view>
     </view>
+    </block>
     <view wx:if="{{query.tab === 'overview' && overviewGroup === 'invite' && !list.length && !loading && !error}}" class="empty muted">暂无符合条件的数据</view>
     <view wx:if="{{query.tab === 'overview' && overviewGroup === 'courses' && !list.length && loading}}" class="empty muted">加载中…</view>
     <view wx:if="{{query.tab === 'overview' && overviewGroup === 'courses' && !list.length && !loading && !error}}" class="empty muted">暂无符合条件的数据</view>
@@ -380,6 +450,22 @@
     </view>
   </scroll-view></view></view>
 
+  <view wx:if="{{historySheet}}" class="mask" bindtap="closeHistory"><view class="sheet course-history-sheet" catchtap="noop">
+    <view class="sheet-title">{{historySheet.name}}的参与课程<text class="history-close" bindtap="closeHistory">关闭</text></view>
+    <view class="course-history-meta">{{historySheet.organization}} · {{historySheet.all ? '2026-01-01 至今' : (historySheet.query.date_from + ' 至 ' + (historySheet.query.date_to || '今天'))}}</view>
+    <view class="course-history-tabs"><text class="{{!historySheet.all ? 'selected' : ''}}" data-all="false" bindtap="onHistoryRange">当前统计范围</text><text class="{{historySheet.all ? 'selected' : ''}}" data-all="true" bindtap="onHistoryRange">全部历史</text></view>
+    <scroll-view scroll-y class="course-history-scroll" bindscrolltolower="loadMoreHistory">
+      <view class="course-history-row" wx:for="{{historySheet.rows}}" wx:key="id">
+        <view class="course-history-line"><text class="course-history-name">{{item.name}}</text><text>{{item.date}}</text></view>
+        <text class="course-history-row-meta">{{item.course_subtype || item.type}} · {{item.teachers || '老师未记录'}} · {{item.participant_role}} · {{item.hours || 0}} 课时</text>
+      </view>
+      <view wx:if="{{historySheet.error}}" class="error" bindtap="retryHistory">{{historySheet.error}} · 点击重试</view>
+      <view wx:if="{{historyLoading}}" class="empty muted">加载中…</view>
+      <view wx:if="{{!historyLoading && !historySheet.error && !historySheet.rows.length}}" class="empty muted">暂无参与课程记录</view>
+      <view wx:if="{{historySheet.hasMore && !historyLoading && !historySheet.error}}" class="mobile-expand" bindtap="loadMoreHistory">加载更多课程</view>
+    </scroll-view>
+    <text class="course-history-count" wx:if="{{!historyLoading || historySheet.rows.length}}">共 {{historySheet.total}} 场课程</text>
+  </view></view>
   <!-- 列表设置：与「自定义筛选 → 选择显示内容」同一套底部弹层样式 -->
   <view class="sheet-mask" wx:if="{{columnSheetOpen}}" catchtouchmove="noop" bindtap="closeColumnSheet"></view>
   <view class="column-sheet" wx:if="{{columnSheetOpen}}">
@@ -438,10 +524,12 @@
   <!-- 邀约 / 取消 / 到店 / 参与活动记录 -->
   <!-- 面板筛选项弹层：选项名 + 数量 -->
   <view class="sheet-mask" wx:if="{{panelSheet}}" catchtouchmove="noop" bindtap="closePanelSheet"></view>
-  <view class="column-sheet {{overviewGroup === 'traffic' || overviewGroup === 'courses' || overviewGroup === 'deals' || overviewGroup === 'invite' ? 'traffic-filter-sheet' : ''}}" wx:if="{{panelSheet}}">
+  <view class="column-sheet {{overviewGroup === 'traffic' || overviewGroup === 'courses' || overviewGroup === 'deals' || overviewGroup === 'invite' || overviewGroup === 'participation' ? 'traffic-filter-sheet' : ''}}" wx:if="{{panelSheet}}">
     <view class="sheet-head"><text class="sheet-title">{{panelSheet.title}}</text><text class="sheet-done" bindtap="closePanelSheet">完成</text></view>
     <scroll-view class="sheet-list" scroll-y>
-      <view class="sheet-item" wx:for="{{panelSheet.options}}" wx:key="label" data-index="{{index}}" bindtap="onPanelOption">
+      <block wx:for="{{panelSheet.options}}" wx:key="rowKey">
+      <view class="sheet-group" wx:if="{{item.groupLabel}}">{{item.groupLabel}}</view>
+      <view class="sheet-item" data-index="{{index}}" bindtap="onPanelOption">
         <text class="sheet-item-name {{item.selected ? 'selected' : ''}}">{{item.label}}</text>
         <view class="sheet-item-copy">
           <text class="sheet-item-note">{{item.text}}</text>
@@ -449,6 +537,7 @@
         </view>
         <view class="sheet-check {{item.selected ? 'selected' : ''}}">{{item.selected ? '✓' : ''}}</view>
       </view>
+      </block>
     </scroll-view>
   </view>
 

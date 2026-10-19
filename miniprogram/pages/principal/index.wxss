@@ -282,6 +282,7 @@
 .column-list { height: 58vh; }
 .sort-list { height: 38vh; }
 .sheet-item { display: flex; align-items: center; min-height: 88rpx; margin: 0 30rpx; border-bottom: 1rpx solid #f0f0f0; }
+.sheet-group { margin: 0; padding: 8rpx 30rpx; background: #f7f8fa; font-size: 22rpx; line-height: 32rpx; color: #8f959e; }
 .sheet-item-name { flex: 1; min-width: 0; font-size: 25rpx; line-height: 1.3; color: #2b2f36; }
 .traffic-filter-sheet .sheet-item-name { font-size: 28rpx; }
 .sheet-item-name.selected { color: #3370ff; font-weight: 500; }
@@ -326,7 +327,10 @@
 .list-head + .record-row { padding-top: 4rpx; }
 .record-main { min-width: 0; }
 .record-top { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; }
-.record-title { flex: 1; min-width: 0; font-size: 29rpx; font-weight: 500; color: #2b2f36; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-top.has-subtitle { align-items: flex-start; }
+.record-title-wrap { flex: 1; min-width: 0; }
+.record-title { display: block; font-size: 29rpx; font-weight: 500; color: #2b2f36; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.record-subtitle { display: block; margin-top: 4rpx; overflow: hidden; color: #8f959e; font-size: 22rpx; font-weight: 400; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 /* 会员身份跟在昵称右边 */
 .record-identity { flex-shrink: 0; margin-left: 12rpx; padding: 2rpx 10rpx; border-radius: 6rpx; background: #eef3ff; color: #3370ff; font-size: 20rpx; line-height: 1.6; }
 /* 每行末尾的「资料 ›」：进客户资料页 */
@@ -572,6 +576,21 @@
   padding: 0 28rpx;
   border-bottom: 2rpx solid #f8f9fa;
 }
+.arrival-day { padding: 8rpx 0 20rpx; }
+.arrival-day + .arrival-day { border-top: 2rpx solid #f2f3f5; }
+.arrival-day-head { display: flex; align-items: center; justify-content: space-between; padding: 18rpx 0 8rpx; }
+.arrival-day-date { color: #1f2329; font-size: 28rpx; font-weight: 600; }
+.arrival-day-count { color: #8f959e; font-size: 22rpx; }
+.arrival-visit { padding: 16rpx 0; border-top: 1rpx solid #f5f6f7; }
+.arrival-visit-top { display: flex; align-items: flex-start; gap: 16rpx; }
+.arrival-time { flex: 0 0 88rpx; color: #8f959e; font-size: 24rpx; line-height: 1.5; }
+.arrival-name { flex: 1; min-width: 0; overflow: hidden; color: #2b2f36; font-size: 26rpx; font-weight: 500; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.arrival-status { flex-shrink: 0; color: #8f959e; font-size: 22rpx; line-height: 1.5; }
+.arrival-status.arrived { color: #2f8f57; }
+.arrival-line { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 8rpx; }
+.arrival-label { flex: 0 0 168rpx; color: #8f959e; font-size: 22rpx; line-height: 1.5; }
+.arrival-value { flex: 1; min-width: 0; color: #4e535a; font-size: 24rpx; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.arrival-more { padding: 8rpx 0 4rpx; color: #8f959e; font-size: 24rpx; }
 .overview-page .invite-toolbar-tabs {
   display: flex;
   flex: none;
@@ -851,3 +870,57 @@
 .overview-page .teacher-person { padding: 20rpx 22rpx; }
 .overview-page .teacher-person-head + .teacher-feedback { padding-top: 20rpx; }
 .overview-page .teacher-feedback + .teacher-feedback { padding-top: 12rpx; }
+
+/* 经营数据两端同步：组织/个人范围、活动参与和按课程归组的用户名单。 */
+.scope-type-picker { width: 180rpx; flex-shrink: 0; }
+.scope-type-picker .scope-control { justify-content: flex-start; }
+.mobile-list-count { padding: 12rpx 4rpx; color: #8f959e; font-size: 22rpx; }
+.participation-card, .participant-course-card { margin-bottom: 16rpx; overflow: hidden; border: 1rpx solid #e9ebed; border-radius: 10rpx; background: #fff; }
+.participation-person-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; padding: 22rpx 22rpx 8rpx; }
+.participation-person-name, .participant-person-name { min-width: 0; font-size: 26rpx; font-weight: 500; color: #2b2f36; }
+.participation-total { flex-shrink: 0; font-size: 24rpx; color: #4e535a; }
+.participation-type-summary { display: block; padding: 0 22rpx; font-size: 22rpx; color: #8f959e; line-height: 1.7; }
+.participation-roles { display: flex; flex-wrap: wrap; gap: 20rpx; padding: 10rpx 22rpx 16rpx; font-size: 22rpx; color: #646a73; }
+.participation-type-title { display: block; padding: 10rpx 22rpx; border-top: 1rpx solid #f0f0f0; background: #f9fafb; font-size: 22rpx; color: #8f959e; }
+.participation-activity { display: flex; align-items: flex-start; gap: 16rpx; margin: 0 22rpx; padding: 16rpx 0; border-bottom: 1rpx solid #f3f4f5; }
+.participation-date { flex-shrink: 0; width: 146rpx; color: #8f959e; font-size: 22rpx; line-height: 36rpx; }
+.participation-activity-main { min-width: 0; flex: 1; }
+.participation-activity-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2b2f36; font-size: 24rpx; line-height: 36rpx; }
+.participation-activity-meta { display: block; color: #8f959e; font-size: 22rpx; line-height: 34rpx; }
+.mobile-expand { display: block; padding: 16rpx 22rpx; font-size: 22rpx; color: #8f959e; text-align: center; }
+.participant-course-head { display: flex; align-items: baseline; gap: 16rpx; padding: 20rpx 22rpx 8rpx; background: #f9fafb; }
+.participant-course-name { flex: 1; min-width: 0; font-size: 26rpx; font-weight: 500; color: #2b2f36; }
+.participant-course-date { flex-shrink: 0; font-size: 21rpx; color: #8f959e; }
+.participant-course-meta { display: block; padding: 0 22rpx 18rpx; border-bottom: 1rpx solid #eef0f2; background: #f9fafb; font-size: 22rpx; line-height: 1.7; color: #8f959e; }
+.participant-person { padding: 20rpx 22rpx; border-bottom: 1rpx solid #f0f0f0; }
+.participant-person-head { display: flex; align-items: baseline; gap: 18rpx; }
+.participant-person-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.participant-person-identity, .participant-person-role { flex-shrink: 0; font-size: 22rpx; color: #646a73; }
+.participant-totals { display: flex; flex-wrap: wrap; gap: 24rpx; margin: 10rpx 0 16rpx; font-size: 22rpx; color: #8f959e; }
+.participant-total-link { padding: 0 8rpx; color: #4e535a; text-decoration: underline; text-underline-offset: 4rpx; }
+.participant-feedback { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 10rpx; }
+.participant-feedback-label { display: flex; flex-direction: column; flex-shrink: 0; width: 100rpx; padding-top: 6rpx; font-size: 22rpx; color: #8f959e; line-height: 34rpx; }
+.participant-feedback-label text + text { font-size: 20rpx; color: #a4abb4; }
+.participant-feedback-body { flex: 1; min-width: 0; padding: 5rpx 12rpx; border: 1rpx solid #e8eaed; border-radius: 6rpx; font-size: 24rpx; color: #2b2f36; line-height: 36rpx; }
+.participant-note-entry + .participant-note-entry { margin-top: 10rpx; }
+.participant-note-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.participant-note-text.expanded { white-space: pre-wrap; overflow-wrap: anywhere; }
+.participant-next-plan { display: block; font-size: 22rpx; line-height: 34rpx; color: #8f959e; }
+.course-history-sheet .sheet-title { font-size: 28rpx; }
+.history-close { float: right; margin-left: 20rpx; color: #646a73; font-size: 24rpx; font-weight: 400; }
+.course-history-meta { padding: 0 24rpx 16rpx; font-size: 22rpx; color: #8f959e; }
+.course-history-tabs { display: flex; margin: 0 24rpx 16rpx; width: max-content; border: 1rpx solid #e1e4e7; border-radius: 6rpx; font-size: 22rpx; color: #8f959e; overflow: hidden; }
+.course-history-tabs text { padding: 10rpx 18rpx; }
+.course-history-tabs text + text { border-left: 1rpx solid #e1e4e7; }
+.course-history-tabs .selected { background: #f0f2f5; color: #2b2f36; }
+.course-history-scroll { max-height: 60vh; min-height: 240rpx; }
+.course-history-row { padding: 18rpx 24rpx; border-top: 1rpx solid #f0f0f0; }
+.course-history-line { display: flex; align-items: baseline; justify-content: space-between; gap: 18rpx; color: #8f959e; font-size: 22rpx; }
+.course-history-name { flex: 1; min-width: 0; color: #2b2f36; font-size: 24rpx; }
+.course-history-row-meta { display: block; margin-top: 8rpx; font-size: 22rpx; color: #8f959e; line-height: 1.7; }
+.course-history-count { display: block; padding: 16rpx 24rpx; border-top: 1rpx solid #f0f0f0; font-size: 22rpx; color: #8f959e; }
+
+/* 归档只控制范围候选项，全部历史统计保留原口径。 */
+.archive-scope-control { display:flex; align-items:center; justify-content:flex-end; gap:10rpx; padding:0 0 12rpx; color:#8f959e; font-size:22rpx; }
+.archive-checkbox { display:inline-flex; justify-content:center; align-items:center; width:24rpx; height:24rpx; border:1rpx solid #c8cdd3; border-radius:4rpx; font-size:20rpx; }
+.archive-checkbox.checked { background:#646a73; border-color:#646a73; color:#fff; }

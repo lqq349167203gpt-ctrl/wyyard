@@ -1246,9 +1246,17 @@ def _calc_offline_expiry(effective_date: str, validity_value: int) -> str:
 
 
 def _build_offline_course_records(customer_id: str) -> list:
-    """构建线下落地课程记录列表（上课记录）"""
+    """技能训练课程记在上课老师名下，不记在上课人详情里。"""
+    customer = customer_service.get_customer(customer_id)
+    teacher_names = {
+        name.strip()
+        for name in ((getattr(customer, "nickname", "") or ""), (getattr(customer, "name", "") or ""))
+        if name and name.strip()
+    }
     records = []
-    for r in offline_course_record_service.list_records(customer_id):
+    for r in offline_course_record_service.list_records():
+        if (r.teacher or "").strip() not in teacher_names:
+            continue
         records.append({
             "id": r.id,
             "record_date": r.record_date,

@@ -82,6 +82,8 @@ class ConversionRule(StrictBaseModel):
 
 
 class PrincipalQuery(StrictBaseModel):
+    scope_type: Literal["organization", "person"] = "organization"
+    referrer_id: str = Field(default="", max_length=64)
     organization_id: str = ""
     date_from: date | None = None
     date_to: date | None = None
@@ -94,6 +96,10 @@ class PrincipalQuery(StrictBaseModel):
     course_subtype: str = ""
     course_view: Literal["course", "participant", "teacher_follow_up"] = "course"
     participant_scope: Literal["", "internal", "external"] = ""
+    # 参与者列表：rows＝一人一行；courses＝一堂课一张卡片；旧端不传仍按行展示。
+    participant_layout: Literal["rows", "courses"] = "rows"
+    # 累计课程明细固定到被点击课程的组织；个人范围仍须校验引流客户归属。
+    participant_history_organization_id: str = Field(default="", max_length=64)
     # 邀约二级列表：arrive＝邀约到店口径；initiated＝发起口径（列内容后续再定）
     invite_view: Literal["arrive", "initiated"] = "arrive"
     order_filter: Literal["", "first", "repeat", "cross", "experience", "conversion", "upsell", "repurchase"] = ""
@@ -109,10 +115,11 @@ class PrincipalQuery(StrictBaseModel):
     export_view: Literal["", "traffic", "invite_initiated", "invite_arrivals"] = ""
     export_customer_ids: list[str] | None = Field(default=None, max_length=50000)
     export_columns: list[str] | None = Field(default=None, max_length=32)
-    arrival_view: Literal["customer", "date"] = "customer"
+    # customer＝一人一行；date＝每次到店一行；date_group＝按到店日期成组，供卡片分页
+    arrival_view: Literal["customer", "date", "date_group"] = "customer"
     # PC 按需明细：旧端不传时保留完整响应；汇总与明细共用同一分析结果。
     compact_overview: bool = False
-    overview_detail: Literal["", "traffic", "invite_arrivals", "invite_initiated"] = ""
+    overview_detail: Literal["", "traffic", "invite_arrivals", "invite_initiated", "participation"] = ""
     overview_detail_key: str = Field(default="", max_length=80)
     detail_picks: list[str] = Field(default_factory=list, max_length=16)
     detail_quick_filter: str = Field(default="", max_length=80)
@@ -129,12 +136,18 @@ class PrincipalQuery(StrictBaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=1000)
     # 管理端小程序按当前经营板块分批取列表；未传裁剪参数的旧客户端保留完整响应。
-    mobile_group: Literal["", "traffic", "invite_arrive", "invite_initiated", "courses", "deals"] = ""
+    mobile_group: Literal["", "traffic", "invite_arrive", "invite_initiated", "participation", "courses", "deals"] = ""
     mobile_quick_filter: str = Field(default="", max_length=80)
     mobile_detail_key: str = Field(default="", max_length=120)
 
     @model_validator(mode="after")
     def validate_range(self):
+        if self.participant_history_organization_id and (self.tab != "courses" or self.course_view != "participant" or not self.customer_id or self.participant_layout != "rows"):
+            raise ValueError("累计课程明细需要指定用户，并使用课程参与者明细视图")
+        if self.scope_type == "person" and (self.organization_id or self.tab == "conversion"):
+            raise ValueError("个人范围不能同时选择组织或用于转化分析")
+        if self.referrer_id and self.scope_type != "person":
+            raise ValueError("请在个人范围下选择引流人")
         if self.date_from and self.date_to and self.date_from > self.date_to:
             raise ValueError("开始日期不能晚于结束日期")
         if self.overview_detail and (self.tab != "overview" or self.mobile_group):

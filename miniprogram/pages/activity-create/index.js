@@ -117,7 +117,8 @@ Page({
       ;(organizations || []).forEach(organization => {
         organizationNames[organization.id] = organization.name
       })
-      const sourceCourses = types.filter(t => t.category !== 'other').map(t => ({
+      const archivedIds = new Set((organizations || []).filter(org => org.status === 'archived').map(org => org.id))
+      const sourceCourses = types.filter(t => t.category !== 'other' && !archivedIds.has(t.organization_id)).map(t => ({
         id: t.name,
         name: t.name,
         organizationId: t.organization_id || '',

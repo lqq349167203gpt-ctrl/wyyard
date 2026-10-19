@@ -38,6 +38,7 @@ def query_result(request, query):
     permissions = position_edit_permission_service.get_permissions(roles)
     criteria = query.model_dump(mode="json", exclude={
         "page", "page_size", "log_analysis", "compact_overview", "overview_detail", "overview_detail_key",
+        "participant_layout",
         "detail_picks", "detail_quick_filter", "detail_sort_by", "detail_sort_order", "arrival_view",
     })
     day = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
@@ -56,7 +57,10 @@ def query_result(request, query):
             pending.wait()
             continue
         try:
-            result = principal_service.analyze(request, query, export=True)
+            result = principal_service.analyze(request, query, export=True, defer_participant_feedback=True)
+            # 课程卡片只在本次分析时整理一次，后续翻页直接切片。
+            if query.course_view == "participant" and not query.participant_history_organization_id:
+                result = {**result, "_participant_cards": principal_service.participant_course_cards(result["items"])}
             # 计算期间如有写入，不复用可能跨版本的结果。
             if version == data_revision() and len(result["items"]) <= _MAX_ROWS:
                 isolated = deepcopy(result)
@@ -71,10 +75,17 @@ def query_result(request, query):
                 _inflight.pop(key, None)
                 pending.set()
         break
-    pages = max(1, ceil(result["total"] / query.page_size))
+    items = result["items"]
+    total = result["total"]
+    # 新视图按课程成卡，分页单位是课；导出和未传布局参数的旧端仍按人展示。
+    if not query.overview_detail and query.course_view == "participant" and query.participant_layout == "courses":
+        items = result.get("_participant_cards", [])
+        total = len(items)
+    pages = max(1, ceil(total / query.page_size))
     page = min(query.page, pages)
     # 先切当前页再隔离返回值，不为20条明细复制整段历史反馈正文。
-    response = {**result, "items": result["items"][(page - 1) * query.page_size:page * query.page_size]}
+    response = {**{key: value for key, value in result.items() if key != "_participant_cards"},
+                "items": items[(page - 1) * query.page_size:page * query.page_size], "total": total}
     if query.overview_detail:
         # 明细独立响应，不连带返回其他板块的列表和卡片。
         return customer_access_service.protect_note_payload(
@@ -85,5 +96,7 @@ def query_result(request, query):
         response["breakdown"] = principal_mobile_service.compact_breakdown(breakdown)
         response["overview_metrics"] = principal_mobile_service.overview_metrics(breakdown, query.detail_picks)
     result = deepcopy(response)
+    if query.tab in {"courses", "overview"} and query.course_view == "participant" and not query.participant_history_organization_id and customer_access_service.can_view_any_note(permissions=permissions["customer_access"]):
+        result["items"] = principal_service.participant_feedback(result["items"], course_cards=query.participant_layout == "courses")
     result.update(page=page, page_size=query.page_size, total_pages=pages)
     return customer_access_service.protect_note_payload(result, permissions=permissions.get("customer_access", {}))

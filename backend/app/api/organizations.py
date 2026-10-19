@@ -1,14 +1,17 @@
-from fastapi import APIRouter, HTTPException
+from typing import Literal
 
-from app.models.organization import OrganizationCreate, OrganizationDataViewersUpdate
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.middleware.jwt_auth import require_page_permission
+from app.models.organization import OrganizationArchive, OrganizationCreate, OrganizationDataViewersUpdate
 from app.services import customer_service, organization_data_viewer_service, organization_service
 
 router = APIRouter(prefix="/api/organizations", tags=["organizations"])
 
 
 @router.get("")
-async def list_organizations():
-    organizations = organization_service.list_organizations()
+async def list_organizations(status: Literal["all", "active", "archived"] = "all"):
+    organizations = organization_service.list_organizations(status)
     # 组织成员/引流人的名字由服务端解析：配置页面不应受「客户资料可见范围」影响，
     # 否则范围窄的账号会把成员全部显示成「已删除」。
     customers = {customer.id: customer for customer in customer_service.list_customers()}
@@ -76,3 +79,32 @@ async def delete_organization(org_id: str):
     if not deleted:
         raise HTTPException(status_code=404, detail="组织不存在")
     return {"message": "已删除"}
+
+
+def _change_status(request: Request, org_id: str, data: OrganizationArchive | None = None):
+    org = organization_service.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="组织不存在")
+    before = org.model_dump(mode="json")
+    try:
+        result = (organization_service.archive_organization(org_id, data) if data is not None
+                  else organization_service.restore_organization(org_id))
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    request.state.operation_log_context = {
+        "content": f"{'归档' if data is not None else '恢复运营'}组织：{org.name}",
+        "entity_id": org_id,
+        "before_data": before,
+        "after_data": result.model_dump(mode="json"),
+    }
+    return result
+
+
+@router.post("/{org_id}/archive", dependencies=[Depends(require_page_permission("organizations"))])
+async def archive_organization(org_id: str, data: OrganizationArchive, request: Request):
+    return _change_status(request, org_id, data)
+
+
+@router.post("/{org_id}/restore", dependencies=[Depends(require_page_permission("organizations"))])
+async def restore_organization(org_id: str, request: Request):
+    return _change_status(request, org_id)

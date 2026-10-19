@@ -309,6 +309,7 @@ FIELD_NAMES = {
     "room_ids": "房间顺序",
     "position_sort_orders": "排序顺序",
     "effective_date": "生效日期", "organization_id": "组织", "rooms": "房间", "teachers": "老师", "themes": "主题",
+    "stopped_on": "停运日期", "archive_reason": "归档原因", "archived_at": "归档时间",
     "enabled": "启用状态", "is_system": "系统角色",
     "daily_card_usage": "日卡使用",
     "healing_notes": "跟进点", "activity_count": "活动次数", "welfare_count": "公益次数",

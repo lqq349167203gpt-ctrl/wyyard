@@ -615,7 +615,8 @@ export function ActivityBatchTable({
 
   // 动态构建类型选项
   const typeOptions = useMemo(() => {
-    const salonTypes = courseTypes.filter(type => type.category !== "other")
+    const archivedIds = new Set(organizations.filter(org => org.status === "archived").map(org => org.id))
+    const salonTypes = courseTypes.filter(type => type.category !== "other" && !archivedIds.has(type.organization_id || ""))
     const organizationNames = new Map(organizations.map(organization => [organization.id, organization.name]))
     const organizationOrder = [...organizations.map(organization => organization.id), ""]
     const classChildren = organizationOrder.flatMap(organizationId => {
@@ -1758,6 +1759,8 @@ export function ActivityBatchTable({
                         size="sm"
                         value={getTypeSelectValue(row.record_type, row.name, row.class_course_type, row.ics_course_key)}
                         options={typeOptions}
+                        placeholder={typeLabel}
+                        textColor="text-[#2b2f36]"
                         onChange={(v) => handleTypeChange(row.key, v)}
                         disabled={isLocked || rowStatus[row.key] === "saving"}
                         buttonClassName="!border-[0.5px] !h-7 !text-[12px]"
@@ -1920,7 +1923,7 @@ export function ActivityBatchTable({
                         value={row.activity_mode || "线下"}
                         options={ACTIVITY_MODE_OPTIONS}
                         onChange={(v) => updateRow(row.key, "activity_mode", v)}
-                        className="[&_button]:border-[0.5px] [&_button]:h-7 [&_button]:text-[12px]"
+                        buttonClassName="border-[0.5px] border-[#e8eaed] h-7 text-[12px]"
                         hideChevron
                       />
                     )}

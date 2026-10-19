@@ -1,5 +1,5 @@
 const {
-  classRecordApi, courseTypeApi, spaceApi, customerApi, visitApi,
+  classRecordApi, courseTypeApi, spaceApi, organizationApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
   energyKnotSessionApi, internalCourseSessionApi,
   isOperationCancelled,
@@ -219,8 +219,9 @@ Page({
   },
 
   async loadCourses(courseType) {
-    return readSource(this, 'courses', () => courseTypeApi.list(), types => {
-      const courses = types.filter(t => t.category !== 'other').map(t => ({ id: t.name, name: t.name }))
+    return readSource(this, 'courses', () => Promise.all([courseTypeApi.list(), organizationApi.list().catch(() => [])]), ([types, organizations]) => {
+      const archivedIds = new Set((organizations || []).filter(org => org.status === 'archived').map(org => org.id))
+      const courses = types.filter(t => t.category !== 'other' && (!archivedIds.has(t.organization_id) || t.name === courseType)).map(t => ({ id: t.name, name: t.name }))
       const courseIndex = courseType
         ? Math.max(-1, courses.findIndex(c => c.name === courseType))
         : -1

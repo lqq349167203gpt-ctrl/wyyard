@@ -3,7 +3,7 @@ import { Copy, Download, GripVertical, Plus, Save, Trash2, X } from "lucide-reac
 
 import { AnalysisDatePicker } from "@/components/analysis-date-picker"
 import { AnalysisPeriodFilter } from "@/components/analysis-period-filter"
-import { monthRange, selectedMonthRange, selectedPeriodValue, todayRange, weekRange } from "@/lib/date-ranges"
+import { ANALYSIS_START_DATE, buildPeriodOptions, monthRange, selectedMonthRange, selectedPeriodValue, todayRange, weekRange } from "@/lib/date-ranges"
 import { PaginationBar } from "@/components/pagination-bar"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Button } from "@/components/ui/button"
@@ -307,20 +307,7 @@ export default function CustomAnalysisPage() {
   const columnOptions = useMemo(() => (metadata?.column_fields ?? metadata?.fields ?? [])
     .filter(field => !field.legacy_only)
     .map(field => ({ value: field.value, label: field.label })), [metadata])
-  const periodOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear()
-    return Array.from({ length: 10 }, (_, index) => currentYear + 1 - index).flatMap(year => [
-      { value: `year-${year}`, label: `${year}年全年` },
-      {
-        value: `months-${year}`,
-        label: `${year}年按月`,
-        children: Array.from({ length: 12 }, (_, monthIndex) => {
-        const month = String(monthIndex + 1).padStart(2, "0")
-          return { value: `month-${year}-${month}`, label: `${year}年${monthIndex + 1}月` }
-        }),
-      },
-    ])
-  }, [])
+  const periodOptions = useMemo(() => buildPeriodOptions(), [])
   const selectedTemplate = templates.find(template => template.id === selectedTemplateId)
   const canManageSelectedTemplate = !!selectedTemplate && (selectedTemplate.created_by_id === currentUser.id || currentUser.role === "超级管理员")
 
@@ -769,9 +756,9 @@ export default function CustomAnalysisPage() {
                     <div className="flex flex-wrap items-center gap-1.5 rounded-[4px] bg-[#f7f8fa] p-2">
                       <span className="mr-1 text-[11px] font-medium text-[#4e535a]">统计周期</span>
                       <SelectDropdown value={selectedPeriodValue(group.date_from, group.date_to)} options={periodOptions} onChange={value => setComparisonPeriod(groupIndex, value)} placeholder="年份或月份" size="sm" className="w-[144px]" buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[11px] !shadow-none" dropdownWidth={176} menuMaxHeight={320} />
-                      <AnalysisDatePicker value={group.date_from} onChange={value => updateComparisonGroup(groupIndex, { date_from: value })} ariaLabel={`${group.name}统计开始日期`} />
+                      <AnalysisDatePicker minDate={ANALYSIS_START_DATE} value={group.date_from} onChange={value => updateComparisonGroup(groupIndex, { date_from: value })} ariaLabel={`${group.name}统计开始日期`} />
                       <span className="text-[11px] text-[#8f959e]">至</span>
-                      <AnalysisDatePicker value={group.date_to} onChange={value => updateComparisonGroup(groupIndex, { date_to: value })} ariaLabel={`${group.name}统计结束日期`} />
+                      <AnalysisDatePicker minDate={ANALYSIS_START_DATE} value={group.date_to} onChange={value => updateComparisonGroup(groupIndex, { date_to: value })} ariaLabel={`${group.name}统计结束日期`} />
                       <div className="flex items-center gap-1">
                         <button type="button" onClick={() => setComparisonPreset(groupIndex, "month")} className="h-6 rounded-[3px] border border-[#e1e4e7] bg-white px-1.5 text-[10px] text-[#646a73]">本月</button>
                         <button type="button" onClick={() => setComparisonPreset(groupIndex, "year")} className="h-6 rounded-[3px] border border-[#e1e4e7] bg-white px-1.5 text-[10px] text-[#646a73]">本年</button>

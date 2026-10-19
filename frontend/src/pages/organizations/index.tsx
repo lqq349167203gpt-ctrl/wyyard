@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from "react"
+import { Link } from "react-router-dom"
 import { Plus, Trash2, Edit, ArrowUp, ArrowDown, CircleAlert, ImagePlus, X } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -24,6 +25,12 @@ const MAX_PUBLIC_IMAGE_SIZE = 2 * 1024 * 1024
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [organizationStatus, setOrganizationStatus] = useState("active")
+  const [statusOrganization, setStatusOrganization] = useState<Organization | null>(null)
+  const [stoppedOn, setStoppedOn] = useState("")
+  const [archiveReason, setArchiveReason] = useState("")
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [statusError, setStatusError] = useState("")
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState("")
   const loadSequence = useRef(0)
@@ -110,21 +117,45 @@ export default function OrganizationsPage() {
   const FIXED_ORG_ALIASES = new Set(["无忧茶苑", "无忧茶院"])
   const isFixedOrganization = (name: string) => FIXED_ORG_ALIASES.has(name.trim())
 
-  const sortedOrganizations = [...organizations].sort((a, b) => {
+  const activeOrganizations = organizations.filter(org => org.status !== "archived")
+  const visibleOrganizations = organizations.filter(org => organizationStatus === "all" || (org.status || "active") === organizationStatus)
+  const sortedOrganizations = [...visibleOrganizations].sort((a, b) => {
     // 无忧茶院始终置顶
     if (isFixedOrganization(a.name)) return -1
     if (isFixedOrganization(b.name)) return 1
     return (a.sort_order ?? 9999) - (b.sort_order ?? 9999)
   })
+  const sortedActiveOrganizations = sortedOrganizations.filter(org => org.status !== "archived")
   const firstMovableOrgIndex = sortedOrganizations[0] && isFixedOrganization(sortedOrganizations[0].name) ? 1 : 0
 
+  const openStatusDialog = (org: Organization) => {
+    setStatusOrganization(org)
+    setStoppedOn(new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" }))
+    setArchiveReason("")
+    setStatusError("")
+  }
+  const saveOrganizationStatus = async () => {
+    if (!statusOrganization || statusSaving) return
+    setStatusSaving(true)
+    setStatusError("")
+    try {
+      if (statusOrganization.status === "archived") await organizationApi.restore(statusOrganization.id)
+      else await organizationApi.archive(statusOrganization.id, { stopped_on: stoppedOn, reason: archiveReason })
+      setStatusOrganization(null)
+      await loadData()
+    } catch (error) {
+      setStatusError(error instanceof Error ? error.message : "操作失败，请重试")
+    } finally { setStatusSaving(false) }
+  }
+
   const handleMoveOrg = async (org: Organization, direction: "up" | "down") => {
-    const idx = sortedOrganizations.findIndex(o => o.id === org.id)
+    const movableOrganizations = sortedActiveOrganizations
+    const idx = movableOrganizations.findIndex(o => o.id === org.id)
     if (idx < 0) return
     const targetIdx = direction === "up" ? idx - 1 : idx + 1
-    if (targetIdx < 0 || targetIdx >= sortedOrganizations.length) return
+    if (targetIdx < 0 || targetIdx >= movableOrganizations.length) return
 
-    const reordered = [...sortedOrganizations]
+    const reordered = [...movableOrganizations]
     const tmp = reordered[idx]
     reordered[idx] = reordered[targetIdx]
     reordered[targetIdx] = tmp
@@ -367,29 +398,31 @@ export default function OrganizationsPage() {
   // 内置的其他活动与普通活动合并展示，但保留不可改名、不可删除的约束。
   const salonCourseTypes = courseTypes.filter(t => t.category !== "other")
   const otherCourseTypes = courseTypes.filter(t => t.category === "other")
-  const activityTypes = [...salonCourseTypes, ...otherCourseTypes]
-  const knownOrganizationIds = new Set(sortedOrganizations.map(org => org.id))
+  const knownOrganizationIds = new Set(organizations.map(org => org.id))
   const unassignedCourseTypes = salonCourseTypes.filter(
     type => !type.organization_id || !knownOrganizationIds.has(type.organization_id)
   )
-  const hasFixedOrganization = sortedOrganizations.some(org => isFixedOrganization(org.name))
+  const hasFixedOrganization = organizations.some(org => isFixedOrganization(org.name))
   const activityGroups = [
     ...sortedOrganizations.map(org => ({
       key: org.id,
       name: isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name,
       organizationId: org.id,
+      archived: org.status === "archived",
       types: [
         ...salonCourseTypes.filter(type => type.organization_id === org.id),
         ...(isFixedOrganization(org.name) ? otherCourseTypes : []),
       ],
     })),
-    ...(unassignedCourseTypes.length > 0 ? [{
+    ...(organizationStatus !== "archived" && unassignedCourseTypes.length > 0 ? [{
+      archived: false,
       key: "unassigned",
       name: "未归属",
       organizationId: "",
       types: unassignedCourseTypes,
     }] : []),
-    ...(!hasFixedOrganization && otherCourseTypes.length > 0 ? [{
+    ...(organizationStatus !== "archived" && !hasFixedOrganization && otherCourseTypes.length > 0 ? [{
+      archived: false,
       key: "fixed-system",
       name: FIXED_ORG_NAME,
       organizationId: "",
@@ -400,7 +433,7 @@ export default function OrganizationsPage() {
   const handleOpenActCreate = (organizationId = "") => {
     setActEditingType(null)
     setActFormName("")
-    setActFormOrganizationId(organizationId || sortedOrganizations[0]?.id || "")
+    setActFormOrganizationId(organizationId || activeOrganizations[0]?.id || "")
     setActFormError("")
     setActFormListImage("")
     setActFormDetailImages([])
@@ -606,7 +639,7 @@ export default function OrganizationsPage() {
             size="sm"
             className="h-8 text-[12px]"
             onClick={() => handleOpenActCreate()}
-            disabled={organizations.length === 0}
+            disabled={activeOrganizations.length === 0}
           >
             <Plus className="mr-1 h-3.5 w-3.5" />
             新增活动
@@ -639,11 +672,20 @@ export default function OrganizationsPage() {
         </div>
         <span className="pb-2 text-[12px] text-[#8f959e]">
           {activeTab === "members"
-            ? `${organizations.length} 个组织，${organizations.reduce((sum, org) => sum + getValidMembers(org).length, 0)} 位成员`
-            : `${activityTypes.length} 个活动类型`}
+            ? `${visibleOrganizations.length} 个组织，${visibleOrganizations.reduce((sum, org) => sum + getValidMembers(org).length, 0)} 位成员`
+            : `${activityGroups.reduce((sum, group) => sum + group.types.length, 0)} 个活动类型`}
         </span>
       </div>
 
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-[4px] border border-[#e8eaed] bg-white p-0.5" aria-label="组织状态">
+          {[{ value: "active", label: "运营中" }, { value: "archived", label: "已归档" }, { value: "all", label: "全部" }].map(item => (
+            <button key={item.value} onClick={() => setOrganizationStatus(item.value)} aria-pressed={organizationStatus === item.value}
+              className={`rounded-[3px] px-3 py-1 text-[12px] ${organizationStatus === item.value ? "bg-[#f0f1f2] font-medium text-[#2b2f36]" : "text-[#8f959e] hover:bg-[#f7f8fa]"}`}>{item.label}</button>
+          ))}
+        </div>
+        <span className="text-[12px] text-[#8f959e]">归档保留历史数据，支持恢复运营</span>
+      </div>
       <div className="overflow-hidden rounded-[6px] border border-[#e8eaed] bg-white">
         {activeTab === "members" ? (
           <>
@@ -674,7 +716,7 @@ export default function OrganizationsPage() {
             {loading ? (
             <div className="py-14 text-center text-[12px] text-[#8f959e]">加载中...</div>
             ) : sortedOrganizations.length === 0 ? (
-            <div className="py-14 text-center text-[12px] text-[#8f959e]">{loadError ? "组织数据尚未加载成功" : "暂无组织，请先新增组织"}</div>
+            <div className="py-14 text-center text-[12px] text-[#8f959e]">{loadError ? "组织数据尚未加载成功" : organizationStatus === "archived" ? "暂无已归档组织" : "暂无运营中的组织"}</div>
             ) : (
             <Table>
               <TableHeader>
@@ -689,7 +731,7 @@ export default function OrganizationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedOrganizations.map((org, orgIndex) => {
+                {sortedOrganizations.map(org => {
                   const rows = org.member_ids.length > 0 ? org.member_ids : [""]
                   // 引流归属配置也直接显示在成员表里：所有人占一行，指定人员一人一行
                   const referrerRows: Array<{ key: string; all?: boolean; customer?: Customer; name: string }> =
@@ -719,11 +761,11 @@ export default function OrganizationsPage() {
                               >
                                 <div className="flex items-start gap-2">
                                   <div className="mt-0.5 flex w-4 shrink-0 flex-col items-center">
-                                    {!isFixedOrganization(org.name) && (
+                                    {org.status !== "archived" && !isFixedOrganization(org.name) && (
                                       <>
                                         <button
                                           className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
-                                          disabled={orgIndex <= firstMovableOrgIndex}
+                                          disabled={sortedActiveOrganizations.indexOf(org) <= firstMovableOrgIndex}
                                           onClick={() => handleMoveOrg(org, "up")}
                                           title="上移组织"
                                         >
@@ -731,7 +773,7 @@ export default function OrganizationsPage() {
                                         </button>
                                         <button
                                           className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
-                                          disabled={orgIndex === sortedOrganizations.length - 1}
+                                          disabled={sortedActiveOrganizations.indexOf(org) === sortedActiveOrganizations.length - 1}
                                           onClick={() => handleMoveOrg(org, "down")}
                                           title="下移组织"
                                         >
@@ -745,6 +787,7 @@ export default function OrganizationsPage() {
                                       <span className="truncate text-[13px] font-medium text-[#2b2f36]">
                                         {isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name}
                                       </span>
+                                      {org.status === "archived" && <span className="shrink-0 rounded-[3px] bg-[#f0f1f2] px-1.5 py-0.5 text-[11px] text-[#646a73]">已归档</span>}
                                       {org.referrer_mode && org.referrer_mode !== "member" && (
                                         <span className="shrink-0 rounded-[3px] bg-[#eef4ff] px-1.5 py-0.5 text-[11px] text-[#3370ff]">
                                           引流：{org.referrer_mode === "all"
@@ -757,7 +800,11 @@ export default function OrganizationsPage() {
                                     {org.include_unassigned_referrers === false && (
                                       <div className="mt-1 max-w-[170px] text-[11px] leading-4 text-[#8f959e]">不含未配置引流人的客户</div>
                                     )}
-                                    <div className="mt-2 flex items-center gap-2 text-[12px]">
+                                    {org.status === "archived" && <div className="mt-1 text-[11px] leading-4 text-[#8f959e]">停运于 {org.stopped_on || "—"}{org.archive_reason && <p className="mt-1 break-words">{org.archive_reason}</p>}</div>}
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px]">
+                                      <Link className="text-[#646a73] hover:text-[#2b2f36]" to={`/principal?organization_id=${encodeURIComponent(org.id)}&include_archived=1`}>查看数据</Link>
+                                      {!isFixedOrganization(org.name) && <button className="text-[#646a73] hover:text-[#2b2f36]" onClick={() => openStatusDialog(org)}>{org.status === "archived" ? "恢复运营" : "归档"}</button>}
+                                      {org.status !== "archived" && <>
                                       <button
                                         className="text-[#3370ff] hover:text-[#245be8]"
                                         onClick={() => {
@@ -787,13 +834,14 @@ export default function OrganizationsPage() {
                                         </>
                                       )}
                                       <button className="text-[#8f959e] hover:text-[#2b2f36]" onClick={() => handleOpenEdit(org)}>编辑</button>
+                                      </>}
                                     </div>
                                   </div>
                                 </div>
                               </TableCell>
                             )}
                             <TableCell className="px-0 text-center">
-                              {memberId ? (
+                              {memberId && org.status !== "archived" ? (
                                 <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                                   <button
                                     className="p-1 text-[#8f959e] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
@@ -827,7 +875,7 @@ export default function OrganizationsPage() {
                             <TableCell className="text-[12px] text-[#4e535a]">{member?.member_type || <EmptyValue />}</TableCell>
                             <TableCell className="text-center text-[12px] text-[#4e535a]">{member?.visit_count ?? <EmptyValue />}</TableCell>
                             <TableCell className="pr-4 text-right">
-                              {memberId && (
+                              {memberId && org.status !== "archived" && (
                                 <button
                                   className="text-[12px] text-[#8f959e] opacity-0 transition-opacity hover:text-[#d14343] group-hover:opacity-100"
                                   onClick={() => handleRemoveMember(org, memberId)}
@@ -852,7 +900,7 @@ export default function OrganizationsPage() {
                           <TableCell className="text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (row.customer?.member_type || <EmptyValue />)}</TableCell>
                           <TableCell className="text-center text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (row.customer?.visit_count ?? <EmptyValue />)}</TableCell>
                           <TableCell className="pr-4 text-right">
-                            {org.referrer_mode === "selected" && row.customer && (
+                            {org.status !== "archived" && org.referrer_mode === "selected" && row.customer && (
                               <button
                                 className="text-[12px] text-[#8f959e] opacity-0 transition-opacity hover:text-[#d14343] group-hover:opacity-100"
                                 onClick={() => handleRemoveReferrer(org, row.customer!.id)}
@@ -887,7 +935,7 @@ export default function OrganizationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {activityGroups.map((group, groupIndex) => {
+              {activityGroups.map(group => {
                 const rows = group.types.length > 0 ? group.types : [null]
                 const organization = group.organizationId
                   ? sortedOrganizations.find(org => org.id === group.organizationId)
@@ -909,11 +957,11 @@ export default function OrganizationsPage() {
                             >
                               <div className="flex items-start gap-2">
                                 <div className="mt-0.5 flex w-4 shrink-0 flex-col items-center">
-                                  {organization && !isFixedOrganization(organization.name) && (
+                                  {organization && organization.status !== "archived" && !isFixedOrganization(organization.name) && (
                                     <>
                                       <button
                                         className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
-                                        disabled={groupIndex <= firstMovableOrgIndex}
+                                        disabled={sortedActiveOrganizations.indexOf(organization) <= firstMovableOrgIndex}
                                         onClick={() => handleMoveOrg(organization, "up")}
                                         title="上移组织"
                                       >
@@ -921,7 +969,7 @@ export default function OrganizationsPage() {
                                       </button>
                                       <button
                                         className="text-[#c2c6cc] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
-                                        disabled={groupIndex === sortedOrganizations.length - 1}
+                                        disabled={sortedActiveOrganizations.indexOf(organization) === sortedActiveOrganizations.length - 1}
                                         onClick={() => handleMoveOrg(organization, "down")}
                                         title="下移组织"
                                       >
@@ -934,8 +982,9 @@ export default function OrganizationsPage() {
                                   <div className="flex items-center gap-2">
                                     <span className="truncate text-[13px] font-medium text-[#2b2f36]">{group.name}</span>
                                     <span className="shrink-0 text-[11px] text-[#8f959e]">{group.types.length} 个</span>
+                                    {group.archived && <span className="rounded-[3px] bg-[#f0f1f2] px-1.5 py-0.5 text-[11px] text-[#646a73]">已归档</span>}
                                   </div>
-                                  {group.organizationId ? (
+                                  {group.organizationId && !group.archived ? (
                                     <button
                                       className="mt-2 text-[12px] text-[#3370ff] hover:text-[#245be8]"
                                       onClick={() => handleOpenActCreate(group.organizationId)}
@@ -948,7 +997,7 @@ export default function OrganizationsPage() {
                             </TableCell>
                           )}
                           <TableCell className="px-0 text-center">
-                            {type && !isSystemActivity ? (
+                            {type && !group.archived && !isSystemActivity ? (
                               <div className="flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                                 <button
                                   className="p-1 text-[#8f959e] hover:text-[#3370ff] disabled:cursor-not-allowed disabled:opacity-30"
@@ -991,7 +1040,7 @@ export default function OrganizationsPage() {
                             )}
                           </TableCell>
                           <TableCell className="pr-4 text-right">
-                            {type && (
+                            {type && !group.archived && (
                               <div className="flex items-center justify-end gap-3 text-[12px] opacity-0 transition-opacity group-hover:opacity-100">
                                 <button className="text-[#3370ff] hover:text-[#245be8]" onClick={() => handleOpenActEdit(type)}>编辑</button>
                                 {!isSystemActivity && (
@@ -1134,6 +1183,25 @@ export default function OrganizationsPage() {
                 {saving ? "保存中..." : "保存"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!statusOrganization} onOpenChange={open => { if (!open && !statusSaving) setStatusOrganization(null) }}>
+        <DialogContent className="max-w-[420px] gap-0 p-0">
+          <DialogHeader className="border-b border-[#e8eaed] px-6 py-4"><DialogTitle className="text-[14px] font-normal">{statusOrganization?.status === "archived" ? "恢复运营" : "归档组织/俱乐部"}</DialogTitle></DialogHeader>
+          <div className="space-y-4 px-6 py-5 text-[13px] text-[#4e535a]">
+            <p>{statusOrganization?.name}</p>
+            {statusOrganization?.status === "archived" ? <p className="text-[12px] leading-5 text-[#8f959e]">恢复后重新出现在日常列表和新增记录的选择框中，原有成员与归属配置继续保留。</p> : <>
+              <p className="text-[12px] leading-5 text-[#8f959e]">归档后日常隐藏。成员、活动、课程和交易记录均保留，历史数据仍可查询。</p>
+              <label className="block space-y-2"><span className="text-[12px]">停运日期</span><Input type="date" value={stoppedOn} onChange={event => setStoppedOn(event.target.value)} /></label>
+              <label className="block space-y-2"><span className="text-[12px]">归档原因（选填）</span><Input value={archiveReason} onChange={event => setArchiveReason(event.target.value)} placeholder="如：俱乐部已停止运营" maxLength={500} /></label>
+            </>}
+            {statusError && <p role="alert" className="text-[12px] text-destructive">{statusError}</p>}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-[#e8eaed] px-6 py-3">
+            <Button size="sm" variant="outline" disabled={statusSaving} onClick={() => setStatusOrganization(null)}>取消</Button>
+            <Button size="sm" disabled={statusSaving || (statusOrganization?.status !== "archived" && !stoppedOn)} onClick={saveOrganizationStatus}>{statusSaving ? "保存中…" : statusOrganization?.status === "archived" ? "恢复运营" : "确认归档"}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1294,7 +1362,7 @@ export default function OrganizationsPage() {
                 <span className="pt-2.5 text-right text-[12px] font-normal tracking-widest text-[#4e535a]">所属组织</span>
                 <SelectDropdown
                   value={actFormOrganizationId}
-                  options={sortedOrganizations.map(org => ({
+                  options={activeOrganizations.map(org => ({
                     value: org.id,
                     label: isFixedOrganization(org.name) ? FIXED_ORG_NAME : org.name,
                   }))}

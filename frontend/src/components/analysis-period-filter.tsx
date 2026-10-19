@@ -3,7 +3,7 @@ import { useMemo, type ReactNode } from "react"
 import { AnalysisDatePicker } from "@/components/analysis-date-picker"
 import { SelectDropdown } from "@/components/select-dropdown"
 import {
-  buildPeriodOptions, datePresetOf, monthRange, selectedMonthRange, selectedPeriodValue, todayRange, weekRange, yearRange,
+  ANALYSIS_START_DATE, buildPeriodOptions, datePresetOf, monthRange, selectedMonthRange, selectedPeriodValue, todayRange, weekRange, yearRange,
   type DatePreset, type DateRange,
 } from "@/lib/date-ranges"
 
@@ -16,7 +16,7 @@ const PRESETS: Array<{ value: Exclude<DatePreset, "custom">; label: string }> = 
 ]
 
 /** 统计周期栏：年份/月份下拉 + 自定义日期 + 当天/本周/本月/本年/全部（与自定义筛选同一套） */
-export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统计周期", hint, leading, inlineLabel = false, variant = "bar" }: {
+export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统计周期", hint, leading, inlineLabel = false, variant = "bar", datePickerWidthClassName }: {
   dateFrom: string
   dateTo: string
   onChange: (range: DateRange) => void
@@ -28,6 +28,8 @@ export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统�
   inlineLabel?: boolean
   /** bar：灰底一栏（自定义筛选、转化分析用）；inline：无底色的一行，快捷档做成分段按钮（列表页用） */
   variant?: "bar" | "inline"
+  /** 自定义起止日期框的宽度，不传则用日期框自己的默认宽度 */
+  datePickerWidthClassName?: string
 }) {
   const options = useMemo(() => buildPeriodOptions(), [])
   const preset = datePresetOf(dateFrom, dateTo)
@@ -69,9 +71,9 @@ export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统�
         />
         <span className="text-[10px] text-[#b0b5bb]">或自定义</span>
         <div className="flex items-center gap-1.5">
-          <AnalysisDatePicker value={dateFrom} onChange={value => onChange({ date_from: value, date_to: dateTo })} ariaLabel={`${label}开始日期`} />
+          <AnalysisDatePicker minDate={ANALYSIS_START_DATE} value={dateFrom} onChange={value => onChange({ date_from: value, date_to: dateTo })} ariaLabel={`${label}开始日期`} widthClassName={datePickerWidthClassName} />
           <span className="text-[11px] text-[#8f959e]">至</span>
-          <AnalysisDatePicker value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} />
+          <AnalysisDatePicker minDate={ANALYSIS_START_DATE} value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} widthClassName={datePickerWidthClassName} />
         </div>
         <div className="flex h-7 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
           {PRESETS.map(item => (
@@ -114,9 +116,9 @@ export function AnalysisPeriodFilter({ dateFrom, dateTo, onChange, label = "统�
       />
       <span className="text-[10px] text-[#b0b5bb]">或自定义</span>
       <div className="flex flex-wrap items-center gap-1.5">
-        <AnalysisDatePicker value={dateFrom} onChange={value => onChange({ date_from: value, date_to: dateTo })} ariaLabel={`${label}开始日期`} widthClassName="w-[142px]" />
+        <AnalysisDatePicker minDate={ANALYSIS_START_DATE} value={dateFrom} onChange={value => onChange({ date_from: value, date_to: dateTo })} ariaLabel={`${label}开始日期`} widthClassName="w-[142px]" />
         <span className="text-[11px] text-[#8f959e]">至</span>
-        <AnalysisDatePicker value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} widthClassName="w-[142px]" />
+        <AnalysisDatePicker minDate={ANALYSIS_START_DATE} value={dateTo} onChange={value => onChange({ date_from: dateFrom, date_to: value })} ariaLabel={`${label}结束日期`} widthClassName="w-[142px]" />
       </div>
       <div className="flex h-7 items-center rounded-[4px] border border-[#dee0e3] bg-white p-0.5">
         {PRESETS.map(item => (

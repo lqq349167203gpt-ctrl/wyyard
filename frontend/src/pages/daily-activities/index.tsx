@@ -1308,8 +1308,8 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
   dateRange: string[]; calendarCounts: Record<string, number>; detailDate: string; todayStr: string
   onPrev: () => void; onNext: () => void; onSelectDate: (d: string) => void
 }) => (
-  <div className="flex items-center justify-between gap-1 mt-1 h-[52px]">
-    <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={onPrev}>
+  <div className="flex items-center justify-between gap-1 mt-3 mb-2 h-[52px]">
+    <button aria-label="前一周" className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={onPrev}>
       <ChevronLeft className="h-4 w-4 text-[#4e535a]" />
     </button>
     <div className="flex-1 flex items-center justify-between overflow-x-auto">
@@ -1320,7 +1320,9 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
         return (
           <button
             key={d}
-            className={`shrink-0 flex flex-col items-center justify-center w-10 h-12 rounded-[2px] transition-colors ${
+            aria-label={`${d} ${getWeekday(d)}${dayCount > 0 ? ` ${dayCount}场` : ""}`}
+            aria-pressed={isSelected}
+            className={`shrink-0 flex flex-col items-center justify-center w-10 h-12 rounded-md transition-colors ${
               isSelected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff]" : "hover:bg-[#f7f8fa]"
             }`}
             onClick={() => onSelectDate(d)}
@@ -1328,7 +1330,7 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
             <span className={`text-[10px] leading-none h-3 flex items-center ${isSelected ? "text-white/80" : "text-[#8f959e]"}`}>
               {getWeekday(d)}
             </span>
-            <span className="text-[14px] font-medium leading-none h-4 flex items-center">{d.split("-")[2]}</span>
+            <span className="text-[14px] font-medium leading-none h-4 flex items-center">{parseInt(d.split("-")[2])}</span>
             <span className={`text-[9px] leading-none h-3 flex items-center mt-0.5 ${isSelected ? "text-white/80" : dayCount > 0 ? "text-[#b0b5bb]" : "text-transparent"}`}>
               {dayCount > 0 ? `${dayCount}场` : " "}
             </span>
@@ -1336,7 +1338,7 @@ const DateScroller = memo(({ dateRange, calendarCounts, detailDate, todayStr, on
         )
       })}
     </div>
-    <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={onNext}>
+    <button aria-label="后一周" className="h-7 w-7 flex items-center justify-center rounded hover:bg-[#f0f0f0] shrink-0" onClick={onNext}>
       <ChevronRight className="h-4 w-4 text-[#4e535a]" />
     </button>
   </div>
@@ -1932,9 +1934,6 @@ export default function DailyActivitiesPage() {
   const [lockDialogOpen, setLockDialogOpen] = useState(false)
   const [lockSubmitting, setLockSubmitting] = useState(false)
   const [themeEditWeekIndex, setThemeEditWeekIndex] = useState<number | null>(null)
-  const [calendarVisible, setCalendarVisible] = useState(() => {
-    try { return localStorage.getItem("daily-calendar-visible") !== "false" } catch { return true }
-  })
 
   const themeMonthStart = useMemo(() => {
     const d = new Date(detailDate)
@@ -2808,87 +2807,21 @@ export default function DailyActivitiesPage() {
             </button>
           )}
           <div className="flex-1" />
-          <button
-            className="flex items-center gap-1 text-[11px] text-[#8f959e] hover:text-[#4e535a] cursor-pointer px-1 py-0.5"
-            onClick={() => { const next = !calendarVisible; setCalendarVisible(next); try { localStorage.setItem("daily-calendar-visible", String(next)) } catch {} }}
-          >
-            <span style={{
-              display: "inline-block",
-              width: 0,
-              height: 0,
-              borderLeft: "4px solid transparent",
-              borderRight: "4px solid transparent",
-              borderTop: calendarVisible ? "5px solid #8f959e" : "none",
-              borderBottom: calendarVisible ? "none" : "5px solid #8f959e",
-            }} />
-            {calendarVisible ? "隐藏" : "展开"}
-          </button>
+
         </div>
 
-        {/* 周视图日历 */}
-        {calendarVisible && <div className="border-[3px] border-[#f7f8fa] rounded-[2px] overflow-x-auto">
-          <table className="border-collapse" style={{ tableLayout: "fixed", width: "100%" }}>
-            <colgroup>
-              <col style={{ width: "80px" }} />
-              {Array.from({ length: 7 }, (_, i) => <col key={i} style={{ width: `${(100 - 13.33) / 7}%` }} />)}
-            </colgroup>
-            <thead>
-              <tr className="bg-[#f7f8fa]">
-                <th className="px-2 py-1 text-center text-[12px] text-[#8f959e] font-normal" style={{ borderRight: "0.5px solid #f0f0f0" }}>周主题</th>
-                {["一", "二", "三", "四", "五", "六", "日"].map(d => (
-                  <th key={d} className="px-1 py-1 text-center text-[11px] text-[#8f959e] font-normal">{d}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {themeWeeks.map((week, wi) => {
-                const firstTheme = week.days
-                  .map(day => themeMap.get(day.date))
-                  .find(theme => theme?.week_theme || theme?.week_theme_detail)
-                const weekThemeText = themeTableText(firstTheme?.week_theme, firstTheme?.week_theme_detail)
-                const isLastWeek = wi === themeWeeks.length - 1
-                return (
-                  <tr key={`week-${wi}`}>
-                    <td
-                      className={`px-2 text-center text-[10px] text-[#2b2f36] overflow-hidden text-ellipsis whitespace-nowrap ${isViewOnly ? "cursor-default" : "cursor-pointer hover:bg-[#f0f5ff]"}`}
-                      style={{ height: "26px", borderRight: "0.5px solid #f0f0f0", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0" }}
-                      title={weekThemeText || undefined}
-                      onClick={() => { if (isViewOnly) return; if (spaces.length === 0) { setNoSpacesDialogOpen(true); return } setThemeEditWeekIndex(wi) }}
-                    >
-                      {weekThemeText}
-                    </td>
-                    {week.days.map((day) => {
-                      const dayNum = day.date.split("-")[2].replace(/^0/, "")
-                      const isSelected = day.date === detailDate
-                      const isToday = day.date === today
-                      const dayTheme = day.inMonth ? themeMap.get(day.date) : undefined
-                      const dayThemeText = themeTableText(dayTheme?.day_theme, dayTheme?.day_theme_detail)
-                      const hasActivities = (calendarCounts[day.date] || 0) > 0
-                      return (
-                        <td
-                          key={day.date}
-                          className={`cursor-pointer overflow-hidden px-1 text-center text-[10px] transition-colors ${
-                            !day.inMonth ? "bg-[#fdfdfd] text-[#b0b5bb]" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36]"
-                          }`}
-                          style={{ height: "26px", borderBottom: isLastWeek ? "none" : "0.5px solid #f0f0f0", boxShadow: isSelected ? "inset 0 -1.5px 0 0 #a8c8ff" : "none" }}
-                          title={dayThemeText || undefined}
-                          onClick={() => day.inMonth && setDetailDate(day.date)}
-                        >
-                          <div className="flex min-w-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap">
-                            <span className={`shrink-0 text-[10px] ${
-                              !day.inMonth ? "text-[#b0b5bb]" : isToday ? "text-[#3370ff]" : hasActivities ? "text-[#2b2f36]" : "text-[#8f959e]"
-                            }`}>{dayNum}</span>
-                            {dayThemeText && <span className="min-w-0 truncate">{dayThemeText}</span>}
-                          </div>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>}
+        {/* 日期选择与邀约页保持一致，主题表格不再显示。 */}
+        <div className="border-b-[0.5px] border-[#f0f1f2]">
+          <DateScroller
+            dateRange={dateRange}
+            calendarCounts={calendarCounts}
+            detailDate={detailDate}
+            todayStr={today}
+            onPrev={onDateScrollerPrev}
+            onNext={onDateScrollerNext}
+            onSelectDate={onDateScrollerSelect}
+          />
+        </div>
         {/* Activity cards */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" aria-busy={detailLoading} onMouseDown={(e) => e.stopPropagation()}>
           <LoadError error={detailError} onRetry={reloadCurrentDate} />

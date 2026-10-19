@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional
 
-from app.models.organization import Organization, OrganizationCreate
+from app.models.organization import Organization, OrganizationArchive, OrganizationCreate
 from app.services.storage import load_data, save_item
 
 FILENAME = "organizations.json"
@@ -29,9 +29,10 @@ def _save(item_id: str):
 _load()
 
 
-def list_organizations() -> List[Organization]:
+def list_organizations(status: str = "all") -> List[Organization]:
+    # 历史归属和统计默认保留已归档组织，日常选择由调用方显式筛选。
     return sorted(
-        [v for v in _organizations.values() if not v.is_deleted],
+        [v for v in _organizations.values() if not v.is_deleted and (status == "all" or v.status == status)],
         key=lambda o: (o.sort_order is None, o.sort_order or 0)
     )
 
@@ -81,9 +82,13 @@ def create_organization(data: OrganizationCreate) -> Organization:
 
 
 def update_organization(org_id: str, data: dict) -> Optional[Organization]:
-    org = _organizations.get(org_id)
+    org = get_organization(org_id)
     if not org:
         return None
+    if org.status == "archived":
+        raise ValueError("该组织已归档，请先恢复运营再修改配置")
+    if set(data) - set(OrganizationCreate.model_fields):
+        raise ValueError("组织状态请通过归档或恢复操作修改")
     if _is_protected_name(org.name) and any(key in data for key in ("name", "is_deleted", "deleted_at")):
         raise ValueError(f"「{org.name}」为系统核心组织，不允许改名或删除")
     # 检查名称
@@ -106,12 +111,47 @@ def update_organization(org_id: str, data: dict) -> Optional[Organization]:
 
 
 def delete_organization(org_id: str) -> bool:
-    org = _organizations.get(org_id)
+    org = get_organization(org_id)
     if not org:
         return False
     if _is_protected_name(org.name):
         raise ValueError(f"「{org.name}」为系统核心组织，不允许删除")
+    if org.status == "archived":
+        raise ValueError("已归档组织需保留历史数据，不允许删除")
     org.is_deleted = True
     org.deleted_at = datetime.now(timezone.utc)
     _save(org_id)
     return True
+
+
+def archive_organization(org_id: str, data: OrganizationArchive) -> Optional[Organization]:
+    org = get_organization(org_id)
+    if not org:
+        return None
+    if _is_protected_name(org.name):
+        raise ValueError(f"「{org.name}」为系统核心组织，不允许归档")
+    if org.status == "archived":
+        return org
+    now = datetime.now(timezone.utc)
+    org.status = "archived"
+    org.stopped_on = data.stopped_on
+    org.archive_reason = data.reason.strip()
+    org.archived_at = now
+    org.updated_at = now
+    _save(org.id)
+    return org
+
+
+def restore_organization(org_id: str) -> Optional[Organization]:
+    org = get_organization(org_id)
+    if not org:
+        return None
+    if org.status == "active":
+        return org
+    org.status = "active"
+    org.stopped_on = None
+    org.archive_reason = ""
+    org.archived_at = None
+    org.updated_at = datetime.now(timezone.utc)
+    _save(org.id)
+    return org

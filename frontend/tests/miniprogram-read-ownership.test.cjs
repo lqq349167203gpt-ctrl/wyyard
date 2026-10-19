@@ -345,3 +345,39 @@ test('个人交易分页追加不漏无 id 的交易，失败重试原页，活�
   await a.loadActivityRecords(true)
   assert.equal(a.data.totalCount, 45); assert.equal(a.data.arrivedCount, 21); assert.equal(a.data.hasMore, true)
 })
+
+
+test('归档组织不进入新增交易选择，编辑旧交易仍保留原归属',async()=>{
+  const organizations=[{id:'active',name:'在营组织'},{id:'old',name:'历史组织',status:'archived'}]
+  const p=fixture('miniprogram/components/payment-form/index.js',{organizationApi:{list:async()=>organizations}})
+  p.data.formData={organization_id:'old'}
+  await p._loadOrganizations()
+  assert.deepEqual(Array.from(p.data.organizations,org=>org.id),['active'])
+  assert.equal(p.data.formData.organization_id,'active')
+  p.data.isEdit=true;p.data.editData={organization_id:'old'}
+  await p._loadOrganizations()
+  assert.equal(p.data.organizations[p.data.orgIndex].name,'历史组织（已归档）')
+  assert.equal(p.data.formData.organization_id,'old')
+  assert.equal(organizations[1].name,'历史组织')
+})
+
+test('新增沙龙排除归档组织类型，保留运营组织和未配置类型',async()=>{
+  const p=fixture('miniprogram/pages/activity-create/index.js',{
+    organizationApi:{list:async()=>[{id:'active',name:'在营组织'},{id:'old',name:'历史组织',status:'archived'}]},
+    courseTypeApi:{list:async()=>[{name:'在营课',organization_id:'active'},{name:'历史课',organization_id:'old'},{name:'待配置课'}]},
+  })
+  await p.loadCourses()
+  assert.deepEqual(Array.from(p.data.courses,course=>course.name),['在营课','待配置课'])
+  assert(!p.data.unifiedTypes.some(item=>item.courseName==='历史课'))
+})
+
+
+test('编辑沙龙保留本场历史类型，不提供其他归档类型',async()=>{
+  const p=fixture('miniprogram/pages/activity-detail/index.js',{
+    organizationApi:{list:async()=>[{id:'active',name:'在营组织'},{id:'old',name:'历史组织',status:'archived'}]},
+    courseTypeApi:{list:async()=>[{name:'在营课',organization_id:'active'},{name:'本场旧课',organization_id:'old'},{name:'其他旧课',organization_id:'old'}]},
+  })
+  await p.loadCourses('本场旧课')
+  assert.deepEqual(Array.from(p.data.courses,course=>course.name),['在营课','本场旧课'])
+  assert.equal(p.data.courses[p.data.courseIndex].name,'本场旧课')
+})

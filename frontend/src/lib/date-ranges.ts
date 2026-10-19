@@ -1,5 +1,6 @@
 export type DateRange = { date_from: string; date_to: string }
 export type DatePreset = "today" | "week" | "month" | "year" | "all" | "custom"
+export const ANALYSIS_START_DATE = "2026-01-01"
 
 function formatLocalDate(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`
@@ -68,10 +69,10 @@ export function datePresetOf(dateFrom: string, dateTo: string): DatePreset {
   return "custom"
 }
 
-/** 近 10 年 + 每年 12 个月，供「年份或月份」下拉使用 */
+/** 统计周期从 2026 年开始，每年提供全年与月份选项。 */
 export function buildPeriodOptions() {
   const currentYear = new Date().getFullYear()
-  return Array.from({ length: 10 }, (_, index) => currentYear + 1 - index).flatMap(year => [
+  return Array.from({ length: Math.max(0, currentYear + 2 - 2026) }, (_, index) => currentYear + 1 - index).flatMap(year => [
     { value: `year-${year}`, label: `${year}年全年` },
     {
       value: `months-${year}`,

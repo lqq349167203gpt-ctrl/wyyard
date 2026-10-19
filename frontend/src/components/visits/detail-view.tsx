@@ -562,6 +562,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         "客户昵称": v.nickname,
         "预计时间": v.visit_time || "",
         "会员身份": v.member_type || "",
+        "客户标签": (v.customer_tags || []).map(tag => tag.name).join("、"),
         "来访需求": v.needs || "",
         "组长情况": role || "-",
         "邀约人": v.referrer_handler || "",
@@ -572,7 +573,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     if (!rows.length) return
 
     const headers = Object.keys(rows[0])
-    const colWidths = [10, 12, 10, 12, 40, 10, 10, 10, 20]
+    const colWidths = [10, 12, 10, 12, 24, 40, 10, 10, 10, 20]
 
     // 按预计时间分场次：上午场 <12:00，下午场 12:00~17:59，晚上场 >=18:00
     const slotIndex = (time: string) => {

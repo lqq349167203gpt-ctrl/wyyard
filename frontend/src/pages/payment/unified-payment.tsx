@@ -492,7 +492,7 @@ export function UnifiedPaymentContent({
   // 打开新增弹窗
   const handleOpenCreate = () => {
     if (!hasAnyOrganization) { setNoOrgDialogOpen(true); return }
-    if (organizations.length === 0) { setNoAssignmentDialogOpen(true); return }
+    if (organizations.every(org => org.status === "archived")) { setNoAssignmentDialogOpen(true); return }
     setEditingItem(null)
     setCoarseDoorSelected(false)
     setFormType(activeType === "all" ? (filterTypes ? filterTypes[0] : "membership_card") : activeType)
@@ -564,7 +564,7 @@ export function UnifiedPaymentContent({
     setFormDealCourse(UNSET_DEAL_COURSE)
     setFormDealCourseName("")
     setFormClosers([])
-    setFormOrganizationId(organizations.length > 0 ? organizations[0].id : "")
+    setFormOrganizationId(organizations.find(org => org.status !== "archived")?.id || "")
     setFormPaymentMethod("")
     setFormNotes("")
     setCloserError(false)
@@ -1790,7 +1790,7 @@ export function UnifiedPaymentContent({
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交归属</span>
               <SelectDropdown
                 value={formOrganizationId}
-                options={organizations.map(o => ({ value: o.id, label: o.name }))}
+                options={organizations.filter(org => org.status !== "archived" || (editingItem && org.id === formOrganizationId)).map(o => ({ value: o.id, label: o.name + (o.status === "archived" ? "（已归档）" : "") }))}
                 placeholder="选择组织"
                 placeholderColor="text-[#a8b1bd]"
                 textColor={formOrganizationId ? "text-[#2b2f36]" : undefined}

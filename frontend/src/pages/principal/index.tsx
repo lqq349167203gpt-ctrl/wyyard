@@ -16,7 +16,27 @@ import { EmptyValue } from "@/components/empty-value"
 import { PaginationBar } from "@/components/pagination-bar"
 import { useServerPagination } from "@/hooks/use-server-pagination"
 import { TeacherFollowUpDialog, TeacherFollowUpList } from "./teacher-follow-up-list"
+import { InviteArrivalDateList } from "./invite-arrival-date-list"
+import { CourseParticipantList, isCourseParticipantCard, type CourseParticipantCard } from "./course-participant-list"
+import { MemberParticipationList } from "./member-participation-list"
 import { principalRecordRows, type PrincipalRecordType } from "@/lib/principal-record-details"
+
+function groupedSalonCourses<T extends { key: string; label: string; organization?: string }>(subtypes: T[], organizations: { name: string }[]) {
+  const rows = subtypes.map(item => {
+    const splitAt = item.key.indexOf("｜")
+    const organization = item.organization || (splitAt === -1 ? "未配置组织" : (item.key.slice(splitAt + 1) || "未配置组织"))
+    const courseName = splitAt === -1 ? item.label : (item.key.slice(0, splitAt) || item.label)
+    return { ...item, label: courseName, organization }
+  })
+  const rank = new Map(organizations.map((organization, index) => [organization.name, index]))
+  rows.sort((left, right) => (rank.get(left.organization) ?? organizations.length) - (rank.get(right.organization) ?? organizations.length))
+  let previous = ""
+  return rows.map(item => {
+    const groupLabel = item.organization !== previous ? item.organization : undefined
+    previous = item.organization
+    return { ...item, groupLabel }
+  })
+}
 
 const INITIAL_RULE: ConversionRule = {
   name: "粗门初次到场 → 会员卡首购",
@@ -30,6 +50,8 @@ const INITIAL_RULE: ConversionRule = {
 type InviteInitiatedRecord = NonNullable<NonNullable<PrincipalBreakdown["invite_inviters"]>[number]["records"]>[number]
 type OverviewCustomerRow = PrincipalBreakdownCustomer & { referrer: string; arrival_id?: string }
 const TABS = [{ key: "overview", label: "经营概况" }, { key: "conversion", label: "转化分析" }] as const
+// 沙龙活动、沙龙技能学习仅有参与者身份。
+const PARTICIPANT_ONLY_ACTIVITY_TYPES = new Set(["class", "ics"])
 // 转化分析上次用过的条件：换页面/刷新后还能接着用
 const CONVERSION_DRAFT_KEY = "principal:conversion-draft"
 function loadConversionDraft(): { rule?: ConversionRule; rule_id?: string; organization_id?: string; date_from?: string | null; date_to?: string | null } | null {
@@ -130,10 +152,10 @@ const headerMinWidth = (key: string, label: string) =>
   label.length * 11 + 46 + (HELP_TIP_COLUMNS.has(key) ? 17 : 0)
 const PAGE_SIZE = 20
 // 子级选项（卡种 / 具体课程）挂在它的上一级下面，选子级时上一级要一起留着
-const PARENT_OF: Record<string, string> = { subtype: "deals", course: "type" }
+const PARENT_OF: Record<string, string> = { subtype: "deals", course: "type", participation_course: "participation_type" }
 // 这些维度是「附加条件」，可以和别的维度一起用：
 // 成交量那边是购买类型，课程数那边是课程类型 / 具体课程 / 课程老师，引流人数那边是引流人 + 阶段 / 来源 / 标签
-const COMBINABLE_PREFIXES = new Set(["buy", "type", "course", "teacher", "traffic", "identity", "stage", "source", "tag", "upsell", "inviter"])
+const COMBINABLE_PREFIXES = new Set(["buy", "type", "course", "teacher", "traffic", "identity", "stage", "source", "tag", "upsell", "inviter", "participation_type", "participation_course", "participation_person"])
 
 // 引流客户列表的列：可在「列表设置」里勾选显示、上下调整顺序
 type TrafficColumnDef = {
@@ -616,16 +638,32 @@ export default function PrincipalPage() {
   const rulesLoaded = useRef(false)
   const [rules, setRules] = useState<SavedConversionRule[]>([])
   // 转化分析的条件（规则 + 范围 + 周期）留在浏览器里：离开页面再回来不会被重置
+  const [entryScope] = useState(() => new URLSearchParams(window.location.search))
+  const [includeArchived, setIncludeArchived] = useState(() => entryScope.get("include_archived") === "1")
   const conversionDraft = loadConversionDraft()
   const [ruleId, setRuleId] = useState(conversionDraft?.rule_id ?? "")
   const [query, setQuery] = useState<PrincipalQuery>(() => ({
-    organization_id: conversionDraft?.organization_id ?? "",
+    organization_id: entryScope.get("organization_id") ?? conversionDraft?.organization_id ?? "",
     date_from: conversionDraft?.date_from ?? monthRange().date_from,
     date_to: conversionDraft?.date_to ?? monthRange().date_to,
     tab: "overview", product: "", activity_type: "", course_subtype: "", order_filter: "", status: "",
     rule: conversionDraft?.rule ?? INITIAL_RULE,
   }))
   const [result, setResult] = useState<PrincipalResult | null>(null)
+  const [overviewScopeType, setOverviewScopeType] = useState<"organization" | "person">("organization")
+  const [selectedReferrerId, setSelectedReferrerId] = useState("")
+  const personalScope = query.tab === "overview" && overviewScopeType === "person"
+  const organizationOptions = [{ value: "", label: "全部可见组织/俱乐部" }, ...(metadata?.organizations || [])
+    .filter(org => includeArchived || org.status !== "archived" || org.id === query.organization_id)
+    .map(org => ({ value: org.id, label: org.name + (org.status === "archived" ? "（已归档）" : "") }))]
+  const archivedScopeControl = <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-[#8f959e]">
+    <input type="checkbox" checked={includeArchived || metadata?.organizations.some(org => org.id === query.organization_id && org.status === "archived") || false}
+      onChange={event => {
+        setIncludeArchived(event.target.checked)
+        if (!event.target.checked && metadata?.organizations.some(org => org.id === query.organization_id && org.status === "archived")) update({ organization_id: "" })
+      }} className="h-3 w-3 accent-[#646a73]" />包含已归档
+  </label>
+  const scopeKey = personalScope ? `person:${selectedReferrerId}` : "organization"
   // 当前结果属于哪个 tab：转化分析没点「查询」前不显示旧数据
   const [resultTab, setResultTab] = useState<PrincipalQuery["tab"] | "">("")
   const [resultQueryKey, setResultQueryKey] = useState("")
@@ -662,10 +700,9 @@ export default function PrincipalPage() {
   const dealReady = dealResultKey === dealQueryKey && !dealPagination.loading && !dealPagination.error
   // 交易列表口径：每笔交易一行 / 同一人只显示一行
   const [listView, setListView] = useState<"order" | "customer">("order")
-  const [inviteArriveView, setInviteArriveView] = useState<"customer" | "date">("customer")
-  // 经营概况：三张卡一次展开一组；二级项目勾选后筛选下面的列表
-  // 默认选中第一张卡（成交量），点它可以收起
-  const [overviewGroup, setOverviewGroup] = useState<"deals" | "courses" | "traffic" | "invite" | "">("traffic")
+  const [inviteArriveView, setInviteArriveView] = useState<"customer" | "date">("date")
+  // 经营概况卡片一次展开一组；默认选中引流人数，再点选中卡片可以收起。
+  const [overviewGroup, setOverviewGroup] = useState<"deals" | "courses" | "traffic" | "invite" | "participation" | "">("traffic")
   const [breakdownPicks, setBreakdownPicks] = useState<string[]>([])
   // 引流客户列表：除昵称外都支持点击表头排序（本地排序，不影响分页口径）
   const [trafficSortBy, setTrafficSortBy] = useState("")
@@ -767,6 +804,12 @@ export default function PrincipalPage() {
         for (const sub of item.subtypes ?? []) values.add(`course:${sub.key}`)
       }
       for (const item of data.breakdown?.courses?.by_teacher ?? []) values.add(`teacher:${item.key}`)
+    } else if (overviewGroup === "participation") {
+      for (const item of data.breakdown?.participation?.by_type ?? []) {
+        values.add(`participation_type:${item.key}`)
+        for (const sub of item.subtypes ?? []) values.add(`participation_course:${sub.key}`)
+      }
+      for (const item of data.breakdown?.participation?.by_participant ?? []) values.add(`participation_person:${item.key}`)
     } else if (overviewGroup === "traffic") {
       for (const item of data.breakdown?.traffic ?? []) values.add(`traffic:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.stage ?? []) values.add(`stage:${item.key}`)
@@ -776,17 +819,20 @@ export default function PrincipalPage() {
       for (const item of data.breakdown?.traffic_filters?.identity ?? []) values.add(`identity:${item.key}`)
     } else if (overviewGroup === "invite") {
       for (const item of data.breakdown?.invite_inviters ?? []) values.add(`inviter:${item.key}`)
-      for (const item of data.breakdown?.traffic ?? []) values.add(`traffic:${item.key}`)
+      for (const item of data.breakdown?.invite_traffic ?? data.breakdown?.traffic ?? []) values.add(`traffic:${item.key}`)
     }
     return values
   }
   // 汇总和明细共用后端筛选；引流人只影响汇总投影，不重复计算底层分析。
   const serverPicks = breakdownPicks.filter(value => !value.startsWith("traffic:"))
-  const resultKey = JSON.stringify([query, listTab, breakdownPicks, listView, sortBy, sortOrder])
+  const resultKey = JSON.stringify([query, scopeKey, listTab, breakdownPicks, listView, sortBy, sortOrder])
   // 点「查询」时置 true：这一次请求要写进分析日志
   const logAnalysisRef = useRef(false)
   const listQuery = { ...query, tab: listTab, include_overview: listTab !== query.tab,
+    scope_type: personalScope ? "person" as const : "organization" as const,
+    referrer_id: personalScope ? selectedReferrerId : "", organization_id: personalScope ? "" : query.organization_id,
     breakdown: serverPicks, list_view: listView, sort_by: sortBy, sort_order: sortOrder,
+    participant_layout: query.course_view === "participant" ? "courses" as const : "rows" as const,
     compact_overview: true, detail_picks: breakdownPicks }
   const pagination = useServerPagination<PrincipalRow>(async (page, size) => {
     const current = ++version.current
@@ -826,7 +872,7 @@ export default function PrincipalPage() {
   const arrivalDetails = useServerPagination<OverviewCustomerRow>((page, size) =>
     principalApi.details({ ...detailQuery, overview_detail: "invite_arrivals", arrival_view: inviteArriveView }, page, size),
   { pageSize: PAGE_SIZE, queryKey: JSON.stringify([resultKey, breakdownPicks, trafficSortBy, trafficSortOrder, inviteArriveView]),
-    enabled: query.tab === "overview" && overviewGroup === "invite" && query.invite_view !== "initiated" })
+    enabled: query.tab === "overview" && overviewGroup === "invite" && query.invite_view !== "initiated" && inviteArriveView !== "date" })
   const inviteDetails = useServerPagination<InviteInitiatedRecord>((page, size) =>
     principalApi.details({ ...listQuery, overview_detail: "invite_initiated", overview_detail_key: inviteDetail!.key,
       detail_sort_by: inviteDetailSort.field, detail_sort_order: inviteDetailSort.order }, page, size),
@@ -845,6 +891,12 @@ export default function PrincipalPage() {
     }).catch(e => { if (current) setError(e.message) })
     return () => { current = false }
   }, [query.tab])
+  useEffect(() => {
+    if (!personalScope || !metadata) return
+    if (!metadata.referrers?.some(item => item.id === selectedReferrerId)) {
+      setSelectedReferrerId(metadata.referrers?.[0]?.id ?? "")
+    }
+  }, [metadata, personalScope, selectedReferrerId])
   useEffect(() => {
     if (query.tab !== "conversion" || rulesLoaded.current) return
     let current = true
@@ -866,19 +918,22 @@ export default function PrincipalPage() {
   // 其他三个 tab 没有查询按钮，改了筛选即时生效。
   const previousQueryRef = useRef(query)
   const previousListTabRef = useRef(listTab)
+  const previousScopeRef = useRef(scopeKey)
   useEffect(() => {
     const previous = previousQueryRef.current
     const previousListTab = previousListTabRef.current
+    const previousScope = previousScopeRef.current
     previousQueryRef.current = query
     previousListTabRef.current = listTab
-    if (previous === query && previousListTab === listTab) return
+    previousScopeRef.current = scopeKey
+    if (previous === query && previousListTab === listTab && previousScope === scopeKey) return
     // 转化分析不自动查询：范围与规则都等使用者点「查询」才出结果（切 tab 也不自动跑）
     if (query.tab === "conversion") return
     version.current++
     // 不把结果清空：切换分组/范围时先沿用上一屏的数据，等新结果回来再替换，避免整块内容闪一下
     setDetail(null)
     pagination.resetPage()
-  }, [query, listTab, pagination.resetPage])
+  }, [query, listTab, scopeKey, pagination.resetPage])
   // 勾选/取消二级项目、切换「每笔交易 / 同一人」后重新取数（后端筛，翻页后口径仍然一致）
   const picksKey = `${breakdownPicks.join(",")}|${listView}|${sortBy}|${sortOrder}`
   const previousPicksRef = useRef(picksKey)
@@ -945,6 +1000,16 @@ export default function PrincipalPage() {
     }))
   }
   const updateRule = (patch: Partial<ConversionRule>) => setQuery(previous => ({ ...previous, rule: { ...previous.rule, ...patch } }))
+  const updateOverviewScope = (value: string) => {
+    resetPanel()
+    setSortBy("")
+    setSortOrder("asc")
+    setQuery(previous => ({ ...previous, course_view: "course", participant_scope: "" }))
+    setOverviewScopeType(value === "person" ? "person" : "organization")
+    if (value === "person") {
+      setSelectedReferrerId(previous => metadata?.referrers?.some(item => item.id === previous) ? previous : metadata?.referrers?.[0]?.id ?? "")
+    }
+  }
   function toggleSort(key: string) {
     if (sortBy === key) setSortOrder(order => order === "asc" ? "desc" : "asc")
     else { setSortBy(key); setSortOrder("asc") }
@@ -959,7 +1024,7 @@ export default function PrincipalPage() {
     setDealResultKey("")
     // 弹窗固定打开时的条件，复用公共分页与过期请求保护，不截断超过100笔的成交。
     setDealDetail({ customer: customerName, period: dateSummary,
-      query: { ...query, tab: "orders", breakdown: serverPicks, list_view: "order", customer_id: customerId },
+      query: { ...listQuery, tab: "orders", breakdown: serverPicks, list_view: "order", customer_id: customerId },
     })
   }
   function openTrafficRecords(customer: PrincipalBreakdownCustomer, type: PrincipalRecordType) {
@@ -1051,13 +1116,16 @@ export default function PrincipalPage() {
       return !childPrefixes(prefix).includes(pickPrefix(item))
     }))
   }
-  const selectOverviewGroup = (key: "deals" | "courses" | "traffic" | "invite") => {
+  const selectOverviewGroup = (key: "deals" | "courses" | "traffic" | "invite" | "participation") => {
     setQuery(current => ({ ...current, course_view: "course", participant_scope: "", invite_view: "arrive" }))
     setOverviewGroup(overviewGroup === key ? "" : key)
     resetPanel()
   }
   // 排序交给后端对「整批筛选结果」排（不是只排当前页），这里直接用返回顺序
   const sortedItems = pagination.paginatedItems
+  // 切到参与者时，分页里暂时还是上一视图的行。那些行没有 participants，直接当卡片画会把整页打进错误边界。
+  const participantCards = sortedItems.every(isCourseParticipantCard) ? sortedItems as unknown as CourseParticipantCard[] : []
+  const participantCardsPending = sortedItems.length > 0 && participantCards.length === 0
   // 与「自定义筛选」一致：名称、说明、可见范围在弹窗里填，保存成功后才进入「已保存」列表
   async function persistRule(name: string, description: string, scope: "private" | "shared", id?: string) {
     const trimmed = name.trim()
@@ -1095,7 +1163,7 @@ export default function PrincipalPage() {
   async function download() {
     if (!hasCurrentResult || pagination.loading || pagination.error) return
     setBusy(true); setError("")
-    try { const blob = await principalApi.download({ ...query, tab: listTab, list_view: listView, breakdown: serverPicks,
+    try { const blob = await principalApi.download({ ...listQuery, tab: listTab, list_view: listView, breakdown: serverPicks,
       ...(showTrafficList ? { export_view: "traffic" as const, sort_by: trafficSortBy, sort_order: trafficSortOrder,
         breakdown: breakdownPicks, detail_quick_filter: quickFilterKey } : {}),
       ...(showInviteArriveList ? { export_view: "invite_arrivals" as const, arrival_view: inviteArriveView,
@@ -1109,7 +1177,7 @@ export default function PrincipalPage() {
     setBusy(true); setError("")
     try {
       const blob = await principalApi.download({
-        ...query,
+        ...listQuery,
         tab: "overview",
         invite_view: "initiated",
         export_view: "invite_initiated",
@@ -1148,7 +1216,33 @@ export default function PrincipalPage() {
     const rate = (count: number, total: number) => total > 0 ? `${Math.round(count * 1000 / total) / 10}%` : "0%"
     return `（${breakdown?.purchase_rules_configured ? "体验" : "体验卡"} ${rate(item.trial_count ?? 0, item.count)} · 升单 ${rate(item.upsell_count ?? 0, item.consumer_count ?? 0)}）`
   }
-  const panelSelects: { label: string; prefix: string; placeholder: string; multi?: boolean; items: { value: string; label: string; text: string; note?: string; compactText?: boolean; muted?: boolean }[] }[] = []
+  const panelSelects: { label: string; prefix: string; placeholder: string; multi?: boolean; items: { value: string; label: string; text: string; note?: string; compactText?: boolean; muted?: boolean; groupLabel?: string }[] }[] = []
+  const selectedParticipationTypes = picksOf("participation_type:")
+  const showParticipationOwners = !selectedParticipationTypes.length
+    || selectedParticipationTypes.some(kind => !PARTICIPANT_ONLY_ACTIVITY_TYPES.has(kind))
+  if (overviewGroup === "participation") {
+    const participation = breakdown?.participation
+    const participationOption = (item: NonNullable<PrincipalBreakdown["participation"]>["by_type"][number], prefix: string) => {
+      const showOwners = prefix === "participation_type"
+        ? !PARTICIPANT_ONLY_ACTIVITY_TYPES.has(item.key) : showParticipationOwners
+      return {
+        value: `${prefix}:${item.key}`, label: item.label,
+        text: showOwners ? `案主 ${item.owner_count} 次 · 参与者 ${item.participant_count} 次` : `参与者 ${item.participant_count} 次`,
+        compactText: true,
+      }
+    }
+    panelSelects.push({ label: "活动类型", prefix: "participation_type", placeholder: "全部",
+      items: (participation?.by_type ?? []).map(item => participationOption(item, "participation_type")) })
+    if (selectedParticipationTypes.includes("class")) {
+      const salonType = participation?.by_type.find(item => item.key === "class")
+      panelSelects.push({ label: "沙龙类型", prefix: "participation_course", placeholder: "全部",
+        items: groupedSalonCourses(salonType?.subtypes ?? [], metadata?.organizations ?? []).map(item => ({
+          ...participationOption(item, "participation_course"), groupLabel: item.groupLabel,
+        })) })
+    }
+    panelSelects.push({ label: "参与者", prefix: "participation_person", placeholder: "全部",
+      items: (participation?.by_participant ?? []).map(item => participationOption(item, "participation_person")) })
+  }
   if (overviewGroup === "deals") {
     panelSelects.push({
       label: "付费项目", prefix: "deals", placeholder: "全部",
@@ -1167,15 +1261,23 @@ export default function PrincipalPage() {
   if (overviewGroup === "courses") {
     const types = breakdown?.courses?.by_type ?? []
     panelSelects.push({
-      label: "课程类型", prefix: "type", placeholder: "全部",
+      label: "活动类型", prefix: "type", placeholder: "全部",
       items: types.map(item => ({ value: `type:${item.key}`, label: item.label, text: `${item.count} 场 · ${item.hours ?? 0} 课时` })),
     })
-    // 选了某个类型，再列这个类型下面每个具体课程各开了多少场
+    // 沙龙按类型统计，同一组织的类型收在一条灰色组织名下面；其他活动仍按活动名称
     const type = types.find(item => picksOf("type:").includes(item.key))
-    if (type?.subtypes?.length) panelSelects.push({
-      label: "具体课程", prefix: "course", placeholder: "全部",
-      items: type.subtypes.map(item => ({ value: `course:${item.key}`, label: item.label, text: `${item.count} 场 · ${item.hours ?? 0} 课时` })),
-    })
+    if (type?.subtypes?.length) {
+      const salon = type.key === "沙龙活动"
+      const textOf = (item: { count: number; hours?: number }) => `${item.count} 场 · ${item.hours ?? 0} 课时`
+      panelSelects.push({
+        label: salon ? "沙龙类型" : "课程名称", prefix: "course", placeholder: "全部",
+        items: salon
+          ? groupedSalonCourses(type.subtypes, metadata?.organizations ?? []).map(item => ({
+              value: `course:${item.key}`, label: item.label, text: textOf(item), groupLabel: item.groupLabel,
+            }))
+          : type.subtypes.map(item => ({ value: `course:${item.key}`, label: item.label, text: textOf(item) })),
+      })
+    }
     panelSelects.push({
       label: "课程老师", prefix: "teacher", placeholder: "全部",
       items: (breakdown?.courses?.by_teacher ?? []).map(item => ({ value: `teacher:${item.key}`, label: item.label, text: `${item.count} 场 · ${item.hours ?? 0} 课时` })),
@@ -1196,7 +1298,7 @@ export default function PrincipalPage() {
     })
     panelSelects.push({
       label: "引流人", prefix: "traffic", placeholder: "全部",
-      items: (breakdown?.traffic ?? []).map(item => ({
+      items: (breakdown?.invite_traffic ?? breakdown?.traffic ?? []).map(item => ({
         value: `traffic:${item.key}`,
         label: item.label,
         text: `邀约到店 ${item.invite_count ?? 0} 次`,
@@ -1283,12 +1385,17 @@ export default function PrincipalPage() {
     { id: "invite", group: "invite" as const, title: "邀约到店", value: `${trafficVisitStats.invitedCount}`, unit: "次",
       sub: `取消 ${trafficVisitStats.cancelledCount} · 未到场 ${trafficVisitStats.noShowCount} · 已到场 ${trafficVisitStats.arrivedCount}`,
       help: <>统计周期内邀约页面里的客户总数</> },
+    { id: "participation", group: "participation" as const, title: "活动参与", value: `${result?.summary["活动参与次数"] ?? "—"}`, unit: "次",
+      sub: `案主 ${result?.summary["活动案主次数"] ?? "—"} 次 · 参与者 ${result?.summary["活动参与者次数"] ?? "—"} 次`,
+      help: <>{personalScope ? "按所选个人引流来的客户" : "按已配置成员"}统计所选时间内实际到场参与活动的次数，包含跨组织活动。沙龙活动、沙龙技能学习只统计参与者；其他活动区分案主与参与者。老师等其他身份不计入。多场逐场累计，重叠人员不重复计算。</> },
     { id: "courses", group: "courses" as const, title: "课程数据", value: `${result?.summary["课程数"] ?? "—"}`, unit: "场",
-      sub: `总 ${result?.summary["课时数"] ?? "—"} 课时`, help: null },
+      sub: `总 ${result?.summary["课时数"] ?? "—"} 课时`,
+      help: personalScope ? <>统计所选时间内引流客户实际到场的课程。同一场课程有多位客户参加只计一场，人数、名单与成交仅统计这些引流客户。</> : null },
     { id: "deals", group: "deals" as const, title: "成交量", value: `${result?.summary["交易笔数"] ?? "—"}`, unit: "笔",
       sub: `会员卡 ${(breakdown?.deals ?? []).filter(item => item.key === "membership").reduce((sum, item) => sum + item.count, 0)} 笔 · 其他 ${(breakdown?.deals ?? []).filter(item => item.key !== "membership").reduce((sum, item) => sum + item.count, 0)} 笔`, help: null },
   ]
   const productTotals = overviewMetrics?.traffic_products ?? []
+  const participationTotals = breakdown?.participation?.totals
   const scopeNumber = (key: string, fallback: string | number | undefined) => listScope?.[key] ?? fallback ?? "—"
   const panelMetrics: {
     label: string; text: string; hint?: string; help?: ReactNode
@@ -1302,7 +1409,15 @@ export default function PrincipalPage() {
     courseDeal?: "" | "same_day" | "related"
     /** 与主指标合并展示的第二项课程成交数据 */
     secondaryCourseDeal?: { label: string; text: string; value: "same_day" | "related" }
-  }[] = overviewGroup === "deals"
+  }[] = overviewGroup === "participation"
+    ? [
+      { label: "活动参与次数", text: `${participationTotals?.count ?? 0} 次`,
+        sub: <div className="flex flex-wrap gap-x-4 gap-y-1">{showParticipationOwners && <span>案主 {participationTotals?.owner_count ?? 0} 次</span>}<span>参与者 {participationTotals?.participant_count ?? 0} 次</span></div> },
+      { label: "活动参与人数", text: `${participationTotals?.people ?? 0} 人`,
+        sub: <div className="flex flex-wrap gap-x-4 gap-y-1">{showParticipationOwners && <span>案主 {participationTotals?.owner_people ?? 0} 人</span>}<span>参与者 {participationTotals?.participant_people ?? 0} 人</span></div>,
+        help: <>同一成员多次参与只算一人。{showParticipationOwners && <>案主人数、参与者人数分别去重；同一成员有过两种身份时，总人数只算一人。</>}</> },
+    ]
+    : overviewGroup === "deals"
     ? [
       { label: "成交量", text: `${scopeNumber("成交量", result?.summary["交易笔数"])} 笔` },
       { label: "总成交人数", text: `${scopeNumber("成交人数", result?.summary["成交人数"])} 人` },
@@ -1353,10 +1468,12 @@ export default function PrincipalPage() {
         ]
         : []
   const showTrafficList = query.tab === "overview" && overviewGroup === "traffic"
+  const showParticipationOverview = query.tab === "overview" && overviewGroup === "participation"
   const showCourseDealOverviewList = query.tab === "overview" && (overviewGroup === "courses" || overviewGroup === "deals")
   const showTeacherFollowUpList = (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses")) && query.course_view === "teacher_follow_up"
   const showInviteListTabs = query.tab === "overview" && overviewGroup === "invite"
   const showInviteArriveList = showInviteListTabs && (query.invite_view || "arrive") === "arrive"
+  const showInviteDateCards = showInviteArriveList && inviteArriveView === "date"
   const showInviteInitiatedList = showInviteListTabs && query.invite_view === "initiated"
   const sortedInviteDetailRecords = inviteDetails.paginatedItems
   const toggleInviteDetailSort = (field: string) => {
@@ -1390,8 +1507,18 @@ export default function PrincipalPage() {
   // 参与者视图单独一套列宽（课程名 +40px、人员类型 -60px）
   const participantTableView = (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses"))
     && query.course_view === "participant"
+  // 课程记录把活动类型放在课程名下面，不再单独占一列
+  const courseRecordTable = (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses"))
+    && (query.course_view || "course") === "course"
+  const listColumns = courseRecordTable
+    ? (result?.columns ?? []).filter(column => column.key !== "type")
+    : (result?.columns ?? [])
   // 参与者视图用固定 px 列宽（内联样式），其它视图仍用百分比
-  const columnWidthClass = (key: string) => (participantTableView ? "" : (COLUMN_WIDTH[key] ?? ""))
+  const columnWidthClass = (key: string) => {
+    if (participantTableView) return ""
+    if (courseRecordTable && key === "name") return "w-[calc(18%-14px)]"
+    return COLUMN_WIDTH[key] ?? ""
+  }
   const columnWidthStyle = (key: string, label: string) => {
     const min = headerMinWidth(key, label)
     if (key === "same_day_deals" && (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses"))) {
@@ -1401,7 +1528,7 @@ export default function PrincipalPage() {
     return { width: Math.max(PARTICIPANT_COLUMN_WIDTH[key] ?? 0, min), minWidth: min }
   }
   // 表格最小宽度＝各列表头所需宽度之和：比它还窄才会横向滚动，正常情况下不会把表格撑出卡片
-  const listTableMinWidth = (result?.columns ?? []).reduce((total, column) => total + headerMinWidth(column.key, column.label), 0)
+  const listTableMinWidth = listColumns.reduce((total, column) => total + headerMinWidth(column.key, column.label), 0)
   const toggleTrafficSort = (field: string) => {
     setTrafficPage(1)
     setInviteArrivePage(1)
@@ -1647,11 +1774,12 @@ export default function PrincipalPage() {
                 size="sm"
                 className="w-[160px]"
                 value={query.organization_id}
-                options={[{ value: "", label: "全部可见组织/俱乐部" }, ...(metadata?.organizations || []).map(org => ({ value: org.id, label: org.name }))]}
+                options={organizationOptions}
                 onChange={organization_id => update({ organization_id })}
                 buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[11px] !shadow-none"
                 placeholderColor="text-[#8f959e]"
               />
+              {archivedScopeControl}
             </>}
           />
         ) : (
@@ -1660,15 +1788,35 @@ export default function PrincipalPage() {
             <div className="flex items-center gap-3">
               <span className="inline-flex w-[62px] shrink-0 items-center gap-[10px] text-[12px] text-[#8f959e]"><span className="h-3 w-[2.5px] rounded-[1px] bg-[#d0d3d6]"></span>范围</span>
               <div className="flex flex-wrap items-center gap-2">
+                {query.tab === "overview" && <SelectDropdown
+                  size="sm"
+                  className="w-[130px]"
+                  value={overviewScopeType}
+                  options={[{ value: "organization", label: "组织/俱乐部" }, { value: "person", label: "个人" }]}
+                  onChange={updateOverviewScope}
+                  buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2 !text-[11px] !shadow-none"
+                />}
+                {personalScope ? <SelectDropdown
+                  size="sm"
+                  className="w-[180px]"
+                  value={selectedReferrerId}
+                  options={(metadata?.referrers ?? []).map(item => ({ value: item.id, label: item.name, rightLabel: `引流 ${item.count} 人` }))}
+                  hideRightLabelInTrigger
+                  disabled={!metadata?.referrers?.length}
+                  placeholder={metadata ? "暂无有引流人数的个人" : "加载中…"}
+                  onChange={value => { resetPanel(); setSelectedReferrerId(value) }}
+                  buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2 !text-[11px] !shadow-none"
+                /> :
                 <SelectDropdown
                   size="sm"
                   className="w-[150px]"
                   value={query.organization_id}
-                  options={[{ value: "", label: "全部可见组织/俱乐部" }, ...(metadata?.organizations || []).map(org => ({ value: org.id, label: org.name }))]}
+                  options={organizationOptions}
                   onChange={organization_id => update({ organization_id })}
                   buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2 !text-[11px] !shadow-none"
                   placeholderColor="text-[#8f959e]"
-                />
+                />}
+                {!personalScope && archivedScopeControl}
                 {/* 经营概况那边的付费项目筛选已经挪到展开面板里，这里只留给「交易记录」用 */}
                 {query.tab === "orders" && (
                   <SelectDropdown
@@ -1733,6 +1881,7 @@ export default function PrincipalPage() {
               <AnalysisPeriodFilter
                 variant="inline"
                 label=""
+                datePickerWidthClassName="w-[142px]"
                 dateFrom={query.date_from || ""}
                 dateTo={query.date_to || ""}
                 onChange={({ date_from, date_to }) => update({ date_from: date_from || null, date_to: date_to || null })}
@@ -1867,20 +2016,16 @@ export default function PrincipalPage() {
       {!pagination.error && result && query.tab === "overview" && (
         /* 经营概况：引流人数、邀约到店人次、课程与成交。 */
         <div className="mt-4 border-t border-[#f0f0f0] pt-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {overviewCards.map(card => {
-              const isPrimaryCard = card.id === card.group
-              const active = isPrimaryCard && overviewGroup === card.group
+              const group = card.group
+              const active = overviewGroup === group
               return (
                 <button
                   key={card.id}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => {
-                    if (isPrimaryCard) selectOverviewGroup(card.group)
-                    else if (card.group === "invite") selectOverviewGroup("invite")
-                    else if (overviewGroup !== "traffic") selectOverviewGroup("traffic")
-                  }}
+                  onClick={() => selectOverviewGroup(group)}
                   className={`group min-w-0 rounded-[8px] border px-4 py-3.5 text-left transition-all ${active
                     ? "border-[#c7d7f7] bg-white shadow-[0_1px_6px_rgba(51,112,255,.07)]"
                     : "border-[#e8eaed] bg-white hover:border-[#d5dbe6] hover:shadow-[0_2px_10px_rgba(31,35,41,.05)]"}`}
@@ -1900,13 +2045,13 @@ export default function PrincipalPage() {
                       <div className="mt-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
                         {!isEmptyMetric(card.value) && (
                           <span className="flex items-baseline gap-1">
-                            <span className="text-[26px] font-semibold leading-none text-[#1f2329] tabular-nums">{card.value}</span>
+                            <span className="text-[22px] font-semibold leading-none text-[#1f2329] tabular-nums">{card.value}</span>
                             <span className="text-[12px] text-[#8f959e]">{card.unit}</span>
                           </span>
                         )}
                       </div>
                     )}
-                  <div className="mt-2 truncate text-[11.5px] text-[#9aa1a9]" title={card.sub}>{card.sub}</div>
+                  <div className={`mt-2 text-[10.5px] text-[#9aa1a9] ${group === "participation" ? "leading-5" : "truncate"}`} title={card.sub}>{card.sub}</div>
                 </button>
               )
             })}
@@ -1916,7 +2061,7 @@ export default function PrincipalPage() {
             <div className="mt-3 overflow-hidden rounded-[8px] border border-[#e8eaed] bg-white">
               <div className="flex min-w-0 items-center gap-2 border-b border-[#f2f3f5] bg-[#fafbfc] px-4 py-2">
                 <span className="shrink-0 text-[12px] text-[#646a73]">{overviewCards.find(item => item.id === overviewGroup)?.title ?? overviewCards.find(item => item.group === overviewGroup)?.title}明细</span>
-                <span className="shrink-0 text-[11px] text-[#b0b5bb]">按下面的维度筛选列表</span>
+                <span className="shrink-0 text-[11px] text-[#b0b5bb]">{showParticipationOverview ? "按下面的维度筛选统计" : "按下面的维度筛选列表"}</span>
                 {(breakdownPicks.length > 0 || trafficQuickFilter || query.course_deal) && (
                   <button type="button" onClick={resetPanel} className="ml-auto shrink-0 text-[11px] text-[#8f959e] hover:text-[#3370ff]">清除全部</button>
                 )}
@@ -1932,6 +2077,7 @@ export default function PrincipalPage() {
                     rightNote: item.note,
                     rightLabelClassName: item.compactText ? "text-[11px]" : undefined,
                     muted: item.muted,
+                    groupLabel: item.groupLabel,
                   }))
                   const active = !!(group.multi ? chosenValues.length : chosen)
                   return (
@@ -1978,7 +2124,7 @@ export default function PrincipalPage() {
                             active ? "!text-[#3370ff]" : "!text-[#8f959e]"
                           }`}
                           placeholderColor="text-[#8f959e]"
-                          dropdownWidth={overviewGroup === "traffic" && group.prefix === "traffic" ? 320 : 260}
+                          dropdownWidth={overviewGroup === "participation" || (overviewGroup === "courses" && group.label === "沙龙类型") ? 340 : overviewGroup === "traffic" && group.prefix === "traffic" ? 320 : 260}
                           menuMaxHeight={280}
                           hideRightLabelInTrigger
                         />
@@ -2115,7 +2261,23 @@ export default function PrincipalPage() {
       )}
 
       {/* 与「自定义筛选」的结果区一致：带 0.5px 边框的容器 + 表头栏 */}
-      <div ref={listCardRef} className="mt-4 min-h-[640px] overflow-hidden border-[0.5px] border-[#eceef0] bg-white">
+      {showParticipationOverview && <MemberParticipationList query={listQuery} period={dateSummary} showOwners={showParticipationOwners} onOpenCustomer={customerId => { setDetailCourseId(""); setDetailCustomerId(customerId) }} />}
+      {showInviteDateCards && <div ref={listCardRef}>
+        <InviteArrivalDateList
+          query={listQuery}
+          period={dateSummary}
+          busy={busy}
+          exportDisabled={busy || pagination.loading || !!pagination.error || !hasCurrentResult}
+          onExport={download}
+          onViewChange={value => { setInviteArriveView(value); setInviteArrivePage(1) }}
+          onInviteViewChange={value => {
+            setSortBy("")
+            setQuery(current => ({ ...current, invite_view: value }))
+          }}
+          onOpenCustomer={customerId => { setDetailCourseId(""); setDetailCustomerId(customerId) }}
+        />
+      </div>}
+      {!showParticipationOverview && !showInviteDateCards && <div ref={listCardRef} className={participantTableView ? "mt-4" : "mt-4 min-h-[640px] overflow-hidden border-[0.5px] border-[#eceef0] bg-white"}>
         {(query.tab === "courses" || showInviteListTabs || (query.tab === "overview" && overviewGroup === "courses")) && (
           <div className="flex flex-wrap items-center gap-4 border-b border-[#eceef0] px-3.5 py-2">
             {/* 分段控件：浅灰底槽 + 白底选中（细阴影），比下划线明显，又不像蓝底那样抢视觉 */}
@@ -2150,7 +2312,7 @@ export default function PrincipalPage() {
               <span className="shrink-0 text-[12px] text-[#8f959e]">
                 {showInviteInitiatedList
                   ? `共 ${inviteInitiatorRows.length} 位邀约人 · ${inviteInitiatedTotal} 人次`
-                  : `共 ${showInviteArriveList ? arrivalDetails.totalItems : showTrafficList ? trafficDetails.totalItems : pagination.totalItems} 条`}
+                  : `共 ${showInviteArriveList ? arrivalDetails.totalItems : showTrafficList ? trafficDetails.totalItems : pagination.totalItems} ${participantTableView ? "堂" : "条"}`}
               </span>
             )}
             {pagination.loading && <span className="shrink-0 text-[11px] text-[#b0b5bb]">查询中…</span>}
@@ -2253,7 +2415,7 @@ export default function PrincipalPage() {
                   {expandNames ? "缩略" : "展开"}
                 </button>
               )}
-              {showTeacherFollowUpList && (
+              {(showTeacherFollowUpList || participantTableView && metadata?.can_view_follow_up) && (
                 <button type="button" onClick={() => setExpandTeacherFollowUp(value => !value)} aria-pressed={expandTeacherFollowUp}
                   className="flex h-7 shrink-0 items-center rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7]">
                   {expandTeacherFollowUp ? "缩略" : "展开"}
@@ -2489,6 +2651,21 @@ export default function PrincipalPage() {
               onPageChange={setTrafficPage}
             />
           </>
+        ) : participantTableView && !pagination.error ? (
+          <>
+            <CourseParticipantList
+              cards={participantCards}
+              query={listQuery}
+              loading={pagination.loading || participantCardsPending}
+              showFeedback={metadata?.can_view_follow_up === true}
+              expandedFeedback={expandTeacherFollowUp}
+              onOpenFeedback={(person, card) => setTeacherFollowUpDetail({
+                ...person, date: card.date, name: card.name, type: card.type, teachers: card.teachers, course_id: card.course_id,
+              } as unknown as PrincipalRow)}
+              onOpenCustomer={(customerId, courseId) => { setDetailCourseId(courseId); setDetailCustomerId(customerId) }}
+            />
+            <PaginationBar currentPage={pagination.currentPage} totalPages={pagination.totalPages} totalItems={pagination.totalItems} startIndex={pagination.startIndex} endIndex={pagination.endIndex} onPageChange={pagination.goToPage} />
+          </>
         ) : showTeacherFollowUpList && !pagination.error ? (
           <>
             <TeacherFollowUpList
@@ -2508,7 +2685,7 @@ export default function PrincipalPage() {
             <Table className="w-full table-fixed" style={{ minWidth: listTableMinWidth }}>
               <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
                 <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
-                  {result?.columns.map((c, i) => {
+                  {listColumns.map((c, i) => {
                     const isNum = NUMBER_COLUMNS.has(c.key)
                     const sortable = !UNSORTABLE_COLUMNS.has(c.key)
                     return (
@@ -2546,8 +2723,8 @@ export default function PrincipalPage() {
                 {sortedItems.map(row => {
                   const hasDetails = row.details?.length > 0
                   return (
-                  <TableRow key={row.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
-                    {result?.columns.map((c, i) => {
+                  <TableRow key={row.id} className={`group border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa] ${courseRecordTable ? "h-auto" : "h-11"}`}>
+                    {listColumns.map((c, i) => {
                       const isNumber = NUMBER_COLUMNS.has(c.key) || typeof row[c.key] === "number"
                       const isFollowUpText = query.course_view === "teacher_follow_up" && ["visit_need", "customer_info", "follow_up"].includes(c.key)
                       // 只有「有数」的数字才可点：0 或空值点了也看不到东西
@@ -2556,6 +2733,8 @@ export default function PrincipalPage() {
                         // 课时数、到场人数、累计课程/课时不参与明细点击，避免误点；成交笔数可点，但不做成蓝色
                         && !["hours", "participants", "org_participation_count", "org_participation_hours"].includes(c.key)
                       const accentClickable = clickable && !["deal_count", "order_count", "same_day_deals"].includes(c.key)
+                      const courseNameCell = courseRecordTable && c.key === "name"
+                      const expandedNames = expandNames && (c.key === "new_names" || c.key === "old_names")
                       return (
                       <TableCell
                         key={c.key}
@@ -2566,10 +2745,16 @@ export default function PrincipalPage() {
                           ? `这个客户在这批数据里共 ${row.deal_count} 笔，点开看全部`
                           : c.key === "classification" && Number(row.repeat_times) > 1
                             ? `第 ${row.repeat_times} 次购买同一个卡种/具体项目，已经复购 ${Number(row.repeat_times) - 1} 次`
+                          : courseNameCell ? undefined
                           : COLUMN_CELL[c.key] && String(row[c.key] ?? "") ? String(row[c.key]) : undefined}
-                        className={`${isFollowUpText ? "whitespace-pre-wrap break-words py-2 align-top" : expandNames && (c.key === "new_names" || c.key === "old_names") ? "whitespace-normal break-words py-2 align-top" : "h-11 overflow-hidden text-ellipsis py-0"} ${showCourseDealOverviewList ? "!px-3" : "!px-2"} text-[12px] ${i === 0 ? (showCourseDealOverviewList ? "!pl-4 !pr-1" : "!pl-3") : ""} ${COLUMN_WIDTH[c.key] || ""} ${COLUMN_CELL[c.key] || ""} ${isNumber ? "text-right tabular-nums" : ""} ${clickable ? "cursor-pointer hover:underline" : ""} ${accentClickable ? "text-[#3370ff]" : ""}`}
+                        className={`${isFollowUpText ? "whitespace-pre-wrap break-words py-2 align-top" : courseNameCell || expandedNames ? "whitespace-normal break-words py-2 align-middle" : courseRecordTable ? "overflow-hidden text-ellipsis py-2 align-middle" : "h-11 overflow-hidden text-ellipsis py-0"} ${showCourseDealOverviewList ? "!px-3" : "!px-2"} text-[12px] ${i === 0 ? (showCourseDealOverviewList ? "!pl-4 !pr-1" : "!pl-3") : ""} ${columnWidthClass(c.key)} ${courseNameCell ? "font-medium text-[#2b2f36]" : (COLUMN_CELL[c.key] || "")} ${isNumber ? "text-right tabular-nums" : ""} ${clickable ? "cursor-pointer hover:underline" : ""} ${accentClickable ? "text-[#3370ff]" : ""}`}
                       >
-                        {c.key === "customer" && row.customer_id ? (
+                        {courseNameCell ? (
+                          <span className="block min-w-0">
+                            <span className="block truncate leading-4" title={String(row.name ?? "")}>{String(row.name ?? "") || <EmptyValue />}</span>
+                            <span className="mt-0.5 block truncate text-[11px] font-normal leading-4 text-[#8f959e]" title={String(row.type ?? "")}>{String(row.type ?? "") || <EmptyValue />}</span>
+                          </span>
+                        ) : c.key === "customer" && row.customer_id ? (
                           <button
                             type="button"
                             onClick={() => { setDetailCourseId(String(row.course_id || "")); setDetailCustomerId(String(row.customer_id)) }}
@@ -2603,6 +2788,9 @@ export default function PrincipalPage() {
                           </span>
                         ) : c.key === "same_day_deals" && (query.tab === "courses" || (query.tab === "overview" && overviewGroup === "courses")) ? (
                           Number(row[c.key]) > 0 ? `${Number(row[c.key])} 笔` : <EmptyValue />
+                        ) : ["hours", "org_participation_hours", "participants"].includes(c.key) ? (
+                          row[c.key] !== undefined && row[c.key] !== null && row[c.key] !== ""
+                            ? `${row[c.key]} ${c.key === "participants" ? "人" : "课时"}` : <EmptyValue />
                         ) : String(row[c.key] ?? "") || <EmptyValue />}
                       </TableCell>
                       )
@@ -2617,7 +2805,7 @@ export default function PrincipalPage() {
             <PaginationBar currentPage={pagination.currentPage} totalPages={pagination.totalPages} totalItems={pagination.totalItems} startIndex={pagination.startIndex} endIndex={pagination.endIndex} onPageChange={pagination.goToPage} />
           </>
         ) : null}
-      </div>
+      </div>}
       </section>
 
     <Dialog open={!!inviteDetail} onOpenChange={open => { if (!open) setInviteDetail(null) }}>

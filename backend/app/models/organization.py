@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Literal, Optional
+
+from pydantic import Field
 
 from app.models.base import SafeBaseModel
 
@@ -26,9 +28,18 @@ class OrganizationDataViewersUpdate(SafeBaseModel):
     data_viewer_ids: List[str] = []
 
 
+class OrganizationArchive(SafeBaseModel):
+    stopped_on: date
+    reason: str = Field(default="", max_length=500)
+
+
 class Organization(OrganizationBase):
     id: str
     created_at: datetime
     updated_at: datetime
+    status: Literal["active", "archived"] = "active"
+    stopped_on: Optional[date] = None
+    archive_reason: str = ""
+    archived_at: Optional[datetime] = None
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None

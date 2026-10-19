@@ -26,8 +26,20 @@ function harness() {
       else this.data[key] = value
     }
   } }
+  instance.data.selectedCustomer = { id: 'customer-1', nickname: '客户甲' }
   return { instance, requests }
 }
+
+test('未选择客户时不查询成交课程，避免展示不属于客户的课程', () => {
+  const { instance, requests } = harness()
+  instance.data.selectedCustomer = null
+  instance.data.formData = { deal_date: '2026-10-18' }
+  instance._loadDealCourses('2026-10-18')
+  assert.equal(requests.length, 0)
+  assert.equal(instance.data.dealCourseLoading, false)
+  assert.equal(instance.data.dealCourseOptions.length, 1)
+  assert.equal(instance.data.dealCourseOptions[0].key, '')
+})
 
 test('线下落地课程按类型带出默认月份，编辑已存有效期不被默认值覆盖', () => {
   const { instance } = harness()
@@ -82,7 +94,7 @@ test('成交日期切换会清空旧选择；旧课程请求不能覆盖新日�
 
 test('编辑保留已保存课程；读取失败可以重试', async () => {
   const { instance, requests } = harness()
-  instance.data.formData = { deal_date: '2026-10-18', deal_course_key: 'saved', deal_course_name: '已存课程' }
+  instance._populateEditData({ customer_id: 'customer-1', nickname: '客户甲', deal_date: '2026-10-18', deal_course_key: 'saved', deal_course_name: '已存课程' })
   const failed = instance._loadDealCourses('2026-10-18')
   requests[0].reject(new Error('网络失败'))
   await failed

@@ -922,6 +922,28 @@ def test_service_people_are_deduplicated_across_courses_and_roles():
     }
 
 
+def test_participant_course_cards_keep_one_session_together():
+    rows = [
+        {"id": "lesson:participant:b", "course_id": "lesson", "customer_id": "b", "customer": "乙",
+         "date": "2026-01-02", "name": "《当下的力量》", "type": "沙龙活动", "course_subtype": "读书会",
+         "organization": "无忧茶院", "teachers": "王老师", "hours": 1,
+         "org_participation_count": 2, "org_participation_hours": 2},
+        {"id": "lesson:participant:a", "course_id": "lesson", "customer_id": "a", "customer": "甲",
+         "date": "2026-01-02", "name": "《当下的力量》", "type": "沙龙活动", "course_subtype": "读书会",
+         "organization": "无忧茶院", "teachers": "王老师", "hours": 1,
+         "org_participation_count": 4, "org_participation_hours": 4},
+        {"id": "other:participant:a", "course_id": "other", "customer_id": "a", "customer": "甲",
+         "date": "2026-01-01", "name": "觉醒一场", "type": "觉醒游戏", "course_subtype": "",
+         "organization": "无忧茶院", "teachers": "", "hours": 1,
+         "org_participation_count": 1, "org_participation_hours": 1},
+    ]
+    cards = service.participant_course_cards(rows)
+    assert [card["course_id"] for card in cards] == ["lesson", "other"]
+    lesson = cards[0]
+    assert lesson["name"] == "《当下的力量》" and lesson["course_subtype"] == "读书会" and lesson["count"] == 2
+    assert [person["customer"] for person in lesson["participants"]] == ["甲", "乙"]
+
+
 def test_course_participants_pagination_export_and_course_scope(monkeypatch):
     def person(cid, nickname, referrer=""):
         return NS(id=cid, nickname=nickname, name="", referrer=referrer)

@@ -58,6 +58,28 @@ def test_mobile_invite_numeric_sort_uses_numbers_not_text():
     assert ids.index("c0") < ids.index("c1")
 
 
+def test_mobile_arrival_date_groups_page_by_day_and_keep_visit_content():
+    customers = [{
+        "id": "c1", "name": "甲", "arrive_count": 0,
+        "invite_visits": [
+            {"id": "late", "arrive_date": "2026-09-02", "arrive_time": "19:00", "arrive_inviter": "王老师",
+             "needs": "想了解课程", "same_day_activities": "读书会、能量结", "same_day_deal_text": "会员卡 · 年卡",
+             "status": "cancelled", "status_label": "已取消"},
+            {"id": "early", "arrive_date": "2026-09-01", "arrive_time": "09:00", "status": "arrived", "status_label": "已到店"},
+        ],
+    }]
+    result = {"items": [], "total": 0, "summary": {}, "breakdown": {
+        "invite_traffic": [{"key": "老师", "label": "老师", "customers": customers}],
+        "traffic": [], "invite_inviters": [],
+    }}
+    first = mobile_result(result, PrincipalQuery(mobile_group="invite_arrive", arrival_view="date_group", page_size=1, sort_by="name"))
+    second = mobile_result(result, PrincipalQuery(mobile_group="invite_arrive", arrival_view="date_group", page=2, page_size=1))
+    assert first["total"] == 2 and first["items"][0]["date"] == "2026-09-02"
+    assert first["items"][0]["records"][0]["same_day_deal_text"] == "会员卡 · 年卡"
+    assert "invite_visits" not in first["items"][0]
+    assert second["items"][0]["date"] == "2026-09-01"
+
+
 def test_light_metadata_does_not_scan_historical_events(monkeypatch):
     monkeypatch.setattr(principal_api.principal_service, "scope", lambda _: (
         [NS(id="org", name="俱乐部")], {}, {"principal_scope": "all", "customer_access": {
@@ -66,5 +88,53 @@ def test_light_metadata_does_not_scan_historical_events(monkeypatch):
     ))
     monkeypatch.setattr(principal_api.principal_service, "collect_data", lambda *_args, **_kwargs: 1 / 0)
     result = principal_api.metadata(NS(), lite=True)
-    assert result["organizations"] == [{"id": "org", "name": "俱乐部"}]
+    assert result["organizations"] == [{"id": "org", "name": "俱乐部", "status": "active"}]
     assert result["can_view_follow_up"] is True
+
+
+def test_mobile_participation_pages_people_and_matches_pc_role_and_type_filters():
+    from copy import deepcopy
+
+    result = _result()
+    result['breakdown']['participation'] = {'members': [
+        {'id': f'm{i:02d}', 'name': f'成员{i:02d}', 'activities': [
+            {'date': '2026-10-01', 'name': '觉醒游戏', 'type': '觉醒游戏', 'activity_type': 'gcs',
+             'course_key': 'game', 'role': '案主', 'teachers': '老师甲'},
+            *([{'date': '2026-10-02', 'name': '读书会', 'type': '沙龙活动', 'activity_type': 'class',
+                'course_key': '读书会', 'role': '参与者', 'teachers': '老师乙'}] if i % 2 else []),
+        ]} for i in range(25)
+    ]}
+    before = deepcopy(result)
+    first = mobile_result(result, PrincipalQuery(mobile_group='participation', page_size=20))
+    second = mobile_result(result, PrincipalQuery(mobile_group='participation', page=2, page_size=20))
+    assert first['total'] == second['total'] == 25
+    assert len(first['items']) == 20 and len(second['items']) == 5
+    assert first['total_pages'] == 2 and second['page'] == 2
+    assert len({row['id'] for row in first['items'] + second['items']}) == 25
+    assert [row['count'] for row in first['items'] + second['items']] == [2] * 12 + [1] * 13
+    assert 'members' not in first['breakdown']['participation']
+    assert first['items'][0]['owner_count'] == first['items'][0]['participant_count'] == 1
+    assert first['items'][0]['activities'][0]['teachers'] == '老师甲'
+    selected = mobile_result(result, PrincipalQuery(mobile_group='participation', breakdown=['participation_type:class', 'participation_course:读书会']))
+    assert selected['total'] == 12
+    assert all(row['count'] == row['participant_count'] == 1 and row['owner_count'] == 0 for row in selected['items'])
+    assert all(row['activities'][0]['type'] == '沙龙活动' for row in selected['items'])
+    assert result == before
+
+
+def test_mobile_participation_api_uses_person_scope_and_empty_or_out_of_range_pages(monkeypatch):
+    result = _result()
+    result['breakdown']['participation'] = {'members': []}
+    calls = []
+
+    def analyzed(_request, query):
+        calls.append(query)
+        return result
+
+    monkeypatch.setattr(principal_api.principal_query_cache, 'query_result', analyzed)
+    query = PrincipalQuery(scope_type='person', referrer_id='referrer', mobile_group='participation', page=9)
+    response = principal_api.query(query, NS(state=NS()))
+    assert calls == [query]
+    assert response['total'] == 0 and response['items'] == []
+    assert response['page'] == response['total_pages'] == 1
+    assert 'members' not in response['breakdown']['participation']

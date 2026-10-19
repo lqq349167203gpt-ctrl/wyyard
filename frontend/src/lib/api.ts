@@ -49,15 +49,17 @@ export interface PrincipalQuery {
   export_view?: "" | "traffic" | "invite_initiated" | "invite_arrivals"
   export_customer_ids?: string[]
   export_columns?: string[]
-  arrival_view?: "customer" | "date"
+  arrival_view?: "customer" | "date" | "date_group"
   compact_overview?: boolean
-  overview_detail?: "" | "traffic" | "invite_arrivals" | "invite_initiated"
+  overview_detail?: "" | "traffic" | "invite_arrivals" | "invite_initiated" | "participation"
   overview_detail_key?: string
   detail_picks?: string[]
   detail_quick_filter?: string
   detail_sort_by?: string
   detail_sort_order?: "asc" | "desc"
   organization_id: string
+  scope_type?: "organization" | "person"
+  referrer_id?: string
   date_from: string | null
   date_to: string | null
   tab: "overview" | "courses" | "orders" | "conversion"
@@ -75,6 +77,10 @@ export interface PrincipalQuery {
   list_view?: "order" | "customer"
   course_view?: "course" | "participant" | "teacher_follow_up"
   participant_scope?: "" | "internal" | "external"
+  /** 参与者列表：courses＝一堂课一张卡片 */
+  participant_layout?: "rows" | "courses"
+  /** 累计课程明细：固定查看被点击课程所属的组织 */
+  participant_history_organization_id?: string
   /** 邀约二级列表：到店口径 / 发起口径（列内容后续再定） */
   invite_view?: "arrive" | "initiated"
   /** 排序整批数据（不是只排当前页），字段名用列的 key */
@@ -86,7 +92,8 @@ export interface PrincipalQuery {
 }
 export interface PrincipalOption { key: string; label: string; subtypes: string[] }
 export interface PrincipalMetadata {
-  organizations: { id: string; name: string }[]
+  organizations: { id: string; name: string; status?: "active" | "archived" }[]
+  referrers?: { id: string; name: string; count: number }[]
   products: PrincipalOption[]
   activity_types: PrincipalOption[]
   scope: "own" | "all"
@@ -176,13 +183,58 @@ export interface PrincipalBreakdownItem {
   consumer_count?: number
   upsell_count?: number
 }
+export interface PrincipalParticipationStats {
+  count: number
+  owner_count: number
+  participant_count: number
+  people: number
+  owner_people: number
+  participant_people: number
+}
+export interface PrincipalParticipationOption extends PrincipalParticipationStats {
+  key: string
+  label: string
+  subtypes?: PrincipalParticipationOption[]
+}
+export interface PrincipalParticipationMember {
+  id: string
+  name: string
+  count: number
+  owner_count: number
+  participant_count: number
+  activities: Array<{ date: string; name: string; type: string; subtype: string; teachers: string; role: "案主" | "参与者" }>
+}
+export interface PrincipalArrivalDateGroup {
+  id: string
+  date: string
+  count: number
+  records: Array<{
+    id: string
+    customer_id: string
+    name: string
+    arrive_time: string
+    arrive_inviter: string
+    needs: string
+    same_day_activities: string
+    same_day_deal_text: string
+    status: "arrived" | "no_show" | "cancelled"
+    status_label: string
+  }>
+}
 export interface PrincipalBreakdown {
   purchase_rules_configured?: boolean
   record_period?: { from: string; to: string }
   deals?: PrincipalBreakdownItem[]
   buys?: PrincipalBreakdownItem[]
   courses?: { by_type: PrincipalBreakdownItem[]; by_teacher: PrincipalBreakdownItem[] }
+  participation?: {
+    overall: PrincipalParticipationStats
+    totals: PrincipalParticipationStats
+    by_type: PrincipalParticipationOption[]
+    by_participant: PrincipalParticipationOption[]
+  }
   traffic?: PrincipalBreakdownItem[]
+  invite_traffic?: PrincipalBreakdownItem[]
   /** 升单配置大类，顺序与配置页一致 */
   traffic_upsell_levels?: PrincipalBreakdownItem[]
   /** 邀约人维度：每人发起 / 邀约到店人次 */
@@ -1166,6 +1218,7 @@ export interface VisitRecord {
   customer_id: string
   nickname: string
   member_type: string
+  customer_tags?: CustomerTag[]
   referrer: string
   daily_card_usage: number
   needs: string
@@ -1356,6 +1409,10 @@ export const courseTypeApi = {
 
 // Organization (共创组织)
 export interface Organization {
+  status?: "active" | "archived"
+  stopped_on?: string | null
+  archive_reason?: string
+  archived_at?: string | null
   id: string
   name: string
   member_ids: string[]
@@ -1387,6 +1444,8 @@ export interface OrganizationCreate {
 
 export const organizationApi = {
   list: () => request<Organization[]>("/api/organizations"),
+  archive: (id: string, data: { stopped_on: string; reason: string }) => request<Organization>(`/api/organizations/${id}/archive`, { method: "POST", body: JSON.stringify(data) }),
+  restore: (id: string) => request<Organization>(`/api/organizations/${id}/restore`, { method: "POST" }),
   /** 全局整体数据查阅人：配置后默认属于每个组织 */
   listDataViewers: () => request<{ data_viewer_ids: string[] }>("/api/organizations/data-viewers"),
   setDataViewers: (data_viewer_ids: string[]) => request<{ data_viewer_ids: string[] }>("/api/organizations/data-viewers", {

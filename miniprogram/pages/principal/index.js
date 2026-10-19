@@ -1,6 +1,7 @@
 const { principalApi, customerApi } = require('../../utils/api')
 const { BASE_URL } = require('../../utils/config')
 const { followUpPlanText, noteRecordText } = require('../../utils/note-feedback-meta')
+const { MIN_DATE, clampRange, courseCard, participationRow, organizationScopeOptions } = require('../../utils/principal-view')
 // 引流客户列表的列（与 PC 的列表设置一致）：档案类字段只有该角色有权限时才出现
 const TRAFFIC_COLUMNS = [
   { key: 'name', label: '昵称（引流日期）' }, { key: 'referrer', label: '引流人' },
@@ -131,6 +132,25 @@ function saveColumnConfig(config, key = COLUMN_STORAGE_KEY) {
   try { wx.setStorageSync(key, config) } catch (e) { /* 存不上也不影响使用 */ }
 }
 
+/** 沙龙二级下拉：组织名做灰色分组，下面只列这个组织的沙龙类型。 */
+function groupSalonCourseOptions(subtypes, organizations) {
+  const rank = new Map((organizations || []).filter(item => item && item.id).map((item, index) => [item.name, index]))
+  const rows = (subtypes || []).map(item => {
+    const key = String(item.key || '')
+    const splitAt = key.indexOf('｜')
+    const organization = item.organization || (splitAt === -1 ? '未配置组织' : (key.slice(splitAt + 1) || '未配置组织'))
+    const label = splitAt === -1 ? item.label : (key.slice(0, splitAt) || item.label)
+    return { key, label, text: `${item.count} 场 · ${item.hours || 0} 课时`, organization }
+  })
+  rows.sort((left, right) => (rank.has(left.organization) ? rank.get(left.organization) : rank.size) - (rank.has(right.organization) ? rank.get(right.organization) : rank.size))
+  let previous = ''
+  return rows.map(item => {
+    const groupLabel = item.organization !== previous ? item.organization : ''
+    previous = item.organization
+    return { key: item.key, label: item.label, text: item.text, groupLabel }
+  })
+}
+
 function describeRule(rule, metadata) {
   const describe = action => {
     const prefix = action.occurrence === 'first' ? '首次' : action.occurrence === 'repeat' ? '再次' : ''
@@ -153,12 +173,14 @@ Page({
   data: {
     ruleSentence: '',
     canManageRule: false,
-    metadata: null, organizations: [{ id: '', name: '全部可见组织/俱乐部' }], orgIndex: 0,
+    includeArchived: false, metadata: null, organizations: [{ id: '', name: '全部可见组织/俱乐部' }], orgIndex: 0,
+    scopeTypes: ['组织/俱乐部', '个人'], scopeTypeIndex: 0, scopeTargetIndex: 0,
+    scopeTargets: [{ id: '', name: '全部可见组织/俱乐部' }], referrers: [], minDate: MIN_DATE,
     // 组织/俱乐部没有「课程记录/交易记录」这两个页面；转化分析按缓存的权限先挂上，接口回来再校正
     tabs: initialTabs(),
-    query: Object.assign({ organization_id: '', tab: 'overview', product: '', order_filter: '', status: '', rule: clone(INITIAL_RULE) }, monthRange()),
+    query: clampRange(Object.assign({ scope_type: 'organization', referrer_id: '', organization_id: '', tab: 'overview', product: '', order_filter: '', status: '', rule: clone(INITIAL_RULE) }, monthRange())),
     rules: [], ruleOptions: ['默认规则'], ruleIndex: 0, ruleId: '',
-    inviteView: 'arrive', arrivalView: 'customer', inviteToolMenuOpen: false, renderCourseView: 'course',
+    inviteView: 'arrive', arrivalView: 'date', inviteToolMenuOpen: false, renderCourseView: 'course', showArrivalDateCards: false,
     arrivalViewOptions: ['单个客户仅显示一次', '按日期显示每条邀约记录'],
     // 快捷周期：与 PC 一致，默认本月
   rangePresets: [{ key: 'today', label: '当天' }, { key: 'week', label: '本周' }, { key: 'month', label: '本月' }, { key: 'year', label: '本年' }, { key: 'all', label: '全部' }],
@@ -177,6 +199,7 @@ Page({
     panelSelects: [], trafficCustomersCount: 0, trafficDealTotal: 0, trafficDealsActive: false,
     trafficProductTotals: [],
     panelSheet: null, teacherDays: [], teacherDetail: null,
+    participantCards: false, historySheet: null, historyLoading: false,
     trafficQuickFilter: '',
     // 列表设置 / 排序 / 成交笔数弹窗
     columns: [], columnFields: [], columnSheetOpen: false, sortSheetOpen: false,
@@ -214,7 +237,7 @@ Page({
         principalApi.metadata(!conversion), conversion ? principalApi.rules() : Promise.resolve(this.data.rules),
       ])
       if (this.data.query.tab !== (conversion ? 'conversion' : 'overview')) {
-        this.setData({ organizations: [{ id: '', name: '全部可见组织/俱乐部' }, ...metadata.organizations] })
+        this.setData({ organizations: organizationScopeOptions(metadata.organizations, this.data.includeArchived, this.data.query.organization_id) })
         await dataPromise
         return
       }
@@ -225,9 +248,17 @@ Page({
       // 接口没带回权限时沿用缓存判断，不能把已经显示的这一栏又拿掉
       const tabs = [OVERVIEW_TAB]
       const transactionAccess = metadata.transaction_access || ((wx.getStorageSync('userEditPermissions') || {}).customer_access || {}).transaction_access
-      if (transactionAccess === 'detail') tabs.push(CONVERSION_TAB)
-      this.setData({ metadata, tabs, rules, ruleOptions: ['默认规则', ...rules.map(ruleLabel)], organizations: [{ id: '', name: '全部可见组织/俱乐部' }, ...metadata.organizations] })
+      if (transactionAccess === 'detail' && this.data.query.scope_type !== 'person') tabs.push(CONVERSION_TAB)
+      const includeArchived = this.data.includeArchived || (metadata.organizations || []).some(org => org.id === this.data.query.organization_id && org.status === 'archived')
+      const organizations = organizationScopeOptions(metadata.organizations, includeArchived)
+      const referrers = (metadata.referrers || []).filter(item => item.count > 0)
+      const personal = this.data.query.scope_type === 'person'
+      const scopeTargets = personal ? (referrers.length ? referrers : [{ id: '', name: '暂无有引流客户的个人' }]) : organizations
+      const selectedId = personal ? this.data.query.referrer_id : this.data.query.organization_id
+      const scopeTargetIndex = Math.max(0, scopeTargets.findIndex(item => item.id === selectedId))
+      this.setData({ metadata, includeArchived, tabs, rules, ruleOptions: ['默认规则', ...rules.map(ruleLabel)], organizations, referrers, scopeTargets, scopeTargetIndex })
       await dataPromise
+      if (personal && !selectedId && scopeTargets[0].id) this.applyFilters({ referrer_id: scopeTargets[0].id })
       if (conversion) this.ensureRuleFields()
     } catch (e) {
       // 数据源错配是最常见的失败原因，直接把当前数据源写在提示里，省得来回猜
@@ -263,19 +294,20 @@ Page({
       // 经营概况里点开「成交量」时列表要按交易记录取（与 PC 的 listTab 一致）
       const listTab = this.data.query.tab === 'overview' && this.data.overviewGroup === 'deals' ? 'orders' : this.data.query.tab
       const baseQuery = {
-        ...this.data.query, breakdown: this.data.picks, sort_by: this.data.sortField, sort_order: this.data.sortOrder,
+        ...clampRange(this.data.query), breakdown: this.data.picks, sort_by: this.data.sortField, sort_order: this.data.sortOrder,
         list_view: this.data.listViewIndex === 1 ? 'customer' : 'order',
+        participant_layout: this.data.query.course_view === 'participant' ? 'courses' : 'rows',
       }
       // 转化分析：只有主动点「查询」这一次才写进「分析日志」（切 tab、翻页不记），和 PC 一致
       if (this._logAnalysis && listTab === 'conversion') baseQuery.log_analysis = true
       this._logAnalysis = false
       const mobileGroup = this.data.query.tab === 'overview'
         ? ({ traffic: 'traffic', invite: this.data.inviteView === 'initiated' ? 'invite_initiated' : 'invite_arrive',
-          courses: 'courses', deals: 'deals' })[this.data.overviewGroup] || 'courses' : ''
+          participation: 'participation', courses: 'courses', deals: 'deals' })[this.data.overviewGroup] || 'courses' : ''
       const result = await principalApi.query({ ...baseQuery, tab: listTab, page, page_size: 20,
         include_overview: listTab !== this.data.query.tab,
         mobile_group: mobileGroup, mobile_quick_filter: this.data.trafficQuickFilter,
-        arrival_view: this.data.arrivalView })
+        arrival_view: mobileGroup === 'invite_arrive' && this.data.arrivalView === 'date' ? 'date_group' : this.data.arrivalView })
       if (sequence !== this._sequence) return
       const panelResult = result
       // 引流客户和邀约到店使用列表设置；课程/交易列表固定按后端返回的列展示。
@@ -295,9 +327,14 @@ Page({
         ? (this.data.inviteView === 'initiated' ? INVITE_INITIATED_COLUMNS : INVITE_ARRIVAL_COLUMNS.concat(profileColumns)) : columns
       const sourceColumns = usingTraffic || usingInvite ? this.visibleColumns(columnFields) : columns
       const teacherView = this.data.overviewGroup === 'courses' && this.data.query.course_view === 'teacher_follow_up'
+      const participantCards = this.data.overviewGroup === 'courses' && this.data.query.course_view === 'participant'
+      const participation = this.data.overviewGroup === 'participation'
+      const showArrivalDateCards = usingInvite && this.data.inviteView === 'arrive' && this.data.arrivalView === 'date'
       const items = teacherView
         ? sourceRows.map(row => ({ id: row.id, customer_id: row.customer_id }))
-        : sourceRows.map(row => this.displayListRow(row, sourceColumns, usingTraffic, usingInvite))
+        : sourceRows.map(row => participantCards ? courseCard(row, this.data.metadata?.can_view_follow_up === true, require('../../utils/note-permissions').noteVisibility((wx.getStorageSync('userEditPermissions') || {}).customer_access || { detail_tabs: {} }))
+          : participation ? participationRow(row)
+          : showArrivalDateCards ? this.displayArrivalDay(row) : this.displayListRow(row, sourceColumns, usingTraffic, usingInvite))
       const list = reset ? items : this.data.list.concat(items)
       const teacherDays = teacherView
         ? this.buildTeacherDays(reset ? sourceRows : (this._sourceRows || []).concat(sourceRows), result.teacher_group_totals || []) : []
@@ -315,6 +352,7 @@ Page({
         ...panel,
         total: result.total,
         hasMore: list.length < result.total,
+        showArrivalDateCards, participantCards,
       }
       if (this.data.query.tab === 'overview' && this.data.overviewGroup === 'courses') {
         viewPatch.renderCourseView = this.data.query.course_view
@@ -393,6 +431,7 @@ Page({
     const parsed = ordered.concat(rest)
       .map(c => {
         const raw = c.key === 'name' && titleColumn.key === 'customer' ? text(row.name) : text(row[c.key])
+        if (group === 'courses' && c.key === 'type') return null
         const empty = !raw || raw === '—' || raw === '未配置'
         const label = SHORT_LABELS[c.key] || c.label
         if (empty) return null
@@ -404,7 +443,9 @@ Page({
         const numeric = NUMBER_KEYS.has(c.key) || /^-?\d+(\.\d+)?$/.test(raw)
         if (numeric) return {
           kind: 'number', label,
-          value: group === 'courses' && c.key === 'same_day_deals' ? `${raw} 笔` : raw,
+          value: group === 'courses' && c.key === 'same_day_deals' ? `${raw} 笔`
+            : ['hours', 'org_participation_hours'].includes(c.key) ? `${raw} 课时`
+            : c.key === 'participants' ? `${raw} 人` : raw,
           empty: group === 'courses' && c.key === 'same_day_deals' && Number(raw) === 0,
         }
         if (c.key === IDENTITY_KEY) return { kind: 'identity', label: '', value: raw }
@@ -420,7 +461,44 @@ Page({
       rowProfiles: parsed.filter(item => item.kind === 'profile'),
       rowRight: dateText,
       rowLinkId: usingTraffic ? row.id : (row.customer_id || ''),
+      rowSubtitle: group === 'courses' ? text(row.type) : '',
     }
+  },
+  displayArrivalDay(group) {
+    const records = (group.records || []).map(record => ({
+      id: record.id || `${group.date}:${record.customer_id}`,
+      customer_id: record.customer_id || '',
+      name: record.name || '未命名',
+      arrive_time: record.arrive_time || '',
+      arrive_inviter: record.arrive_inviter || '',
+      needs: record.needs || '',
+      same_day_activities: record.same_day_activities || '',
+      same_day_deal_text: record.same_day_deal_text || '',
+      status_label: record.status_label || '已到店',
+      arrived: (record.status || 'arrived') === 'arrived',
+    }))
+    const people = {}
+    records.forEach(record => { people[record.customer_id || record.id] = true })
+    return {
+      id: group.id || group.date,
+      date: group.date || '',
+      people: Object.keys(people).length,
+      open: false,
+      hiddenCount: Math.max(0, records.length - 4),
+      records,
+      visibleRecords: records.slice(0, 4),
+    }
+  },
+  toggleArrivalDay(e) {
+    const id = e.currentTarget.dataset.id
+    const index = (this.data.list || []).findIndex(item => item.id === id)
+    if (index < 0) return
+    const item = this.data.list[index]
+    const open = !item.open
+    this.setData({
+      [`list[${index}].open`]: open,
+      [`list[${index}].visibleRecords`]: open ? item.records : item.records.slice(0, 4),
+    })
   },
   columnConfigKey() {
     if (this.data.query.tab === 'overview' && this.data.overviewGroup === 'invite') {
@@ -599,6 +677,9 @@ Page({
       { key: 'invite', title: '邀约到店', value: invited, unit: '次',
         help: '统计周期内邀约页面里的客户总数',
         sub: `取消 ${cancelled} · 未到场 ${noShow} · 已到场 ${arrived}` },
+      { key: 'participation', title: '活动参与', value: summary['活动参与次数'] ?? 0, unit: '次',
+        help: `${this.data.query.scope_type === 'person' ? '按所选个人引流来的客户' : '按所选组织已配置成员'}统计实际到场的活动，包含跨组织活动。沙龙活动和沙龙技能学习只统计参与者。`,
+        sub: `案主 ${summary['活动案主次数'] ?? 0} 次 · 参与者 ${summary['活动参与者次数'] ?? 0} 次` },
       { key: 'courses', title: '课程数据', value: summary['课程数'] ?? 0, unit: '场',
         help: '', sub: `总 ${summary['课时数'] ?? 0} 课时` },
       { key: 'deals', title: '成交量', value: summary['交易笔数'] ?? 0, unit: '笔',
@@ -622,7 +703,20 @@ Page({
     }
     const selects = []
     let title = ''
-    if (group === 'deals') {
+    if (group === 'participation') {
+      title = '活动参与明细'
+      const participation = breakdown.participation || {}
+      const option = (item, hasOwners) => ({ key: item.key, label: item.label,
+        text: `${hasOwners ? `案主 ${item.owner_people || 0} 人 · ` : ''}参与者 ${item.participant_people || 0} 人` })
+      selects.push(select('活动类型', 'participation_type', (participation.by_type || []).map(item => option(item, !['class', 'ics'].includes(item.key)))))
+      if (pickedOf('participation_type').includes('class')) {
+        const salon = (participation.by_type || []).find(item => item.key === 'class')
+        selects.push(select('沙龙类型', 'participation_course', (salon?.subtypes || []).map(item => ({ ...option(item, false), groupLabel: item.organization || '' }))))
+      }
+      const types = pickedOf('participation_type')
+      const hasOwners = !types.length || types.some(type => !['class', 'ics'].includes(type))
+      selects.push(select('参与者', 'participation_person', (participation.by_participant || []).map(item => option(item, hasOwners))))
+    } else if (group === 'deals') {
       title = '成交量明细'
       selects.push(select('付费项目', 'deals', (breakdown.deals || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 笔` }))))
       // 选了会员卡再列它的卡种（和 PC 的子级下拉一致）
@@ -634,10 +728,14 @@ Page({
     } else if (group === 'courses') {
       title = '课程数据明细'
       const types = (breakdown.courses && breakdown.courses.by_type) || []
-      selects.push(select('课程类型', 'type', types.map(item => ({ key: item.key, label: item.label, text: `${item.count} 场 · ${item.hours || 0} 课时` }))))
+      selects.push(select('活动类型', 'type', types.map(item => ({ key: item.key, label: item.label, text: `${item.count} 场 · ${item.hours || 0} 课时` }))))
       const pickedType = types.find(item => pickedOf('type').indexOf(item.key) >= 0)
       if (pickedType && (pickedType.subtypes || []).length) {
-        selects.push(select('具体课程', 'course', (pickedType.subtypes || []).map(item => ({ key: item.key, label: item.label.replace(' · ', '·'), text: `${item.count} 场 · ${item.hours || 0} 课时` }))))
+        const salon = pickedType.key === '沙龙活动'
+        const courseOptions = salon
+          ? groupSalonCourseOptions(pickedType.subtypes, this.data.organizations)
+          : (pickedType.subtypes || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 场 · ${item.hours || 0} 课时` }))
+        selects.push(select(salon ? '沙龙类型' : '课程名称', 'course', courseOptions))
       }
       selects.push(select('课程老师', 'teacher', ((breakdown.courses && breakdown.courses.by_teacher) || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 场 · ${item.hours || 0} 课时` }))))
     } else if (group === 'invite') {
@@ -677,6 +775,7 @@ Page({
     const trafficRows = group === 'traffic' ? this.buildTrafficRows(breakdown, picks) : []
     return {
       panelTitle: title,
+      showParticipationOwners: !pickedOf('participation_type').length || pickedOf('participation_type').some(type => !['class', 'ics'].includes(type)),
       panelSelects: selects,
       panelMetrics: this.buildMetrics(group, result, trafficRows, picks),
       // 内/外的解释放在统计数值框里（和 PC 端一字不差）
@@ -814,7 +913,10 @@ Page({
   },
   openTeacherDetail(e) {
     if (this.data.loading && this.data.query.tab === 'overview' && this.data.overviewGroup === 'courses') return
-    const row = (this._sourceRows || []).find(item => item.id === e.currentTarget.dataset.id)
+    const dataset = e.currentTarget.dataset
+    const card = dataset.course ? (this._sourceRows || []).find(item => item.course_id === dataset.course) : null
+    const person = card ? (card.participants || []).find(item => item.customer_id === dataset.id) : null
+    const row = person ? { ...person, date: card.date, name: card.name, teachers: card.teachers } : (this._sourceRows || []).find(item => item.id === dataset.id)
     if (!row) return
     const fields = [ ['visit_need', '来访需求'], ['customer_info', '深度需求'], ['follow_up', '跟进点'], ['customer_feedback', '客户反馈'] ]
     const visibility = require('../../utils/note-permissions').noteVisibility((wx.getStorageSync('userEditPermissions') || {}).customer_access || { detail_tabs: {} })
@@ -831,6 +933,63 @@ Page({
     } })
   },
   closeTeacherDetail() { this.setData({ teacherDetail: null }) },
+  toggleCoursePeople(e) {
+    const index = this.data.list.findIndex(item => item.course_id === e.currentTarget.dataset.course)
+    if (index < 0) return
+    const card = this.data.list[index]
+    const open = !card.open
+    this.setData({ [`list[${index}].open`]: open, [`list[${index}].visiblePeople`]: open ? card.people : card.people.slice(0, 4) })
+  },
+  toggleParticipation(e) {
+    const index = this.data.list.findIndex(item => item.id === e.currentTarget.dataset.id)
+    if (index < 0) return
+    this.setData({ [`list[${index}]`]: participationRow(this.data.list[index], !this.data.list[index].open) })
+  },
+  openHistory(e) {
+    if (this.data.loading) return
+    const { course, id } = e.currentTarget.dataset
+    const card = (this._sourceRows || []).find(item => item.course_id === course)
+    const person = card?.participants?.find(item => item.customer_id === id)
+    if (!person || !card.organization_id) return
+    this.setData({ historySheet: { name: person.customer, organization: card.organization, customerId: id, organizationId: card.organization_id,
+      query: clone(this.data.query), all: false, rows: [], page: 0, total: 0, hasMore: false, error: '' } })
+    this.loadHistory(true)
+  },
+  onHistoryRange(e) {
+    const sheet = this.data.historySheet
+    const all = e.currentTarget.dataset.all === true || e.currentTarget.dataset.all === 'true'
+    if (!sheet || sheet.all === all) return
+    this.setData({ historySheet: { ...sheet, all, rows: [], page: 0, error: '' } })
+    this.loadHistory(true)
+  },
+  async loadHistory(reset = false) {
+    const sheet = this.data.historySheet
+    if (!sheet || this.data.historyLoading && !reset || !reset && !sheet.hasMore) return
+    const sequence = this._historySequence = (this._historySequence || 0) + 1
+    const page = reset ? 1 : sheet.page + 1
+    this.setData({ historyLoading: true, 'historySheet.error': '' })
+    try {
+      const result = await principalApi.query({ ...clampRange(sheet.query),
+        tab: 'courses', course_view: 'participant', participant_layout: 'rows',
+        participant_history_organization_id: sheet.organizationId, customer_id: sheet.customerId,
+        date_from: sheet.all ? MIN_DATE : sheet.query.date_from, date_to: sheet.all ? null : sheet.query.date_to,
+        activity_type: sheet.all ? '' : sheet.query.activity_type || '', course_subtype: sheet.all ? '' : sheet.query.course_subtype || '',
+        breakdown: [], detail_picks: [], course_deal: '', participant_scope: '', include_overview: false,
+        mobile_group: '', overview_detail: '', sort_by: '', log_analysis: false, page, page_size: 20,
+      })
+      if (sequence !== this._historySequence || !this.data.historySheet) return
+      const rows = reset ? result.items : sheet.rows.concat(result.items)
+      this.setData({ historySheet: { ...sheet, rows, page: result.page, total: result.total, hasMore: rows.length < result.total, error: '' } })
+    } catch (error) {
+      if (sequence === this._historySequence && this.data.historySheet) this.setData({ 'historySheet.error': error.message || '课程记录加载失败，请重试' })
+    } finally {
+      if (sequence === this._historySequence) this.setData({ historyLoading: false })
+    }
+  },
+  retryHistory() { this.loadHistory(!this.data.historySheet?.rows?.length) },
+  loadMoreHistory() { this.loadHistory(false) },
+  closeHistory() { this._historySequence = (this._historySequence || 0) + 1; this.setData({ historySheet: null, historyLoading: false }) },
+  onUnload() { this._sequence = (this._sequence || 0) + 1; this._historySequence = (this._historySequence || 0) + 1 },
   /** 指标条：转化分析那几项能点着筛（与 PC 一致） */
   buildMetrics(group, result, trafficRows, picks) {
     const metric = (label, value, action) => ({
@@ -844,6 +1003,15 @@ Page({
           : this.data.trafficQuickFilter === action.slice(6)) : false,
     })
     if (group === 'traffic') return []
+    if (group === 'participation') {
+      const totals = result.breakdown?.participation?.totals || {}
+      const types = picks.filter(pick => pick.startsWith('participation_type:')).map(pick => pick.slice('participation_type:'.length))
+      const owners = !types.length || types.some(type => !['class', 'ics'].includes(type))
+      return [
+        { ...metric('活动参与次数', `${totals.count || 0} 次`), sub: `${owners ? `案主 ${totals.owner_count || 0} 次 · ` : ''}参与者 ${totals.participant_count || 0} 次` },
+        { ...metric('活动参与人数', `${totals.people || 0} 人`), sub: `${owners ? `案主 ${totals.owner_people || 0} 人 · ` : ''}参与者 ${totals.participant_people || 0} 人` },
+      ]
+    }
     // 成交量这一组：指标口径与列表一致（成交批次里筛出来的），字段名和 PC 对齐
     if (group === 'deals') {
       const scope = result.list_summary || {}
@@ -899,7 +1067,7 @@ Page({
     // 面板选项是 { key, label, text }，「全部」是 { value: '' }，两种都要能选
     const chosenKey = chosen.key || chosen.value || ''
     const value = chosenKey ? `${item.prefix}:${chosenKey}` : ''
-    const childOf = { deals: ['subtype'], type: ['course'] }
+    const childOf = { deals: ['subtype'], type: ['course'], participation_type: ['participation_course'] }
     const picks = this.data.picks.filter(entry => {
       const prefix = entry.slice(0, entry.indexOf(':'))
       if (prefix === item.prefix) return false
@@ -917,7 +1085,7 @@ Page({
     const selected = this.data.picks.filter(value => value.startsWith(item.prefix + ':')).map(value => value.slice(item.prefix.length + 1))
     const options = item.options.map((option, optionIndex) => {
       const key = option.key || option.value || ''
-      return { ...option, selected: item.multi ? (key ? selected.includes(key) : selected.length === 0) : optionIndex === item.index }
+      return { ...option, rowKey: key || `all-${optionIndex}`, selected: item.multi ? (key ? selected.includes(key) : selected.length === 0) : optionIndex === item.index }
     })
     this.setData({ panelSheet: { index, title: item.label, options, multi: !!item.multi } })
   },
@@ -968,21 +1136,57 @@ Page({
   },
   togglePick(e) {
     const value = e.currentTarget.dataset.value
-    const picks = this.data.picks.indexOf(value) >= 0
+    let picks = this.data.picks.indexOf(value) >= 0
       ? this.data.picks.filter(item => item !== value)
       : this.data.picks.concat(value)
+    const children = { deals: 'subtype:', type: 'course:', participation_type: 'participation_course:' }
+    const child = children[value.split(':')[0]]
+    if (child) picks = picks.filter(item => !item.startsWith(child))
     this.setData({ picks })
     this.loadData(true)
   },
-  updateQuery(patch) { const query = { ...this.data.query, ...patch }; this.setData({ query, ruleSentence: describeRule(query.rule, this.data.metadata) }); this.loadData(true) },
+  updateQuery(patch) { const query = clampRange({ ...this.data.query, ...patch }); this.setData({ query, ruleSentence: describeRule(query.rule, this.data.metadata) }); this.loadData(true) },
   /** 改筛选条件：转化分析要等点「查询」才重算，其它 tab 即时生效（和 PC 一致） */
   applyFilters(patch) {
-    const query = { ...this.data.query, ...patch }
+    const query = clampRange({ ...this.data.query, ...patch })
+    this.closeHistory()
+    this.setData({ picks: [], sortField: '', trafficQuickFilter: '', teacherDetail: null })
     this.setData({ query, ruleSentence: describeRule(query.rule, this.data.metadata) })
+    if ((this.data.metadata?.organizations || []).some(org => org.id === query.organization_id && org.status === 'archived')) {
+      const organizations = organizationScopeOptions(this.data.metadata.organizations, true)
+      this.setData({ includeArchived: true, organizations, ...(query.scope_type !== 'person' ? { scopeTargets: organizations } : {}) })
+    }
+    const selected = query.scope_type === 'person' ? query.referrer_id : query.organization_id
+    this.setData({ scopeTargetIndex: Math.max(0, this.data.scopeTargets.findIndex(item => item.id === selected)), orgIndex: Math.max(0, this.data.organizations.findIndex(item => item.id === query.organization_id)) })
     this.refreshEditors()
     if (query.tab !== 'conversion') this.loadData(true)
   },
+  toggleArchivedOrganizations() {
+    const includeArchived = !this.data.includeArchived
+    const selectedArchived = (this.data.metadata?.organizations || []).some(org => org.id === this.data.query.organization_id && org.status === 'archived')
+    const selectedId = !includeArchived && selectedArchived ? '' : this.data.query.organization_id
+    const organizations = organizationScopeOptions(this.data.metadata?.organizations, includeArchived)
+    const selectedIndex = Math.max(0, organizations.findIndex(org => org.id === selectedId))
+    this.setData({ includeArchived, organizations, orgIndex: selectedIndex,
+      ...(this.data.query.scope_type !== 'person' ? { scopeTargets: organizations, scopeTargetIndex: selectedIndex } : {}) })
+    if (selectedId !== this.data.query.organization_id) this.applyFilters({ organization_id: selectedId })
+  },
   onOrg(e) { const i = Number(e.detail.value); this.setData({ orgIndex: i }); this.applyFilters({ organization_id: this.data.organizations[i].id }) },
+  onScopeType(e) {
+    const personal = Number(e.detail.value) === 1
+    const targets = personal ? (this.data.referrers.length ? this.data.referrers : [{ id: '', name: '暂无有引流客户的个人' }]) : this.data.organizations
+    const tabs = [OVERVIEW_TAB]
+    if (!personal && (this.data.metadata?.transaction_access === 'detail' || initialTabs().length > 1)) tabs.push(CONVERSION_TAB)
+    this.setData({ scopeTypeIndex: personal ? 1 : 0, scopeTargets: targets, scopeTargetIndex: 0, tabs, overviewGroup: 'traffic' })
+    this.applyFilters({ scope_type: personal ? 'person' : 'organization', referrer_id: personal ? targets[0].id : '', organization_id: personal ? '' : targets[0].id, tab: 'overview', course_view: 'course', participant_scope: '', course_deal: '' })
+  },
+  onScopeTarget(e) {
+    const index = Number(e.detail.value)
+    const target = this.data.scopeTargets[index]
+    if (!target) return
+    this.setData({ scopeTargetIndex: index, orgIndex: this.data.scopeTypeIndex ? 0 : index })
+    this.applyFilters(this.data.scopeTypeIndex ? { referrer_id: target.id, organization_id: '' } : { organization_id: target.id, referrer_id: '' })
+  },
   onCourseView(e) {
     const view = e.currentTarget.dataset.view
     const previousQuery = this.data.query
@@ -1009,7 +1213,7 @@ Page({
       rollbackArrivalView: this._loadedArrivalView || previousView })
   },
   onDate(e) { this.setData({ rangePreset: 'custom', rangePresetIndex: -1 }); this.applyFilters({ [e.currentTarget.dataset.field]: e.detail.value }) },
-  clearDates() { this.setData({ rangePreset: 'all', rangePresetIndex: 4 }); this.applyFilters({ date_from: null, date_to: null }) },
+  clearDates() { this.setData({ rangePreset: 'all', rangePresetIndex: 4 }); this.applyFilters({ date_from: MIN_DATE, date_to: null }) },
   /** 快捷周期：当天 / 本周 / 本月 / 本年 / 全部 */
   onRangePreset(e) {
     const key = e.currentTarget.dataset.key
@@ -1027,6 +1231,7 @@ Page({
   },
   onTab(e) {
     const tab = e.currentTarget.dataset.key
+    if (this.data.query.scope_type === 'person' && tab === 'conversion') return
     this.setData({ overviewGroup: tab === 'overview' ? 'traffic' : '', picks: [], inviteToolMenuOpen: false })
     this.updateQuery({ tab, product: '', course_view: 'course', participant_scope: '' })
     if (tab === 'conversion') this.loadConversionSetup()

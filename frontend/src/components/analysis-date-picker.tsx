@@ -6,18 +6,19 @@ import { SelectDropdown } from "@/components/select-dropdown"
 import { onOtherPopoverOpen } from "@/lib/popover"
 
 
-export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = false, widthClassName = "w-[132px]" }: { value: string; onChange: (value: string) => void; ariaLabel: string; fullWidth?: boolean; widthClassName?: string }) {
+export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = false, widthClassName = "w-[132px]", minDate = "" }: { value: string; onChange: (value: string) => void; ariaLabel: string; fullWidth?: boolean; widthClassName?: string; minDate?: string }) {
   const today = new Date()
   const todayValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
   const [open, setOpen] = useState(false)
-  const [viewMonth, setViewMonth] = useState(() => value.slice(0, 7) || todayValue.slice(0, 7))
+  const selectedMonth = (value ? (value < minDate ? minDate : value) : todayValue).slice(0, 7)
+  const [viewMonth, setViewMonth] = useState(selectedMonth)
   const [position, setPosition] = useState<React.CSSProperties>({})
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open) setViewMonth(value.slice(0, 7) || todayValue.slice(0, 7))
-  }, [open, todayValue, value])
+    if (!open) setViewMonth(selectedMonth)
+  }, [open, selectedMonth])
 
   useEffect(() => {
     if (!open) return
@@ -58,8 +59,8 @@ export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = fal
   const daysInMonth = new Date(year, month, 0).getDate()
   const cells = [...Array.from({ length: firstWeekday }, () => null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)]
   const yearOptions = useMemo(
-    () => Array.from({ length: 26 }, (_, index) => today.getFullYear() + 1 - index).map(item => ({ value: String(item), label: `${item}年` })),
-    [today],
+    () => Array.from({ length: minDate ? Math.max(0, today.getFullYear() + 2 - Number(minDate.slice(0, 4))) : 26 }, (_, index) => today.getFullYear() + 1 - index).map(item => ({ value: String(item), label: `${item}年` })),
+    [today, minDate],
   )
   const calendarMonthOptions = useMemo(
     () => Array.from({ length: 12 }, (_, index) => ({ value: String(index + 1).padStart(2, "0"), label: `${index + 1}月` })),
@@ -67,7 +68,8 @@ export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = fal
   )
   const moveMonth = (offset: number) => {
     const next = new Date(year, month - 1 + offset, 1)
-    setViewMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`)
+    const nextMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
+    if (!minDate || nextMonth >= minDate.slice(0, 7)) setViewMonth(nextMonth)
   }
   const displayValue = value
     ? `${value.slice(0, 4)}年${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日`
@@ -89,7 +91,7 @@ export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = fal
       {open && typeof document !== "undefined" && createPortal(
         <div ref={panelRef} className="fixed z-[2147483646] rounded-[6px] border border-[#e1e4e7] bg-white p-3 shadow-[0_8px_24px_rgba(31,35,41,0.14)]" style={position}>
           <div className="mb-2.5 flex items-center gap-1.5">
-            <button type="button" onClick={() => moveMonth(-1)} className="flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7]" aria-label="上个月"><ChevronLeft className="h-3.5 w-3.5" /></button>
+            <button type="button" disabled={!!minDate && viewMonth <= minDate.slice(0, 7)} onClick={() => moveMonth(-1)} className="flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7] disabled:opacity-30 disabled:cursor-not-allowed" aria-label="上个月"><ChevronLeft className="h-3.5 w-3.5" /></button>
             <SelectDropdown value={String(year)} options={yearOptions} onChange={next => setViewMonth(`${next}-${String(month).padStart(2, "0")}`)} size="sm" className="w-[92px]" buttonClassName="!h-7 !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={104} menuMaxHeight={260} />
             <SelectDropdown value={String(month).padStart(2, "0")} options={calendarMonthOptions} onChange={next => setViewMonth(`${year}-${next}`)} size="sm" className="w-[72px]" buttonClassName="!h-7 !border !border-[#e1e4e7] !bg-white !px-2 !text-[12px] !shadow-none" dropdownWidth={80} menuMaxHeight={260} />
             <button type="button" onClick={() => moveMonth(1)} className="ml-auto flex h-7 w-7 items-center justify-center rounded-[3px] text-[#646a73] hover:bg-[#f5f6f7]" aria-label="下个月"><ChevronRight className="h-3.5 w-3.5" /></button>
@@ -103,7 +105,7 @@ export function AnalysisDatePicker({ value, onChange, ariaLabel, fullWidth = fal
               const dateValue = `${viewMonth}-${String(day).padStart(2, "0")}`
               const selected = dateValue === value
               const isToday = dateValue === todayValue
-              return <button key={dateValue} type="button" onClick={() => { onChange(dateValue); setOpen(false) }} className={`flex h-7 items-center justify-center rounded-[3px] text-[11px] ${selected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36] hover:bg-[#f5f6f7]"}`}>{day}</button>
+              return <button key={dateValue} type="button" disabled={!!minDate && dateValue < minDate} onClick={() => { onChange(dateValue); setOpen(false) }} className={`flex h-7 items-center justify-center rounded-[3px] text-[11px] disabled:opacity-30 disabled:cursor-not-allowed ${selected ? "bg-[#3370ff] text-white" : isToday ? "bg-[#f0f5ff] text-[#3370ff]" : "text-[#2b2f36] hover:bg-[#f5f6f7]"}`}>{day}</button>
             })}
           </div>
           <div className="mt-2 flex justify-end border-t border-[#f0f0f0] pt-2">

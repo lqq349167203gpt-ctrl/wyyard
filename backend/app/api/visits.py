@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.models.visit import VisitRecordCreate
-from app.services import customer_access_service, customer_service, visit_service, visit_verification_service
+from app.services import (
+    customer_access_service,
+    customer_service,
+    customer_tag_service,
+    visit_service,
+    visit_verification_service,
+)
 from app.services.customer_service import get_customer
 from app.utils.pagination import paginate
 from app.utils.record_ownership import ensure_creator_for_changed_fields, ensure_record_creator, stamp_creator
@@ -190,9 +196,11 @@ async def list_visits(
     need_map, note_map = _visit_note_maps(request, visit_ids, notes=notes)
     summaries = daily_customer_note_service.visit_summaries(visit_ids, notes=notes)
     first_arrivals = visit_service.first_arrival_dates({record.customer_id for record in records})
+    visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", "") if request else "")
     items = []
     for record in records:
         item = _fill_member_type(record, need_map.get(record.id, ""), shared_summary=summaries.get(record.id, {}), first_arrivals=first_arrivals)
+        item["customer_tags"] = visible_tags.get(record.customer_id, [])
         item["visit_notes"] = note_map.get(record.id, [])
         item = customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"])
         items.append(item)
@@ -231,7 +239,7 @@ async def list_visits_light(
             item["visit_notes"] = note_map.get(str(item.get("id") or ""), [])
         protected = [customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"]) for item in items]
         for item in protected:
-            item.pop("visit_notes", None)
+            item.pop("visit_notes", None)  # 轻量列表只返回过滤后的汇总，不重复携带全部备注正文。
         return protected
     except Exception as e:
         import traceback
@@ -316,6 +324,7 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     items = [_fill_member_type(record, need_map.get(record.id, ""), first_arrivals=first_arrivals) for record in active_records]
     items = [customer_access_service.protect_note_fields({**item, "visit_notes": note_map.get(item["id"], [])},
               get_request_roles(request) if request else ["超级管理员"]) for item in items]
+    visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", "") if request else "")
 
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
@@ -331,6 +340,7 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
             "客户昵称": v.get("nickname") or "",
             "预计时间": v.get("visit_time") or "",
             "会员身份": v.get("member_type") or "",
+            "客户标签": "、".join(tag["name"] for tag in visible_tags.get(v["customer_id"], [])),
             "来访需求": v.get("needs") or "",
             "组长情况": role or "-",
             "邀约人": v.get("referrer_handler") or "",
@@ -342,12 +352,11 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         # 空表也返回有效 xlsx（只有表头）
         rows = []
 
-    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
-    col_widths = [10, 12, 10, 12, 40, 10, 10, 10, 20]
+    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "客户标签", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
     if not customer_access_service.can_view_note(get_request_roles(request) if request else ["超级管理员"], "visit_need"):
-        hidden_index = headers.index("来访需求")
-        headers.pop(hidden_index)
-        col_widths.pop(hidden_index)
+        headers.remove("来访需求")
+    col_widths = {"引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "客户标签": 24,
+                  "来访需求": 40, "组长情况": 10, "邀约人": 10, "接待人": 10, "目标": 20}
 
     wb = Workbook()
     ws = wb.active
@@ -355,8 +364,8 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     ws.sheet_view.showGridLines = False
 
     # 设置列宽
-    for i, w in enumerate(col_widths, 1):
-        ws.column_dimensions[chr(64 + i)].width = w
+    for i, header in enumerate(headers, 1):
+        ws.column_dimensions[chr(64 + i)].width = col_widths[header]
 
     # 写表头
     header_font = Font(bold=True)

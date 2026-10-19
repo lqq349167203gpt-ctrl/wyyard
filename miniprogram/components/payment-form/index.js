@@ -372,8 +372,8 @@ Component({
       this.setData({ organizationLoadError: '' })
       const loading = organizationApi.list().then(res => {
         if (!isCurrent()) return
-        const orgs = res || []
         const currentOrgId = (this.data.isEdit && this.data.editData ? this.data.editData.organization_id : this.data.formData.organization_id) || ''
+        const orgs = (res || []).filter(org => org.status !== 'archived' || (this.data.isEdit && org.id === currentOrgId)).map(org => Object.assign({}, org, { name: org.name + (org.status === 'archived' ? '（已归档）' : '') }))
         const currentIndex = orgs.findIndex(item => item.id === currentOrgId)
         // 粗门次卡新增：成交归属不预选，必须由录入人自己确认（必填）
         const needsExplicitChoice = this.data.type === 'coarse_door_card' && !this.data.isEdit

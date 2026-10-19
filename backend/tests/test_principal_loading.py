@@ -14,6 +14,7 @@ from app.models.principal import PrincipalQuery
 from app.services import principal_query_cache as cache
 from app.services.principal_mobile_service import compact_breakdown, overview_metrics
 from app.services.principal_response_service import detail_page
+from app.services.principal_service import _ordered_activity_names
 
 
 def test_principal_reads_bypass_busy_write_lock_but_course_writes_still_wait(monkeypatch):
@@ -99,6 +100,52 @@ def test_arrival_pages_keep_each_visit_and_customer_modes_distinct():
     assert result["total"] == 25 and result["page"] == 2
 
 
+def test_same_day_activities_are_ordered_by_start_time():
+    assert _ordered_activity_names([
+        ("19:00", "能量结"),
+        ("", "未排时间"),
+        ("09:30", "读书会"),
+        ("14:00", "觉醒游戏"),
+        ("09:30", "读书会"),
+    ]) == ["读书会", "觉醒游戏", "能量结", "未排时间"]
+
+
+def test_arrival_date_groups_page_by_day_without_splitting_visits():
+    query = PrincipalQuery(overview_detail="invite_arrivals", arrival_view="date_group", page_size=1)
+    result = detail_page(result_fixture()["breakdown"], query)
+    assert result["total"] == 2 and result["total_pages"] == 2
+    assert result["items"][0]["date"] == "2026-09-02"
+    assert result["items"][0]["count"] == 25
+    assert {record["id"] for record in result["items"][0]["records"]} == {f"v{i}-2" for i in range(25)}
+    assert result["items"][0]["records"][0]["needs"] == "第二次需求"
+    assert result["items"][0]["records"][0]["status_label"] == "已到店"
+    assert "visit_purpose" not in result["items"][0]["records"][0]
+    assert "arrival_records" not in result["items"][0]
+    query.page = 2
+    second = detail_page(result_fixture()["breakdown"], query)
+    assert second["items"][0]["date"] == "2026-09-01"
+
+
+def test_arrival_date_groups_keep_cancelled_and_no_show_on_the_same_day():
+    customers = [
+        {"id": "c1", "name": "甲", "invite_visits": [
+            {"id": "a", "arrive_date": "2026-09-01", "arrive_time": "10:00", "arrive_inviter": "老师", "needs": "看看", "same_day_activities": "读书会", "same_day_deal_text": "会员卡 · 年卡", "status": "arrived", "status_label": "已到店"},
+            {"id": "b", "arrive_date": "2026-09-01", "arrive_inviter": "老师", "status": "no_show", "status_label": "未到店"},
+            {"id": "c", "arrive_date": "2026-09-01", "status": "cancelled", "status_label": "已取消"},
+        ]},
+        {"id": "c2", "name": "乙", "arrive_count": 0, "invite_visits": [
+            {"id": "d", "arrive_date": "2026-09-02", "status": "cancelled", "status_label": "已取消"},
+        ]},
+    ]
+    result = detail_page({"traffic": [{"key": "老师", "label": "老师", "customers": customers}]},
+                         PrincipalQuery(overview_detail="invite_arrivals", arrival_view="date_group"))
+    assert [row["date"] for row in result["items"]] == ["2026-09-02", "2026-09-01"]
+    assert [record["status_label"] for record in result["items"][1]["records"]] == ["已到店", "未到店", "已取消"]
+    assert result["items"][1]["records"][0]["same_day_activities"] == "读书会"
+    assert result["items"][1]["records"][0]["same_day_deal_text"] == "会员卡 · 年卡"
+    assert "invite_visits" not in result["items"][0]
+
+
 def test_inviter_details_only_read_requested_person_and_sort_before_page():
     query = PrincipalQuery(overview_detail="invite_initiated", overview_detail_key="老师乙",
                            detail_sort_by="deals", detail_sort_order="desc", page=2, page_size=10)
@@ -143,6 +190,31 @@ def test_summary_and_detail_pages_reuse_analysis_without_changing_legacy_or_mobi
     assert len(cached_analysis) == 1
     mobile = cache.query_result(request(), PrincipalQuery(compact_overview=True, mobile_group="traffic"))
     assert mobile["breakdown"]["traffic"][0]["customers"][0]["arrival_records"]
+
+
+def test_participation_summary_and_paged_details_share_analysis(cached_analysis, monkeypatch):
+    def analyze(*args, **kwargs):
+        cached_analysis.append(True)
+        result = result_fixture()
+        result["breakdown"]["participation"] = {"totals": {"count": 6}, "members": [
+            {"id": f"m{count}", "name": f"成员{count}", "activities": [
+                {"name": "读书会", "date": "2026-01-10", "role": "参与者", "type": "沙龙活动",
+                 "activity_type": "class", "course_key": "读书会｜甲"} for _ in range(count)
+            ]} for count in (1, 3, 2)
+        ]}
+        return result
+
+    monkeypatch.setattr(cache.principal_service, "analyze", analyze)
+    compact = cache.query_result(request(), PrincipalQuery(compact_overview=True))
+    assert "members" not in compact["breakdown"]["participation"]
+    detail = cache.query_result(request(), PrincipalQuery(overview_detail="participation", page_size=1))
+    assert set(detail) == {"overview_detail"}
+    assert detail["overview_detail"]["items"][0]["id"] == "m3"
+    second = cache.query_result(request(), PrincipalQuery(overview_detail="participation", page=2, page_size=1))
+    assert second["overview_detail"]["items"][0]["id"] == "m2"
+    chosen = cache.query_result(request(), PrincipalQuery(overview_detail="participation", detail_picks=["participation_person:m1"]))
+    assert chosen["overview_detail"]["total"] == 1
+    assert len(cached_analysis) == 1
 
 
 def test_concurrent_identical_queries_share_one_calculation(cached_analysis, monkeypatch):

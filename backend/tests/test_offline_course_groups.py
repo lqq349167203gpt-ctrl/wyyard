@@ -25,6 +25,27 @@ def test_group_record_is_visible_for_each_participant_and_persisted(monkeypatch)
     assert saved[record.id]["course_name"] == renamed.course_name == "新的课程"
 
 
+def test_detail_lists_skill_course_for_the_teacher_not_the_participants(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.api import customer_detail
+
+    record = SimpleNamespace(
+        id="r1", record_date="2026-09-28", teacher="胡芸", content="内容", result="结果",
+        creator="娟娟", created_at="2026-09-28", customer_id="", participant_ids=["stu"],
+    )
+    monkeypatch.setattr(customer_detail.offline_course_record_service, "list_records", lambda customer_id=None: [record])
+
+    def get_customer(customer_id):
+        if customer_id == "teacher":
+            return SimpleNamespace(nickname="胡芸", name="")
+        return SimpleNamespace(nickname="学员", name="")
+
+    monkeypatch.setattr(customer_detail.customer_service, "get_customer", get_customer)
+    assert [row["id"] for row in customer_detail._build_offline_course_records("teacher")] == ["r1"]
+    assert customer_detail._build_offline_course_records("stu") == []
+
+
 def test_old_customer_record_still_matches(monkeypatch):
     monkeypatch.setattr(service, "_records", {})
     monkeypatch.setattr(service, "save_item", lambda *_: None)

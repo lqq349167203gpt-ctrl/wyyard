@@ -248,7 +248,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
           </div>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交归属</span>
-            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.map(item => ({ value: item.id, label: item.name }))} onChange={value => { setSettlementOrganizationId(value); setOrgMissing(false) }} disabled={!!editRecord || loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "请选择成交归属"} />
+            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.filter(org => org.status !== "archived" || (editRecord && org.id === settlementOrganizationId)).map(item => ({ value: item.id, label: item.name + (item.status === "archived" ? "（已归档）" : "") }))} onChange={value => { setSettlementOrganizationId(value); setOrgMissing(false) }} disabled={!!editRecord || loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "请选择成交归属"} />
           </div>
           {/* 成交归属是业绩归属依据：默认不预选，点了保存又没选时才提示 */}
           {orgMissing && !settlementOrganizationId && (

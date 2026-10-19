@@ -1,6 +1,7 @@
 """组织/俱乐部小程序视图：统计口径复用主理人分析，只向手机发送当前页。"""
 
 from collections import Counter
+from math import ceil
 
 NUMERIC_SORT_FIELDS = {
     "deals", "invite_count", "initiated_count", "cancel_count", "no_show_count",
@@ -20,13 +21,13 @@ def _sort_value(row: dict, field: str):
     return str(value or "")
 
 
-def selected_customers(breakdown: dict, picks: list[str]) -> list[dict]:
+def selected_customers(breakdown: dict, picks: list[str], *, source="traffic") -> list[dict]:
     selected = {}
     for pick in picks:
         prefix, _, value = pick.partition(":")
         selected.setdefault(prefix, set()).add(value)
     rows = []
-    for group in breakdown.get("traffic", []):
+    for group in breakdown.get(source, breakdown.get("traffic", [])):
         for customer in group.get("customers", []):
             row = {**customer, "referrer": group["label"]}
             if selected.get("traffic") and row["referrer"] not in selected["traffic"]:
@@ -74,13 +75,14 @@ def traffic_quick_filter(rows: list[dict], quick: str) -> list[dict]:
 def _small_customer(row: dict) -> dict:
     return {key: ("、".join(value) if key == "tags" and isinstance(value, list) else value)
             for key, value in row.items()
-            if key not in {"products", "subtypes", "upsell_levels", "arrival_records", "inviters"}}
+            if key not in {"products", "subtypes", "upsell_levels", "arrival_records", "invite_visits", "inviters"}}
 
 
 def overview_metrics(breakdown: dict, picks: list[str], customers=None) -> dict:
     """两端卡片共用汇总，不要求浏览器下载客户全集来计算。"""
     if customers is None:
         customers = selected_customers(breakdown, picks)
+    invite_customers = selected_customers(breakdown, picks, source="invite_traffic") if "invite_traffic" in breakdown else customers
     inviters = breakdown.get("invite_inviters") or []
     products = Counter()
     levels = Counter()
@@ -99,8 +101,8 @@ def overview_metrics(breakdown: dict, picks: list[str], customers=None) -> dict:
         "traffic_levels": [{**level, "count": levels[level["key"]]}
                            for level in breakdown.get("traffic_upsell_levels") or []] if breakdown.get("purchase_rules_configured") or any(key == "membership" for key, _ in products) else [],
         "invite": {
-            key: {"times": sum(int(row.get(key) or 0) for row in customers),
-                  "people": sum(int(row.get(key) or 0) > 0 for row in customers)}
+            key: {"times": sum(int(row.get(key) or 0) for row in invite_customers),
+                  "people": sum(int(row.get(key) or 0) > 0 for row in invite_customers)}
             for key in ("invite_count", "cancel_count", "no_show_count", "arrive_count")
         },
         "initiated_times": sum(int(group.get("initiated_count") or 0) for group in chosen_inviters),
@@ -108,10 +110,10 @@ def overview_metrics(breakdown: dict, picks: list[str], customers=None) -> dict:
                                  for record in group.get("records") or [] if record.get("customer_id")}),
     }
     mobile["invite_total"] = sum(mobile["invite"][key]["times"] for key in ("cancel_count", "no_show_count", "arrive_count"))
-    mobile["invite_people"] = sum(int(row.get("invite_count") or 0) > 0 for row in customers)
+    mobile["invite_people"] = sum(int(row.get("invite_count") or 0) > 0 for row in invite_customers)
     mobile["invite"]["invited_count"] = {
         "times": mobile["invite_total"],
-        "people": sum(any(int(row.get(key) or 0) > 0 for key in ("cancel_count", "no_show_count", "arrive_count")) for row in customers),
+        "people": sum(any(int(row.get(key) or 0) > 0 for key in ("cancel_count", "no_show_count", "arrive_count")) for row in invite_customers),
     }
     return mobile
 
@@ -129,9 +131,15 @@ def compact_breakdown(breakdown: dict) -> dict:
             "consumer_count": len(consumers),
             "upsell_count": sum(bool(row.get("is_upsell")) for row in consumers),
         })
-    return {**breakdown, "traffic": compact_traffic,
-                         "invite_inviters": [{key: value for key, value in item.items() if key != "records"}
-                                             for item in breakdown.get("invite_inviters") or []]}
+    compact = {**breakdown, "traffic": compact_traffic,
+               "invite_inviters": [{key: value for key, value in item.items() if key != "records"}
+                                   for item in breakdown.get("invite_inviters") or []]}
+    if "participation" in compact:
+        compact["participation"] = {key: value for key, value in compact["participation"].items() if key != "members"}
+    if "invite_traffic" in compact:
+        compact["invite_traffic"] = [{key: value for key, value in group.items() if key != "customers"}
+                                     for group in compact["invite_traffic"]]
+    return compact
 
 
 def mobile_result(result: dict, query) -> dict:
@@ -144,10 +152,26 @@ def mobile_result(result: dict, query) -> dict:
     chosen_inviters = [item for item in breakdown.get("invite_inviters") or []
                       if not selected_inviters or item["key"] in selected_inviters]
     group = query.mobile_group
+    if group == "participation":
+        from app.services.principal_response_service import _participation_rows
+        from app.services.principal_service import _collate
+
+        rows = sorted(_participation_rows(breakdown, query), key=lambda row: (-row["count"], _collate(row["name"]), row["id"]))
+        total = len(rows)
+        pages = max(1, ceil(total / query.page_size))
+        page = min(query.page, pages)
+        return {**result, "breakdown": compact_breakdown(breakdown),
+                "items": rows[(page - 1) * query.page_size:page * query.page_size], "total": total,
+                "page": page, "total_pages": pages, "mobile": mobile}
     if group == "traffic":
         rows = traffic_quick_filter(customers, query.mobile_quick_filter)
+    elif group == "invite_arrive" and query.arrival_view == "date_group":
+        from app.services.principal_response_service import _arrival_date_groups
+
+        # 按天分页，含未到店和已取消；不按列表字段重排，避免把同一天拆开。
+        rows = _arrival_date_groups(selected_customers(breakdown, picks, source="invite_traffic"))
     elif group == "invite_arrive":
-        rows = [row for row in customers if int(row.get("arrive_count") or 0) > 0]
+        rows = [row for row in selected_customers(breakdown, picks, source="invite_traffic") if int(row.get("arrive_count") or 0) > 0]
         if query.arrival_view == "date":
             rows = [{**row, "customer_id": row["id"], **record}
                     for row in rows for record in row.get("arrival_records") or []]
@@ -158,16 +182,17 @@ def mobile_result(result: dict, query) -> dict:
     else:
         rows = result.get("items") or []
     if group in {"traffic", "invite_arrive", "invite_initiated"}:
-        if query.sort_by:
-            rows.sort(key=lambda row: _sort_value(row, query.sort_by), reverse=query.sort_order == "desc")
-        elif group == "invite_arrive":
-            rows.sort(key=lambda row: str(row.get("arrive_date") or ""), reverse=True)
+        if query.arrival_view != "date_group":
+            if query.sort_by:
+                rows.sort(key=lambda row: _sort_value(row, query.sort_by), reverse=query.sort_order == "desc")
+            elif group == "invite_arrive":
+                rows.sort(key=lambda row: str(row.get("arrive_date") or ""), reverse=True)
         total = len(rows)
         start = (query.page - 1) * query.page_size
         rows = rows[start:start + query.page_size]
         if group == "invite_initiated":
             rows = [{key: value for key, value in row.items() if key != "records"} for row in rows]
-        else:
+        elif query.arrival_view != "date_group":
             rows = [_small_customer(row) for row in rows]
     else:
         total = result["total"]

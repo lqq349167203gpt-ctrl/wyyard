@@ -129,16 +129,19 @@ def conversion_log_snapshot(request: Request, data: PrincipalQuery, result: dict
 @router.get("/metadata")
 def metadata(request: Request, lite: bool = False):
     if lite:
-        organizations, _, permissions = principal_service.scope(request)
-        return {"organizations": [{"id": o.id, "name": o.name} for o in organizations],
+        organizations, customers, permissions = principal_service.scope(request)
+        return {"organizations": [{"id": o.id, "name": o.name, "status": getattr(o, "status", "active")} for o in organizations],
+                "referrers": principal_service.referrer_options(organizations, customers, own_scope=permissions["principal_scope"] == "own"),
                 "scope": permissions["principal_scope"], "products": [], "activity_types": [],
                 "transaction_access": permissions["customer_access"]["transaction_access"],
                 "can_view_follow_up": customer_access_service.can_view_any_note(permissions=permissions["customer_access"])}
     organizations, permissions, events, _ = principal_service.collect_data(request, metadata_only=True)
+    _, customers, _ = principal_service.scope(request)
     options = []
     for key, label, _, _field in principal_service.PRODUCTS:
         options.append({"key": key, "label": label, "subtypes": sorted({e["subtype"] for e in events if e["kind"] == "purchase" and e["product"] == key and e["subtype"]})})
-    return {"organizations": [{"id": o.id, "name": o.name} for o in organizations],
+    return {"organizations": [{"id": o.id, "name": o.name, "status": getattr(o, "status", "active")} for o in organizations],
+            "referrers": principal_service.referrer_options(organizations, customers, own_scope=permissions["principal_scope"] == "own"),
             "scope": permissions["principal_scope"], "products": options,
             "transaction_access": permissions["customer_access"]["transaction_access"],
             "can_view_follow_up": customer_access_service.can_view_any_note(permissions=permissions["customer_access"]),
@@ -230,7 +233,7 @@ def export(data: PrincipalQuery, request: Request):
         fields = [(key, field_labels[key]) for key in requested
                   if key in field_labels and (key not in profile_fields or key in allowed_profile)]
         customers = {customer["id"]: customer for customer in principal_mobile_service.selected_customers(
-            result.get("breakdown", {}), data.breakdown) if customer.get("id")}
+            result.get("breakdown", {}), data.breakdown, source="invite_traffic") if customer.get("id")}
         ids = data.export_customer_ids if data.export_customer_ids is not None else list(customers)
         items = []
         for customer_id in dict.fromkeys(ids):
@@ -238,11 +241,11 @@ def export(data: PrincipalQuery, request: Request):
             if not customer or not customer.get("arrive_count"):
                 continue
             base = {**customer, "tags": "、".join(customer.get("tags") or []), "details": []}
-            if data.arrival_view == "date":
+            if data.arrival_view in ("date", "date_group"):
                 items.extend({**base, **arrival} for arrival in customer.get("arrival_records", []))
             else:
                 items.append(base)
-        if data.arrival_view == "date":
+        if data.arrival_view in ("date", "date_group"):
             items.sort(key=lambda item: (item.get("arrive_date", ""), item.get("name", "")), reverse=True)
         elif data.export_customer_ids is None:
             items.sort(key=lambda item: str(item.get("arrive_date") or ""), reverse=True)
