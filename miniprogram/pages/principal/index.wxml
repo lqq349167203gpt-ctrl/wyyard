@@ -258,7 +258,7 @@
     </view>
   </view>
   <view class="participation-list" wx:if="{{query.tab === 'overview' && overviewGroup === 'participation'}}">
-    <view class="mobile-list-count">共 {{total}} 人 · 按参与次数从多到少</view>
+    <view class="participation-toolbar"><text class="mobile-list-count">共 {{total}} 人 · 按参与次数从多到少</text><text class="tool-btn" bindtap="exportData">{{busy ? '导出中' : '导出'}}</text></view>
     <view class="participation-card" wx:for="{{list}}" wx:for-item="member" wx:key="id">
       <view class="participation-person-head"><text class="participation-person-name">{{member.name}}</text><text class="participation-total">参与 {{member.count}} 次</text></view>
       <text class="participation-type-summary">{{member.typeText}}</text>

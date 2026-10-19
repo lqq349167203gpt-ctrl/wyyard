@@ -12,12 +12,13 @@ function page(query = async () => response()) {
   const calls = []
   const exports = []
   const toasts = []
+  const writes = []
   vm.runInNewContext(readFileSync(path.join(root,'miniprogram/pages/principal/index.js'),'utf8'), {
     Page: value => { definition=value }, wx: {getStorageSync:()=>({customer_access:{detail_tabs:{follow_up:true}}}),
       showToast(value){toasts.push(value)},env:{USER_DATA_PATH:'/mock'},
-      getFileSystemManager:()=>({writeFile:options=>options.success()}),openDocument:options=>options.success()}, getApp:()=>({checkLogin:()=>true}), console,
+      getFileSystemManager:()=>({writeFile:options=>{writes.push(options);options.success()}}),openDocument:options=>options.success()}, getApp:()=>({checkLogin:()=>true}), console,
     require: key => key.endsWith('/api') ? {principalApi:{query:params=>{calls.push(params);return query(params)},
-      export:async params=>{exports.push(params);return new ArrayBuffer(0)}},customerApi:{}}
+      export:async params=>{exports.push(params);return {buffer:new ArrayBuffer(0),filename:({traffic:'引流人数',invite:'邀约到店',participation:'活动参与',courses:'课程数据',deals:'成交量'})[params.export_group]+'_2026年10月1日至2026年10月19日.xlsx'}}},customerApi:{}}
       : key.endsWith('/config') ? {BASE_URL:'http://local.invalid'} : require(path.join(root,'miniprogram/pages/principal',key)),
   })
   definition.data = structuredClone(definition.data)
@@ -31,7 +32,7 @@ function page(query = async () => response()) {
     }
     done?.()
   }
-  return {page:definition,calls,exports,toasts}
+  return {page:definition,calls,exports,toasts,writes}
 }
 function response(items=[],extra={}) { return {items,total:items.length,page:1,page_size:20,columns:[],summary:{'引流人数':1,'课程数':1},breakdown:{traffic:[],deals:[],courses:{by_type:[],by_teacher:[]}},...extra} }
 const person={id:'p',customer_id:'p',customer:'用户甲',member_type:'年卡',participant_role:'案主',org_participation_count:23,org_participation_hours:46,
@@ -40,7 +41,7 @@ const card={id:'gcs:1',course_id:'gcs:1',organization_id:'org',organization:'测
 
 test('各卡片导出带上板块和当前筛选，由同一服务端计算汇总，不上传客户端数量',async()=>{
   for(const group of ['traffic','invite','participation','courses','deals']) {
-    const {page:p,exports,toasts}=page()
+    const {page:p,exports,toasts,writes}=page()
     p.data.query.tab='overview';p.data.overviewGroup=group
     p.data.picks=['traffic:老师甲'];p.data.listViewIndex=1
     p.data.cards=[{count:99999}]
@@ -52,6 +53,8 @@ test('各卡片导出带上板块和当前筛选，由同一服务端计算汇�
     assert(!JSON.stringify(exports[0]).includes('99999'))
     assert.equal(toasts.length,0)
     assert.equal(p.data.busy,false)
+    const title=({traffic:'引流人数',invite:'邀约到店',participation:'活动参与',courses:'课程数据',deals:'成交量'})[group]
+    assert.equal(writes[0].filePath,`/mock/${title}_2026年10月1日至2026年10月19日.xlsx`)
   }
 })
 

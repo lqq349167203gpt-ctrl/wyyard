@@ -1663,7 +1663,7 @@ Page({
     try {
       const traffic = this.data.query.tab === 'overview' && this.data.overviewGroup === 'traffic'
       const invite = this.data.query.tab === 'overview' && this.data.overviewGroup === 'invite'
-      const buffer = await principalApi.export({
+      const { buffer, filename } = await principalApi.export({
         ...this.data.query, breakdown: this.data.picks,
         export_group: this.data.query.tab === 'overview' ? this.data.overviewGroup : '',
         list_view: this.data.listViewIndex === 1 ? 'customer' : 'order',
@@ -1677,7 +1677,7 @@ Page({
           ? { export_view: 'invite_initiated', export_columns: ['date', 'visit_date', 'name', 'identity', 'referrer', 'referrer_handler', 'status_label', 'invite_count', 'cancel_count', 'no_show_count', 'arrive_count'] }
           : {}),
       })
-      const path = wx.env.USER_DATA_PATH + '/principal-' + Date.now() + '.xlsx'
+      const path = wx.env.USER_DATA_PATH + '/' + filename.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
       await new Promise((resolve, reject) => wx.getFileSystemManager().writeFile({ filePath: path, data: buffer, success: resolve, fail: reject }))
       await new Promise((resolve, reject) => wx.openDocument({ filePath: path, fileType: 'xlsx', showMenu: true, success: resolve, fail: reject }))
     } catch (e) { wx.showToast({ title: e.message || '导出失败', icon: 'none' }) } finally { this.setData({ busy: false }) }

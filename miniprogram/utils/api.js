@@ -402,7 +402,7 @@ async function performRequest(path, options = {}) {
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           _saveRenewedToken(res.header, token)
-          resolve(res.data)
+          resolve(options.withResponseHeaders ? { data: res.data, header: res.header || {} } : res.data)
         } else if (res.statusCode === 409 && res.data && res.data.coarse_cancellation_required && path.indexOf('confirm_coarse_cancellation=1') < 0) {
           _askCoarseCancellation(res.data).then((confirmed) => {
             if (confirmed) request(path + (path.indexOf('?') >= 0 ? '&' : '?') + 'confirm_coarse_cancellation=1', options).then(resolve).catch(reject)
@@ -997,7 +997,13 @@ module.exports = {
     query: (data) => request('/api/principal/query', { method: 'POST', data }),
     saveRule: (data, id) => request('/api/principal/rules' + (id ? '/' + id : ''), { method: id ? 'PATCH' : 'POST', data }),
     deleteRule: (id) => request('/api/principal/rules/' + id, { method: 'DELETE' }),
-    export: (data) => request('/api/principal/export', { method: 'POST', data, responseType: 'arraybuffer', timeout: 120000 }),
+    export: async (data) => {
+      const result = await request('/api/principal/export', { method: 'POST', data, responseType: 'arraybuffer', timeout: 120000, withResponseHeaders: true })
+      const disposition = _getResponseHeader(result.header, 'content-disposition') || ''
+      const match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      if (!match) throw new Error('导出文件名缺失，请刷新后重试')
+      return { buffer: result.data, filename: decodeURIComponent(match[1]) }
+    },
   },
   request,
   isOperationCancelled: (error) => Boolean(error && error.cancelled === true),

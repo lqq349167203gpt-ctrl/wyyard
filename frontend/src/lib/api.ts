@@ -330,7 +330,10 @@ export const principalApi = {
     applyNewToken(res)
     if (res.status === 401) handle401()
     if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.detail || "导出失败") }
-    return res.blob()
+    const disposition = res.headers.get("Content-Disposition") || ""
+    const encodedFilename = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    if (!encodedFilename) throw new Error("导出文件名缺失，请刷新后重试")
+    return { blob: await res.blob(), filename: decodeURIComponent(encodedFilename) }
   },
 }
 let lastTrackedPagePath = ""
@@ -1220,6 +1223,8 @@ export interface VisitRecord {
   nickname: string
   member_type: string
   customer_tags?: CustomerTag[]
+  /** 本条邀约来访需求中的可见标签，服务端统一去重，不是客户档案标签。 */
+  visit_need_tags?: string[]
   referrer: string
   daily_card_usage: number
   needs: string

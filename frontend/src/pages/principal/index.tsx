@@ -1163,21 +1163,21 @@ export default function PrincipalPage() {
   async function download() {
     if (!hasCurrentResult || pagination.loading || pagination.error) return
     setBusy(true); setError("")
-    try { const blob = await principalApi.download({ ...listQuery, tab: listTab, list_view: listView, breakdown: breakdownPicks,
+    try { const { blob, filename } = await principalApi.download({ ...listQuery, tab: listTab, list_view: listView, breakdown: breakdownPicks,
       export_group: query.tab === "overview" ? overviewGroup : "",
       ...(showTrafficList ? { export_view: "traffic" as const, sort_by: trafficSortBy, sort_order: trafficSortOrder,
         breakdown: breakdownPicks, detail_quick_filter: quickFilterKey } : {}),
       ...(showInviteArriveList ? { export_view: "invite_arrivals" as const, arrival_view: inviteArriveView,
         breakdown: breakdownPicks, sort_by: trafficSortBy, sort_order: trafficSortOrder,
         export_columns: visibleInviteColumns.map(column => column.key) } : {}),
-    }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = showTrafficList ? "引流客户.xlsx" : showInviteArriveList ? "邀约到店.xlsx" : "组织俱乐部.xlsx"; link.click(); URL.revokeObjectURL(url) }
+    }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url) }
     catch (e) { setError(e instanceof Error ? e.message : "导出失败") } finally { setBusy(false) }
   }
   async function downloadInviteDetail() {
     if (!inviteDetail) return
     setBusy(true); setError("")
     try {
-      const blob = await principalApi.download({
+      const { blob, filename } = await principalApi.download({
         ...listQuery,
         tab: "overview",
         invite_view: "initiated",
@@ -1193,7 +1193,7 @@ export default function PrincipalPage() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = `${inviteDetail.label}发起邀约.xlsx`
+      link.download = filename
       link.click()
       URL.revokeObjectURL(url)
     } catch (e) {
@@ -2263,7 +2263,9 @@ export default function PrincipalPage() {
       )}
 
       {/* 与「自定义筛选」的结果区一致：带 0.5px 边框的容器 + 表头栏 */}
-      {showParticipationOverview && <MemberParticipationList query={listQuery} period={dateSummary} showOwners={showParticipationOwners} onOpenCustomer={customerId => { setDetailCourseId(""); setDetailCustomerId(customerId) }} />}
+      {showParticipationOverview && <MemberParticipationList query={listQuery} period={dateSummary} showOwners={showParticipationOwners}
+        busy={busy} exportDisabled={busy || pagination.loading || !!pagination.error || !hasCurrentResult} onExport={download}
+        onOpenCustomer={customerId => { setDetailCourseId(""); setDetailCustomerId(customerId) }} />}
       {showInviteDateCards && <div ref={listCardRef}>
         <InviteArrivalDateList
           query={listQuery}

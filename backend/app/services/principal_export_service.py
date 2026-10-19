@@ -1,5 +1,8 @@
 """组织/俱乐部导出汇总：复用页面统计，不接受客户端传入数量。"""
 
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
 from app.services.principal_mobile_service import overview_metrics
 
 
@@ -15,6 +18,23 @@ def export_group(query) -> str:
     if query.tab == "orders" and query.include_overview:
         return "deals"
     return "courses" if query.tab == "overview" else ""
+
+
+def export_filename(result: dict, query) -> str:
+    titles = {"traffic": "引流人数", "invite": "邀约到店", "participation": "活动参与",
+              "courses": "课程数据", "deals": "成交量"}
+    title = titles.get(export_group(query), "转化分析" if query.tab == "conversion" else "课程数据")
+    if query.tab == "orders":
+        title = "成交量"
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    period = result.get("breakdown", {}).get("record_period") or {}
+    start = date.fromisoformat(period["from"]) if period.get("from") else query.date_from or date(2026, 1, 1)
+    end = date.fromisoformat(period["to"]) if period.get("to") else min(query.date_to or today, today)
+    if start == date.min:
+        start = date(2026, 1, 1)
+    def label(day):
+        return f"{day.year}年{day.month}月{day.day}日"
+    return f"{title}_{label(start)}至{label(end)}.xlsx"
 
 
 def summary_rows(result: dict, query, group: str) -> list[list]:

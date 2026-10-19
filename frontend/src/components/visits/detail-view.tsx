@@ -19,6 +19,7 @@ import { CUSTOMER_INCOME_FIELDS } from "@/lib/customer-income"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { BatchInputTable, type VisitHistoryEntry, type VisitChangedCell, type VisitRowSummary } from "./batch-input-table"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
+import { canViewNote, canViewNotePart } from "@/lib/note-permissions"
 
 // ===== 三级手风琴组件（天→小时→条目）=====
 type VisitHourGroup = { hour: string; entries: VisitHistoryEntry[] }
@@ -562,8 +563,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         "客户昵称": v.nickname,
         "预计时间": v.visit_time || "",
         "会员身份": v.member_type || "",
-        "客户标签": (v.customer_tags || []).map(tag => tag.name).join("、"),
-        "来访需求": v.needs || "",
+        ...(canViewNotePart(editPermissions.customer_access, "visit_need_tags")
+          ? { "来访标签": (v.visit_need_tags || []).join("、") } : {}),
+        ...(canViewNote(editPermissions.customer_access, "visit_need") ? { "来访需求": v.needs || "" } : {}),
         "组长情况": role || "-",
         "邀约人": v.referrer_handler || "",
         "接待人": v.receptionist || "",
@@ -573,7 +575,9 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     if (!rows.length) return
 
     const headers = Object.keys(rows[0])
-    const colWidths = [10, 12, 10, 12, 24, 40, 10, 10, 10, 20]
+    const widthByHeader: Record<string, number> = { "引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12,
+      "来访标签": 24, "来访需求": 40, "组长情况": 10, "邀约人": 10, "接待人": 10, "目标": 20 }
+    const colWidths = headers.map(header => widthByHeader[header])
 
     // 按预计时间分场次：上午场 <12:00，下午场 12:00~17:59，晚上场 >=18:00
     const slotIndex = (time: string) => {

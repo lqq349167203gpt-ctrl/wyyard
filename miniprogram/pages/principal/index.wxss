@@ -875,6 +875,7 @@
 .scope-type-picker { width: 180rpx; flex-shrink: 0; }
 .scope-type-picker .scope-control { justify-content: flex-start; }
 .mobile-list-count { padding: 12rpx 4rpx; color: #8f959e; font-size: 22rpx; }
+.participation-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 12rpx; }
 .participation-card, .participant-course-card { margin-bottom: 16rpx; overflow: hidden; border: 1rpx solid #e9ebed; border-radius: 10rpx; background: #fff; }
 .participation-person-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; padding: 22rpx 22rpx 8rpx; }
 .participation-person-name, .participant-person-name { min-width: 0; font-size: 26rpx; font-weight: 500; color: #2b2f36; }

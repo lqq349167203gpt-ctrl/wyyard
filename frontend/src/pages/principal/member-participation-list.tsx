@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Download } from "lucide-react"
 
 import { EmptyValue } from "@/components/empty-value"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -81,11 +82,14 @@ function activityTypeLabel(activity: Activity) {
   return activity.type === "沙龙活动" ? (activity.subtype || "未分类") : (activity.type || "其他活动")
 }
 
-export function MemberParticipationList({ query, period, showOwners, onOpenCustomer }: {
+export function MemberParticipationList({ query, period, showOwners, onOpenCustomer, onExport, busy, exportDisabled }: {
   query: PrincipalQuery
   period: string
   showOwners: boolean
   onOpenCustomer: (customerId: string) => void
+  onExport: () => void
+  busy: boolean
+  exportDisabled: boolean
 }) {
   const detailQuery: PrincipalQuery = { ...query, overview_detail: "participation", detail_sort_by: "" }
   const queryKey = JSON.stringify(detailQuery)
@@ -106,7 +110,13 @@ export function MemberParticipationList({ query, period, showOwners, onOpenCusto
           <span className="font-medium">{period} · 活动参与</span>
           <span className="ml-2 text-[12px] text-[#8f959e]">共 {pagination.totalItems} 人</span>
         </div>
-        <span className="text-[12px] text-[#8f959e]">按参与次数从多到少</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-[#8f959e]">按参与次数从多到少</span>
+          <button type="button" onClick={onExport} disabled={exportDisabled || pagination.loading || !!pagination.error}
+            className="flex h-7 shrink-0 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-2.5 text-[12px] font-normal text-[#4e535a] hover:bg-[#f5f6f7] disabled:opacity-50">
+            <Download className="h-3.5 w-3.5" />{busy ? "导出中" : "导出"}
+          </button>
+        </div>
       </div>
       {pagination.error && (
         <div role="alert" className="mb-3 flex items-center gap-3 rounded-[6px] border border-[#f1d9dc] bg-[#fff8f8] px-3.5 py-2 text-[12px] text-[#b94a58]">

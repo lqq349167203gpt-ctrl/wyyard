@@ -308,7 +308,7 @@ def export(data: PrincipalQuery, request: Request):
     # Excel 工作表名不允许包含 “/”，用去掉斜杠的名称
     headers = [c["label"] for c in columns] + (["关联明细"] if include_details else [])
     summary_rows = principal_export_service.summary_rows(result, data, export_group)
-    return _xlsx_response("组织俱乐部", headers, rows, "组织俱乐部.xlsx", summary_rows=summary_rows)
+    return _xlsx_response("组织俱乐部", headers, rows, principal_export_service.export_filename(result, data), summary_rows=summary_rows)
 
 
 @router.get("/rules")

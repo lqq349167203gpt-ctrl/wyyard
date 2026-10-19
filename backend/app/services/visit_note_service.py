@@ -63,6 +63,14 @@ def display_content_dict(note: dict) -> str:
     return "\n".join(value for value in (labels, note.get("content", "")) if value)
 
 
+def visit_need_tag_names(visible_notes: Iterable[dict]) -> list[str]:
+    """从已按权限过滤的本条邀约备注提取来访标签；多人录入同名标签只显示一次。"""
+    return list(dict.fromkeys(
+        tag["name"] for note in visible_notes if note.get("category") == "visit_need"
+        for tag in note.get("need_tags", []) if tag.get("name")
+    ))
+
+
 def _resolve_need_tags(category, tag_ids, previous=()):
     from app.services import customer_tag_service
 

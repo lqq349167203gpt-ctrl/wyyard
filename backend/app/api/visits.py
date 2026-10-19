@@ -8,6 +8,7 @@ from app.services import (
     customer_access_service,
     customer_service,
     customer_tag_service,
+    visit_note_service,
     visit_service,
     visit_verification_service,
 )
@@ -203,6 +204,7 @@ async def list_visits(
         item["customer_tags"] = visible_tags.get(record.customer_id, [])
         item["visit_notes"] = note_map.get(record.id, [])
         item = customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"])
+        item["visit_need_tags"] = visit_note_service.visit_need_tag_names(item["visit_notes"])
         items.append(item)
     role = get_request_roles(request) if request else ["超级管理员"]
     if date and customer_access_service.can_view_transaction_summary(role):
@@ -324,8 +326,6 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     items = [_fill_member_type(record, need_map.get(record.id, ""), first_arrivals=first_arrivals) for record in active_records]
     items = [customer_access_service.protect_note_fields({**item, "visit_notes": note_map.get(item["id"], [])},
               get_request_roles(request) if request else ["超级管理员"]) for item in items]
-    visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", "") if request else "")
-
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
     for r in items:
@@ -340,7 +340,7 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
             "客户昵称": v.get("nickname") or "",
             "预计时间": v.get("visit_time") or "",
             "会员身份": v.get("member_type") or "",
-            "客户标签": "、".join(tag["name"] for tag in visible_tags.get(v["customer_id"], [])),
+            "来访标签": "、".join(visit_note_service.visit_need_tag_names(v.get("visit_notes", []))),
             "来访需求": v.get("needs") or "",
             "组长情况": role or "-",
             "邀约人": v.get("referrer_handler") or "",
@@ -352,10 +352,12 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         # 空表也返回有效 xlsx（只有表头）
         rows = []
 
-    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "客户标签", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
+    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "来访标签", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
+    if not customer_access_service.can_view_detail_tab(get_request_roles(request) if request else ["超级管理员"], "visit_need_tags"):
+        headers.remove("来访标签")
     if not customer_access_service.can_view_note(get_request_roles(request) if request else ["超级管理员"], "visit_need"):
         headers.remove("来访需求")
-    col_widths = {"引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "客户标签": 24,
+    col_widths = {"引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "来访标签": 24,
                   "来访需求": 40, "组长情况": 10, "邀约人": 10, "接待人": 10, "目标": 20}
 
     wb = Workbook()

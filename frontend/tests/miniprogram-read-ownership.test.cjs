@@ -254,6 +254,23 @@ test('导出和上传共用来源、会话续期与中文错误；无权限不�
   assert.equal((await upload).url, '/image.png'); assert.equal(storage.auth_token, 'c')
 })
 
+test('组织导出沿用服务端卡片及日期文件名，其他请求仍直接返回原数据', async () => {
+  const requests = []
+  const api = fixture('miniprogram/utils/api.js', {}, { wx: {
+    getStorageSync: key => key === 'auth_token' ? 'a' : 'device', request: data => requests.push(data),
+  } })
+  const promise = api.principalApi.export({ export_group: 'deals' })
+  const filename = '成交量_2026年10月1日至2026年10月19日.xlsx'
+  const binary = new ArrayBuffer(2)
+  requests[0].success({ statusCode: 200, data: binary, header: { 'Content-Disposition': "attachment; filename*=UTF-8''" + encodeURIComponent(filename) } })
+  const result = await promise
+  assert.equal(result.filename, filename)
+  assert.equal(result.buffer, binary)
+  const plain = api.request('/api/health')
+  requests[1].success({ statusCode: 200, data: { status: 'ok' } })
+  assert.equal((await plain).status, 'ok')
+})
+
 test('信息核对空间失败可重试，后续页失败不跳页，完整天数由后端提供', async () => {
   let spaceReads = 0, reads = 0
   const p = fixture('miniprogram/pages/audit-check/index.js', {

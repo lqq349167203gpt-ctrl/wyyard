@@ -1,12 +1,17 @@
 """组织各卡片导出的顶部汇总与下拉统计共用服务端数据。"""
 
 from copy import deepcopy
+from datetime import date, datetime
 from io import BytesIO
+from urllib.parse import unquote
+from zoneinfo import ZoneInfo
 
 import pytest
 from openpyxl import load_workbook
 
 from app.api import principal as api
+from app.models.principal import PrincipalQuery
+from app.services.principal_export_service import export_filename
 
 
 @pytest.fixture
@@ -21,6 +26,7 @@ def export_data(monkeypatch):
                   {"date": "2026-10-02", "name": "课程乙", "details": []}],
         "total": 2,
         "breakdown": {
+            "record_period": {"from": "2026-10-01", "to": "2026-10-19"},
             "traffic": [{"key": "老师甲", "label": "老师甲", "count": 40, "customers": [customer]}],
             "traffic_filters": {key: [{"key": key, "label": label, "count": count}]
                                 for key, label, count in (("identity", "年卡", 5), ("upsell", "已升单", 2),
@@ -89,6 +95,8 @@ def test_export_has_all_dropdown_counts_above_details(client, export_data, group
         "export_group": group, "export_view": view, "page_size": 1,
     })
     assert response.status_code == 200, response.text
+    title = {"traffic": "引流人数", "invite": "邀约到店", "courses": "课程数据", "deals": "成交量", "participation": "活动参与"}[group]
+    assert f"{title}_2026年10月1日至2026年10月19日.xlsx" in unquote(response.headers["content-disposition"])
     sheet = load_workbook(BytesIO(response.content)).active
     assert [cell.value for cell in sheet[1]][:3] == ["统计分类", "统计项目", "数量"]
     rows = list(sheet.values)
@@ -158,3 +166,12 @@ def test_multiple_dropdown_options_share_one_cell_and_keep_all_counts(client, ex
     assert len(cells) == 1
     assert cells[0].value == "\n".join(f"付费项目{index} {index} 笔" for index in range(5))
     assert sheet.row_dimensions[cells[0].row].height >= 5 * 16
+
+
+def test_export_filename_for_all_time_cross_year_and_conversion():
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    assert export_filename({}, PrincipalQuery(export_group="deals")) == f"成交量_2026年1月1日至{today.year}年{today.month}月{today.day}日.xlsx"
+    assert export_filename({}, PrincipalQuery(export_group="courses", date_from=date(2026, 1, 1), date_to=date(2099, 12, 31))) == f"课程数据_2026年1月1日至{today.year}年{today.month}月{today.day}日.xlsx"
+    result = {"breakdown": {"record_period": {"from": "2025-12-31", "to": "2026-01-02"}}}
+    assert export_filename(result, PrincipalQuery(export_group="invite")) == "邀约到店_2025年12月31日至2026年1月2日.xlsx"
+    assert export_filename({}, PrincipalQuery(tab="conversion", date_from=date(2026, 1, 1), date_to=date(2026, 1, 2))) == "转化分析_2026年1月1日至2026年1月2日.xlsx"
