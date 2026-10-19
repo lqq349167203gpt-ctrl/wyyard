@@ -1665,6 +1665,8 @@ Page({
       const invite = this.data.query.tab === 'overview' && this.data.overviewGroup === 'invite'
       const buffer = await principalApi.export({
         ...this.data.query, breakdown: this.data.picks,
+        export_group: this.data.query.tab === 'overview' ? this.data.overviewGroup : '',
+        list_view: this.data.listViewIndex === 1 ? 'customer' : 'order',
         sort_by: this.data.sortField, sort_order: this.data.sortOrder,
         ...(traffic ? { export_view: 'traffic', mobile_quick_filter: this.data.trafficQuickFilter } : {}),
         ...(invite && this.data.inviteView === 'arrive'

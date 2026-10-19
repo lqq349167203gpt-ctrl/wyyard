@@ -10,6 +10,7 @@ from app.models.principal import CONDITION_FIELD_ORDER, CONDITION_FIELDS, Conver
 from app.services import (
     customer_access_service,
     operation_log_service,
+    principal_export_service,
     principal_mobile_service,
     principal_query_cache,
     principal_response_service,
@@ -191,8 +192,12 @@ def query(data: PrincipalQuery, request: Request):
 
 @router.post("/export")
 def export(data: PrincipalQuery, request: Request):
+    export_group = principal_export_service.export_group(data)
     if data.export_view in ("traffic", "invite_initiated", "invite_arrivals"):
         data = data.model_copy(update={"tab": "overview"})
+    if export_group:
+        data = data.model_copy(update={"include_overview": True,
+                                      "tab": "orders" if export_group == "deals" else data.tab})
     result = principal_service.analyze(request, data, export=True)
     if data.export_view == "traffic":
         fields = [
@@ -283,6 +288,14 @@ def export(data: PrincipalQuery, request: Request):
             items = principal_response_service.sort_rows(items, data.sort_by, data.sort_order)
         result = {**result, "columns": [{"key": key, "label": label} for key, label in fields],
                   "items": items, "total": len(items)}
+    if export_group == "participation":
+        members = principal_response_service._participation_rows(result.get("breakdown", {}), data)
+        items = [{"customer": member["name"], **activity, "details": []}
+                 for member in members for activity in member["activities"]]
+        fields = [("customer", "参与者"), ("date", "日期"), ("name", "活动"), ("type", "类型"),
+                  ("subtype", "具体类型"), ("role", "身份"), ("teachers", "老师")]
+        result = {**result, "items": items, "total": len(items),
+                  "columns": [{"key": key, "label": label} for key, label in fields]}
     columns = result["columns"]
     include_details = data.export_view != "invite_arrivals" and not (data.tab in {"courses", "overview"} and data.course_view == "teacher_follow_up")
     rows = [[item.get(c["key"], "") for c in columns] + (["\n".join(item["details"])] if include_details else [])
@@ -294,7 +307,8 @@ def export(data: PrincipalQuery, request: Request):
     audit(request, f"{label}：{result['total']}条{suffix}", "EXPORT")
     # Excel 工作表名不允许包含 “/”，用去掉斜杠的名称
     headers = [c["label"] for c in columns] + (["关联明细"] if include_details else [])
-    return _xlsx_response("组织俱乐部", headers, rows, "组织俱乐部.xlsx")
+    summary_rows = principal_export_service.summary_rows(result, data, export_group)
+    return _xlsx_response("组织俱乐部", headers, rows, "组织俱乐部.xlsx", summary_rows=summary_rows)
 
 
 @router.get("/rules")

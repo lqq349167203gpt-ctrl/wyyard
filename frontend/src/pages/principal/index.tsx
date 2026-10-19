@@ -1163,7 +1163,8 @@ export default function PrincipalPage() {
   async function download() {
     if (!hasCurrentResult || pagination.loading || pagination.error) return
     setBusy(true); setError("")
-    try { const blob = await principalApi.download({ ...listQuery, tab: listTab, list_view: listView, breakdown: serverPicks,
+    try { const blob = await principalApi.download({ ...listQuery, tab: listTab, list_view: listView, breakdown: breakdownPicks,
+      export_group: query.tab === "overview" ? overviewGroup : "",
       ...(showTrafficList ? { export_view: "traffic" as const, sort_by: trafficSortBy, sort_order: trafficSortOrder,
         breakdown: breakdownPicks, detail_quick_filter: quickFilterKey } : {}),
       ...(showInviteArriveList ? { export_view: "invite_arrivals" as const, arrival_view: inviteArriveView,
@@ -1181,6 +1182,7 @@ export default function PrincipalPage() {
         tab: "overview",
         invite_view: "initiated",
         export_view: "invite_initiated",
+        export_group: "invite",
         sort_by: inviteDetailSort.field, sort_order: inviteDetailSort.order,
         export_columns: ["date", "visit_date", ...visibleInviteDetailColumns.map(column => column.key), "status_label"],
         breakdown: [

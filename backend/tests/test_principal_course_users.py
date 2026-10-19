@@ -162,7 +162,7 @@ def test_analyze_and_export_include_scoped_user_fields_and_enforce_notes_permiss
     assert all(row["customer_info"] == "深度需求正文" for row in result["items"])
     assert next(row for row in result["items"] if row["customer_id"] == "o")["org_participation_count"] == 1
     monkeypatch.setattr(api, "audit", lambda *_a, **_k: None)
-    monkeypatch.setattr(api, "_xlsx_response", lambda _sheet, headers, rows, _file: {"headers": headers, "rows": rows})
+    monkeypatch.setattr(api, "_xlsx_response", lambda _sheet, headers, rows, _file, **_kwargs: {"headers": headers, "rows": rows})
     exported = api.export(query, request)
     assert {"用户", "会员身份", "本场身份", "来访需求", "深度需求", "跟进点", "客户反馈"}.issubset(exported["headers"])
     assert "案主" in {row[exported["headers"].index("本场身份")] for row in exported["rows"]}

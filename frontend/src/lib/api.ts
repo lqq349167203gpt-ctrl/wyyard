@@ -47,6 +47,7 @@ export interface ConversionRule {
 }
 export interface PrincipalQuery {
   export_view?: "" | "traffic" | "invite_initiated" | "invite_arrivals"
+  export_group?: "" | "traffic" | "invite" | "participation" | "courses" | "deals"
   export_customer_ids?: string[]
   export_columns?: string[]
   arrival_view?: "customer" | "date" | "date_group"

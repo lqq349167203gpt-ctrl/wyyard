@@ -123,7 +123,7 @@ def test_conflicting_scope_inputs_are_rejected(values):
 def test_person_arrival_export_includes_historical_referrals_and_excludes_other_people(personal_data, monkeypatch):
     request, _, _ = personal_data
     monkeypatch.setattr(api, "audit", lambda *_a, **_k: None)
-    monkeypatch.setattr(api, "_xlsx_response", lambda _sheet, headers, rows, _file: {"headers": headers, "rows": rows})
+    monkeypatch.setattr(api, "_xlsx_response", lambda _sheet, headers, rows, _file, **_kwargs: {"headers": headers, "rows": rows})
     exported = api.export(query(export_view="invite_arrivals", export_columns=["name"]), request)
     assert exported["headers"] == ["昵称"]
     assert {row[0] for row in exported["rows"]} == {"历史客户", "本期客户"}

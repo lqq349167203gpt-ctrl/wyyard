@@ -113,6 +113,8 @@ class PrincipalQuery(StrictBaseModel):
     customer_id: str = Field(default="", max_length=64)
     # 引流客户导出：ID 仅用于收窄已授权结果及保持页面顺序，不作为数据来源。
     export_view: Literal["", "traffic", "invite_initiated", "invite_arrivals"] = ""
+    # 仅指定导出所属卡片；数量必须由服务端按当前权限和筛选计算。
+    export_group: Literal["", "traffic", "invite", "participation", "courses", "deals"] = ""
     export_customer_ids: list[str] | None = Field(default=None, max_length=50000)
     export_columns: list[str] | None = Field(default=None, max_length=32)
     # customer＝一人一行；date＝每次到店一行；date_group＝按到店日期成组，供卡片分页

@@ -76,7 +76,10 @@ def record_pc_export(data: dict, request: Request):
     return {"success": True}
 
 
-def _xlsx_response(sheet_name: str, headers: list[str], rows: list[list], filename: str):
+def _xlsx_response(sheet_name: str, headers: list[str], rows: list[list], filename: str, *, summary_rows: list[list] | None = None):
+    from math import ceil
+    from unicodedata import east_asian_width
+
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
@@ -87,17 +90,40 @@ def _xlsx_response(sheet_name: str, headers: list[str], rows: list[list], filena
     worksheet.sheet_view.showGridLines = False
     border = Border(bottom=Side(style="thin", color="F0F0F0"))
     header_fill = PatternFill(start_color="F7F8FA", end_color="F7F8FA", fill_type="solid")
+    header_row = 1
+    if summary_rows:
+        for row_number, values in enumerate([["统计分类", "统计项目", "数量"], *summary_rows], 1):
+            for column, value in enumerate(values, 1):
+                # 统计选项也可能来自用户填写，不能作为 Excel 公式执行。
+                if isinstance(value, str) and value.startswith(("=", "+", "-", "@")):
+                    value = "'" + value
+                cell = worksheet.cell(row=row_number, column=column, value=value)
+                cell.alignment = Alignment(vertical="center", wrap_text=True)
+                cell.border = border
+                if row_number == 1:
+                    cell.font = Font(bold=True, color="4E535A")
+                    cell.fill = header_fill
+            if row_number > 1 and len(values) == 3 and values[2] == "":
+                worksheet.merge_cells(start_row=row_number, start_column=2, end_row=row_number, end_column=3)
+                # Excel 不会自动撑开合并单元格，按换行和中英文宽度预留高度。
+                lines = sum(max(1, ceil(sum(2 if east_asian_width(char) in {"W", "F"} else 1
+                                           for char in line) / 50)) for line in str(values[1]).split("\n"))
+                worksheet.row_dimensions[row_number].height = min(409, 16 * lines + 8)
+        header_row = len(summary_rows) + 3
     for column, label in enumerate(headers, 1):
-        cell = worksheet.cell(row=1, column=column, value=label)
+        cell = worksheet.cell(row=header_row, column=column, value=label)
         cell.font = Font(bold=True, color="4E535A")
         cell.fill = header_fill
         cell.alignment = Alignment(vertical="center")
         worksheet.column_dimensions[get_column_letter(column)].width = 18
-    for row_number, values in enumerate(rows, 2):
+    for row_number, values in enumerate(rows, header_row + 1):
         for column, value in enumerate(values, 1):
             cell = worksheet.cell(row=row_number, column=column, value=value)
             cell.alignment = Alignment(vertical="center", wrap_text=True)
             cell.border = border
+    if summary_rows:
+        for column in range(1, 4):
+            worksheet.column_dimensions[get_column_letter(column)].width = 26
     buffer = io.BytesIO()
     workbook.save(buffer)
     buffer.seek(0)
