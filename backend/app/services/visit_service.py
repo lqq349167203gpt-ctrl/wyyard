@@ -624,7 +624,7 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "arrival_time": r.arrival_time or "",
                 "arrived_count": all_arrived_counts.get(r.customer_id, 0),
                 "cancelled": r.cancelled,
-                "cancel_reason": r.cancel_reason,
+                "cancel_reason": r.cancel_reason if r.cancelled else "",
                 "is_leader": r.is_leader,
                 "space_id": r.space_id or "",
                 "member_type": member_type,
@@ -737,13 +737,15 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
             if record.arrived:
                 raise ValueError("已到店的邀约不能取消")
             if set(data) != {"cancelled", "cancel_reason"}:
-                raise ValueError("取消邀约时只能提交取消状态和原因")
-            reason = data.get("cancel_reason")
-            if not isinstance(reason, str) or not reason.strip():
-                raise ValueError("请输入取消原因")
-            reason = reason.strip()
-            if len(reason) > 200:
-                raise ValueError("取消原因不能超过200字")
+                raise ValueError("取消邀约时不能同时修改其他内容")
+            if not isinstance(data.get("cancel_reason"), str):
+                raise ValueError("取消原因必须填写文字")
+            reason = data["cancel_reason"].strip()
+            if not reason:
+                raise ValueError("请填写取消原因")
+            if len(reason) > 500:
+                raise ValueError("取消原因不能超过500字")
+            data["cancel_reason"] = reason
 
         if data.get("arrived") is True and (record.cancelled or requested_cancelled is True):
             raise ValueError("已取消的邀约不能确认到店")
@@ -770,7 +772,9 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
 
         old_arrived = record.arrived
         if requested_cancelled is True:
-            data = {"cancelled": True, "cancel_reason": reason, "arrived": False, "arrival_time": ""}
+            data = {"cancelled": True, "cancel_reason": data["cancel_reason"], "arrived": False, "arrival_time": ""}
+        elif requested_cancelled is False and record.cancelled:
+            data = {"cancelled": False, "cancel_reason": ""}
         for key, value in data.items():
             if hasattr(record, key) and key not in ("id", "created_at", "created_by_id", "created_by"):
                 setattr(record, key, value)

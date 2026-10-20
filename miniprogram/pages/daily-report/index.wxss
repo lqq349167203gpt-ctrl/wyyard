@@ -210,6 +210,10 @@
 }
 
 /* ================= 客户 ================= */
+.c-group { margin-bottom: 24rpx; }
+.c-group-title { margin: 0 4rpx 12rpx; color: #4e535a; font-size: 25rpx; font-weight: 600; }
+.c-group-count { color: #8f959e; font-weight: 400; }
+.c-group-empty { margin: 0 4rpx 16rpx; color: #a0a4ab; font-size: 22rpx; }
 .c-card {
   background: #ffffff;
   border-radius: 20rpx;
@@ -235,6 +239,10 @@
 
 .c-card.grey::before {
   background: #e5e6eb;
+}
+
+.c-card.cancelled::before {
+  background: #d97070;
 }
 
 .c-l1 {

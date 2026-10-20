@@ -64,12 +64,17 @@
   <!-- ================= 客户 ================= -->
   <view class="r-body" wx:if="{{activeTab === 'customers'}}">
     <block wx:if="{{!loading && !error}}">
+      <block wx:if="{{visits.length > 0}}">
+      <view class="c-group" wx:for="{{customerGroups}}" wx:for-item="group" wx:for-index="groupIndex" wx:key="key">
+        <view class="c-group-title">{{group.label}}<text class="c-group-count">（{{group.rows.length}}人）</text></view>
+        <view class="c-group-empty" wx:if="{{group.rows.length === 0}}">暂无客户</view>
       <view
-        class="c-card {{item.arrived ? 'green' : 'grey'}} {{item.open ? 'open' : ''}}"
-        wx:for="{{visits}}"
+        class="c-card {{item.cancelled ? 'cancelled' : item.arrived ? 'green' : 'grey'}} {{item.open ? 'open' : ''}}"
+        wx:for="{{group.rows}}"
         wx:key="id"
         bindtap="onVisitToggle"
         data-index="{{index}}"
+        data-group-index="{{groupIndex}}"
       >
         <view class="c-l1">
           <text class="c-time" wx:if="{{item.visitTimeText}}">{{item.visitTimeText}}</text>
@@ -90,14 +95,21 @@
         </view>
         <view wx:if="{{noteVisibility.visit_need}}" class="c-l3"><text class="k">来访需求</text><text class="v">{{item.needText || ''}}<text class="dash" wx:if="{{!item.needText}}">-</text></text></view>
         <view class="c-detail">
-          <view wx:if="{{noteVisibility.customer_info}}" class="d-row"><text class="d-label">深度需求</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
-          <view wx:if="{{noteVisibility.follow_up}}" class="d-row"><text class="d-label">跟进点</text><view class="d-val" wx:if="{{item.followEntries.length}}"><view class="note-feedback-entry" wx:for="{{item.followEntries}}" wx:for-item="note" wx:key="id"><template is="note-feedback-meta" data="{{author: note.author, nextFollowUpText: note.nextFollowUpText, inline: true}}" /><text class="note-feedback-content">{{note.content}}</text></view></view><text class="d-val" wx:else>{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>
-          <view wx:if="{{noteVisibility.customer_feedback}}" class="d-row"><text class="d-label">客户反馈</text><text class="d-val">{{item.feedbackText || ''}}<text class="dash" wx:if="{{!item.feedbackText}}">-</text></text></view>
+          <block wx:if="{{item.cancelled}}">
+            <view wx:if="{{noteVisibility.follow_up}}" class="d-row"><text class="d-label">取消原因</text><text class="d-val">{{item.cancelReason || ''}}<text class="dash" wx:if="{{!item.cancelReason}}">-</text></text></view>
+          </block>
+          <block wx:else>
+            <view wx:if="{{noteVisibility.customer_info}}" class="d-row"><text class="d-label">深度需求</text><text class="d-val">{{item.infoText || ''}}<text class="dash" wx:if="{{!item.infoText}}">-</text></text></view>
+            <view wx:if="{{noteVisibility.follow_up}}" class="d-row"><text class="d-label">跟进点</text><view class="d-val" wx:if="{{item.followEntries.length}}"><view class="note-feedback-entry" wx:for="{{item.followEntries}}" wx:for-item="note" wx:key="id"><template is="note-feedback-meta" data="{{author: note.author, nextFollowUpText: note.nextFollowUpText, inline: true}}" /><text class="note-feedback-content">{{note.content}}</text></view></view><text class="d-val" wx:else>{{item.followText || ''}}<text class="dash" wx:if="{{!item.followText}}">-</text></text></view>
+            <view wx:if="{{noteVisibility.customer_feedback}}" class="d-row"><text class="d-label">客户反馈</text><text class="d-val">{{item.feedbackText || ''}}<text class="dash" wx:if="{{!item.feedbackText}}">-</text></text></view>
+          </block>
           <view class="d-divider"></view>
           <view class="d-row"><text class="d-label">引流</text><text class="d-val">{{item.refText || '自然到店'}}</text></view>
           <view class="d-row"><text class="d-label">邀约</text><text class="d-val">{{item.refHandlerText || ''}}<text class="dash" wx:if="{{!item.refHandlerText}}">-</text></text></view>
         </view>
       </view>
+      </view>
+      </block>
       <view class="empty-state" wx:if="{{visits.length === 0}}">
         <text class="empty-text">当日无邀约记录</text>
       </view>

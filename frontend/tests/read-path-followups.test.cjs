@@ -170,6 +170,32 @@ test('报表导出尚未就绪时不能产生新日期的旧数据文件', () =>
   assert.doesNotThrow(() => run()) // 任何 Blob / DOM / 文件操作均未提供，越过守卫即失败。
 })
 
+test('报表导出按到店状态分组，取消组只显示取消原因', () => {
+  let html = ''
+  const visit = (id, extra) => ({ id, customer_id: id, nickname: id, invitation_count: 1,
+    cancelled_count: 0, arrived_count: 0, activity_count: 0, ...extra })
+  const visitGroups = [
+    { key: 'arrived', label: '已到店', records: [visit('已到店', { arrived: true })] },
+    { key: 'pending', label: '未到店未取消', records: [visit('待到店', {})] },
+    { key: 'cancelled', label: '已取消', records: [visit('已取消', { cancelled: true, cancel_reason: '客户改期', feedback: '旧内容' })] },
+  ]
+  const run = callback('pages/daily-report/index.tsx', 'handleExport', {
+    reportReady: true, visitGroups, permissions: { customer_access: {} }, canViewNote: () => true,
+    todayActivityCountMap: {}, transactionCounts: {}, financeReady: false, hasCardSet: new Set(),
+    reportFollowUpText: () => '旧跟进点', activities: [], canViewTransactions: false,
+    detailDate: '2026-10-01', Blob: class { constructor(parts) { html = parts.join('') } },
+    URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+    document: { createElement: () => ({ click() {} }) },
+  })
+  run()
+  const titles = ['已到店（1人）', '未到店未取消（1人）', '已取消（1人）']
+  assert.ok(titles.every((title, index) => html.indexOf(title) > (index ? html.indexOf(titles[index - 1]) : -1)))
+  const cancelledTable = html.split(titles[2])[1].split('</table>')[0]
+  assert.match(cancelledTable, /<th>取消原因<\/th>/)
+  assert.match(cancelledTable, /客户改期/)
+  assert.doesNotMatch(cancelledTable, /深度需求|跟进点|客户反馈|旧内容/)
+})
+
 test('报表补全课程展示不把五类来源重复用于销卡计算', async () => {
   const sources = Object.fromEntries(['membership-cards', 'group-cases', 'emotional-releases', 'oh-card-readings',
     'energy-knots', 'internal-courses', 'other-projects', 'tea-seat-fees', 'offline-courses'].map(key => [key, []]))

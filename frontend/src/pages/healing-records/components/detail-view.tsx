@@ -780,7 +780,20 @@ export default function DetailView({
                     <div className="grid grid-cols-[64px_1fr] gap-x-3 gap-y-1.5">
                       {canViewNote(access, "visit_need") && <><span className="text-[12px] text-[#a8b1bd] pt-px">来访需求</span><VisitNoteRows notes={visitNeedNotes} /></>}
                       {canViewNote(access, "customer_info") && <><span className="text-[12px] text-[#a8b1bd] pt-px">深度需求</span><VisitNoteRows notes={customerInfoNotes} /></>}
-                      {canViewNote(access, "follow_up") && <><span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span><VisitNoteRows notes={followUpNotes} /></>}
+                      {canViewNote(access, "follow_up") && <>
+                        <span className="pt-px text-[12px] text-[#a8b1bd]">跟进点</span>
+                        {followUpNotes.length > 0 || (v.cancelled && v.cancel_reason) ? (
+                          <div className="flex min-w-0 flex-col gap-1">
+                            {followUpNotes.length > 0 && <VisitNoteRows notes={followUpNotes} />}
+                            {v.cancelled && v.cancel_reason && (
+                              <div className="flex min-w-0 gap-2 text-[12px] leading-[1.6]">
+                                <span className="shrink-0 text-[#8f959e]">取消原因</span>
+                                <span className="min-w-0 whitespace-pre-wrap break-words text-[#3a4150]">{v.cancel_reason}</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : <DvEmpty />}
+                      </>}
                       {canViewNote(access, "customer_feedback") && <><span className="pt-px text-[12px] text-[#a8b1bd]">客户反馈</span><VisitNoteRows notes={customerFeedbackNotes} /></>}
                     </div>
                   </div>

@@ -189,9 +189,9 @@
             <text class="k">深度需求</text>
             <view class="v"><block wx:if="{{item.infoNotes.length}}"><view class="visit-note-entry" wx:for="{{item.infoNotes}}" wx:for-item="note" wx:key="id"><view class="visit-note-meta"><text>{{note.feedbackText}}<text class="attribution-action">反馈</text></text><text><text wx:if="{{note.timeText}}" style="margin-right: 12rpx;">{{note.timeText}}</text>{{note.creatorText}}<text class="attribution-action">创建</text></text></view><text class="visit-note-content">{{note.content}}</text></view></block><text wx:else>{{item.feedback}}</text></view>
           </view>
-          <view class="rec-kv" wx:if="{{item.growth_record || item.followNotes.length}}">
+          <view class="rec-kv" wx:if="{{item.growth_record || item.followNotes.length || (item.cancelled && item.cancel_reason)}}">
             <text class="k">跟进点</text>
-            <view class="v"><block wx:if="{{item.followNotes.length}}"><view class="visit-note-entry" wx:for="{{item.followNotes}}" wx:for-item="note" wx:key="id"><view class="visit-note-meta"><text>{{note.feedbackText}}<text class="attribution-action">反馈</text></text><text><text wx:if="{{note.timeText}}" style="margin-right: 12rpx;">{{note.timeText}}</text>{{note.creatorText}}<text class="attribution-action">创建</text></text></view><text class="visit-note-content">{{note.content}}</text></view></block><text wx:else>{{item.growth_record}}</text></view>
+            <view class="v"><block wx:if="{{item.followNotes.length}}"><view class="visit-note-entry" wx:for="{{item.followNotes}}" wx:for-item="note" wx:key="id"><view class="visit-note-meta"><text>{{note.feedbackText}}<text class="attribution-action">反馈</text></text><text><text wx:if="{{note.timeText}}" style="margin-right: 12rpx;">{{note.timeText}}</text>{{note.creatorText}}<text class="attribution-action">创建</text></text></view><text class="visit-note-content">{{note.content}}</text></view></block><text wx:elif="{{item.growth_record}}">{{item.growth_record}}</text><view class="visit-note-entry" wx:if="{{item.cancelled && item.cancel_reason}}"><text class="visit-note-content">取消原因：{{item.cancel_reason}}</text></view></view>
           </view>
           <view class="rec-kv" wx:if="{{item.experience || item.feedbackNotes.length}}">
             <text class="k">客户反馈</text>
