@@ -8,9 +8,9 @@
 .feedback-field { display: flex; align-items: center; gap: 16rpx; padding: 14rpx 28rpx 0; color: #646a73; font-size: 26rpx; }
 .feedback-label { display: flex; flex-shrink: 0; align-items: center; gap: 8rpx; }
 .feedback-label-dot { width: 12rpx; height: 12rpx; flex-shrink: 0; border-radius: 50%; background: #f4dc84; }
-.feedback-field picker { flex: 0 1 200rpx; min-width: 0; margin-left: auto; }
+.feedback-field picker { flex: 0 1 260rpx; min-width: 0; }
 .feedback-picker { display: flex; align-items: center; justify-content: space-between; height: 58rpx; box-sizing: border-box; padding: 0 16rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fcfcfc; color: #2b2f36; font-size: 26rpx; }
-.feedback-picker-text { flex: 1; min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-picker-text { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .feedback-picker-arrow { flex-shrink: 0; width: 0; height: 0; margin-left: 12rpx; border-top: 7rpx solid #9aa1a9; border-right: 7rpx solid transparent; border-left: 7rpx solid transparent; }
 
 .note-header,
@@ -320,7 +320,9 @@
 .enlarged-meta .note-meta-right {
   font-size: 24rpx;
 }
-.need-tags-section { margin-bottom: 28rpx; }
+.need-tags-section { margin: 24rpx 28rpx 28rpx; }
+.note-display-tags { display: flex; flex-wrap: wrap; gap: 10rpx; margin: 8rpx 0; }
+.note-display-tag { max-width: 100%; box-sizing: border-box; padding: 2rpx 12rpx; border: 1rpx solid #dce5f2; border-radius: 8rpx; background: #f2f6fc; color: #526886; font-size: 24rpx; line-height: 34rpx; word-break: break-all; }
 .need-tags-label { display: block; margin-bottom: 16rpx; font-size: 24rpx; color: #646a73; }
 .need-tags-options { display: flex; flex-wrap: wrap; gap: 16rpx; }
 .need-tag { padding: 10rpx 20rpx; border: 1rpx solid #e5e7eb; border-radius: 8rpx; background: #fff; color: #646a73; font-size: 24rpx; }

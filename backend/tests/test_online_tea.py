@@ -20,7 +20,7 @@ def test_online_tea_crud_expiry_no_amount_and_reporting(client, created_customer
     assert result.status_code == 200, result.text
     item = result.json()
     record_id = item["id"]
-    assert item["validity_value"] == 1 and item["expiry_date"] == "2026-02-27"
+    assert item["validity_value"] == 1 and item["validity_unit"] == "month" and item["expiry_date"] == "2026-02-27"
     assert item["closers"][0]["amount"] == 0
     assert item["amount_recorded"] is False and "amount" not in item and "price" not in item
     assert client.get(f"/api/online-tea/{record_id}").status_code == 200
@@ -30,11 +30,14 @@ def test_online_tea_crud_expiry_no_amount_and_reporting(client, created_customer
     assert page["total"] == 1 and page["items"][0]["notes"] == "仅登记购买"
     result = client.patch(f"/api/online-tea/{record_id}", json={"validity_value": 2})
     assert result.status_code == 200 and result.json()["expiry_date"] == "2026-03-30"
+    result = client.patch(f"/api/online-tea/{record_id}", json={"validity_value": 2, "validity_unit": "day"})
+    assert result.status_code == 200 and result.json()["expiry_date"] == "2026-02-01"
     assert client.patch(f"/api/online-tea/{record_id}", json={"validity_value": 0}).status_code == 400
+    assert client.patch(f"/api/online-tea/{record_id}", json={"validity_unit": "week"}).status_code == 400
     assert online_tea_service.get_record(record_id).validity_value == 2
     detail = client.get(f"/api/customer-detail/{created_customer['id']}").json()
-    assert any(row["type"] == "线上茶疗" for row in detail["purchase_summary"])
-    assert any(row["type"] == "线上茶疗" and row["amount"] is None for row in detail["payment_records"])
+    assert any(row["type"] == "线上茶疗" and row["validity_unit"] == "day" for row in detail["purchase_summary"])
+    assert any(row["type"] == "线上茶疗" and row["quantity"] == "2天" and row["amount"] is None for row in detail["payment_records"])
     query = client.post(
         "/api/principal/query",
         json={"tab": "orders", "organization_id": org["id"], "date_from": "2026-01-01", "date_to": "2026-12-31"},
@@ -43,13 +46,13 @@ def test_online_tea_crud_expiry_no_amount_and_reporting(client, created_customer
     from app.services import payment_export_service
 
     exported = payment_export_service._build_rows("超级管理员", allowed_customer_ids={created_customer["id"]})
-    assert any(row["付费类型"] == "线上茶疗" and row["金额"] == "" for row in exported)
+    assert any(row["付费类型"] == "线上茶疗" and row["数量/期限"] == "2天" and row["金额"] == "" for row in exported)
     assert client.delete(f"/api/online-tea/{record_id}").status_code == 200
     assert client.get(f"/api/online-tea/{record_id}").status_code == 404
     assert client.get("/api/online-tea", params={"customer_ids": created_customer["id"]}).json() == []
 
 
-def test_online_tea_dates_months_required(client, created_customer):
+def test_online_tea_dates_and_validity_units_required(client, created_customer):
     payload = {
         "customer_id": created_customer["id"],
         "nickname": created_customer["nickname"],
@@ -62,6 +65,7 @@ def test_online_tea_dates_months_required(client, created_customer):
         {"deal_date": ""},
         {"validity_value": 0},
         {"validity_value": -1},
+        {"validity_unit": "week"},
         {"organization_id": ""},
     ):
         assert client.post("/api/online-tea", json={**payload, **patch}).status_code == 422

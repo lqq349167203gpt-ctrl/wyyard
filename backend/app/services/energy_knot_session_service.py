@@ -186,7 +186,7 @@ def search_customers(keyword: str, date: str = "") -> list:
                 "id": c.id,
                 "nickname": c.nickname,
                 "name": c.name,
-                "member_type": c.member_type,
+                "member_type": c.member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
                 "remaining": remaining,
             })
     return results
@@ -306,7 +306,7 @@ def get_debt_record(customer_id: str) -> dict:
     return {
         "customer_id": customer_id,
         "nickname": customer.nickname if customer else "",
-        "member_type": customer.member_type if customer else "",
+        "member_type": customer.member_type if customer else "", "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
         "total_count": total,
         "deducted_count": used + manual,
         "debt_count": debt,

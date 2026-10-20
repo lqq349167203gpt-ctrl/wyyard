@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+
 from app.api import class_records, visits
 from app.models.activity_participant_note import ActivityParticipantNote
 from app.models.class_record import ClassRecord
@@ -156,6 +157,10 @@ def test_visit_list_reuses_projection_and_keeps_summary_permissions_and_order(mo
     monkeypatch.setattr(account_service, "get_account", lambda _: SimpleNamespace(roles=["员工"], role="员工"))
     monkeypatch.setattr(visits.customer_access_service, "can_view_detail_tab", lambda *_: can_view_need)
     monkeypatch.setattr(visits.customer_access_service, "can_view_transaction_summary", lambda *_: False)
+    access = visits.customer_access_service.position_edit_permission_service._full_customer_access()
+    access["detail_tabs"]["visit_need_tags"] = can_view_need
+    access["detail_tabs"]["visit_need_detail"] = can_view_need
+    monkeypatch.setattr(visits.customer_access_service, "get_customer_permissions", lambda _: access)
     projection_calls = []
     original = visit_note_service.list_notes
 
@@ -210,6 +215,10 @@ def test_light_visit_list_filters_customer_scope_before_one_note_read(monkeypatc
     monkeypatch.setattr(visit_service, "first_arrival_dates", lambda _: {})
     monkeypatch.setattr(account_service, "get_account", lambda _: None)
     monkeypatch.setattr(visits.customer_access_service, "can_view_detail_tab", lambda *_: False)
+    access = visits.customer_access_service.position_edit_permission_service._full_customer_access()
+    access["detail_tabs"]["visit_need_tags"] = False
+    access["detail_tabs"]["visit_need_detail"] = False
+    monkeypatch.setattr(visits.customer_access_service, "get_customer_permissions", lambda _: access)
     calls = []
 
     def projection(visit_ids, ensure_legacy=True):

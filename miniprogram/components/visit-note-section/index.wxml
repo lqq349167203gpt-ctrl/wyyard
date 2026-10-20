@@ -17,7 +17,10 @@
     <text class="section-label-hint" wx:if="{{myNote}}">{{myNote.timeText}}<text class="attribution-action">更新</text> · {{myNote.creatorText}}<text class="attribution-action">创建</text><text wx:if="{{!readOnly}}"> · <text class="clear-btn" bindtap="onClearMine">清空</text></text></text>
   </view>
   <view class="mine-box" bindtap="onAdd">
-    <text class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.displayContent : (readOnly ? '暂无记录' : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'))}}</text>
+    <view class="note-display-tags" wx:if="{{category === 'visit_need' && showNeedTags && myNote.need_tags.length}}">
+      <text class="note-display-tag" wx:for="{{myNote.need_tags}}" wx:for-item="tag" wx:key="id">{{tag.name}}</text>
+    </view>
+    <text wx:if="{{!myNote || (showDetail && myNote.content)}}" class="mine-content {{myNote ? '' : 'mine-placeholder'}}">{{myNote ? myNote.content : (readOnly ? '暂无记录' : (privateToCreator ? '填写' + title + '…' : '写下你观察到的' + title + '…'))}}</text>
   </view>
 
   <!-- 别人填写的 -->
@@ -30,7 +33,10 @@
         <view class="note-person-plan"><text class="note-creator"><text class="attribution-label">反馈：</text>{{item.feedbackText}}</text><text class="plan-meta" wx:if="{{category === 'follow_up' && (item.next_follow_up_person || item.next_follow_up_date)}}"><text class="attribution-label">下次跟进：</text>{{item.next_follow_up_person}}<text wx:if="{{item.next_follow_up_person && item.next_follow_up_date}}"> </text>{{item.followUpDateText}}</text></view>
         <view class="note-meta-right"><text class="note-time">{{item.timeText}}</text><text>{{item.creatorText}}<text class="attribution-action">创建</text></text></view>
       </view>
-      <text class="note-content">{{item.displayContent}}</text>
+      <view class="note-display-tags" wx:if="{{category === 'visit_need' && showNeedTags && item.need_tags.length}}">
+        <text class="note-display-tag" wx:for="{{item.need_tags}}" wx:for-item="tag" wx:key="id">{{tag.name}}</text>
+      </view>
+      <text wx:if="{{showDetail && item.content}}" class="note-content">{{item.content}}</text>
     </view>
   </block>
 
@@ -49,8 +55,14 @@
     </view>
   </view>
   <scroll-view class="editor-body" scroll-y>
+  <view class="feedback-field feedback-field-plan">
+    <view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view>
+    <picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange">
+      <view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view>
+    </picker>
+  </view>
   <view wx:if="{{category === 'visit_need' && showNeedTags}}" class="need-tags-section">
-    <text class="need-tags-label">来访需求（可多选）</text>
+    <text class="need-tags-label">来访标签（可多选）</text>
     <view class="need-tags-options">
       <text wx:for="{{needTagOptions}}" wx:key="id" class="need-tag {{item.selected ? 'need-tag-selected' : ''}}" data-id="{{item.id}}" bindtap="onToggleNeedTag">{{item.name}}</text>
     </view>
@@ -58,14 +70,7 @@
     <text wx:elif="{{needTagsError}}" class="need-tags-state" bindtap="loadNeedTags">{{needTagsError}} · 点击重试</text>
     <text wx:elif="{{!needTagOptions.length}}" class="need-tags-state">暂未配置公共来访需求</text>
   </view>
-  <view class="feedback-field feedback-field-plan">
-    <view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view>
-    <picker range="{{feedbackOptions}}" range-key="name" value="{{feedbackIndex}}" bindchange="onFeedbackChange">
-      <view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[feedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view>
-    </picker>
-  </view>
   <block wx:if="{{category === 'follow_up'}}">
-    <view class="editor-section-label">我填写的</view>
     <view class="plan-fields">
       <view class="plan-field plan-person-field">
         <text class="plan-label">下次跟进</text>

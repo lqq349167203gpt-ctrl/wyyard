@@ -26,6 +26,7 @@ const TABS = [
   { key: "offline_course", label: "线下落地课程" },
   { key: "other", label: "其他项目" },
 ]
+const EXPORT_TYPES = TABS.filter(tab => tab.key !== "coarse_door_card")
 
 const EXPORT_RANGE_OPTIONS: { value: PaymentExportRangeType; label: string }[] = [
   { value: "day", label: "按天" },
@@ -63,6 +64,7 @@ export default function PaymentPage() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState("")
+  const [selectedExportTypes, setSelectedExportTypes] = useState<string[]>(() => EXPORT_TYPES.map(tab => tab.key))
   const [rangeType, setRangeType] = useState<PaymentExportRangeType>("month")
   const [selectedDate, setSelectedDate] = useState(currentDate)
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
@@ -94,6 +96,10 @@ export default function PaymentPage() {
 
   const handleExport = async () => {
     if (exporting) return
+    if (selectedExportTypes.length === 0) {
+      setExportError("请至少选择一项付费项目")
+      return
+    }
     if (rangeType === "custom" && (!dateFrom || !dateTo)) {
       setExportError("请选择完整的开始日期和结束日期")
       return
@@ -103,7 +109,7 @@ export default function PaymentPage() {
       return
     }
 
-    const params: PaymentExportParams = { range_type: rangeType }
+    const params: PaymentExportParams = { range_type: rangeType, types: selectedExportTypes.join(",") }
     if (rangeType === "day") params.period = selectedDate
     if (rangeType === "month") params.period = selectedMonth
     if (rangeType === "year") params.period = selectedYear
@@ -177,11 +183,11 @@ export default function PaymentPage() {
           if (!open) setExportError("")
         }}
       >
-        <DialogContent className="w-[420px] max-w-[90vw] p-0 gap-0 rounded-[4px]" initialFocus={false}>
+        <DialogContent className="w-[420px] max-w-[90vw] max-h-[85vh] overflow-y-auto p-0 gap-0 rounded-[4px]" initialFocus={false}>
           <DialogHeader className="px-6 pt-4 pb-3 border-b border-[#f0f0f0] gap-1">
             <DialogTitle className="text-[14px] font-normal text-[#1f2329]">导出付费记录</DialogTitle>
             <DialogDescription className="text-[12px] text-[#8f959e]">
-              导出所有付费类型，并按成交日期从近到远排列
+              选择项目和时间范围，按成交日期从近到远排列
             </DialogDescription>
           </DialogHeader>
 
@@ -296,8 +302,43 @@ export default function PaymentPage() {
               )}
             </div>
 
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[12px] text-[#4e535a]">
+                <span>付费项目（已选 {selectedExportTypes.length} 项）</span>
+                <button
+                  type="button"
+                  className="text-[#3370ff] hover:underline"
+                  onClick={() => {
+                    setSelectedExportTypes(selectedExportTypes.length === EXPORT_TYPES.length ? [] : EXPORT_TYPES.map(tab => tab.key))
+                    setExportError("")
+                  }}
+                >
+                  {selectedExportTypes.length === EXPORT_TYPES.length ? "清空" : "全选"}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                {EXPORT_TYPES.map(tab => (
+                  <label key={tab.key} className="flex min-h-7 cursor-pointer items-center gap-2 text-[12px] text-[#2b2f36]">
+                    <input
+                      type="checkbox"
+                      checked={selectedExportTypes.includes(tab.key)}
+                      onChange={event => {
+                        setSelectedExportTypes(previous => event.target.checked
+                          ? [...previous, tab.key]
+                          : previous.filter(key => key !== tab.key))
+                        setExportError("")
+                      }}
+                      className="h-4 w-4 accent-[#3370ff]"
+                    />
+                    {tab.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-[#8f959e]">粗门次卡归入会员卡</p>
+            </div>
+
             <div className="rounded-[4px] bg-[#f7f8fa] px-3 py-2 text-[12px] leading-5 text-[#646a73]">
-              将导出全部付费类型 · {rangeSummary}
+              已选 {selectedExportTypes.length} 项 · {rangeSummary}
             </div>
             {exportError && <p className="text-[12px] text-[#f54a45]">{exportError}</p>}
           </div>

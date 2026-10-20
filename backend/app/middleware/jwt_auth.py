@@ -21,6 +21,7 @@ PUBLIC_GET_PATHS = (
     "/api/client/activities",
     "/api/activity-themes",
     "/api/uploads/public-images",
+    "/api/activity-icons/default",
 )
 
 # 客户角色可访问的路径前缀
@@ -267,6 +268,17 @@ def _is_activity_participant_patch(path: str, method: str) -> bool:
     return False
 
 
+def _is_activity_teacher_action(path: str, method: str) -> bool:
+    """仅放行到业务层校验的老师操作入口，不放行课程删除等其他写入。"""
+    import re
+
+    if method == "POST" and path in {"/api/class-records/course-roster/confirm", "/api/class-records/participant-notes"}:
+        return True
+    if method == "DELETE" and path.startswith("/api/class-records/course-roster/notes/"):
+        return True
+    return bool(re.fullmatch(r"/api/(?:class-records/[^/]+/withdrawals|activity-withdrawals/(?:gcs|ers|eks|ics)/[^/]+)(?:/[^/]+)?", path)) and method in {"POST", "DELETE"}
+
+
 def _is_activity_lock_action(path: str, method: str) -> bool:
     return method == "POST" and path in {
         "/api/activity-themes/lock",
@@ -443,6 +455,11 @@ class AuthMiddleware:
                                 or edit_permissions["activity_teachers"] != "view"
                             )
                         )
+                        independent_activity_teacher_allowed = (
+                            read_only_area == "activities"
+                            and edit_permissions["activity_teachers"] != "view"
+                            and _is_activity_teacher_action(path, method)
+                        )
                         independent_activity_lock_allowed = (
                             read_only_area == "activities"
                             and _is_activity_lock_action(path, method)
@@ -456,6 +473,7 @@ class AuthMiddleware:
                         if (
                             edit_permissions[read_only_area] == "view"
                             and not independent_activity_patch_allowed
+                            and not independent_activity_teacher_allowed
                             and not independent_activity_lock_allowed
                             and not independent_visit_lock_allowed
                         ):

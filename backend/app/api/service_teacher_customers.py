@@ -199,7 +199,7 @@ def export_follow_ups(
             teacher,
             item["nickname"] or item["name"] or "-",
             item["member_type"] or "-",
-            item["follow_up_status"] or "-",
+            item.get("card_status") or "-",
             item["latest_customer_info_content"] or "-",
             item["latest_customer_info_by"] or "-",
             item["latest_customer_info_created_by"] or "-",
@@ -221,7 +221,7 @@ def export_follow_ups(
     normalized_filter = {"inactive_30": "inactive", "active_30": "active"}.get(follow_up_filter, follow_up_filter)
     filter_label = {"inactive": f"近{follow_up_days}天未录入", "active": f"近{follow_up_days}天已录入", "all": "全部客户"}[normalized_filter]
     record_service_teacher_action(request, f"导出跟进记录：服务老师 {teacher}；{definition_label}；{filter_label}；共{len(rows)}人", export=True)
-    headers = ["服务老师", "客户昵称", "会员身份", "跟进阶段", "最近深度需求", "深度需求反馈人", "深度需求创建人", "深度需求录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"]
+    headers = ["服务老师", "客户昵称", "会员身份", "当前卡次", "最近深度需求", "深度需求反馈人", "深度需求创建人", "深度需求录入时间", "最近跟进点", "跟进点反馈人", "跟进点创建人", "跟进点录入时间", "当前状态"]
     hidden = set()
     for category, indexes in (("customer_info", range(4, 8)), ("follow_up", range(8, 12))):
         if not customer_access_service.can_view_note(get_request_roles(request), category):
@@ -281,7 +281,7 @@ def list_course_participants(
                 "course_subtype": course.get("course_subtype", ""),
                 "customer_id": participant["id"],
                 "nickname": participant["nickname"],
-                "member_type": participant.get("member_type", ""),
+                "member_type": participant.get("member_type", ""), "card_status": participant.get("card_status", ""), "card_status_tone": participant.get("card_status_tone", "neutral"),
                 "identity_group": participant.get("identity_group", ""),
                 "visit_need": participant.get("daily_need", ""),
                 "customer_info": participant.get("daily_customer_info", ""),
@@ -308,7 +308,7 @@ def list_course_participants(
                 "course_subtype": course.get("course_subtype", ""),
                 "customer_id": owner_id,
                 "nickname": owner["nickname"],
-                "member_type": owner.get("member_type", ""),
+                "member_type": owner.get("member_type", ""), "card_status": owner.get("card_status", ""), "card_status_tone": owner.get("card_status_tone", "neutral"),
                 "identity_group": owner.get("identity_group", ""),
                 "visit_need": owner.get("daily_need", ""),
                 "customer_info": owner.get("daily_customer_info", ""),

@@ -1081,13 +1081,17 @@
 .edit-reference-title { display: block; font-size: 24rpx; color: #8f959e; }
 .edit-reference-text { display: block; margin-top: 8rpx; font-size: 27rpx; line-height: 1.6; color: #4e535a; word-break: break-all; white-space: pre-wrap; }
 .edit-label { display: block; margin-top: 28rpx; font-size: 24rpx; color: #8f959e; }
-.feedback-field { display: flex; align-items: center; gap: 16rpx; margin-top: 6rpx; color: #646a73; font-size: 26rpx; }
-.feedback-label { display: flex; flex-shrink: 0; align-items: center; gap: 8rpx; }
+.feedback-field { display: flex; align-items: center; gap: 12rpx; margin-top: 10rpx; color: #646a73; font-size: 24rpx; }
+.feedback-label { display: flex; flex-shrink: 0; align-items: center; gap: 8rpx; min-width: 104rpx; }
 .feedback-label-dot { width: 12rpx; height: 12rpx; flex-shrink: 0; border-radius: 50%; background: #f4dc84; }
-.feedback-field picker { flex: 0 1 200rpx; min-width: 0; margin-left: auto; }
-.feedback-picker { display: flex; align-items: center; justify-content: space-between; height: 58rpx; box-sizing: border-box; padding: 0 16rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fcfcfc; color: #2b2f36; font-size: 26rpx; }
-.feedback-picker-text { flex: 1; min-width: 0; overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-field picker { flex: 0 1 230rpx; min-width: 0; }
+.feedback-picker { display: flex; align-items: center; justify-content: space-between; height: 52rpx; box-sizing: border-box; padding: 0 14rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #fcfcfc; color: #2b2f36; font-size: 24rpx; }
+.feedback-picker-text { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .feedback-picker-arrow { flex-shrink: 0; width: 0; height: 0; margin-left: 12rpx; border-top: 7rpx solid #9aa1a9; border-right: 7rpx solid transparent; border-left: 7rpx solid transparent; }
+.participant-plan-fields { display: flex; align-items: center; gap: 20rpx; }
+.participant-plan-fields .feedback-field { flex: 1; min-width: 0; }
+.participant-plan-fields .feedback-field picker { flex: 1; min-width: 0; }
+.participant-plan-fields .feedback-label { min-width: 0; white-space: nowrap; }
 .edit-input { width: 100%; height: 260rpx; margin-top: 12rpx; margin-bottom: 20rpx; padding: 18rpx; box-sizing: border-box; border-radius: 8rpx; background: #f5f6f7; font-size: 28rpx; line-height: 1.6; }
 .edit-input-placeholder { color: #b7bdc6; }
 .edit-actions { display: flex; flex-shrink: 0; gap: 20rpx; padding: 20rpx 30rpx 26rpx; }

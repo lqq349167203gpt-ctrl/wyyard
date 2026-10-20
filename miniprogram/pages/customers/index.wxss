@@ -713,3 +713,31 @@
   font-size: 28rpx;
   font-weight: 500;
 }
+.workspace-tabs { display: flex; gap: 32rpx; padding: 24rpx 32rpx 0; background: #fff; }
+.workspace-tab { padding: 8rpx 0 16rpx; color: #8f959e; font-size: 30rpx; border-bottom: 4rpx solid transparent; }
+.workspace-tab.selected { color: #1f2329; font-weight: 600; border-bottom-color: #1f2329; }
+.handoff-tabs { display: flex; gap: 16rpx; padding: 20rpx 32rpx; background: #fff; }
+.handoff-tab { padding: 10rpx 22rpx; color: #646a73; font-size: 25rpx; border-radius: 8rpx; }
+.handoff-tab.selected { background: #edf0f3; color: #1f2329; font-weight: 500; }
+.handoff-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 16rpx; font-size: 23rpx; color: #8f959e; }
+.handoff-accept { flex-shrink: 0; margin: 0; padding: 0 20rpx; font-size: 24rpx; line-height: 60rpx; background: #edf0f3; color: #1f2329; border-radius: 8rpx; }
+.handoff-accept::after { border: 0; }
+.workspace-error { padding: 28rpx 32rpx; color: #646a73; font-size: 26rpx; text-align: center; }
+.workspace-tools { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 12rpx 32rpx; background: #fff; }
+.workspace-owner { font-size: 25rpx; color: #4e535a; padding: 10rpx 0; }
+.owner-chevron { margin-left: 12rpx; color: #8f959e; }
+.workspace-settings-link { margin: 0 0 0 auto; padding: 8rpx 0; line-height: 1.6; background: transparent; color: #646a73; font-size: 25rpx; }
+.workspace-settings-link::after { border: 0; }
+.workspace-settings-mask { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 32rpx; box-sizing: border-box; background: rgba(0,0,0,.4); }
+.workspace-settings-panel { width: 100%; max-height: 85vh; overflow-y: auto; padding: 32rpx; box-sizing: border-box; border-radius: 20rpx; background: #fff; }
+.workspace-settings-title { font-size: 32rpx; font-weight: 600; color: #1f2329; }
+.workspace-settings-hint { font-size: 23rpx; color: #8f959e; margin-top: 12rpx; }
+.workspace-setting-label { font-size: 26rpx; font-weight: 500; color: #1f2329; margin-top: 28rpx; margin-bottom: 12rpx; }
+.workspace-setting-option { display: flex; align-items: center; justify-content: space-between; padding: 16rpx 0; font-size: 28rpx; color: #4e535a; }
+.workspace-check { width: 34rpx; height: 34rpx; line-height: 34rpx; text-align: center; border: 1rpx solid #c9cdd4; border-radius: 6rpx; }
+.workspace-check.checked { background: #edf0f3; border-color: #646a73; color: #1f2329; }
+.workspace-default { display: flex; justify-content: space-between; background: #f5f6f8; border-radius: 8rpx; padding: 22rpx; font-size: 28rpx; }
+.workspace-settings-actions { display: flex; gap: 24rpx; margin-top: 32rpx; padding-bottom: env(safe-area-inset-bottom); }
+.workspace-settings-actions button { flex: 1; margin: 0; font-size: 28rpx; background: #f5f6f8; color: #4e535a; }
+.workspace-settings-actions button:last-child { background: #1f2329; color: #fff; }
+.workspace-settings-actions button::after { border: 0; }

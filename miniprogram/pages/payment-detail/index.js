@@ -106,9 +106,9 @@ Page({
       } else if (type === 'tea_seat_fee') {
         item._quantity = item.quantity || 1
         item._remaining = ''
-      } else if (type === 'offline_course') {
-        item._validity = `${item.validity_value || 1} 个月`
-        item._expiryDate = calcOfflineExpiry(item)
+      } else if (type === 'offline_course' || type === 'online_tea') {
+        item._validity = `${item.validity_value || 1} ${type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月'}`
+        item._expiryDate = type === 'online_tea' ? (item.expiry_date || '') : calcOfflineExpiry(item)
         item._remaining = ''
       } else if (isHealing) {
         item._remaining = item.effective_remaining != null ? `${item.effective_remaining}${type === 'energy_knot' ? '个' : '次'}` : ''

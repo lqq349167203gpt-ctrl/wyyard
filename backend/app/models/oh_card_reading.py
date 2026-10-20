@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from app.models.payment_course import PaymentCourseFields
 from app.utils.payment_types import OH_READING_TYPES
@@ -34,7 +34,14 @@ class OhCardReadingBase(PaymentCourseFields):
 
 
 class OhCardReadingCreate(OhCardReadingBase):
-    pass
+    diagnosis_teacher: str = Field(default="", validate_default=True)
+
+    @field_validator("diagnosis_teacher", mode="before")
+    @classmethod
+    def require_diagnosis_teacher(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("请选择诊断老师")
+        return value.strip()
 
 
 class OhCardReading(OhCardReadingBase):

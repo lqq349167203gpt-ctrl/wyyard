@@ -114,6 +114,7 @@ def _group_person_courses(debt_type: str, records: list[dict]) -> dict[str, dict
 
 
 def _result(state: dict) -> dict:
+    from app.services.member_card_label_service import label_for
     current_ids = set(state.get("current_unit_ids") or [])
     baseline_ids = set(state.get("baseline_ids") or [])
     new_ids = current_ids - baseline_ids if state.get("confirmed") else current_ids
@@ -134,7 +135,7 @@ def _result(state: dict) -> dict:
             "note", "first_seen_at", "reviewed_at",
             "reviewed_by", "resolved_at",
         )
-    } | {
+    } | label_for(state["customer_id"]) | {
         "status": status,
         "debt_count": len(current_ids),
         "approved_count": len(current_ids - new_ids),

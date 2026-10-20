@@ -14,7 +14,6 @@ CONDITION_FIELD_ORDER = (
     "gender",
     "age",
     "member_type",
-    "follow_up_status",
     "customer_tags",
     "traffic_source",
     "referrer",
@@ -34,6 +33,8 @@ class ConversionAction(StrictBaseModel):
     @field_validator("conditions")
     @classmethod
     def validate_conditions(cls, value: list[AnalysisCondition]) -> list[AnalysisCondition]:
+        # 停用人工跟进阶段；载入旧规则时不再显示或应用这项条件。
+        value = [condition for condition in value if condition.field != "follow_up_status"]
         for condition in value:
             if condition.field not in CONDITION_FIELDS:
                 raise ValueError(f"转化分析暂不支持「{condition.field}」条件")

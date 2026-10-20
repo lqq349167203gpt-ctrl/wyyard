@@ -1,0 +1,18 @@
+<view class="page">
+  <view wx:if="{{error}}" class="error" bindtap="load">{{error}} · 点击重试</view>
+  <view wx:elif="{{loading && !course}}" class="empty">正在读取学员名单…</view>
+  <block wx:if="{{course}}">
+    <view class="course-head"><activity-type-icon source="{{course.source}}" /><view class="course-copy"><text class="course-name">{{course.name}}</text><text class="meta">{{course.date}} · {{course.start_time}}–{{course.end_time}} · {{course.mode}}</text></view></view>
+    <view class="tools"><input class="search" placeholder="搜索学员姓名" value="{{keyword}}" bindinput="onSearch"/><text class="toggle" bindtap="onToggleWithdrawn">{{showWithdrawn ? '隐藏退课' : '含已退课'}}</text></view>
+    <view class="count">{{activeCount}} 人参与<text wx:if="{{selectedCount}}"> · 已选 {{selectedCount}} 人</text><text wx:if="{{loading}}"> · 刷新中…</text></view>
+    <view class="person {{item.withdrawn ? 'withdrawn' : ''}}" wx:for="{{visiblePeople}}" wx:key="id">
+      <view class="person-top"><view class="person-choice" bindtap="onSelect" data-id="{{item.id}}"><view wx:if="{{!item.withdrawn && (course.can_confirm || course.can_withdraw)}}" class="check {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</view><text class="name">{{item.nickname}}</text></view><text class="status {{item.attended ? 'attended' : ''}}">{{item.status}}</text></view>
+      <view class="identity"><member-labels identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" /> · {{item.role}}</view>
+      <view class="needs">{{item.needs || '当日未记录来访需求'}}</view>
+      <view class="tags" wx:if="{{item.tags.length}}"><text class="tag" wx:for="{{item.tags}}" wx:key="id" wx:for-item="tag">{{tag.name}}</text></view>
+      <view class="person-bottom"><text class="profile" bindtap="onProfile" data-id="{{item.id}}">完整资料</text><button wx:if="{{!item.withdrawn}}" class="record" data-id="{{item.id}}" bindtap="onRecord" disabled="{{submitting || loading || !!error}}">{{item.recordText}} ›</button></view>
+    </view>
+    <view class="empty" wx:if="{{!visiblePeople.length && !loading}}">暂无符合条件的学员</view>
+    <view class="actions" wx:if="{{course.can_confirm || course.can_withdraw}}"><button wx:if="{{course.can_withdraw}}" bindtap="onWithdraw" disabled="{{submitting || loading || !!error}}">退课</button><button wx:if="{{course.can_confirm}}" class="primary" bindtap="onConfirm" loading="{{submitting}}" disabled="{{submitting || loading || !!error}}">确认已上课</button></view>
+  </block>
+</view>

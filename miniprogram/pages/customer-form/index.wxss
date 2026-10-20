@@ -27,6 +27,11 @@
   text-align: right;
 }
 
+.post-fields { display: flex; gap: 20rpx; padding: 24rpx 0; }
+.post-field { flex: 1; min-width: 0; }
+.post-label { display: block; margin-bottom: 12rpx; font-size: 26rpx; color: #646a73; }
+.post-input { box-sizing: border-box; width: 100%; height: 72rpx; padding: 0 16rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; font-size: 26rpx; text-align: left; }
+
 .contact-field {
   display: flex;
   flex: 1;
@@ -212,6 +217,21 @@
   font-size: 30rpx;
   color: #1f2329;
 }
+
+.referrer-picker .picker-close { color: #4e535a; }
+.referrer-picker .picker-item { min-height: 104rpx; box-sizing: border-box; gap: 20rpx; padding: 12rpx 32rpx; }
+.referrer-picker .picker-item-name { flex: 1; min-width: 0; font-size: 28rpx; line-height: 42rpx; word-break: break-all; }
+.referrer-check-area { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 80rpx; height: 80rpx; }
+.referrer-checkbox { display: flex; align-items: center; justify-content: center; width: 44rpx; height: 44rpx; box-sizing: border-box; border: 2rpx solid #b0b5bb; border-radius: 8rpx; background: #fff; }
+.referrer-checkbox-checked { border-color: #646a73; background: #f5f6f7; }
+.referrer-checkmark { width: 12rpx; height: 22rpx; margin-top: -6rpx; border-right: 4rpx solid #33393f; border-bottom: 4rpx solid #33393f; transform: rotate(45deg); }
+.referrer-value { flex: 1; min-width: 0; text-align: right; line-height: 1.5; word-break: break-all; }
+.picker-selected { padding: 20rpx 32rpx 8rpx; border-bottom: 1rpx solid #f0f0f0; }
+.picker-selected-label { display: block; margin-bottom: 12rpx; color: #8f959e; font-size: 24rpx; }
+.picker-selected-chips { display: flex; flex-wrap: wrap; gap: 10rpx; }
+.picker-selected-chip { display: inline-flex; align-items: center; max-width: 100%; box-sizing: border-box; gap: 12rpx; padding: 6rpx 14rpx; border: 1rpx solid #e1e4e7; border-radius: 8rpx; background: #f6f7f8; color: #4e535a; font-size: 24rpx; line-height: 36rpx; }
+.picker-selected-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-selected-remove { flex-shrink: 0; font-size: 30rpx; }
 
 .picker-item-type {
   font-size: 24rpx;

@@ -91,7 +91,7 @@ def update_record(record_id: str, data: dict, request: Request):
     try:
         return online_tea_service.update_record(record_id, data)
     except ValidationError:
-        raise HTTPException(400, "请填写有效的成交日期、生效日期、用户、成交归属和正整数月有效期")
+        raise HTTPException(400, "请填写有效的成交日期、生效日期、用户、成交归属和正整数天或月有效期")
 
 
 @router.delete("/{record_id}")

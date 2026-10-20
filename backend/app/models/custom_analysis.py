@@ -11,7 +11,7 @@ AnalysisField = Literal[
     "name",
     "gender",
     "age",
-    "member_type",
+    "member_type", "card_status",
     "follow_up_status",
     "customer_tags",
     "traffic_source",
@@ -78,7 +78,7 @@ CardDimension = Literal[
     "invitation_day_type",
     "gender",
     "follow_up_status",
-    "member_type",
+    "member_type", "card_status",
     "customer_tags",
     "traffic_source",
     "referrer",
@@ -217,12 +217,11 @@ class AnalysisPlan(StrictBaseModel):
     date_to: str = ""
     metrics: list[AnalysisMetric] = Field(default_factory=lambda: ["total_customers"], min_length=1, max_length=14)
     card_metric: AnalysisMetric = "total_customers"
-    card_dimension: CardDimension = "follow_up_status"
+    card_dimension: CardDimension = "none"
     columns: list[AnalysisField] = Field(
         default_factory=lambda: [
             "nickname",
-            "member_type",
-            "follow_up_status",
+            "member_type", "card_status",
             "traffic_source",
             "referrer",
             "visit_count",
@@ -237,6 +236,19 @@ class AnalysisPlan(StrictBaseModel):
     row_display_mode: RowDisplayMode = "unique_customers"
     analysis_mode: Literal["single", "comparison"] = "single"
     comparison_groups: list[AnalysisComparisonGroup] = Field(default_factory=list, max_length=4)
+
+    @model_validator(mode="after")
+    def retire_manual_follow_up_stage(self):
+        """人工跟进阶段已停用；旧模板转换为当前可用字段，不改写历史存储。"""
+        self.conditions = [condition for condition in self.conditions if condition.field != "follow_up_status"]
+        for group in self.comparison_groups:
+            group.conditions = [condition for condition in group.conditions if condition.field != "follow_up_status"]
+        if self.card_dimension == "follow_up_status":
+            self.card_dimension = "none"
+        self.columns = [column for column in self.columns if column != "follow_up_status"] or ["nickname"]
+        if self.sort_by == "follow_up_status":
+            self.sort_by = "referral_date"
+        return self
 
     @field_validator("title", "total_card_title")
     @classmethod

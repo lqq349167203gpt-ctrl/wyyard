@@ -34,6 +34,7 @@ SECTION_MAP = {
     "/api/customer-tags": "客户标签",
     "/api/follow-up-statuses": "跟进状态配置",
     "/api/activity-permissions": "课表",
+    "/api/activity-icons": "活动配置",
     "/api/activity-registrations": "课表",
     "/api/activity-withdrawals": "课表",
     "/api/activity-orders": "课表",
@@ -248,6 +249,7 @@ def _scrub_sensitive(data: dict) -> dict:
 
 
 FIELD_NAMES = {
+    "traffic_post_name": "帖子名称",
     "id": "记录编号", "project_id": "项目编号", "project_type": "项目类型",
     "nickname": "昵称", "name": "名称", "title": "标题", "username": "用户名", "owner": "归属人",
     "phone": "手机", "email": "邮箱", "gender": "性别", "birthday": "生日",
@@ -298,7 +300,7 @@ FIELD_NAMES = {
     "customer_tags": "客户标签",
     "wechat": "微信", "core_situation": "核心情况",
     "deal_date": "成交日期", "deal_course_key": "成交课程标识", "deal_course_name": "成交课程", "last_visit_date": "最近到店", "other_info": "其他信息",
-    "service_teacher": "服务老师", "is_leader": "组长",
+    "service_teacher": "Sales", "is_leader": "组长",
     "need_tags": "需求标签", "follow_up_node": "跟进节点", "follow_up_status": "跟进阶段",
     "follow_up_action": "跟进动作", "tracking_plan": "跟进计划",
     "pages": "页面权限", "member_types": "用户信息权限", "page_permissions": "用户信息权限",
@@ -1558,12 +1560,14 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
         if method not in ("POST", "PUT", "PATCH", "DELETE"):
             return await call_next(request)
 
-        body_bytes = await request.body()
-        body_str = body_bytes.decode("utf-8") if body_bytes else ""
-        try:
-            body = json.loads(body_str) if body_str else {}
-        except json.JSONDecodeError:
-            body = {}
+        # 图标上传为二进制表单，交由接口提供日志快照，不按 JSON 解码图片。
+        body = {}
+        if not request.headers.get("content-type", "").lower().startswith("multipart/form-data"):
+            body_bytes = await request.body()
+            try:
+                body = json.loads(body_bytes) if body_bytes else {}
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                body = {}
 
         ip = get_client_ip(request)
 

@@ -148,10 +148,10 @@ def test_recommended_journey_supports_first_big_prerequisite_and_cross_product_r
     assert by_id['trial']['purchase_rule_keys']==['experience']
     assert by_id['exp']['purchase_rule_keys']==['conversion']
     assert by_id['big']['purchase_rule_keys']==['upsell']
-    assert by_id['cross']['purchase_rule_keys']==['upsell','repurchase']
-    assert by_id['online']['purchase_rule_keys']==['upsell','repurchase']
+    assert by_id['cross']['purchase_rule_keys']==['repurchase']
+    assert by_id['online']['purchase_rule_keys']==['repurchase']
     assert by_id['direct']['purchase_rule_keys']==['conversion']
-    assert by_id['direct-second']['purchase_rule_keys']==['repurchase']
+    assert by_id['direct-second']['purchase_rule_keys']==['upsell']
     assert by_id['cross']['repeat_times']==1  # 同类次数不冒充跨项目次数。
 
 
@@ -160,9 +160,9 @@ def test_reverse_sequence_does_not_make_prior_upsell_and_trial_is_not_a_big_orde
             purchase('c','2026-01-03',subtype='次卡'),purchase('d','2026-01-04',subtype='60次卡')]
     upsell_config_service.classify_purchases(events, upsell_config_service.recommended_rules())
     assert events[0]['purchase_rule_keys']==['conversion']
-    assert events[1]['purchase_rule_keys']==['conversion']
-    assert events[2]['purchase_rule_keys']==['experience']
-    assert events[3]['purchase_rule_keys']==['upsell','repurchase']
+    assert events[1]['purchase_rule_keys']==[]
+    assert events[2]['purchase_rule_keys']==[]
+    assert events[3]['purchase_rule_keys']==['upsell']
 
 
 def test_advanced_rules_roundtrip_validated_without_activating_on_read(client):
@@ -175,8 +175,10 @@ def test_advanced_rules_roundtrip_validated_without_activating_on_read(client):
     upsell_config_service._load()
     saved=upsell_config_service.list_rules()
     assert saved[3]['conditions'][0]['count_scope']=='group'
-    assert saved[2]['conditions'][0]['previous_products']==['membership:体验会员']
-    assert saved[1]['conditions'][1]['first_purchase'] is True
+    assert saved[2]['previous_stage'] == 'conversion'
+    assert saved[3]['previous_stage'] == 'upsell'
+    assert saved[1]['once'] is True and saved[2]['once'] is True
+    assert saved[0]['conditions'][0]['excluded_previous_products']
     saved[2]['conditions'][0]['previous_products']=['invalid']
     assert client.put('/api/upsell-config',json={'rules':saved}).status_code==400
 
@@ -196,5 +198,89 @@ def test_saved_rules_invalidate_analysis_cache_and_count_big_orders_before_perio
     after = client.post('/api/principal/query', json=params)
     assert after.status_code == 200, after.text
     assert after.json()['total'] == 1
-    assert after.json()['items'][0]['classification'] == '升单、复购'
+    assert after.json()['items'][0]['classification'] == '复购'
     assert after.json()['items'][0]['product'] == 'online_tea'
+
+
+@pytest.mark.parametrize("low", ["membership:次卡", "coarse"])
+def test_low_price_customer_can_upgrade_twice_and_then_repurchase(low):
+    product, _, subtype = low.partition(":")
+    events = [purchase("low", "2026-01-01", product=product, subtype=subtype),
+              purchase("entry", "2026-01-02"),
+              purchase("big", "2026-01-03", subtype="30次卡"),
+              purchase("repeat", "2026-01-04", subtype="60次卡")]
+    upsell_config_service.classify_purchases(events, upsell_config_service.recommended_rules())
+    assert [event["purchase_rule_keys"] for event in events] == [["experience"], ["conversion"], ["upsell"], ["repurchase"]]
+    direct_big = [events[0], purchase("big-direct", "2026-01-03", subtype="30次卡")]
+    upsell_config_service.classify_purchases(direct_big, upsell_config_service.recommended_rules())
+    assert direct_big[-1]["purchase_rule_keys"] == ["conversion"]
+
+
+def test_excluded_previous_project_matches_whole_category_before_current_purchase():
+    rules = rules_with(upsell=[{"products": ["membership:体验会员"], "operator": "eq", "count": 1,
+                               "previous_products": ["coarse"], "excluded_previous_products": ["energy"]}])
+    events = [purchase("big", "2026-01-01", product="energy", subtype=""),
+              purchase("low", "2026-01-02", product="coarse", subtype=""), purchase("entry", "2026-01-03")]
+    upsell_config_service.classify_purchases(events, rules)
+    assert events[-1]["purchase_rule_keys"] == []
+    upsell_config_service.classify_purchases(events[1:], rules)
+    assert events[-1]["purchase_rule_keys"] == ["upsell"]
+
+
+def test_preview_is_read_only_and_rejects_invalid_exclusion(client):
+    rules = upsell_config_service.recommended_rules()
+    before = load_data(upsell_config_service.UPSELL_FILE)
+    result = client.post("/api/upsell-config/preview", json={"rules": rules})
+    assert result.status_code == 200, result.text
+    outcomes = {row["journey"]: row["classification"] for row in result.json()["items"]}
+    assert outcomes["次卡 → 首次买 398"] == "转化"
+    assert outcomes["粗门次卡 → 首次买大单"] == "转化"
+    assert outcomes["398 → 再买 398"] == "未匹配"
+    assert outcomes["398 → 30 次卡 → 60 次卡"] == "复购"
+    assert outcomes["大单 → 次卡 → 首次买 398"] == "未匹配"
+    assert load_data(upsell_config_service.UPSELL_FILE) == before
+    rules[2]["conditions"][0]["excluded_previous_products"] = ["invalid"]
+    assert client.put("/api/upsell-config", json={"rules": rules}).status_code == 400
+
+
+@pytest.mark.parametrize("items,expected", [
+    (["group_case", "energy", "online_tea", "offline"], ["转化", "升单", "复购", "复购"]),
+    (["membership:体验会员", "membership:体验会员", "energy", "membership:次卡", "online_tea"], ["转化", "未匹配", "升单", "未匹配", "复购"]),
+    (["coarse", "coarse", "group_case", "membership:体验会员", "energy", "online_tea"], ["体验", "体验", "转化", "未匹配", "升单", "复购"]),
+])
+def test_stage_journeys_same_day_and_reordered_rules(items, expected):
+    events = [purchase(str(i), "2026-01-01", product=item.partition(":")[0], subtype=item.partition(":")[2], at=f"2026-01-01T{i:02}:00:00Z") for i, item in enumerate(items)]
+    upsell_config_service.classify_purchases(list(reversed(events)), list(reversed(upsell_config_service.recommended_rules())))
+    assert [e["classification"] for e in events] == expected
+    assert all(len(e["purchase_rule_keys"]) <= 1 for e in events)
+
+
+def test_stage_dependencies_reject_cycles(client):
+    rules = upsell_config_service.recommended_rules()
+    rules[1]["previous_stage"] = "upsell"
+    assert client.put("/api/upsell-config", json={"rules": rules}).status_code == 422
+
+
+def test_coarse_purchase_survives_missing_course_attendance(monkeypatch):
+    from app.api import statistics
+    from app.services import course_service, course_type_service
+    org = NS(id="org", name="小院", member_ids=[])
+    permissions = {"customer_access": {"transaction_access": "detail"}}
+    monkeypatch.setattr(principal_service, "scope", lambda _: ([org], {"c1": NS(nickname="甲", name="甲")}, permissions))
+    monkeypatch.setattr(principal_service.organization_service, "list_organizations", lambda: [org])
+    monkeypatch.setattr(course_service, "list_courses", lambda: [])
+    monkeypatch.setattr(course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(statistics, "COURSE_ACTIVITY_TYPES", [])
+    monkeypatch.setattr(principal_service, "PRODUCTS", [])
+    base = dict(id="bound", project_name="粗门次卡", is_deleted=False, cancelled=False, customer_id="c1",
+                source_organization_id="org", organization_id="org", deduction_date="2026-01-02",
+                source_activity_date="2026-01-01", source_activity_type="class", source_activity_id="removed",
+                source_activity_name="课程", count=2, closers=[], closer_name="", created_at="2026-01-02")
+    rows = [NS(**base), NS(**{**base, "id": "cancelled", "cancelled": True}), NS(**{**base, "id": "outside", "source_organization_id": "private"})]
+    monkeypatch.setattr(principal_service.project_deduction_service, "list_deductions", lambda: rows)
+    events = principal_service.collect_data(NS())[2]
+    assert len(events) == 1
+    assert events[0]["id"] == "coarse:bound"
+    assert events[0]["deal_date"] == "2026-01-02"
+    permissions["customer_access"]["transaction_access"] = "none"
+    assert principal_service.collect_data(NS())[2] == []

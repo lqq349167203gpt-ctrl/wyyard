@@ -151,7 +151,7 @@
     </view>
     <view wx:if="{{dealCourseError}}" class="pf-placeholder" bindtap="onDealCourseRetry">{{dealCourseError}}，点击重试</view>
     <view class="pf-row">
-      <text class="pf-label">诊断老师</text>
+      <text class="pf-label"><text style="color:#ef4444">*</text>诊断老师</text>
       <picker class="pf-picker" mode="selector" range="{{diagnosisTeachers}}" range-key="nickname" value="{{diagnosisTeacherIndex}}" bindchange="onDiagnosisTeacherChange">
         <view class="pf-value {{diagnosisTeacherIndex === -1 ? 'pf-placeholder' : ''}}">{{diagnosisTeacherIndex === -1 ? '选择诊断老师' : diagnosisTeachers[diagnosisTeacherIndex].nickname}}</view>
       </picker>
@@ -195,8 +195,8 @@
   </view>
 
   <!-- 线下课程 -->
-  <view class="pf-card" wx:if="{{type === 'offline_course'}}">
-    <view class="pf-row">
+  <view class="pf-card" wx:if="{{type === 'offline_course' || type === 'online_tea'}}">
+    <view class="pf-row" wx:if="{{type === 'offline_course'}}">
       <text class="pf-label">课程类型</text>
       <picker class="pf-picker" range="{{offlineCourseTypes}}" value="{{offlineCourseTypeIndex}}" bindchange="onOfflineCourseTypeChange"><view class="pf-value {{offlineCourseTypeIndex < 0 ? 'pf-placeholder' : ''}}">{{offlineCourseTypeIndex >= 0 ? offlineCourseTypes[offlineCourseTypeIndex] : '选择课程类型'}}</view></picker>
     </view>
@@ -224,7 +224,10 @@
       <text class="pf-label">有效期</text>
       <view class="pf-inline">
         <input class="pf-input pf-input-short" type="number" placeholder="输入时长" placeholder-class="pf-placeholder" value="{{formData.validity_value}}" bindinput="onFieldInput" data-field="validity_value" />
-        <text class="pf-suffix">个月</text>
+        <picker wx:if="{{type === 'online_tea'}}" mode="selector" range="{{durationTypes}}" range-key="label" value="{{formData.validity_unit === 'day' ? 0 : 1}}" bindchange="onOnlineTeaValidityUnitChange">
+          <view class="pf-suffix">{{formData.validity_unit === 'day' ? '天' : '月'}} ▾</view>
+        </picker>
+        <text wx:else class="pf-suffix">个月</text>
       </view>
     </view>
     <view class="pf-row pf-row-last" wx:if="{{!hidePaymentDetails}}">

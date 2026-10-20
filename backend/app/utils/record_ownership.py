@@ -265,3 +265,10 @@ def ensure_payment_record_manager(request: Request, record) -> None:
     )
     if not allowed:
         raise HTTPException(status_code=403, detail="只能修改或删除自己创建的付费记录")
+
+
+def ensure_activity_withdrawal_access(request: Request, record) -> None:
+    """创建人、已获课程操作权的老师及核对人可办理本场退课。"""
+    if has_audit_check_permission(request) or can_request_edit_activity_content(request, record):
+        return
+    raise HTTPException(status_code=403, detail="没有办理本场退课的权限")

@@ -6,6 +6,7 @@
   </view>
 
   <block wx:if="{{!loading}}">
+  <view class="activity-heading"><activity-type-icon source="{{activityType}}" /><text>{{activityName || typeLabel}}</text></view>
   <view class="record-meta">
     <text>创建人 · {{createdBy || '未记录'}}</text>
     <text class="readonly-text" wx:if="{{readOnly}}">{{dayLocked ? ('已核对锁定 · ' + (lockedBy || '未记录')) : (viewOnly ? ((canEditParticipants || canEditTeachers) ? '课程内容仅浏览，可配置获权字段' : '当前账号仅可浏览') : '部分信息仅创建人可改')}}</text>

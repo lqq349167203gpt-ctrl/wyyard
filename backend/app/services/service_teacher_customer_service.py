@@ -166,7 +166,7 @@ def list_teacher_customers(
             "id": customer.id,
             "nickname": customer.nickname or "",
             "name": customer.name or "",
-            "member_type": customer.member_type or "",
+            "member_type": customer.member_type or "", "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
             "follow_up_status": getattr(follow_up_status, "value", follow_up_status) or "未配置",
             "service_teacher": customer.service_teacher or "",
             "last_follow_up_at": note_updated_at.isoformat() if note_updated_at else "",

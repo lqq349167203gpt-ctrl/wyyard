@@ -60,7 +60,7 @@ def deal_course(client, created_customer):
     ("group-cases", "group_cases.json", {"purchase_count": 1, "amount": 0}),
     ("emotional-releases", "emotional_releases.json", {"purchase_count": 1, "amount": 0}),
     ("energy-knots", "energy_knots.json", {"purchase_count": 1, "amount": 0}),
-    ("oh-card-readings", "oh_card_readings.json", {"reading_type": "OH卡情感梳理", "amount": 0}),
+    ("oh-card-readings", "oh_card_readings.json", {"reading_type": "OH卡情感梳理", "diagnosis_teacher": "老师甲", "amount": 0}),
     ("tea-seat-fees", "tea_seat_fees.json", {"quantity": 1, "amount": 0}),
     ("offline-courses", "offline_courses.json", {"course_type": "主理人训练", "amount": 0}),
     ("internal-courses", "internal_courses.json", {"course_type": "OH卡技能梳理", "price": 0}),

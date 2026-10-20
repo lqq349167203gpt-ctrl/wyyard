@@ -7,6 +7,7 @@ from app.api.accounts import router as accounts_router
 from app.api.activity_ai_config import router as activity_ai_config_router
 from app.api.activity_checkins import router as activity_checkins_router
 from app.api.activity_history import router as activity_history_router
+from app.api.activity_icons import router as activity_icons_router
 from app.api.activity_orders import router as activity_orders_router
 from app.api.activity_permissions import router as activity_permissions_router
 from app.api.activity_registrations import router as activity_registrations_router
@@ -147,6 +148,7 @@ app.include_router(energy_knot_sessions_router)
 app.include_router(internal_course_sessions_router)
 app.include_router(member_identities_router)
 app.include_router(uploads_router)
+app.include_router(activity_icons_router)
 app.include_router(healing_records_router)
 app.include_router(customer_detail_router)
 app.include_router(system_logs_router)

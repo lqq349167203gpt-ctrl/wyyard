@@ -207,7 +207,7 @@ def export(data: PrincipalQuery, request: Request):
         fields = [
             ("name", "昵称"), ("referral_date", "引流日期"), ("referrer", "引流人"),
             ("referrer_handler", "承接人"), ("identity", "会员身份"),
-            ("follow_up_status", "跟进阶段"), ("traffic_source", "流量来源"),
+            ("traffic_source", "流量来源"),
             ("tags", "客户标签"), ("deals", "交易笔数"), ("initiated_count", "发起邀约次"),
             ("cancel_count", "取消次"), ("no_show_count", "未到场次"), ("arrive_count", "实际到场次"),
             ("visit_interval", "平均到店间隔"), ("activity_count", "参与活动"),
@@ -229,7 +229,7 @@ def export(data: PrincipalQuery, request: Request):
     elif data.export_view == "invite_arrivals":
         field_labels = {
             "arrive_date": "到店日期", "name": "昵称", "identity": "会员身份", "referrer": "引流人",
-            "referrer_handler": "承接人", "follow_up_status": "跟进阶段", "traffic_source": "流量来源",
+            "referrer_handler": "承接人", "traffic_source": "流量来源",
             "tags": "客户标签", "deals": "交易笔数", "invite_count": "邀约次数", "cancel_count": "取消",
             "no_show_count": "未到场", "arrive_count": "已到场", "activity_count": "参与活动数",
             "visit_interval": "平均到店间隔", "same_day_deals": "当日成交", "arrive_inviter": "邀约人",
@@ -265,7 +265,7 @@ def export(data: PrincipalQuery, request: Request):
     elif data.export_view == "invite_initiated":
         field_labels = {
             "date": "发起邀约", "visit_date": "邀约到店", "name": "昵称", "identity": "会员身份",
-            "referrer": "引流人", "referrer_handler": "承接人", "follow_up_status": "跟进阶段",
+            "referrer": "引流人", "referrer_handler": "承接人",
             "traffic_source": "流量来源", "tags": "客户标签", "deals": "交易笔数",
             "invite_count": "邀约次数", "cancel_count": "取消", "no_show_count": "未到场",
             "arrive_count": "已到场", "activity_count": "参与活动数", "visit_interval": "平均到店间隔",

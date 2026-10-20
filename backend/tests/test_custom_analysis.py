@@ -917,12 +917,31 @@ def test_invitation_day_split_resets_incompatible_metrics(metric):
     assert plan.card_metric == metric
 
 
+def test_retired_stage_is_removed_from_legacy_analysis_plan():
+    raw = {"field": "follow_up_status", "operator": "eq", "value": "已成交"}
+    plan = AnalysisPlan(conditions=[raw, {"field": "visit_count", "operator": "gt", "value": 0}],
+                        columns=["nickname", "follow_up_status"], card_dimension="follow_up_status",
+                        sort_by="follow_up_status", comparison_groups=[{"name": "旧分组", "conditions": [raw]}])
+    assert [item.field for item in plan.conditions] == ["visit_count"]
+    assert plan.columns == ["nickname"]
+    assert plan.card_dimension == "none" and plan.sort_by == "referral_date"
+    assert plan.comparison_groups[0].conditions == []
+
+
+def test_local_invited_not_arrived_uses_actual_records():
+    plan = custom_analysis_service._local_plan("已邀约未到店的客户", "actor")
+    assert {(item.field, item.operator, item.value) for item in plan.conditions} == {
+        ("invitation_count", "gt", 0), ("visit_count", "eq", 0),
+    }
+
+
 def test_metadata_endpoint(client):
     response = client.get("/api/custom-analysis/metadata")
     assert response.status_code == 200
     metadata = response.json()
     assert {"value": "invitation_day_type", "label": "工作日 / 双休日"} in metadata["card_dimensions"]
-    assert any(item["value"] == "follow_up_status" for item in metadata["fields"])
+    assert all(item["value"] != "follow_up_status" for item in metadata["fields"])
+    assert all(item["value"] != "follow_up_status" for item in metadata["card_dimensions"])
     assert any(item["value"] == "payment_dates" and item["label"] == "成交日期" for item in metadata["fields"])
     invitation_date = next(item for item in metadata["fields"] if item["value"] == "invitation_dates")
     assert invitation_date["label"] == "邀约到店日期"
@@ -1334,7 +1353,7 @@ def test_analysis_template_plan_update(client):
     template_id = created.json()["id"]
     try:
         columns = ["nickname", "name", "gender", "age", "member_type",
-                   "follow_up_status", "customer_tags", "traffic_source", "referrer",
+                   "card_status", "customer_tags", "traffic_source", "referrer",
                    "referrer_handler", "service_teacher", "referral_date", "created_at",
                    "invitation_dates", "invitation_created_dates"]
         next_plan = AnalysisPlan(card_dimension="none", row_display_mode="arrival_visits", columns=columns)

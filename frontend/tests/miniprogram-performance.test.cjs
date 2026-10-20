@@ -27,6 +27,8 @@ function page(file, api, globals = {}) {
     '../../utils/schedule-date': scheduleDate,
     '../../utils/note-feedback-meta': load('miniprogram/utils/note-feedback-meta.js'),
     '../../utils/visit-groups': load('miniprogram/utils/visit-groups.js'),
+    '../../utils/customer-referrers': load('miniprogram/utils/customer-referrers.js'),
+    '../../utils/schedule-workflow': load('miniprogram/utils/schedule-workflow.js'),
     '../../utils/record-ownership': { canEditRecord: () => true },
     '../../utils/note-permissions': load('miniprogram/utils/note-permissions.js', {}, { wx: { getStorageSync: () => ({}) } }),
     '../../utils/customer-access': {}, '../../utils/customer-search': {},

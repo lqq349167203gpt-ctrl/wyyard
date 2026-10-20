@@ -520,7 +520,7 @@ def get_details(
                 "status": "converted" if is_converted else "invited",
                 "arrived": v.arrived,
                 "cancelled": v.cancelled,
-                "member_type": member_type,
+                "member_type": member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
                 "referrer_handler": visit_referrer,
             })
             if v.arrived:
@@ -530,7 +530,7 @@ def get_details(
                     "date": visit_date,
                     "status": "converted" if is_converted else "arrived",
                     "arrived": True,
-                    "member_type": member_type,
+                    "member_type": member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
                     "referrer_handler": visit_referrer,
                 })
 
@@ -582,7 +582,7 @@ def get_details(
                     "type": TYPE_LABELS.get(type_name, type_name),
                     "name": name,
                     "quantity": quantity,
-                    "member_type": c_member_type,
+                    "member_type": c_member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
                     "referrer_handler": "、".join(customer_referrers(c)),
                     "amount": getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0,
                 })
@@ -1545,7 +1545,7 @@ def get_member_statistics(
         members_list.append({
             "id": c.id,
             "nickname": c.nickname or "",
-            "member_type": mt,
+            "member_type": mt, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             "created_date": (
                 c.created_at.strftime("%Y-%m-%d")
                 if isinstance(c.created_at, datetime)
@@ -1923,7 +1923,7 @@ def _course_owner_participants(
         owners.append({
             "id": owner_id,
             "nickname": getattr(customer, "nickname", "") or getattr(customer, "name", "") or owner_id,
-            "member_type": member_type,
+            "member_type": member_type, "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
             "identity_group": identity_groups.get(member_type, "") or "老人",
             "participation_role": "案主",
             "daily_need": daily_needs.get((activity.date, owner_id), ""),
@@ -2231,7 +2231,7 @@ def get_course_statistics(
                         or getattr(customer, "name", "")
                         or participant_id
                     ),
-                    "member_type": member_type,
+                    "member_type": member_type, "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
                     "identity_group": identity_group,
                     "participation_role": participant_roles[participant_id],
                     "arrived": participant_id in arrived_ids,
@@ -2658,7 +2658,7 @@ def get_referral_statistics(
             "id": customer.id,
             "nickname": customer.nickname or "",
             "referral_date": referral_date,
-            "member_type": customer.member_type or "",
+            "member_type": customer.member_type or "", "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
             "referrer": customer.referrer or "",
             "traffic_source": customer.traffic_source or "",
             "referrer_handler": customer.referrer_handler or "",

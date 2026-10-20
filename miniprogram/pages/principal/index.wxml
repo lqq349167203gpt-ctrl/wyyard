@@ -279,7 +279,7 @@
       <view class="participant-course-head"><text class="participant-course-name">{{course.name}}</text><text class="participant-course-date">{{course.date}} · {{course.count}} 人</text></view>
       <text class="participant-course-meta">{{course.typeLabel}} · {{course.organization}} · {{course.teachers || '老师未记录'}} · {{course.hours || 0}} 课时</text>
       <view class="participant-person" wx:for="{{course.visiblePeople}}" wx:for-item="person" wx:key="id">
-        <view class="participant-person-head"><text class="participant-person-name" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openParticipantProfile">{{person.customer}}</text><text class="participant-person-identity">{{person.member_type || '—'}}</text><text class="participant-person-role">{{person.participant_role}}</text></view>
+        <view class="participant-person-head"><text class="participant-person-name" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openParticipantProfile">{{person.customer}}</text><member-labels identity="{{person.member_type}}" status="{{person.card_status}}" tone="{{person.card_status_tone}}" /><text class="participant-person-role">{{person.participant_role}}</text></view>
         <view class="participant-totals"><text>累计课程 <text class="participant-total-link" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openHistory">{{person.org_participation_count || 0}}</text></text><text>累计课时 {{person.org_participation_hours || 0}} 课时</text></view>
         <view class="participant-feedback" wx:for="{{person.feedback}}" wx:for-item="field" wx:key="key" data-id="{{person.customer_id}}" data-course="{{course.course_id}}" catchtap="openTeacherDetail">
           <view class="participant-feedback-label"><text>{{field.label}}</text><text wx:if="{{field.count}}">{{field.count}}条</text></view>
@@ -357,7 +357,7 @@
             <text class="record-title" wx:else>{{item.rowTitle}}</text>
             <text class="record-subtitle" wx:if="{{item.rowSubtitle}}">{{item.rowSubtitle}}</text>
           </view>
-          <text class="record-identity" wx:if="{{item.rowIdentity}}">{{item.rowIdentity}}</text>
+          <member-labels identity="{{item.rowIdentity}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
         </view>
         <!-- 分类值做成小标签 -->
         <view class="record-tags" wx:if="{{item.rowTags.length}}">

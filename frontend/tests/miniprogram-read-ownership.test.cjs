@@ -289,16 +289,16 @@ test('信息核对空间失败可重试，后续页失败不跳页，完整天�
 })
 
 test('表单元数据失败明确提示，仅重试失败来源，已有输入不被重载', async () => {
-  let peopleReads = 0, statusReads = 0
+  let peopleReads = 0, tagReads = 0
   const p = fixture('miniprogram/pages/customer-form/index.js', {
-    customerApi: { selector: async () => { if (++peopleReads === 1) throw new Error('人员失败'); return [{ id: 'a' }] } },
-    followUpStatusApi: { list: async () => { statusReads++; return [{ name: '沟通中' }] } },
+    customerApi: { assignmentOptions: async () => { if (++peopleReads === 1) throw new Error('人员失败'); return [{ id: 'a' }] } },
+    customerTagApi: { list: async () => { tagReads++; return [{ id: 'tag-a', name: '客户标签' }] } },
   })
-  await Promise.all([p.loadCustomers(), p.loadFollowUpStatuses()])
+  await Promise.all([p.loadCustomers(), p.loadCustomerTags('')])
   p.data.nickname = '已填写昵称'
   assert.equal(p.data.sourceError, '人员失败')
   await p.retrySources()
-  assert.equal(p.data.sourceError, ''); assert.equal(peopleReads, 2); assert.equal(statusReads, 1)
+  assert.equal(p.data.sourceError, ''); assert.equal(peopleReads, 2); assert.equal(tagReads, 1)
   assert.equal(p.data.nickname, '已填写昵称')
 })
 
@@ -397,4 +397,46 @@ test('编辑沙龙保留本场历史类型，不提供其他归档类型',async(
   await p.loadCourses('本场旧课')
   assert.deepEqual(Array.from(p.data.courses,course=>course.name),['在营课','本场旧课'])
   assert.equal(p.data.courses[p.data.courseIndex].name,'本场旧课')
+})
+
+
+test('线上茶疗表单默认一个月，月底按自然月算，提交不携带金额',()=>{
+  const p=fixture('miniprogram/components/payment-form/index.js')
+  p.data.type='online_tea';p.data.isEdit=false
+  p._applyTypeDefaults('online_tea')
+  assert.equal(p.data.formData.validity_value,'1')
+  p.data.formData={...p.data.formData,organization_id:'org',effective_date:'2026-01-31',deal_date:'2026-01-30',notes:'备注',amount:'999'}
+  p.data.selectedCustomer={id:'user',nickname:'用户'};p.data.closers=[{id:'closer',nickname:'成交人'}]
+  const payload=p._buildPayload()
+  assert.equal(payload.validity_value,1);assert.equal(payload.expiry_date,'2026-02-27')
+  assert.equal(payload.validity_unit,'month')
+  assert.equal(payload.customer_id,'user');assert.equal(payload.notes,'备注')
+  assert(!('amount' in payload));assert(!('price' in payload))
+  const rows=p._buildConfirmRows()
+  assert(rows.some(row=>row.label==='有效期' && row.value==='1个月'))
+  assert(!rows.some(row=>row.label==='购买场次' || row.label==='课程类型' || row.label==='付费金额'))
+  p.onOnlineTeaValidityUnitChange({detail:{value:0}})
+  p.data.formData.validity_value='2'
+  const dailyPayload=p._buildPayload()
+  assert.equal(dailyPayload.validity_unit,'day')
+  assert.equal(dailyPayload.expiry_date,'2026-02-01')
+  assert(p._buildConfirmRows().some(row=>row.label==='有效期' && row.value==='2天'))
+})
+
+test('付费项目导出只传勾选类型，未选择时阻止导出',async()=>{
+  const toasts=[]
+  const types=[{key:'membership_card',label:'会员卡'},{key:'group_case',label:'觉醒游戏'},{key:'online_tea',label:'线上茶疗'}]
+  const p=fixture('miniprogram/pages/payment/index.js',{
+    PAYMENT_PROJECT_TYPES:types,
+    paymentApi:{},
+  },{wx:{showToast:message=>toasts.push(message)}})
+  p.onExportTypesChange({detail:{value:['group_case','online_tea']}})
+  assert.equal(p.getExportParams().types,'group_case,online_tea')
+  assert.deepEqual(Array.from(p.data.exportTypeOptions,item=>item.selected),[false,true,true])
+  p.onExportSelectAll()
+  assert.equal(p.getExportParams().types,'membership_card,group_case,online_tea')
+  p.onExportSelectAll()
+  assert.equal(p.getExportParams().types,'')
+  await p.onExportConfirm()
+  assert.equal(toasts.at(-1).title,'请至少选择一项付费项目')
 })

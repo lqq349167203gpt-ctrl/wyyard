@@ -201,7 +201,7 @@
         </view>
         <view class="card-agreement-row">
           <view class="card-closer">成交人：<text class="{{item._closerNames ? '' : 'card-empty'}}">{{item._closerNames || '—'}}</text></view>
-          <view class="card-agreement">协议签订：<text class="{{item._agreementStatus ? '' : 'card-empty'}}">{{item._agreementStatus || '—'}}</text></view>
+          <view class="card-agreement" wx:if="{{tabs[activeTab].key === 'membership_card'}}">协议签订：<text class="{{item._agreementStatus ? '' : 'card-empty'}}">{{item._agreementStatus || '—'}}</text></view>
         </view>
         <view class="card-meta" wx:if="{{item._metaPrimary || item._creator}}">
           <text class="card-meta-item" wx:if="{{item._metaPrimary}}">{{item._metaPrimary}}</text>
@@ -240,7 +240,7 @@
     <view class="export-panel" catchtap="stopPropagation">
       <view class="export-panel-header">
         <text class="export-panel-title">导出付费记录</text>
-        <text class="export-panel-desc">导出全部付费类型，并按成交日期从近到远排列</text>
+        <text class="export-panel-desc">选择项目和时间范围，按成交日期从近到远排列</text>
       </view>
 
       <view class="export-panel-body">
@@ -294,8 +294,22 @@
           </view>
         </view>
 
+        <view class="export-field export-types-field">
+          <view class="export-types-heading">
+            <text class="export-field-label">付费项目（已选 {{exportSelectedTypes.length}} 项）</text>
+            <text class="export-select-all" bindtap="onExportSelectAll">{{exportSelectedTypes.length === exportTypeOptions.length ? '清空' : '全选'}}</text>
+          </view>
+          <checkbox-group class="export-type-options" bindchange="onExportTypesChange">
+            <label class="export-type-option" wx:for="{{exportTypeOptions}}" wx:key="key">
+              <checkbox value="{{item.key}}" checked="{{item.selected}}" color="#3370ff" />
+              <text>{{item.label}}</text>
+            </label>
+          </checkbox-group>
+          <text class="export-types-hint">粗门次卡归入会员卡</text>
+        </view>
+
         <view class="export-summary">
-          <text>将导出全部付费类型 · {{exportRangeSummary}}</text>
+          <text>已选 {{exportSelectedTypes.length}} 项 · {{exportRangeSummary}}</text>
         </view>
       </view>
 

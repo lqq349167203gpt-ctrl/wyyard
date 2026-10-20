@@ -114,7 +114,6 @@ Component({
             const creator = String(note.created_by || '').trim()
             return Object.assign({}, note, {
               timeText: formatNoteTime(note.updated_at || note.created_at),
-              displayContent: [(note.need_tags || []).map(tag => tag.name).join('、'), note.content].filter(Boolean).join('\n'),
               followUpDateText: formatPlanDate(note.next_follow_up_date),
               creatorText: creator && creator !== '历史记录' ? creator : '未知',
               feedbackText: String(note.feedback_person || '').trim() || creator || '未知',

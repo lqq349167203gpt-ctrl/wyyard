@@ -124,6 +124,7 @@ def export_payment_records(
     period: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
+    types: str | None = None,
 ):
     user_role = getattr(request.state, "user_role", "")
     if user_role in {"", "customer", "system"}:
@@ -144,11 +145,18 @@ def export_payment_records(
         date_from,
         date_to,
     )
+    selected_types = None
+    if types is not None:
+        selected_types = set(types.split(","))
+        valid_types = {project_type for project_type, _, _ in payment_export_service.PROJECT_SOURCES}
+        if not selected_types or "" in selected_types or not selected_types <= valid_types:
+            raise HTTPException(status_code=400, detail="请选择有效的付费项目类型")
     output, record_count = payment_export_service.build_payment_export(
         user_role,
         resolved_from,
         resolved_to,
         allowed_customer_ids=visible_customer_ids,
+        project_types=selected_types,
     )
     if record_count == 0:
         raise HTTPException(status_code=404, detail="所选时间范围内暂无付费记录")

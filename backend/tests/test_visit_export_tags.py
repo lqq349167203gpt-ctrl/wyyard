@@ -74,7 +74,8 @@ def test_visit_list_and_export_include_visible_customer_tags(client, created_cus
         tag_index = headers.index("来访标签")
         assert "客户标签" not in headers
         assert tag_index == headers.index("会员身份") + 1
-        assert headers[tag_index + 1] == "来访需求"
+        assert headers[tag_index + 1] == "当前卡次"
+        assert headers[tag_index + 2] == "来访需求"
         row = next(row for row in sheet.iter_rows(min_row=2) if row[1].value == created_customer["nickname"])
         assert row[tag_index].value == ("、".join(expected_need_names) or None)
         assert row[tag_index].alignment.wrap_text is True

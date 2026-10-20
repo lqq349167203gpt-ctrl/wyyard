@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
+import { MemberLabels } from "@/components/member-labels"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Plus, Trash2, Edit, ArrowUp, ArrowDown, ShieldCheck, Loader2 } from "lucide-react"
 import {
@@ -35,6 +36,7 @@ const TYPE_LABELS: Record<string, string> = {
   teacher: "疗愈老师",
   fixed: "固定人员",
   amount: "消费金额",
+  remaining: "剩余卡次",
 }
 
 const TEACHER_POSITIONS = [...HEALING_POSITIONS]
@@ -51,6 +53,11 @@ function getPaymentCategories(c: IdentityCondition): string[] {
 }
 
 function conditionSummary(c: IdentityCondition): string {
+  if (c.type === "remaining") {
+    const states = { unlimited: "有效不限次卡", never: "从未办卡", expired: "卡已过期", pending: "尚未生效", voided: "全部作废" }
+    const scope = c.items.length ? c.items.join("、") : "全部会员卡"
+    return `${scope}：${c.remaining_state && c.remaining_state !== "range" ? states[c.remaining_state] : `剩余 ${c.remaining_min ?? 0}${c.remaining_max == null ? " 次及以上" : `～${c.remaining_max} 次`}`}`
+  }
   if (c.type === "invitation") {
     const label = c.invitation_scope === "cancelled" ? "取消邀约" : "邀约情况"
     if (c.count_value === 0 && c.count_op === "=") return c.invitation_scope === "cancelled" ? "没有取消记录" : "未被邀约"
@@ -109,6 +116,9 @@ export default function MemberIdentitiesPage() {
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [group, setGroup] = useState<"identity" | "card_status">("identity")
+  const [formTone, setFormTone] = useState<"neutral" | "warning">("neutral")
+  const loadRevision = useRef(0)
 
   const [formName, setFormName] = useState("")
   const [formType, setFormType] = useState("")
@@ -133,20 +143,22 @@ export default function MemberIdentitiesPage() {
   const { paginatedItems, currentPage, totalPages, totalItems, goToPage, startIndex, endIndex } = usePagination(filteredIdentities)
 
   const load = () => {
+    const revision = ++loadRevision.current
     setError("")
-    memberIdentityApi.list()
-      .then(setIdentities)
-      .catch(e => setError(e instanceof Error ? e.message : "身份加载失败，请重试"))
-      .finally(() => setLoading(false))
+    memberIdentityApi.list(group)
+      .then(items => { if (revision === loadRevision.current) setIdentities(items) })
+      .catch(e => { if (revision === loadRevision.current) setError(e instanceof Error ? e.message : "身份加载失败，请重试") })
+      .finally(() => { if (revision === loadRevision.current) setLoading(false) })
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { setLoading(true); setIdentities([]); load(); return () => { loadRevision.current += 1 } }, [group])
 
   const handleOpenCreate = () => {
     setEditingItem(null)
     setFormName("")
     setFormType("")
-    setFormConditions([defaultCondition()])
+    setFormConditions([{ ...defaultCondition(), ...(group === "card_status" ? { type: "remaining" as const, remaining_state: "range" as const, remaining_min: 0, remaining_max: null } : {}) }])
+    setFormTone("neutral")
     setFormOperator("all")
     setDialogOpen(true)
   }
@@ -155,6 +167,7 @@ export default function MemberIdentitiesPage() {
     setEditingItem(item)
     setFormName(item.name)
     setFormType(item.type || "")
+    setFormTone(item.tone || "neutral")
     // 兼容旧类型：card/course 自动转为 payment
     const conditions = item.conditions.length > 0 ? item.conditions.map(c => {
       if (c.type === "card") return { ...c, type: "payment" as const, payment_categories: ["会员卡"] }
@@ -167,7 +180,10 @@ export default function MemberIdentitiesPage() {
   }
 
   const handleSave = async () => {
-    if (!formName.trim() || !formType) return
+    if (!formName.trim() || (group === "identity" && !formType)) return
+    if (formConditions.some(c => c.type === "remaining" && (c.remaining_max != null && c.remaining_max < (c.remaining_min ?? 0)))) {
+      setError("剩余次数的上限不能小于下限"); return
+    }
     setSaving(true)
     setError("")
     try {
@@ -177,6 +193,8 @@ export default function MemberIdentitiesPage() {
       }))
       const data: MemberIdentityCreate = {
         name: formName.trim(),
+        group,
+        tone: formTone,
         type: formType,
         conditions: validConditions,
         operator: validConditions.length > 1 ? formOperator : "all",
@@ -286,12 +304,15 @@ export default function MemberIdentitiesPage() {
   return (
     <div className="px-6 pt-4 pb-6 space-y-3">
       <h1 className="text-[18px] font-medium text-[#1f2329]">会员身份</h1>
+      <div className="flex gap-5 border-b border-[#e8eaed]">{([{ key: "identity", label: "会员身份" }, { key: "card_status", label: "卡次状态" }] as const).map(tab => <button key={tab.key} className={`border-b-2 px-1 py-2 text-[14px] ${group === tab.key ? "border-[#3370ff] text-[#3370ff]" : "border-transparent text-[#646a73]"}`} onClick={() => { setGroup(tab.key); setKeyword(""); setTypeFilter(""); setConditionFilter(""); goToPage(1) }}>{tab.label}</button>)}</div>
+      <p className="text-[12px] text-[#646a73]">{group === "identity" ? "第一套标签，沿用原有身份、权限和新老分类。" : "第二套标签，按当前有效会员卡匹配；所选卡种余量相加，历史欠卡不计入。"}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Input className="h-8 w-52 text-xs" value={keyword} placeholder="搜索身份名称" onChange={e => { setKeyword(e.target.value); goToPage(1) }} />
-        <SelectDropdown value={typeFilter} options={[{ value: "", label: "全部分类" }, { value: "新人", label: "新人" }, { value: "老人", label: "老人" }]} onChange={v => { setTypeFilter(v); goToPage(1) }} />
+        {group === "identity" && <SelectDropdown value={typeFilter} options={[{ value: "", label: "全部分类" }, { value: "新人", label: "新人" }, { value: "老人", label: "老人" }]} onChange={v => { setTypeFilter(v); goToPage(1) }} />}
         <SelectDropdown value={conditionFilter} options={[{ value: "", label: "全部条件" }, ...Object.entries(TYPE_LABELS).filter(([key]) => key !== "card" && key !== "course").map(([value, label]) => ({ value, label })), { value: "none", label: "默认匹配" }]} onChange={v => { setConditionFilter(v); goToPage(1) }} />
         {(keyword || typeFilter || conditionFilter) && <Button variant="ghost" size="sm" onClick={() => { setKeyword(""); setTypeFilter(""); setConditionFilter(""); goToPage(1) }}>重置</Button>}
-        <Button size="sm" className="ml-auto h-8 text-xs" onClick={handleOpenCreate}><Plus className="mr-1 h-3.5 w-3.5" />新增身份</Button>
+        {group === "card_status" && !loading && !identities.length && <Button variant="outline" size="sm" disabled={saving} onClick={async () => { setSaving(true); try { await memberIdentityApi.cardStatusPreset(); load() } catch (e) { setError(e instanceof Error ? e.message : "添加失败") } finally { setSaving(false) } }}>添加常用标签</Button>}
+        <Button size="sm" className="ml-auto h-8 text-xs" onClick={handleOpenCreate}><Plus className="mr-1 h-3.5 w-3.5" />新增标签</Button>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>显示 {filteredIdentities.length} / {identities.length} 个身份 · 从上到下，首个命中生效{keyword || typeFilter || conditionFilter ? " · 清空筛选后可调整顺序" : ""}</span>
@@ -319,7 +340,7 @@ export default function MemberIdentitiesPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-12 pl-4">优先级</TableHead>
                 <TableHead>身份名称</TableHead>
-                <TableHead className="w-16">类型</TableHead>
+                <TableHead className="w-16">{group === "identity" ? "类型" : "样式"}</TableHead>
                 <TableHead>匹配条件</TableHead>
                 <TableHead className="text-right pr-4">操作</TableHead>
               </TableRow>
@@ -349,10 +370,10 @@ export default function MemberIdentitiesPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-[13px] text-[#2b2f36] font-medium">{item.name}</span>
+                    <MemberLabels customer={group === "identity" ? { member_type: item.name } : { card_status: item.name, card_status_tone: item.tone }} />
                   </TableCell>
                   <TableCell>
-                    <span className="text-[12px] text-[#4e535a]">{item.type || "-"}</span>
+                    <span className="text-[12px] text-[#4e535a]">{group === "identity" ? item.type || "-" : item.tone === "warning" ? "提醒" : "普通"}</span>
                   </TableCell>
                   <TableCell>
                     {item.conditions.length > 0 ? (
@@ -372,10 +393,10 @@ export default function MemberIdentitiesPage() {
                   </TableCell>
                   <TableCell className="text-right pr-4">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleOpenEdit(item)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label={`编辑${item.name}`} onClick={() => handleOpenEdit(item)}>
                         <Edit className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setDeleteId(item.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label={`删除${item.name}`} onClick={() => setDeleteId(item.id)}>
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </div>
@@ -409,7 +430,7 @@ export default function MemberIdentitiesPage() {
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">身份名称</span>
               <Input value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="输入会员身份名称" />
             </div>
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+            {group === "identity" ? <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">分类</span>
               <SelectDropdown
                 value={formType}
@@ -417,11 +438,11 @@ export default function MemberIdentitiesPage() {
                 placeholder="请选择类型"
                 onChange={setFormType}
               />
-            </div>
+            </div> : <div className="grid grid-cols-[70px_1fr] items-center gap-2"><span className="text-[12px] text-right">标签样式</span><SelectDropdown value={formTone} options={[{ value: "neutral", label: "普通" }, { value: "warning", label: "提醒" }]} onChange={value => setFormTone(value as "neutral" | "warning")} /></div>}
 
             <div className="space-y-3 border-t pt-4">
               <h2 className="text-[13px] font-medium">匹配规则</h2>
-              <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+              {group === "identity" && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                 <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">满足方式</span>
                 <div className="flex items-center justify-between gap-2">
                   {(
@@ -436,7 +457,7 @@ export default function MemberIdentitiesPage() {
                     <Plus className="mr-1 h-3 w-3" /> 新增条件
                   </Button>
                 </div>
-              </div>
+              </div>}
 
               {formConditions.length === 0 ? (
                 <div className="grid grid-cols-[70px_1fr] items-start gap-2">
@@ -453,7 +474,7 @@ export default function MemberIdentitiesPage() {
                         <span className="text-[12px] text-[#4e535a] font-light shrink-0 w-[50px] text-right">条件</span>
                         <SelectDropdown
                           value={cond.type}
-                          options={[{value: "invitation", label: "邀约情况"}, {value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}, {value: "amount", label: "消费金额"}]}
+                          options={group === "card_status" ? [{ value: "remaining", label: "剩余卡次" }] : [{value: "invitation", label: "邀约情况"}, {value: "arrival", label: "到店情况"}, {value: "activity", label: "活动参与"}, {value: "teacher", label: "疗愈老师"}, {value: "payment", label: "付费项目"}, {value: "fixed", label: "固定人员"}, {value: "amount", label: "消费金额"}, { value: "remaining", label: "剩余卡次" }]}
                           placeholder="请选择条件类型"
                           onChange={(v) => updateCondition(ci, { type: v as IdentityCondition["type"] })}
                         />
@@ -469,6 +490,13 @@ export default function MemberIdentitiesPage() {
                           </button>
                         )}
                       </div>
+
+                      {cond.type === "remaining" && <div className="space-y-3">
+                        <SelectDropdown size="sm" multi value={cond.items} options={CARD_TYPES.map(value => ({ value, label: value }))} onChange={items => updateCondition(ci, { items })} placeholder="全部会员卡（可选指定卡种）" buttonClassName="!h-auto min-h-8" />
+                        <SelectDropdown size="sm" value={cond.remaining_state || "range"} options={[{ value: "range", label: "按剩余次数" }, { value: "unlimited", label: "有效不限次卡" }, { value: "never", label: "从未办卡" }, { value: "expired", label: "卡已过期" }, { value: "pending", label: "尚未生效" }, { value: "voided", label: "全部作废" }]} onChange={value => updateCondition(ci, { remaining_state: value as IdentityCondition["remaining_state"] })} />
+                        {(!cond.remaining_state || cond.remaining_state === "range") && <div className="flex items-center gap-2 text-[12px]"><span>剩余</span><Input aria-label="剩余次数下限" type="number" min="0" className="h-8 w-20" value={cond.remaining_min ?? 0} onChange={event => updateCondition(ci, { remaining_min: Number(event.target.value) })} /><span>～</span><Input aria-label="剩余次数上限" type="number" min="0" className="h-8 w-28" placeholder="不限上限" value={cond.remaining_max ?? ""} onChange={event => updateCondition(ci, { remaining_max: event.target.value === "" ? null : Number(event.target.value) })} /><span>次</span></div>}
+                        <p className="text-[12px] text-[#646a73]">{conditionSummary(cond)}</p>
+                      </div>}
 
                       {/* 邀约/到店/活动 → 按次数 */}
                       {cond.type && (cond.type === "invitation" || cond.type === "arrival" || cond.type === "activity") && (
@@ -654,7 +682,7 @@ export default function MemberIdentitiesPage() {
 
             <section aria-live="polite" className="rounded-md border border-[#e5e6eb] bg-[#f7f8fa] p-3 space-y-2">
               <h2 className="text-[13px] font-medium">规则预览</h2>
-              <p className="text-xs text-muted-foreground">{formName.trim() || "未命名身份"}{formType ? " · " + formType : ""}</p>
+              <MemberLabels customer={group === "identity" ? { member_type: formName.trim() || "未命名标签" } : { card_status: formName.trim() || "未命名标签", card_status_tone: formTone }} />
               {formConditions.some(c => c.type) ? (
                 <div className="space-y-1 text-[13px] leading-6 text-[#4e535a]">
                   {formConditions.filter(c => c.type).map((c, index) => (
@@ -662,11 +690,11 @@ export default function MemberIdentitiesPage() {
                   ))}
                 </div>
               ) : <p className="text-[13px] text-[#4e535a]">默认匹配：接收前面规则未命中的客户，建议放在最后。</p>}
-              <p className="text-xs text-muted-foreground">保存后自动更新客户身份；数量未填时按 0 保存。</p>
+              <p className="text-xs text-muted-foreground">{formConditions.some(c => c.type === "remaining") ? "所选有效会员卡余量相加；上限留空表示不限上限。" : "保存后自动更新客户身份；数量未填时按 0 保存。"}</p>
             </section>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setDialogOpen(false)}>取消</Button>
-              <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !formName.trim() || !formType}>
+              <Button size="sm" className="h-8 text-[12px]" onClick={handleSave} disabled={saving || !formName.trim() || (group === "identity" && !formType)}>
                 {saving ? "保存中..." : "保存"}
               </Button>
             </div>

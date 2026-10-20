@@ -670,7 +670,7 @@ def get_current_card_remaining(customer_id: str, on_date: Optional[str] = None) 
     )
 
 
-def list_current_card_remaining(customer_ids: set) -> dict:
+def list_current_card_remaining(customer_ids: set, *, card_types: set | None = None, on_date: str | None = None) -> dict:
     """批量计算客户当前有效会员卡剩余次数（轻量，不逐客户 reconcile，供列表页使用）。
 
     返回 {customer_id: remaining}，remaining 取值：
@@ -680,7 +680,7 @@ def list_current_card_remaining(customer_ids: set) -> dict:
     """
     from app.services import project_deduction_service
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = on_date or datetime.now().strftime("%Y-%m-%d")
 
     # 销卡流水次数索引 {card_id: count}
     manual_map: dict = {}
@@ -698,6 +698,8 @@ def list_current_card_remaining(customer_ids: set) -> dict:
     result: dict = {}
     for card in list_cards():
         if card.customer_id not in customer_ids:
+            continue
+        if card_types and card.card_type not in card_types:
             continue
         # 有效卡：已生效、未过期、未作废
         if (
@@ -1394,7 +1396,7 @@ def get_debt_record(customer_id: str) -> dict:
     return {
         "customer_id": customer_id,
         "nickname": customer.nickname if customer else "",
-        "member_type": customer.member_type if customer else "",
+        "member_type": customer.member_type if customer else "", "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
         "total_count": get_grand_total(customer_id),
         "deducted_count": get_manual_deductions(customer_id) + get_activity_deductions(customer_id) + debt,
         "debt_count": debt,
@@ -1429,6 +1431,6 @@ def search_customers(keyword: str) -> list:
                 "id": c.id,
                 "nickname": c.nickname,
                 "name": c.name,
-                "member_type": c.member_type,
+                "member_type": c.member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             })
     return results

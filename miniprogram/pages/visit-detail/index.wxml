@@ -3,7 +3,7 @@
   <view class="profile-card">
     <view class="profile-header">
       <text class="nickname" bindtap="onProfileTap">{{visit.nickname}}</text>
-      <text class="member-type" wx:if="{{visit.member_type}}">{{visit.member_type}}</text>
+      <member-labels wx:if="{{visit.member_type || visit.card_status}}" identity="{{visit.member_type}}" status="{{visit.card_status}}" tone="{{visit.card_status_tone}}" />
     </view>
     <view class="profile-stats">
       <view class="stat-item">

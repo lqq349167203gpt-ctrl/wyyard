@@ -26,7 +26,15 @@ Component({
       } else if (count !== null && count !== undefined) {
         remainingText = '剩余' + count + '次'
       }
-      this.setData({ remainingText, noteVisibility: require('../../utils/note-permissions').noteVisibility() })
+      const noteVisibility = require('../../utils/note-permissions').noteVisibility()
+      const needEntries = (visit.visit_need_entries || []).map(note => ({
+        id: note.id,
+        author: note.feedback_person || note.created_by || '未知',
+        tags: noteVisibility.visit_need_tags ? note.need_tags || [] : [],
+        content: noteVisibility.visit_need_detail ? note.content || '' : '',
+      })).filter(note => note.tags.length || note.content)
+      this.setData({ remainingText, noteVisibility, needEntries,
+        hasStructuredNeeds: Array.isArray(visit.visit_need_entries) })
     },
   },
 

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
-import { customerApi, customerTagApi, followUpStatusApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag, type FollowUpStatusConfig } from "@/lib/api"
+import { customerApi, customerTagApi, type ContactPermissions, type CustomerAccessPermissions, type CustomerCreate, type CustomerLight, type CustomerTag } from "@/lib/api"
 import { CustomerTagField } from "@/components/customer-tag-editor"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { useReadResource } from "@/hooks/use-read-resource"
@@ -16,17 +16,15 @@ import { customerReferrers } from "@/lib/customer-referrers"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
-  follow_up_status: "未配置",
   member_type: "", paid_content: [], visit_count: 0,
-  basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "",
+  basic_info: "", assessment: "", tags: "", traffic_source: "", traffic_source_detail: "", traffic_post_name: "",
 }
 
 const UPDATE_FIELDS = [
   "nickname", "name", "gender", "phone", "wechat", "age",
   "service_teacher", "referrer", "referrers", "referral_date", "referrer_handler",
-  "follow_up_status",
   "customer_quality",
-  "traffic_source", "traffic_source_detail",
+  "traffic_source", "traffic_source_detail", "traffic_post_name",
   "work_status", "work_description",
   ...CUSTOMER_INCOME_FIELDS.map(field => field.key),
   "basic_info", "assessment", "tags", "other_info",
@@ -81,13 +79,12 @@ export default function CustomerFormPage() {
     ...emptyCustomer,
     referral_date: id ? "" : getTodayDate(),
   }))
-  const { data: customers, error: directoryError, refresh: refreshDirectory } = useReadResource<CustomerLight[]>(() => customerApi.light(), [])
+  const { data: customers, error: directoryError, refresh: refreshDirectory } = useReadResource<CustomerLight[]>(() => customerApi.assignmentOptions(), [])
   const [referrerError, setReferrerError] = useState("")
   const [referrerHandlerError, setReferrerHandlerError] = useState("")
   const [loading, setLoading] = useState(false)
   const [entityId, setEntityId] = useState<string | null>(id || null)
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
-  const { data: followUpStatuses, error: statusError, refresh: refreshStatuses } = useReadResource<FollowUpStatusConfig[]>(() => followUpStatusApi.list(), [])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [tagsLoaded, setTagsLoaded] = useState(false)
   const [tagsLoading, setTagsLoading] = useState(true)
@@ -317,7 +314,6 @@ export default function CustomerFormPage() {
       {/* 表单 */}
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 pb-20" {...enterToNext}>
         <LoadError error={directoryError} onRetry={refreshDirectory} />
-        <LoadError error={statusError} onRetry={refreshStatuses} />
         {/* 基本信息 */}
         <div className="space-y-3">
           <h2 className="text-[13px] font-normal text-[#1f2329]">基本信息</h2>
@@ -439,7 +435,7 @@ export default function CustomerFormPage() {
               </div>
               {referrerHandlerError && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{referrerHandlerError}</p>}
             </div>
-            <div className="flex basis-full items-center gap-2">
+            <div className="flex basis-full flex-wrap items-center gap-2">
               <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">流量来源</label>
               <SelectDropdown
                 className="w-[200px]"
@@ -447,10 +443,13 @@ export default function CustomerFormPage() {
                 options={["小红书", "抖音", "公众号", "视频号", "朋友圈", "美团", "大众点评", "好友推荐", "粗门"].map(v => ({value: v, label: v}))}
                 placeholder="请选择"
                 menuMaxHeight={304}
-                onChange={(v) => setForm({ ...form, traffic_source: v, traffic_source_detail: "" })}
+                onChange={(v) => setForm({ ...form, traffic_source: v, traffic_source_detail: "", traffic_post_name: "" })}
               />
               {["小红书", "抖音", "公众号", "视频号"].includes(form.traffic_source) && (
+<>
+                <Input aria-label="帖子名称" value={form.traffic_post_name || ""} onChange={(e) => setField("traffic_post_name", e.target.value)} placeholder="帖子名称" maxLength={200} className="w-[200px]" />
                 <Input value={form.traffic_source_detail || ""} onChange={(e) => setField("traffic_source_detail", e.target.value)} placeholder="内容链接" className="w-[200px]" />
+              </>
               )}
               {form.traffic_source === "好友推荐" && (
                 <div className="w-[200px]">
@@ -476,15 +475,6 @@ export default function CustomerFormPage() {
               <label className="w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">客户质量</label>
               <SelectDropdown value={form.customer_quality || "正常"} options={["正常", "忽视"].map(value => ({ value, label: value }))} onChange={value => setField("customer_quality", value)} className="w-[200px]" />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="w-12 flex-shrink-0 text-right text-[12px] font-normal text-[#4e535a]">跟进阶段</label>
-              <SelectDropdown
-                value={form.follow_up_status || "未配置"}
-                options={followUpStatuses.map(status => ({ value: status.name, label: status.name }))}
-                onChange={(value) => setField("follow_up_status", value)}
-                className="w-[200px]"
-              />
-            </div>
             <CustomerTagField
               tags={availableTags}
               value={selectedTagIds}
@@ -506,7 +496,7 @@ export default function CustomerFormPage() {
           <h2 className="text-[13px] font-normal text-[#1f2329] mb-3">疗愈情况</h2>
           <div className="flex flex-wrap gap-x-[14px] gap-y-3 pl-[15px]">
             <div className="flex items-center gap-2">
-              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">服务老师</label>
+              <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">Sales</label>
               <div className="w-[200px]">
                 <CustomerSearchInput customers={customers} value={form.service_teacher || ""} onChange={(v) => setField("service_teacher", typeof v === "string" ? v : v[0] || "")} placeholder="请搜索" excludeIds={form.id ? [form.id] : []} filterSelected={false} />
               </div>

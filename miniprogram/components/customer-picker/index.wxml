@@ -2,7 +2,7 @@
   <!-- 已选中客户 -->
   <view class="selected" wx:if="{{value}}">
     <text class="selected-name">{{value.nickname}}</text>
-    <text class="selected-type" wx:if="{{value.member_type}}">{{value.member_type}}</text>
+    <member-labels wx:if="{{value.member_type || value.card_status}}" identity="{{value.member_type}}" status="{{value.card_status}}" tone="{{value.card_status_tone}}" />
     <text class="selected-count" wx:if="{{value.visit_count}}">第{{value.visit_count}}次</text>
     <view class="clear-btn" bindtap="onClear">✕</view>
   </view>
@@ -34,7 +34,7 @@
       data-customer="{{item}}"
     >
       <text class="item-name">{{item.nickname}}</text>
-      <text class="item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+      <member-labels wx:if="{{item.member_type || item.card_status}}" identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
       <text class="item-count" wx:if="{{item.visit_count}}">{{item.visit_count}}次</text>
     </view>
     <view class="dropdown-empty" wx:if="{{!searching && results.length === 0}}">

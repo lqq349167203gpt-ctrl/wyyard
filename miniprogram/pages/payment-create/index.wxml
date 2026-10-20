@@ -1,4 +1,4 @@
 <page-meta page-style="{{pickerOpen ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
-  <payment-form type="{{type}}" bind:success="onFormSuccess" bind:pickerstate="onPickerState" />
+  <payment-form type="{{type}}" preset-customer="{{presetCustomer}}" bind:success="onFormSuccess" bind:pickerstate="onPickerState" />
 </view>

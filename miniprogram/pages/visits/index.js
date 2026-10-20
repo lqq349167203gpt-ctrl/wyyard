@@ -1,3 +1,4 @@
+const { onWorkflowTap } = require('../../utils/schedule-workflow')
 const { visitApi, spaceApi, visitVerificationApi, downloadFile } = require('../../utils/api')
 const { formatDate } = require('../../utils/util')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
@@ -84,6 +85,7 @@ function buildWeekPages(selectedDate, calendarCounts, verificationMap) {
 }
 
 Page({
+  onWorkflowTap,
   data: {
     hasPagePermission: true,
     currentDate: '',
@@ -646,39 +648,14 @@ Page({
   onCancelVisitTap(e) {
     const visit = e.detail.visit
     if (!visit || this.data.isViewOnly || this.data.isDayVerified) return
-    if (visit.cancelled) {
-      this.updateCancelVisit(visit, false)
-      return
-    }
-    wx.showModal({
-      title: '取消邀约',
-      content: '请输入取消原因',
-      editable: true,
-      placeholderText: '填写取消原因',
-      confirmText: '确认取消',
-      success: (result) => {
-        if (!result.confirm) return
-        const reason = String(result.content || '').trim()
-        if (!reason) {
-          wx.showToast({ title: '请输入取消原因', icon: 'none' })
-          return
-        }
-        if (reason.length > 200) {
-          wx.showToast({ title: '取消原因不能超过200字', icon: 'none' })
-          return
-        }
-        this.updateCancelVisit(visit, true, reason)
-      },
-    })
-  },
-
-  updateCancelVisit(visit, cancelled, reason = '') {
-    if (this._cancelUpdating) return
-    this._cancelUpdating = true
-    visitApi.update(visit.id, cancelled ? { cancelled: true, cancel_reason: reason } : { cancelled: false }).then((updated) => {
+    const cancelled = !visit.cancelled
+    const submit = (reason = '') => visitApi.update(visit.id, cancelled
+      ? { cancelled: true, cancel_reason: reason }
+      : { cancelled: false }).then(() => {
       wx.showToast({ title: cancelled ? '已取消邀约' : '已恢复邀约' })
-      // 就地更新当前项，避免整页刷新导致滚动位置丢失
-      const visits = this.data.visits.map(v => v.id === visit.id ? { ...v, cancelled, cancel_reason: (updated && updated.cancel_reason) || reason || v.cancel_reason || '' } : v)
+      // 就地更新当前项，避免 loadData() 触发整页刷新导致滚动位置丢失
+      const visits = this.data.visits.map(v => v.id === visit.id ? { ...v, cancelled, cancel_reason: cancelled ? reason : '' } : v)
+      // 已取消的行移到末尾，未取消保持相对顺序
       const reordered = [...visits.filter(v => !v.cancelled), ...visits.filter(v => v.cancelled)]
       this._setVisits(reordered)
       const counts = { ...(this._calendarCounts || {}) }
@@ -688,8 +665,18 @@ Page({
       this.setData({ weekPages: buildWeekPages(this.data.currentDate, counts, this._verificationMap || {}) })
     }).catch((error) => {
       wx.showToast({ title: (error && error.message) || '操作失败', icon: 'none' })
-    }).finally(() => {
-      this._cancelUpdating = false
+    })
+    if (!cancelled) return submit()
+    wx.showModal({
+      title: '取消邀约', content: `请填写取消 ${visit.nickname || '客户'} 邀约的原因`,
+      editable: true, placeholderText: '请输入取消原因',
+      success: (result) => {
+        if (!result.confirm) return
+        const reason = String(result.content || '').trim()
+        if (!reason) return wx.showToast({ title: '请填写取消原因', icon: 'none' })
+        if (reason.length > 500) return wx.showToast({ title: '取消原因不能超过500字', icon: 'none' })
+        submit(reason)
+      },
     })
   },
 

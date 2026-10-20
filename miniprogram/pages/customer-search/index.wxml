@@ -33,6 +33,7 @@
       <view class="dropdown-content filter-dropdown">
         <scroll-view class="filter-scroll" scroll-y="{{true}}" enable-flex="{{true}}" show-scrollbar="{{false}}">
           <view class="filter-body">
+          <view class="filter-section" wx:if="{{cardStatusList.length}}"><view class="filter-section-title">卡次状态</view><view class="tags-wrap"><view class="tag-item {{item.selected ? 'active' : ''}}" wx:for="{{cardStatusList}}" wx:key="name" data-name="{{item.name}}" bindtap="onToggleCardStatus">{{item.name}}</view></view></view>
           <view class="filter-section">
           <view class="filter-section-title">到店间隔</view>
           <view class="range-panel-content">
@@ -139,6 +140,7 @@
           <text class="c-tag" wx:if="{{item.customer_tags && item.customer_tags.length}}">{{item.customer_tags[0].name}}</text>
           <text class="c-days {{item.isStale ? 'hot' : ''}}">{{item.daysPillText}}</text>
         </view>
+        <member-labels identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
         <view class="c-line2">
           <text>到店 {{item.visit_count}} 次</text>
           <block wx:if="{{item.referrer}}"><text class="c-sep">·</text><text>引流 {{item.referrer}}</text></block>

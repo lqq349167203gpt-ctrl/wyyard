@@ -113,10 +113,10 @@
       </view>
     </view>
     <view wx:if="{{noteVisibility.customer_info}}" class="form-item column textarea-row">
-      <text class="form-label" style="margin-bottom: 8rpx;">客户信息</text>
+      <text class="form-label" style="margin-bottom: 8rpx;">深度需求</text>
       <view class="feedback-field"><view class="feedback-label"><view class="feedback-label-dot"></view><text>反馈人</text></view><picker range="{{feedbackOptions}}" range-key="name" value="{{infoFeedbackIndex}}" data-field="feedback" bindchange="onFeedbackPersonChange"><view class="feedback-picker"><text class="feedback-picker-text">{{feedbackOptions[infoFeedbackIndex].name || '选择反馈人'}}</text><view class="feedback-picker-arrow"></view></view></picker></view>
-      <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="客户信息">
-        <text class="text-preview-content {{feedback ? '' : 'text-preview-placeholder'}}">{{feedback || '点击输入客户信息'}}</text>
+      <view class="text-preview" bindtap="onOpenEditor" data-field="feedback" data-label="深度需求">
+        <text class="text-preview-content {{feedback ? '' : 'text-preview-placeholder'}}">{{feedback || '点击输入深度需求'}}</text>
         <text class="text-preview-count">{{feedback.length}} 字</text>
       </view>
     </view>
@@ -143,7 +143,7 @@
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
         <text class="picker-item-name">{{item.nickname}}</text>
-        <text class="picker-item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+        <member-labels wx:if="{{item.member_type || item.card_status}}" identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
       </view>
       <view class="picker-empty" wx:if="{{pickerList.length === 0 && !(pickerKeyword && pickerField === 'customer')}}">
         <text>无匹配用户</text>

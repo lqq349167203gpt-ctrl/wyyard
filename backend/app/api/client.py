@@ -925,7 +925,12 @@ def get_remaining(request: Request):
         {},
     )
     current_remaining = membership.get("current_remaining", 0)
+    customer = get_customer(customer_id)
     return {
+        "customer_id": customer_id,
+        "member_type": customer.member_type if customer else "",
+        "card_status": getattr(customer, "card_status", "") if customer else "",
+        "card_status_tone": getattr(customer, "card_status_tone", "neutral") if customer else "neutral",
         "remaining": None if current_remaining == "不限" else current_remaining,
         "current_total": membership.get("current_total", 0),
         "debt_count": membership.get("debt_count", 0),

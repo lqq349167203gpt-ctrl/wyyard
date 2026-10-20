@@ -96,7 +96,7 @@ function getValidityDetails(type, formData) {
   } else if (type === 'internal_course') {
     durationType = 'month'
     durationValue = formData.validity_value || 12
-  } else if (type === 'offline_course') {
+  } else if (type === 'offline_course' || type === 'online_tea') {
     durationType = formData.validity_unit || 'month'
     durationValue = formData.validity_value || 1
   }
@@ -251,9 +251,10 @@ Component({
       } else if (type === 'tea_seat_fee') {
         if (!initData.quantity) initData.quantity = '1'
         if (initData.amount === undefined || initData.amount === '') initData.amount = '68'
-      } else if (type === 'offline_course') {
+      } else if (type === 'offline_course' || type === 'online_tea') {
         if (!initData.effective_date) initData.effective_date = today()
-        if (!initData.validity_value) initData.validity_value = String(offlineCourseDefaultMonths(initData.course_type))
+        if (!initData.validity_value) initData.validity_value = String(type === 'online_tea' ? 1 : offlineCourseDefaultMonths(initData.course_type))
+        if (type === 'online_tea' && !initData.validity_unit) initData.validity_unit = 'month'
       } else if (type === 'internal_course') {
         if (!initData.effective_date) initData.effective_date = today()
         if (!initData.validity_value) initData.validity_value = '12'
@@ -323,6 +324,8 @@ Component({
       } else if (type === 'tea_seat_fee') {
         rows.push({ label: '数量', value: (formData.quantity || '1') + ' 位' })
         amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
+      } else if (type === 'online_tea') {
+        rows.push({ label: '生效日期', value: formData.effective_date || '-' })
       } else if (type === 'offline_course') {
         rows.push({ label: '课程类型', value: formData.course_type || '-' })
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
@@ -783,6 +786,11 @@ Component({
       })
     },
 
+    onOnlineTeaValidityUnitChange(e) {
+      const unit = DURATION_TYPES[Number(e.detail.value)]
+      if (unit) this.setData({ 'formData.validity_unit': unit.key })
+    },
+
     onPaymentMethodChange(e) {
       const idx = parseInt(e.detail.value)
       this.setData({
@@ -840,13 +848,17 @@ Component({
           payload.duration_value,
         ) || undefined
       }
-      // 线下课程: 从 effective_date + validity_value 计算 expiry_date（固定月）
-      if (type === 'offline_course' && payload.effective_date && payload.validity_value) {
+      // 线下课程和线上茶疗按所选单位计算到期日期
+      if ((type === 'offline_course' || type === 'online_tea') && payload.effective_date && payload.validity_value) {
         payload.expiry_date = calculateExpiryDate(
           payload.effective_date,
           payload.validity_unit || 'month',
           payload.validity_value,
         ) || undefined
+      }
+      if (type === 'online_tea') {
+        delete payload.amount; delete payload.price; delete payload.payment_method
+        payload.validity_value = Number(payload.validity_value)
       }
       if (type === 'internal_course') {
         payload.validity_value = parseInt(payload.validity_value) || 12
@@ -890,6 +902,9 @@ Component({
         else if (type === 'other') payload.fee = 0
         else payload.amount = 0
         payload.payment_method = null
+      }
+      if (type === 'online_tea') {
+        ;['price', 'amount', 'fee', 'payment_method'].forEach(key => delete payload[key])
       }
       // 成交人独立于金额配置；保留空值，确保编辑时也能清空原成交人。
       payload.closer_id = closers[0] ? (closers[0].id || null) : null
@@ -946,11 +961,17 @@ Component({
       if (type === 'membership_card' && formData.card_type === '定制化' && !isEdit && (!Number.isInteger(Number(formData.duration_value)) || Number(formData.duration_value) <= 0 || (!this.data.cardUnlimited && (!Number.isInteger(Number(formData.remaining_count)) || Number(formData.remaining_count) <= 0)))) {
         wx.showToast({ title: '请填写次数和有效期，或选择不限次数', icon: 'none' }); return
       }
+      if (type === 'online_tea' && (!formData.organization_id || !formData.deal_date || !formData.effective_date || !Number.isInteger(Number(formData.validity_value)) || Number(formData.validity_value) < 1 || Number(formData.validity_value) > 1200)) {
+        wx.showToast({ title: '请填写成交归属、日期和1至1200的有效期', icon: 'none' }); return
+      }
       if (type === 'offline_course' && !isEdit && this.data.offlineCourseTypeIndex < 0) {
         wx.showToast({ title: '请选择课程类型', icon: 'none' }); return
       }
       if (type === 'oh_card_reading' && !isEdit && !formData.reading_type) {
         wx.showToast({ title: '请选择诊断类型', icon: 'none' }); return
+      }
+      if (type === 'oh_card_reading' && !(formData.diagnosis_teacher || '').trim()) {
+        wx.showToast({ title: '请选择诊断老师', icon: 'none' }); return
       }
       if (type === 'membership_card' && !['次卡', '体验会员', '粗门次卡'].includes(formData.card_type) && !formData.agreement_status) {
         wx.showToast({ title: '请选择协议签订状态', icon: 'none' }); return

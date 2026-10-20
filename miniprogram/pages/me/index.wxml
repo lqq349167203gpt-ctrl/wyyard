@@ -9,7 +9,7 @@
         <text class="id-name">{{user.owner}}</text>
         <view class="id-meta">
           <text class="id-slogan">{{role}}</text>
-          <view class="member-switch" bindtap="onMemberViewTap">切换到会员端 <text>›</text></view>
+          <!-- 切换到会员端：已隐藏 -->
         </view>
       </view>
     </view>

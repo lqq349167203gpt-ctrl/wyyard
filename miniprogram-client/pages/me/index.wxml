@@ -16,7 +16,7 @@
         </view>
         <view class="id-text">
           <text class="id-name">{{customer.nickname}}</text>
-          <text class="id-slogan">{{customer.member_type || '助力亿万家庭幸福美满'}}</text>
+          <view class="id-slogan"><member-labels wx:if="{{customer.member_type || customer.card_status}}" identity="{{customer.member_type}}" status="{{customer.card_status}}" tone="{{customer.card_status_tone}}" /><text wx:else>助力亿万家庭幸福美满</text></view>
         </view>
       </view>
     </view>

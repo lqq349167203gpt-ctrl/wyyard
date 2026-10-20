@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { canViewNote, canViewNotePart } from "@/lib/note-permissions"
@@ -734,7 +735,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
         { header: "服务老师", key: "teacher", width: 14 },
         { header: "客户昵称", key: "nickname", width: 16 },
         { header: "会员身份", key: "memberType", width: 16 },
-        { header: "跟进阶段", key: "followUpStatus", width: 16 },
+        { header: "当前卡次", key: "cardStatus", width: 16 },
         { header: "最近深度需求", key: "customerInfo", width: 42 },
         { header: "深度需求反馈人", key: "customerInfoBy", width: 16 },
         { header: "深度需求创建人", key: "customerInfoCreatedBy", width: 16 },
@@ -749,8 +750,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
       rows.forEach(item => worksheet.addRow({
         teacher,
         nickname: item.nickname || item.name || "-",
-        memberType: item.member_type || "-",
-        followUpStatus: item.follow_up_status || "-",
+        memberType: item.member_type || "-", cardStatus: item.card_status || "-",
         customerInfo: item.latest_customer_info_content || "-",
         customerInfoBy: item.latest_customer_info_by || "-",
         customerInfoCreatedBy: item.latest_customer_info_created_by || "-",
@@ -1123,15 +1123,16 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                                 </div>
                               </td>
                               <td className="px-3 py-2.5">
-                                {row.member_type || row.identity_group
-                                  ? <IdentityTag value={row.member_type || row.identity_group} />
+                                {row.member_type || row.identity_group || row.card_status
+                                  ? <MemberLabels customer={{ ...row, member_type: row.member_type || row.identity_group }} />
                                   : <EmptyDash />}
                               </td>
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
                               {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).filter(field => canViewNote(noteAccess, field)).map(field => {
+                                const teacherName = teacher.trim()
                                 const entries = row[`${field}_entries`] || []
-                                const mine = entries.filter(isOwnParticipantNote)
-                                const others = entries.filter(entry => !isOwnParticipantNote(entry))
+                                const mine = entries.filter(entry => Boolean(teacherName) && entry.author?.trim() === teacherName)
+                                const others = entries.filter(entry => !mine.includes(entry))
                                 const otherEntries = others.length ? others : (!entries.length && row[field] ? [{ author: "", content: row[field], at: "" }] : [])
                                 const otherLine = otherEntries.map(entry => `${entry.author?.trim() ? `${entry.author.trim()}：` : ""}${entry.content.replace(/\s+/g, " ").trim()}`).filter(Boolean).join("；")
                                 return (
@@ -1446,8 +1447,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
             <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
               <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
                 <TableHead className="h-9 w-[110px] px-3 pl-4 text-[11px] font-normal">客户昵称</TableHead>
-                <TableHead className="h-9 w-[110px] px-3 text-[11px] font-normal">会员身份</TableHead>
-                <TableHead className="h-9 w-[120px] px-3 text-[11px] font-normal">跟进阶段</TableHead>
+                <TableHead className="h-9 w-[170px] px-3 text-[11px] font-normal">会员身份</TableHead>
                 <TableHead hidden={!canViewNote(noteAccess, "customer_info")} className="h-9 px-3 text-[11px] font-normal">最近深度需求</TableHead>
                 <TableHead hidden={!canViewNote(noteAccess, "follow_up")} className="h-9 px-3 text-[11px] font-normal">最近跟进点</TableHead>
                 <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">最近录入时间</TableHead>
@@ -1462,8 +1462,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                       {item.nickname || item.name || <EmptyDash />}
                     </button>
                   </TableCell>
-                  <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.member_type || undefined}>{item.member_type || <EmptyDash />}</TableCell>
-                  <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.follow_up_status || undefined}>{item.follow_up_status || <EmptyDash />}</TableCell>
+                  <TableCell className="h-11 truncate px-3 py-0 text-[12px] text-[#4e535a]" title={item.member_type || undefined}><MemberLabels customer={item} /></TableCell>
                   <TableCell hidden={!canViewNote(noteAccess, "customer_info")} className={followUpContentExpanded ? "min-h-[44px] whitespace-normal px-3 py-1.5 align-top text-[12px]" : "h-11 overflow-hidden px-3 py-0 text-[12px]"}>
                     <NoteContent author={item.latest_customer_info_by} content={item.latest_customer_info_content} expanded={followUpContentExpanded} />
                   </TableCell>
@@ -1511,13 +1510,6 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
               {participantEditing?.row.course_date} · {participantEditing?.row.nickname} · {participantEditing?.row.course_name}
             </p>
             <div>
-              {participantEditing?.field === "visit_need" && canViewNotePart(noteAccess, "visit_need_tags") && <div className="mb-3 flex flex-wrap gap-2">
-                {participantNeedTags.length ? participantNeedTags.map(tag => <button key={tag.id} type="button"
-                  disabled={participantEditorLoading || participantEditorReadFailed}
-                  onClick={() => setParticipantNeedTagIds(ids => ids.includes(tag.id) ? ids.filter(id => id !== tag.id) : [...ids, tag.id])}
-                  className={`rounded-[4px] border px-2 py-1 text-[12px] ${participantNeedTagIds.includes(tag.id) ? "border-[#b9cdf8] bg-[#f0f5ff] text-[#3370ff]" : "border-[#e1e4e7] text-[#646a73]"}`}>{tag.name}</button>)
-                  : <span className="text-[11px] text-[#a8b0ba]">暂无公共来访需求标签，可在客户标签中配置</span>}
-              </div>}
               <div className="mb-1 text-[11px] text-[#8f959e]">我填写的内容</div>
               <div className={`${participantEditing?.field === "follow_up" ? "mb-2" : "mb-3"} grid grid-cols-2 gap-3`}>
                 <div className="flex min-w-0 items-center gap-2">
@@ -1560,17 +1552,6 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                 placeholder={participantEditing?.field === "customer_info" ? "填写深度需求..." : participantEditing?.field === "follow_up" ? "填写跟进点..." : participantEditing?.field === "customer_feedback" ? "填写客户反馈..." : "填写来访需求..."}
                 className="w-full rounded-[4px] border-[0.5px] border-[#e1e4e7] px-3 py-2 text-[12.5px] leading-5 text-[#2b2f36] outline-none placeholder:text-[#b0b5bb] focus:border-[#b9cdf8]"
               />
-              {participantEditing?.field === "follow_up" && <div className="mt-3 space-y-2">
-                <div className="flex items-center gap-2"><span className="w-[84px] text-[12px] text-[#646a73]">下次跟进人</span>
-                  <CustomerSearchInput customers={participantFollowUpPeople} value={participantPlan.next_follow_up_person || ""} selectionOnly
-                    onChange={value => { if (!value) setParticipantPlan(plan => ({ ...plan, next_follow_up_person_id: "", next_follow_up_person: "" })) }}
-                    onSelectItem={person => setParticipantPlan(plan => ({ ...plan, next_follow_up_person_id: person.id, next_follow_up_person: person.nickname }))} />
-                </div>
-                <div className="flex items-center gap-2"><span className="w-[84px] text-[12px] text-[#646a73]">下次跟进时间</span>
-                  <Input type="date" value={participantPlan.next_follow_up_date || ""} onChange={event => setParticipantPlan(plan => ({ ...plan, next_follow_up_date: event.target.value }))} className="h-8 w-[180px] text-[12px]" />
-                  {participantPlan.next_follow_up_date && <button type="button" onClick={() => setParticipantPlan(plan => ({ ...plan, next_follow_up_date: "" }))} className="text-[11px] text-[#8f959e]">清空</button>}
-                </div>
-              </div>}
               {participantEditorError && <p className="mt-1 text-[11px] text-[#c4506a]">{participantEditorError}</p>}
             </div>
             {participantEditing && (participantEditing.row[`${participantEditing.field}_entries`] || []).some(entry => !isOwnParticipantNote(entry)) && (

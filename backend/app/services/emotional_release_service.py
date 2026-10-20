@@ -105,6 +105,6 @@ def search_customers(keyword: str) -> list:
                 "id": c.id,
                 "nickname": c.nickname,
                 "name": c.name,
-                "member_type": c.member_type,
+                "member_type": c.member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             })
     return results

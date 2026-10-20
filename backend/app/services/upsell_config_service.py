@@ -37,8 +37,11 @@ def rules_configured() -> bool:
 
 def _rule_dict(rule):
     result = rule.model_dump(mode="json")
+    for key, default in (("previous_stage", ""), ("once", False)):
+        if result[key] == default:
+            result.pop(key)
     for condition in result["conditions"]:
-        for key, default in (("products", []), ("count_scope", "subtype"), ("first_purchase", False), ("previous_products", [])):
+        for key, default in (("products", []), ("count_scope", "subtype"), ("first_purchase", False), ("previous_products", []), ("excluded_previous_products", [])):
             if condition[key] == default:
                 condition.pop(key)
         if not condition.get("product"):
@@ -71,14 +74,20 @@ def recommended_rules() -> list[dict]:
 
     big = [f"membership:{name}" for name in MEMBERSHIP_CARD_TYPES if name not in {"次卡", "体验会员"}]
     big += ["group_case", "emotional", "online_tea", "energy", "internal", "offline"]
+    low = ["membership:次卡", "coarse"]
+    entry = ["membership:体验会员"]
     return [
-        {"key": "experience", "conditions": [{"products": ["membership:次卡", "coarse"], "operator": "gte", "count": 1, "count_scope": "group"}]},
-        {"key": "conversion", "conditions": [
-            {"product": "membership:体验会员", "operator": "gte", "count": 1},
-            {"products": big, "operator": "gte", "count": 1, "count_scope": "group", "first_purchase": True},
+        {"key": "experience", "conditions": [{"products": low, "operator": "gte", "count": 1,
+            "count_scope": "group", "excluded_previous_products": entry + big}]},
+        {"key": "conversion", "once": True, "conditions": [
+            {"products": entry + big, "operator": "eq", "count": 1, "count_scope": "group"},
         ]},
-        {"key": "upsell", "conditions": [{"products": big, "operator": "gte", "count": 1, "count_scope": "group", "previous_products": ["membership:体验会员"]}]},
-        {"key": "repurchase", "conditions": [{"products": big, "operator": "gte", "count": 2, "count_scope": "group"}]},
+        {"key": "upsell", "previous_stage": "conversion", "once": True, "conditions": [
+            {"products": big, "operator": "gte", "count": 1, "count_scope": "group"},
+        ]},
+        {"key": "repurchase", "previous_stage": "upsell", "conditions": [
+            {"products": big, "operator": "gte", "count": 1, "count_scope": "group"},
+        ]},
     ]
 
 
@@ -90,6 +99,7 @@ def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> N
     previous_counts = defaultdict(dict)
     group_counts = defaultdict(int)
     customer_counts = defaultdict(int)
+    achieved_stages = defaultdict(set)
     configured = list_rules() if rules is None else rules
     timeline = sorted(events, key=lambda item: (
         (item.get("deal_date") or "") if item.get("kind") == "coarse_usage" else item.get("date", ""),
@@ -118,12 +128,25 @@ def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> N
                     times > 0 and any(matches_item(item, prior_product, prior_subtype) for item in previous)
                     for (prior_product, prior_subtype), times in previous_counts[customer].items()
                 )
+                excluded = condition.get("excluded_previous_products") or []
+                if any(
+                    times > 0 and any(matches_item(item, prior_product, prior_subtype) for item in excluded)
+                    for (prior_product, prior_subtype), times in previous_counts[customer].items()
+                ):
+                    continue
                 if condition.get("first_purchase") and customer_counts[customer]:
                     continue
                 if prior_match and (count == condition["count"] or (condition["operator"] == "gte" and count >= condition["count"])):
                     matched = True
+            # 仅看此前成交达到的阶段，本笔完成后再更新，避免一笔连跳多个阶段。
+            previous_stage = rule.get("previous_stage")
+            if previous_stage and previous_stage not in achieved_stages[customer]:
+                matched = False
+            if rule.get("once") and rule["key"] in achieved_stages[customer]:
+                matched = False
             if matched:
                 matches.append(rule["key"])
+        achieved_stages[customer].update(matches)
         counts[(customer, product, subtype)] += 1
         previous_counts[customer][(product, subtype)] = occurrence
         customer_counts[customer] += 1
@@ -132,6 +155,35 @@ def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> N
         event["purchase_rule_labels"] = [PURCHASE_RULE_LABELS[key] for key in matches]
         event["classification"] = "、".join(event["purchase_rule_labels"]) or "未匹配"
         event["is_upsell"] = "upsell" in matches
+
+
+def preview_rules(rules: list[dict]) -> list[dict]:
+    """只用模拟购买顺序预览分类，不读取或写入客户业务记录。"""
+    cases = [
+        ("大单 → 大单", ["group_case", "energy"]),
+        ("大单 → 大单 → 大单", ["group_case", "energy", "online_tea"]),
+        ("体验会员 → 体验会员 → 大单", ["membership:体验会员", "membership:体验会员", "energy"]),
+        ("首次买 398", ["membership:体验会员"]),
+        ("首次买大单", ["membership:30次卡"]),
+        ("次卡 → 首次买 398", ["membership:次卡", "membership:体验会员"]),
+        ("粗门次卡 → 首次买 398", ["coarse", "membership:体验会员"]),
+        ("次卡 → 首次买大单", ["membership:次卡", "membership:30次卡"]),
+        ("粗门次卡 → 首次买大单", ["coarse", "membership:30次卡"]),
+        ("398 → 首次买大单", ["membership:体验会员", "membership:30次卡"]),
+        ("398 → 再买 398", ["membership:体验会员", "membership:体验会员"]),
+        ("398 → 30 次卡 → 60 次卡", ["membership:体验会员", "membership:30次卡", "membership:60次卡"]),
+        ("大单 → 次卡 → 首次买 398", ["membership:30次卡", "membership:次卡", "membership:体验会员"]),
+    ]
+    rows = []
+    for title, items in cases:
+        events = []
+        for index, item in enumerate(items):
+            product, subtype = parse_item(item)
+            events.append({"id": str(index), "customer_id": "preview", "kind": "purchase",
+                           "product": product, "subtype": subtype, "date": f"2026-01-{index + 1:02d}"})
+        classify_purchases(events, rules)
+        rows.append({"journey": title, "classification": events[-1]["classification"]})
+    return rows
 
 
 def replace_levels(levels: list[UpsellLevel]) -> list[dict]:

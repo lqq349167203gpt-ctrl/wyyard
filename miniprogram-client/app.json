@@ -39,5 +39,8 @@
   },
   "lazyCodeLoading": "requiredComponents",
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "usingComponents": {
+    "member-labels": "/components/member-labels/index"
+  }
 }

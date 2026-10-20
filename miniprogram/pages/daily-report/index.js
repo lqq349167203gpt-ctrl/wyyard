@@ -335,7 +335,7 @@ Page({
         emotions: sources['emotional-releases'] || [], ohs: sources['oh-card-readings'] || [],
         energies: sources['energy-knots'] || [], courses: sources['internal-courses'] || [],
         others: sources['other-projects'] || [], teaFees: sources['tea-seat-fees'] || [],
-        offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [], remainingByCustomer: result.remaining_by_customer || {} }
+        onlineTea: sources['online-tea'] || [], offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [], remainingByCustomer: result.remaining_by_customer || {} }
       const assembled = this._assemble(this._report, date)
       for (const key of ['visits', 'activities']) {
         const opened = new Set(this.data[key].filter(row => row.open).map(row => row.id))
@@ -384,7 +384,8 @@ Page({
         customer_id: v.customer_id,
         nickname: v.nickname || '',
         identityText: v.member_type || '',
-        hasIdentity: !!v.member_type,
+        card_status: v.card_status || '', card_status_tone: v.card_status_tone || 'neutral',
+        hasIdentity: !!(v.member_type || v.card_status),
         arrived: !!v.arrived,
         cancelled: !!v.cancelled,
         cancelReason: v.cancel_reason || '',
@@ -541,6 +542,7 @@ Page({
           break
         case 'tea_seat_fee':
           itemType = '茶位费'; purchaseCount = item.quantity; break
+        case 'online_tea': itemType = '线上茶疗'; itemName = `${item.validity_value || 1} ${item.validity_unit === 'day' ? '天' : '个月'}`; break
         case 'offline_course':
           itemType = '线下落地课程'; itemName = item.course_name || ''; break
         case 'other':
@@ -581,6 +583,7 @@ Page({
     for (const i of payment.courses || []) addItem(i, 'internal_course')
     for (const i of payment.others || []) addItem(i, 'other')
     for (const i of payment.teaFees || []) addItem(i, 'tea_seat_fee')
+    for (const i of payment.onlineTea || []) addItem(i, 'online_tea')
     for (const i of payment.offlineCourses || []) addItem(i, 'offline_course')
 
     const total = rows.reduce((s, r) => s + (r.amount || 0), 0)

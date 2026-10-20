@@ -1,3 +1,4 @@
+@import "../../utils/schedule-workflow.wxss";
 .page {
   min-height: 100vh;
   background-color: #f5f6f8;
@@ -6,7 +7,7 @@
 
 /* 头部 */
 .head {
-  background-color: #f3f7ff;
+  background-color: #c6e4fe;
   position: fixed;
   top: 0;
   left: 0;
@@ -314,9 +315,9 @@
   font-weight: 400;
 }
 
-/* 连续名单：与客户首页保持“一组一卡、组内分行” */
+/* 连续名单：移除外层卡片，保留组内分隔。 */
 .visit-section {
-  padding-top: 330rpx;
+  padding-top: 462rpx;
 }
 
 .list-heading {
@@ -357,10 +358,10 @@
 .visit-list {
   position: relative;
   overflow: hidden;
-  margin: 0 24rpx 20rpx;
-  border-radius: 24rpx;
-  background-color: #ffffff;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  margin: 0 0 20rpx;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
 }
 
 .visit-items {
@@ -460,7 +461,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 466rpx 0 0;
+  padding: 620rpx 0 0;
 }
 
 .empty-icon {
@@ -497,7 +498,9 @@
 .loading {
   display: flex;
   justify-content: center;
-  padding: 466rpx 0 0;
+  padding: 620rpx 0 0;
   color: #b0b5bb;
   font-size: 28rpx;
 }
+
+.head-date .wk, .head-date .drop { color: #657b90; }

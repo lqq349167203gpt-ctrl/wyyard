@@ -1,10 +1,26 @@
-<page-meta page-style="{{showFilterPanel ? 'overflow:hidden;height:100vh;' : ''}}" />
+<page-meta page-style="{{showFilterPanel || showWorkspaceSettings ? 'overflow:hidden;height:100vh;' : ''}}" />
 <view class="page">
   <!-- 无权限 -->
   <view class="no-permission" wx:if="{{!hasPagePermission}}">
     <text class="no-permission-text">无权限访问此页面</text>
   </view>
   <block wx:else>
+  <view class="workspace-tabs" wx:if="{{scopeReady && workspaces.length}}">
+    <view wx:for="{{workspaces}}" wx:key="key" class="workspace-tab {{workspace === item.key ? 'selected' : ''}}" data-key="{{item.key}}" bindtap="onWorkspaceTap">{{item.label}}</view>
+  </view>
+  <view class="handoff-tabs" wx:if="{{scopeReady && workspace === 'handoff'}}">
+    <view wx:for="{{handoffTabs}}" wx:key="key" class="handoff-tab {{handoffStatus === item.key ? 'selected' : ''}}" data-key="{{item.key}}" bindtap="onHandoffStatusTap">{{item.label}}</view>
+  </view>
+  <view class="workspace-error" wx:if="{{workspaceError}}" bindtap="loadWorkspaces">{{workspaceError}} · 点击重试</view>
+  <view class="loading" wx:if="{{!scopeReady && !workspaceError}}">加载客户视图…</view>
+  <block wx:if="{{scopeReady}}">
+  <view class="workspace-tools" wx:if="{{isAdmin}}">
+    <picker wx:if="{{workspace !== 'all'}}" mode="selector" range="{{ownerOptions}}" value="{{ownerIndex}}" disabled="{{ownerLoading || !!ownerError}}" bindchange="onOwnerChange">
+      <view class="workspace-owner">{{workspace === 'referral' ? '引流人' : (workspace === 'handoff' ? '承接人' : 'Sales')}}：{{ownerLoading ? '加载中…' : ownerOptions[ownerIndex]}} <text class="owner-chevron">⌄</text></view>
+    </picker>
+    <button class="workspace-settings-link" bindtap="onOpenWorkspaceSettings">界面设置</button>
+  </view>
+  <view class="workspace-error" wx:if="{{isAdmin && workspace !== 'all' && ownerError}}" bindtap="loadActiveCustomerNames">{{ownerError}}</view>
   <!-- 搜索栏 -->
   <view class="search-bar">
     <view class="search-input-wrap search-entry" bindtap="onSearchTap" hover-class="search-entry-active" hover-stay-time="80">
@@ -16,13 +32,15 @@
       <text class="filter-count" wx:if="{{filterCount > 0}}">{{filterCount}}</text>
       <view class="filter-toggle-arrow {{showFilterPanel ? 'open' : ''}}"></view>
     </view>
+    <view class="filter-btn" bindtap="onExportTap"><text>导出</text></view>
   </view>
 
   <view class="dropdown-panel" wx:if="{{showFilterPanel}}">
     <view class="dropdown-mask" bindtap="onCloseFilterPanel"></view>
-    <view class="dropdown-content filter-dropdown">
+    <view class="dropdown-content filter-dropdown" style="{{filterTop ? 'top:' + filterTop + 'px;height:calc(100vh - ' + filterTop + 'px);' : ''}}">
       <scroll-view class="filter-scroll" scroll-y="{{true}}" enable-flex="{{true}}" show-scrollbar="{{false}}">
         <view class="filter-body">
+          <view class="filter-section" wx:if="{{cardStatusList.length}}"><view class="filter-section-title">卡次状态</view><view class="tags-wrap"><view class="tag-item {{item.selected ? 'active' : ''}}" wx:for="{{cardStatusList}}" wx:key="name" data-name="{{item.name}}" bindtap="onToggleCardStatus">{{item.name}}</view></view></view>
           <view class="filter-section">
             <view class="filter-section-title">到店间隔</view>
             <view class="range-panel-content">
@@ -116,7 +134,7 @@
       <view class="c-group-head">
         <view class="c-group-dot {{item.dotClass}}"></view>
         <text class="c-group-title">{{item.type}}</text>
-        <text class="c-group-count">{{item.list.length}} 人</text>
+        <text class="c-group-count">{{workspace ? total : item.list.length}} 人</text>
       </view>
       <view class="c-group-card">
         <view id="{{customer._rowDomId}}" class="c-row" wx:for="{{item.list}}" wx:for-item="customer" wx:key="id" bindtap="onCustomerTap" data-id="{{customer.id}}">
@@ -126,9 +144,14 @@
             <text class="c-tag" wx:if="{{customer.customer_tags && customer.customer_tags.length}}">{{customer.customer_tags[0].name}}</text>
             <text class="c-days {{customer.isStale ? 'hot' : ''}}">{{customer.daysPillText}}</text>
           </view>
+          <member-labels identity="{{customer.member_type}}" status="{{customer.card_status}}" tone="{{customer.card_status_tone}}" />
           <view class="c-line2">
             <text>到店 {{customer.visit_count}} 次</text>
-            <block wx:if="{{customer.referrer}}">
+            <block wx:if="{{workspace === 'sales'}}">
+              <text class="c-sep">·</text>
+              <text>Sales {{customer.service_teacher || '未分配'}}</text>
+            </block>
+            <block wx:elif="{{customer.referrer}}">
               <text class="c-sep">·</text>
               <text>引流 {{customer.referrer}}</text>
             </block>
@@ -136,6 +159,10 @@
               <text class="c-sep">·</text>
               <text>{{customer.cardRemainingText}}</text>
             </block>
+          </view>
+          <view class="handoff-row" wx:if="{{workspace === 'handoff' || workspace === 'referral'}}">
+            <text>{{customer.handoffLabel}}{{customer.referrer_handler ? ' · ' + customer.referrer_handler : ''}}{{customer.handoffTime ? ' · ' + customer.handoffTime : ''}}</text>
+            <button wx:if="{{workspace === 'handoff' && handoffStatus === 'pending' && !isViewOnly && customer.can_accept_handoff}}" class="handoff-accept" catchtap="onAcceptHandoff" data-id="{{customer.id}}" data-assignment="{{customer.handoff.id}}" disabled="{{!!acceptingId}}" loading="{{acceptingId === customer.id}}">确认承接</button>
           </view>
         </view>
       </view>
@@ -148,12 +175,13 @@
   </view>
 
   <!-- 空状态 -->
-  <view class="empty-state" wx:if="{{!loading && groupedCustomers.length === 0}}">
+  <view class="workspace-error" wx:if="{{listError}}" bindtap="retryList">{{listError}} · 点击重试</view>
+  <view class="empty-state" wx:if="{{!loading && !listError && groupedCustomers.length === 0}}">
     <view class="empty-circle">
       <text class="empty-char">空</text>
     </view>
-    <text class="empty-text">暂无客户</text>
-    <text class="empty-hint">{{isViewOnly ? '当前账号仅可浏览' : '点击右下角 + 添加'}}</text>
+    <text class="empty-text">{{workspace === 'handoff' && handoffStatus === 'pending' ? '暂无待承接客户' : '暂无客户'}}</text>
+    <text class="empty-hint">{{workspace === 'handoff' ? (handoffStatus === 'history' ? '启用交接前已分配的客户在这里' : '新分配的客户会显示在待承接中') : (isViewOnly ? '当前账号仅可浏览' : '点击右下角 + 添加')}}</text>
   </view>
 
   <!-- 加载更多 -->
@@ -166,5 +194,26 @@
 
   <!-- 浮动添加按钮 -->
   <draggable-fab wx:if="{{!isViewOnly}}" storage-key="customers-fab-position" bindtap="onAddTap" bindlongpress="onFabLongPress" />
+  <view class="workspace-settings-mask" wx:if="{{showWorkspaceSettings}}" catchtap="onCloseWorkspaceSettings">
+    <view class="workspace-settings-panel" catchtap="stopSettingsTap">
+      <view class="workspace-settings-title">界面设置</view>
+      <view class="workspace-settings-hint">仅影响本人界面，权限保持不变</view>
+      <view class="workspace-setting-label">显示入口</view>
+      <view class="workspace-setting-option" wx:for="{{settingsOptions}}" wx:key="key" data-key="{{item.key}}" bindtap="onToggleWorkspaceSetting">
+        <text>{{item.label}}</text><text class="workspace-check {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</text>
+      </view>
+      <view class="workspace-settings-hint">全部客户始终保留</view>
+      <view class="workspace-setting-label">默认打开</view>
+      <picker mode="selector" range="{{defaultOptions}}" range-key="label" value="{{defaultIndex}}" disabled="{{settingsSaving}}" bindchange="onDefaultWorkspaceChange">
+        <view class="workspace-default">{{defaultOptions[defaultIndex].label}} <text>⌄</text></view>
+      </picker>
+      <view class="workspace-error" wx:if="{{settingsError}}">{{settingsError}}</view>
+      <view class="workspace-settings-actions">
+        <button disabled="{{settingsSaving}}" bindtap="onCloseWorkspaceSettings">取消</button>
+        <button disabled="{{settingsSaving}}" loading="{{settingsSaving}}" bindtap="onSaveWorkspaceSettings">保存</button>
+      </view>
+    </view>
+  </view>
+  </block>
   </block>
 </view>

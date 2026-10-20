@@ -169,7 +169,7 @@ const FIELD_CN: Record<string, string> = {
   updated_at: "更新时间", is_deleted: "是否删除", deleted_at: "删除时间",
   voided: "是否退费", voided_at: "退费时间",
   customer_nickname: "客户昵称", tag_ids: "客户标签",
-  last_visit_date: "最近到店", other_info: "其他信息", service_teacher: "服务老师",
+  last_visit_date: "最近到店", other_info: "其他信息", service_teacher: "Sales",
   is_leader: "是否组长",
   room_ids: "房间顺序", position_sort_orders: "排序顺序", is_system: "是否系统角色",
   healing_notes: "跟进点", activity_count: "活动次数", welfare_count: "公益次数", activities: "活动记录",

@@ -48,7 +48,7 @@ def test_endpoint_ignores_foreign_customer_and_reuses_own_data(client, monkeypat
     assert response.status_code == 200
     result = response.json()
     assert requested == ["self"] and seen[0] != "foreign"
-    assert result["customer"] == {"nickname": "昵称甲", "member_type": "体验会员"}
+    assert result["customer"] == {"nickname": "昵称甲", "member_type": "体验会员", "card_status": "", "card_status_tone": "neutral"}
     assert "phone" not in result["customer"]
     assert len(result["items"]) == (25 if section == "cards" else 5)
 

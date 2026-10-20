@@ -74,7 +74,7 @@
       <text class="pd-value">{{item.purchase_count || '-'}}{{type === 'energy_knot' ? '个' : '次'}}</text>
     </view>
     <view class="pd-row">
-      <text class="pd-label">剩余次数</text>
+      <text class="pd-label">{{type === 'energy_knot' ? '剩余个数' : '剩余次数'}}</text>
       <text class="pd-value">{{item._remaining || '-'}}</text>
     </view>
     <view class="pd-row">
@@ -129,8 +129,8 @@
   </view>
 
   <!-- 线下课程 -->
-  <view class="pd-card" wx:if="{{type === 'offline_course'}}">
-    <view class="pd-row"><text class="pd-label">课程类型</text><text class="pd-value">{{item.course_type || '-'}}</text></view>
+  <view class="pd-card" wx:if="{{type === 'offline_course' || type === 'online_tea'}}">
+    <view class="pd-row" wx:if="{{type === 'offline_course'}}"><text class="pd-label">课程类型</text><text class="pd-value">{{item.course_type || '-'}}</text></view>
     <view class="pd-row">
       <text class="pd-label">生效日期</text>
       <text class="pd-value">{{item.effective_date || '-'}}</text>
@@ -143,7 +143,7 @@
       <text class="pd-label">到期日期</text>
       <text class="pd-value">{{item._expiryDate || '-'}}</text>
     </view>
-    <view class="pd-row">
+    <view class="pd-row" wx:if="{{type !== 'online_tea'}}">
       <text class="pd-label">付费金额</text>
       <text class="pd-value pd-price">¥{{item.amount || 0}}</text>
     </view>

@@ -35,7 +35,7 @@ def selected_customers(breakdown: dict, picks: list[str], *, source="traffic") -
                 continue
             if selected.get("identity") and row.get("identity", "") not in selected["identity"]:
                 continue
-            if selected.get("stage") and row.get("follow_up_status", "") not in selected["stage"]:
+            if selected.get("card_status") and row.get("card_status", "") not in selected["card_status"]:
                 continue
             if selected.get("source") and row.get("traffic_source", "") not in selected["source"]:
                 continue

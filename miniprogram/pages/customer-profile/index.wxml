@@ -35,19 +35,13 @@
     <view class="group-card">
       <view class="kv">
         <text class="k">会员身份</text>
-        <text class="v identity-value">{{customer.member_type || ''}}</text>
+        <member-labels wx:if="{{customer.member_type || customer.card_status}}" identity="{{customer.member_type}}" status="{{customer.card_status}}" tone="{{customer.card_status_tone}}" />
         <text class="mechanism">系统判定</text>
       </view>
       <view class="kv">
-        <text class="k">服务老师</text>
+        <text class="k">Sales</text>
         <text class="v identity-value">{{healerText || ''}}</text>
         <text class="mechanism">人工分配</text>
-      </view>
-      <view class="kv">
-        <text class="k">跟进阶段</text>
-        <text wx:if="{{customer.follow_up_status && customer.follow_up_status !== '未配置'}}" class="v identity-value">{{customer.follow_up_status}}</text>
-        <text wx:else class="v identity-value" style="color: #c9cdd4;">—</text>
-        <text class="mechanism">人工设置</text>
       </view>
       <view class="tag-zone">
         <view class="kv"><text class="k">客户质量</text><text class="v identity-value">{{customer.customer_quality || '正常'}}</text></view>
@@ -113,6 +107,7 @@
         <text class="k">流量来源</text>
         <text class="v">{{customer.traffic_source}}</text>
       </view>
+      <view class="kv" wx:if="{{customer.traffic_source === '小红书' || customer.traffic_source === '抖音' || customer.traffic_source === '公众号' || customer.traffic_source === '视频号'}}"><text class="k">帖子名称</text><text class="v">{{customer.traffic_post_name || '—'}}</text></view>
       <view class="kv">
         <text class="k">{{trafficDetailLabel}}</text>
         <text class="v">{{customer.traffic_source_detail}}</text>

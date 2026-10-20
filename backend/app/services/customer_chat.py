@@ -92,7 +92,7 @@ def create_customer(nickname: str, gender: str = "", age: str = "", phone: str =
         phone: 手机号
         wechat: 微信号
         member_type: 会员身份
-        service_teacher: 服务老师
+        service_teacher: Sales
         referrer: 引流人
         referrer_handler: 承接人
         traffic_source: 流量来源
@@ -158,7 +158,7 @@ def update_customer_fields(customer_name: str, nickname: str = "", gender: str =
         phone: 手机号
         wechat: 微信号
         member_type: 会员身份
-        service_teacher: 服务老师
+        service_teacher: Sales
         referrer: 引流人
         referrer_handler: 承接人
         traffic_source: 流量来源
@@ -226,7 +226,7 @@ def update_customer_fields(customer_name: str, nickname: str = "", gender: str =
             FIELD_LABELS = {
                 "nickname": "昵称", "name": "姓名", "gender": "性别", "age": "年龄",
                 "phone": "电话", "wechat": "微信", "member_type": "会员身份",
-                "service_teacher": "服务老师", "referrer": "引流人", "referrer_handler": "承接人",
+                "service_teacher": "Sales", "referrer": "引流人", "referrer_handler": "承接人",
                 "traffic_source": "流量来源", "traffic_source_detail": "来源详情",
                 "basic_info": "创伤经历", "core_situation": "当下卡点",
                 "tags": "到访目的", "other_info": "其他信息",
@@ -271,7 +271,7 @@ def query_customer_info(customer_name: str) -> str:
     FIELD_MAP = {
         "nickname": "昵称", "name": "姓名", "gender": "性别", "phone": "电话",
         "wechat": "微信", "age": "年龄", "member_type": "会员身份",
-        "service_teacher": "服务老师", "referrer": "引流人", "referrer_handler": "承接人",
+        "service_teacher": "Sales", "referrer": "引流人", "referrer_handler": "承接人",
         "traffic_source": "流量来源", "traffic_source_detail": "来源详情",
         "basic_info": "创伤经历", "core_situation": "当下卡点",
         "tags": "到访目的", "other_info": "其他信息",

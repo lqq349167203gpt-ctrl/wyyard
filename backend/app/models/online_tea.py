@@ -15,6 +15,7 @@ class OnlineTeaCreate(PaymentCourseFields):
     organization_id: str
     effective_date: str
     validity_value: int = Field(default=1, ge=1, le=1200)
+    validity_unit: Literal["day", "month"] = "month"
     closers: list[dict] = []
     closer_id: str | None = None
     closer_name: str | None = None

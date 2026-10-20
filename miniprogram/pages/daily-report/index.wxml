@@ -79,7 +79,7 @@
         <view class="c-l1">
           <text class="c-time" wx:if="{{item.visitTimeText}}">{{item.visitTimeText}}</text>
           <text class="c-name" catchtap="onNicknameTap" data-customer-id="{{item.customer_id}}">{{item.nickname}}</text>
-          <text class="c-id" wx:if="{{item.hasIdentity}}">{{item.identityText}}</text>
+          <member-labels wx:if="{{item.hasIdentity}}" identity="{{item.identityText}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
           <text class="c-amount {{item.hasAmount ? '' : 'none'}}" catchtap="onVisitStatTap" data-customer-id="{{item.customer_id}}" data-type="payment" data-nickname="{{item.nickname}}">{{item.amountText}}</text>
         </view>
         <view class="c-l2">

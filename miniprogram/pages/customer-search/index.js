@@ -1,6 +1,7 @@
 const { customerApi, customerTagApi, memberIdentityApi } = require('../../utils/api')
 const { readSource } = require('../../utils/source-state')
 const { disposeReads } = require('../../utils/read-scope')
+const { customerReferrers } = require('../../utils/customer-referrers')
 
 function decorateCustomers(items) {
   const today = new Date()
@@ -44,8 +45,10 @@ Page({
     filterCount: 0,
     filterOptionsLoading: false,
     memberTypes: [],
+    cardStatusList: [],
     memberTypeList: [],
     selectedMemberTypes: [],
+      selectedCardStatuses: [],
     customerTags: [],
     customerTagList: [],
     selectedTagIds: [],
@@ -58,7 +61,8 @@ Page({
     daysFilterMax: 60,
   },
 
-  onLoad() {
+  onLoad(query = {}) {
+    this._workspaceScope = query.workspace ? { workspace: query.workspace, workspace_owner: query.workspace_owner, handoff_status: query.handoff_status || "pending" } : {}
     if (!getApp().checkLogin()) return
     if (!getApp().checkPagePermission('healing-records')) {
       this.setData({ hasPagePermission: false })
@@ -98,17 +102,19 @@ Page({
     if (this.data.filterOptionsLoading) return
     this.setData({ filterOptionsLoading: true })
     await readSource(this, 'filters', () => Promise.all([
-        memberIdentityApi.list(),
+        memberIdentityApi.list('all'),
         customerTagApi.list(),
-        customerApi.selector(),
+        customerApi.selector(this._workspaceScope),
       ]), ([identities, tags, customerResult]) => {
       const sourceCustomers = (customerResult && customerResult.items) || (Array.isArray(customerResult) ? customerResult : [])
       const referrerCount = {}
       sourceCustomers.forEach(customer => {
-        const name = (customer.referrer || '').trim()
-        if (name) referrerCount[name] = (referrerCount[name] || 0) + 1
+        for (const name of customerReferrers(customer)) {
+          referrerCount[name] = (referrerCount[name] || 0) + 1
+        }
       })
-      const memberTypes = identities.map(item => item.name).filter(Boolean)
+      const memberTypes = identities.filter(item => item.group !== 'card_status').map(item => item.name).filter(Boolean)
+      this.setData({ cardStatusList: identities.filter(item => item.group === 'card_status').map(item => ({ name: item.name, selected: this.data.selectedCardStatuses.includes(item.name) })) })
       const customerTags = tags || []
       const referrerNames = Object.keys(referrerCount).sort((a, b) => referrerCount[b] - referrerCount[a])
       this.setData({ memberTypes, customerTags, referrerNames })
@@ -122,6 +128,7 @@ Page({
     const selectedTagIds = new Set(this.data.selectedTagIds)
     const selectedReferrers = new Set(this.data.selectedReferrers)
     this.setData({
+      cardStatusList: this.data.cardStatusList.map(item => ({ ...item, selected: this.data.selectedCardStatuses.includes(item.name) })),
       memberTypeList: this.data.memberTypes.map(name => ({ name, selected: selectedMemberTypes.has(name) })),
       customerTagList: this.data.customerTags.map(tag => Object.assign({}, tag, { selected: selectedTagIds.has(tag.id) })),
       referrerList: this.data.referrerNames.map(name => ({ name, selected: selectedReferrers.has(name) })),
@@ -129,7 +136,7 @@ Page({
   },
 
   hasActiveFilters() {
-    return this.data.selectedMemberTypes.length > 0 ||
+    return this.data.selectedCardStatuses.length > 0 || this.data.selectedMemberTypes.length > 0 ||
       this.data.selectedReferrers.length > 0 ||
       this.data.selectedTagIds.length > 0 ||
       this.data.daysFilterMin > 0 ||
@@ -139,6 +146,7 @@ Page({
   updateFilterCount() {
     let count = 0
     if (this.data.selectedMemberTypes.length > 0) count++
+    if (this.data.selectedCardStatuses.length > 0) count++
     if (this.data.selectedReferrers.length > 0) count++
     if (this.data.selectedTagIds.length > 0) count++
     if (this.data.daysFilterMin > 0 || this.data.daysFilterMax < 60) count++
@@ -161,9 +169,11 @@ Page({
     this.setData(reset ? { loading: true, hasSearched: true } : { loadingMore: true })
     try {
       const result = await customerApi.list({
+        ...this._workspaceScope,
         page,
         page_size: this.data.pageSize,
         nickname: keyword || undefined,
+        card_statuses: this.data.selectedCardStatuses.length ? this.data.selectedCardStatuses.join(',') : undefined,
         member_types: this.data.selectedMemberTypes.length ? this.data.selectedMemberTypes.join(',') : undefined,
         referrers: this.data.selectedReferrers.length ? this.data.selectedReferrers.join(',') : undefined,
         tag_ids: this.data.selectedTagIds.length ? this.data.selectedTagIds.join(',') : undefined,
@@ -223,6 +233,7 @@ Page({
     }
     this._filterSnapshot = {
       selectedMemberTypes: this.data.selectedMemberTypes.slice(),
+      selectedCardStatuses: this.data.selectedCardStatuses.slice(),
       selectedReferrers: this.data.selectedReferrers.slice(),
       selectedTagIds: this.data.selectedTagIds.slice(),
       rangeMin: this.data.rangeMin,
@@ -283,9 +294,20 @@ Page({
     this._rangeType = null
   },
 
+  onToggleCardStatus(e) {
+    const name = e.currentTarget.dataset.name
+    const selected = this.data.selectedCardStatuses.slice()
+    const index = selected.indexOf(name)
+    if (index < 0) selected.push(name)
+    else selected.splice(index, 1)
+    this.setData({ selectedCardStatuses: selected, cardStatusList: this.data.cardStatusList.map(item => ({ ...item, selected: selected.includes(item.name) })) })
+  },
+
   onResetFilter() {
     this.setData({
+      cardStatusList: this.data.cardStatusList.map(item => ({ ...item, selected: false })),
       selectedMemberTypes: [],
+      selectedCardStatuses: [],
       selectedReferrers: [],
       selectedTagIds: [],
       rangeMin: 0,

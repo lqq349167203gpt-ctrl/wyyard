@@ -1,6 +1,7 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useState, useMemo } from "react"
 import { Plus, X, Edit, Trash2, Inbox } from "lucide-react"
-import { communicationRecordApi, customerApi, memberIdentityApi, type CommunicationRecord, type CommunicationRecordCreate } from "@/lib/api"
+import { communicationRecordApi, customerApi, memberIdentityApi, type CommunicationRecord, type CommunicationRecordCreate, type CustomerLight } from "@/lib/api"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { useServerPagination } from "@/hooks/use-server-pagination"
@@ -51,9 +52,9 @@ export default function CommunicationRecordsPage() {
 
   // 客户昵称→身份映射
   const nicknameToIdentity = useMemo(() => {
-    const map: Record<string, string> = {}
+    const map: Record<string, CustomerLight> = {}
     customers.forEach(c => {
-      if (c.nickname) map[c.nickname] = c.member_type || ""
+      if (c.nickname) map[c.nickname] = c
     })
     return map
   }, [customers])
@@ -212,11 +213,7 @@ export default function CommunicationRecordsPage() {
                     </div>
                   </TableCell>
                   <TableCell style={{ paddingRight: "20px" }}>
-                    {nicknameToIdentity[record.customer_nickname] ? (
-                      <span className="inline-block max-w-[110px] overflow-hidden text-ellipsis whitespace-nowrap rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{nicknameToIdentity[record.customer_nickname]}</span>
-                    ) : (
-                      <span className="text-[12px] text-[#a8b1bd]">-</span>
-                    )}
+                    <MemberLabels customer={nicknameToIdentity[record.customer_nickname]} />
                   </TableCell>
                   <TableCell className="pl-[20px] text-[12px] text-[#4e535a] whitespace-normal break-words">{record.content}</TableCell>
                   <TableCell className="text-[12px] text-[#a8b1bd]">{record.creator || "-"}</TableCell>

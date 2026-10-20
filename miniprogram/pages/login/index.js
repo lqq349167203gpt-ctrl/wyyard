@@ -1,4 +1,4 @@
-const { authApi, organizationApi, saveLoginState } = require('../../utils/api')
+const { authApi, saveLoginState } = require('../../utils/api')
 const { DEV } = require('../../utils/config')
 
 const DEV_ACCOUNTS = [
@@ -48,12 +48,13 @@ Page({
     this.setData({ checkingLogin: true })
     // 用一个轻量且所有角色都能访问的接口探活，避免"页面进来了、第一个请求才发现登录失效"
     const memberOnly = user.role === 'customer'
-    Promise.resolve(memberOnly ? authApi.memberData('home') : organizationApi.list())
+    return Promise.resolve(authApi.sessionStatus())
       .then(async result => {
         if (memberOnly && result.can_manage) saveLoginState(await authApi.switchToManagement())
         getApp().enterDefaultView()
       })
-      .catch(() => { this.setData({ checkingLogin: false }) })
+      .catch(error => { this.setData({ error: error.message || '暂时无法连接，请重新登录' }) })
+      .finally(() => { this.setData({ checkingLogin: false }) })
   },
 
   // ---------- 模式切换 ----------
@@ -81,6 +82,7 @@ Page({
     this.setData({ loading: true, error: '' })
     try {
       const loginCode = await new Promise((resolve, reject) => wx.login({
+        timeout: 10000,
         success: result => result.code ? resolve(result.code) : reject(new Error('微信登录失败，请重试')),
         fail: () => reject(new Error('微信登录失败，请重试')),
       }))
@@ -155,7 +157,7 @@ Page({
 
     this.setData({ loading: true, error: '' })
 
-    authApi.passwordLogin(username, password).then((data) => {
+    return authApi.passwordLogin(username, password).then((data) => {
       if (data && data.success === false) {
         throw new Error(data.message || '用户名或密码错误')
       }
@@ -191,7 +193,7 @@ Page({
     const account = DEV_ACCOUNTS[this.data.devIndex]
     this.setData({ loading: true, error: '' })
 
-    authApi.devLogin(account.username).then((data) => {
+    return authApi.devLogin(account.username).then((data) => {
       this._saveLogin(data)
       getApp().enterDefaultView()
     }).catch((err) => {

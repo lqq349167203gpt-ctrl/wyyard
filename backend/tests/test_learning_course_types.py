@@ -60,7 +60,7 @@ def test_old_permission_and_filter_names_compatible():
 def test_oh_subtype_roundtrip_filter_and_validation(client, created_customer, reading_type):
     response = client.post("/api/oh-card-readings", json={
         "customer_id": created_customer["id"], "nickname": created_customer["nickname"],
-        "reading_type": reading_type, "amount": 0,
+        "reading_type": reading_type, "diagnosis_teacher": "老师甲", "amount": 0,
     })
     assert response.status_code == 200, response.text
     reading = response.json()

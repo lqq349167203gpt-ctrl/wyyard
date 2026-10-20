@@ -1,4 +1,4 @@
-"""线上茶疗购买记录；有效期按自然月计算，不参与金额与扣卡计算。"""
+"""线上茶疗购买记录；有效期支持天或自然月，不参与金额与扣卡计算。"""
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -32,9 +32,10 @@ def _save(item):
 def _values(data):
     values = data.model_dump()
     values["closers"] = [{**closer, "amount": 0} for closer in values["closers"]]
-    values["expiry_date"] = (
-        date.fromisoformat(data.effective_date) + relativedelta(months=data.validity_value) - timedelta(days=1)
-    ).isoformat()
+    start = date.fromisoformat(data.effective_date)
+    end = start + (timedelta(days=data.validity_value) if data.validity_unit == "day"
+                   else relativedelta(months=data.validity_value))
+    values["expiry_date"] = (end - timedelta(days=1)).isoformat()
     return values
 
 
