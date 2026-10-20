@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from app.api import principal as principal_api
 from app.api import statistics
 from app.models.principal import PrincipalQuery
+from app.services import course_service, course_type_service
 from app.services import principal_service as service
 from app.services.principal_mobile_service import compact_breakdown, mobile_result
 from app.services.principal_response_service import detail_page
@@ -244,11 +245,11 @@ def salon_people(monkeypatch):
     monkeypatch.setattr(service.organization_service, "list_organizations", lambda: [
         NS(id="a", name="甲组织", member_ids=[]), NS(id="b", name="乙组织", member_ids=["teacher"]),
     ])
-    monkeypatch.setattr(service.course_service, "list_courses", lambda: [
+    monkeypatch.setattr(course_service, "list_courses", lambda: [
         NS(id="book-a", organization_id="a"), NS(id="bowl-a", organization_id="a"),
         NS(id="book-b", organization_id="b"),
     ])
-    monkeypatch.setattr(service.course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(course_type_service, "list_course_types", lambda: [])
     install_activities(monkeypatch, {
         "class": [
             activity(course_id="book-a", course_name="读书会", course_type="读书会", activity_name="《当下的力量》", teacher_ids=["teacher"], participant_ids=["m1", "m2"]),
@@ -308,8 +309,8 @@ def test_salon_detail_uses_course_type_instead_of_the_session_title(monkeypatch)
     monkeypatch.setattr(service.organization_service, "list_organizations", lambda: [
         NS(id="a", name="甲组织", member_ids=[]),
     ])
-    monkeypatch.setattr(service.course_service, "list_courses", lambda: [NS(id="book", organization_id="a")])
-    monkeypatch.setattr(service.course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(course_service, "list_courses", lambda: [NS(id="book", organization_id="a")])
+    monkeypatch.setattr(course_type_service, "list_course_types", lambda: [])
     people = {"m1": NS(id="m1", nickname="成员", name="")}
     install_activities(monkeypatch, {
         "class": [

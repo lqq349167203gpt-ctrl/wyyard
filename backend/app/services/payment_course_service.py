@@ -14,8 +14,6 @@ def fill_course_organizations(items: list[dict]) -> None:
         return
     from app.services import (
         class_record_service,
-        course_service,
-        course_type_service,
         emotional_release_session_service,
         energy_knot_session_service,
         group_case_session_service,
@@ -32,11 +30,9 @@ def fill_course_organizations(items: list[dict]) -> None:
     }
     organizations = organization_service.list_organizations()
     organization_names = {org.id: org.name for org in organizations}
-    courses = course_service.list_courses()
-    course_orgs = {course.id: course.organization_id for course in courses if course.organization_id in organization_names}
-    name_orgs = {course.name: course.organization_id for course in courses if course.name and course.organization_id in organization_names}
-    type_orgs = {row["name"]: row["organization_id"] for row in course_type_service.list_course_types()
-                 if row.get("name") and row.get("organization_id") in organization_names}
+    from app.services.course_organization_service import build_salon_organization_resolver
+
+    resolve_salon = build_salon_organization_resolver()
     teacher_orgs: dict[str, set[str]] = {}
     for org in organizations:
         for teacher_id in org.member_ids:
@@ -49,9 +45,7 @@ def fill_course_organizations(items: list[dict]) -> None:
             record = getters[source](record_id) if source in getters and record_id else None
             org_ids: set[str] = set()
             if record and source == "class_record":
-                org_id = (course_orgs.get(getattr(record, "course_id", ""))
-                          or name_orgs.get(getattr(record, "course_name", ""))
-                          or type_orgs.get(getattr(record, "course_type", "")))
+                org_id = resolve_salon(record)
                 if org_id:
                     org_ids.add(org_id)
             if record and not org_ids:

@@ -46,7 +46,29 @@ def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] =
     # 动态计算当前实际剩余次数
     _fill_current_remaining(results)
 
-    return results
+    return _with_current_course_organizations(results)
+
+
+def _with_current_course_organizations(results: list[ProjectDeduction]) -> list[ProjectDeduction]:
+    """只更新返回副本的课程所属，保留交易原始快照和成交归属。"""
+    coarse = [row for row in results
+              if row.project_name == COARSE_DOOR_CARD_TYPE and row.source_activity_type == "class"]
+    if not coarse:
+        return results
+    from app.services import class_record_service, organization_service
+    from app.services.course_organization_service import build_salon_organization_resolver
+
+    resolve = build_salon_organization_resolver()
+    names = {org.id: org.name for org in organization_service.list_organizations()}
+    updates = {}
+    for row in coarse:
+        activity = class_record_service.get_record(row.source_activity_id)
+        org_id = resolve(activity) if activity else ""
+        if org_id:
+            updates[row.id] = row.model_copy(update={
+                "source_organization_id": org_id, "source_organization_name": names[org_id],
+            })
+    return [updates.get(row.id, row) for row in results]
 
 
 def coarse_customer_ids_by_activity() -> dict[tuple[str, str], set[str]]:
@@ -482,8 +504,6 @@ def _activity_rows(customer_id: str) -> list[dict]:
     """汇总客户仍在参与名单中的课程，供粗门次卡人工选择。"""
     from app.services import (
         class_record_service,
-        course_service,
-        course_type_service,
         emotional_release_session_service,
         group_case_session_service,
         organization_service,
@@ -494,42 +514,22 @@ def _activity_rows(customer_id: str) -> list[dict]:
     arrived_by_date = visit_service.get_arrived_customer_ids_by_date()
 
     organizations = organization_service.list_organizations()
-    organization_ids = {organization.id for organization in organizations}
     member_organizations: dict[str, set[str]] = {}
     for organization in organizations:
         for member_id in organization.member_ids:
             member_organizations.setdefault(member_id, set()).add(organization.id)
 
-    courses = course_service.list_courses()
-    course_organizations = {
-        course.id: course.organization_id
-        for course in courses
-        if course.organization_id in organization_ids
-    }
-    course_name_organizations = {
-        course.name: course.organization_id
-        for course in courses
-        if course.name and course.organization_id in organization_ids
-    }
-    type_organizations = {
-        item.get("name", ""): item.get("organization_id", "")
-        for item in course_type_service.list_course_types()
-        if item.get("name") and item.get("organization_id") in organization_ids
-    }
+    from app.services.course_organization_service import build_salon_organization_resolver
+
+    resolve_salon = build_salon_organization_resolver()
 
     def resolve_organization_ids(record_type: str, record) -> list[str]:
         """按课程配置识别组织，无法识别时回退到授课老师所属组织。"""
         resolved: set[str] = set()
         if record_type == "class":
-            course_id = getattr(record, "course_id", "")
-            course_name = getattr(record, "course_name", "")
-            course_type = getattr(record, "course_type", "")
-            if course_organizations.get(course_id):
-                resolved.add(course_organizations[course_id])
-            elif course_name_organizations.get(course_name):
-                resolved.add(course_name_organizations[course_name])
-            elif type_organizations.get(course_type):
-                resolved.add(type_organizations[course_type])
+            org_id = resolve_salon(record)
+            if org_id:
+                resolved.add(org_id)
 
         if not resolved:
             teacher_ids = set(getattr(record, "teacher_ids", []) or [])

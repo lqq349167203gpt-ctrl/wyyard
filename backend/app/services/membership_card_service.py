@@ -567,11 +567,57 @@ def _rebuild_activity_tracking(
     expected_keys: list[str],
 ) -> None:
     """以当前业务数据为准重建活动权益流水，清除重复及失效预支。"""
+    # 重建不能把有效课程已有的粗门抵扣改回普通扣卡。
+    coarse_records = {
+        item["key"]: dict(item)
+        for item in _deductions.get(customer_id, [])
+        if isinstance(item, dict) and item.get("key") in expected_keys
+        and (item.get("benefit_type") == "coarse_door_offset" or item.get("benefit_name") == "粗门次卡")
+    }
     _deductions.pop(customer_id, None)
+    if coarse_records:
+        _deductions[customer_id] = list(coarse_records.values())
     _debt_activities.pop(customer_id, None)
     _debts.pop(customer_id, None)
     for activity_key in expected_keys:
         _do_deduct(customer_id, activity_key)
+
+
+def _recover_coarse_offsets(customer_id: str, expected_keys: list[str]) -> bool:
+    """以有效交易恢复丢失的抵扣标记；已取消、删除或不再应扣的课程不恢复。"""
+    from app.services import project_deduction_service
+
+    expected = set(expected_keys)
+    records = _deductions.get(customer_id, [])
+    by_key = {item["key"]: item for item in records if isinstance(item, dict) and item.get("key")}
+    changed = False
+    for deduction in project_deduction_service._deductions.values():
+        if (deduction.customer_id != customer_id or deduction.is_deleted or deduction.cancelled
+                or deduction.project_type != "membership-cards"
+                or deduction.project_name != project_deduction_service.COARSE_DOOR_CARD_TYPE
+                or not deduction.source_activity_type or not deduction.source_activity_id):
+            continue
+        prefix = f"{deduction.source_activity_type}:{deduction.source_activity_id}"
+        for unit in range(1, deduction.count + 1):
+            key = _activity_unit_key(prefix, unit)
+            if key not in expected:
+                continue
+            values = {
+                "key": key, "card_id": None, "benefit_type": "coarse_door_offset",
+                "benefit_id": prefix, "benefit_name": "粗门次卡", "remaining_after": None,
+            }
+            record = by_key.get(key)
+            if record is None:
+                record = {**values, "deducted_at": deduction.created_at.isoformat()}
+                records.append(record)
+                by_key[key] = record
+                changed = True
+            elif any(record.get(field) != value for field, value in values.items()):
+                record.update(values)
+                changed = True
+    if changed:
+        _deductions[customer_id] = records
+    return changed
 
 
 def get_effective_remaining(customer_id: str) -> Optional[int]:
@@ -948,7 +994,7 @@ def release_coarse_card_assignment(customer_id: str, activity_keys: str | list[s
             _deductions.pop(customer_id, None)
         for activity_key in keys:
             _do_deduct(customer_id, activity_key)
-        reconcile_customer_card_usage(customer_id)
+        reconcile_customer_card_usage(customer_id, excluded_coarse_keys=key_set)
         _save_customer_usages({customer_id})
 
 
@@ -1040,7 +1086,7 @@ def _rebuild_card_remaining_snapshots(card: MembershipCard) -> bool:
     return changed
 
 
-def reconcile_customer_card_usage(customer_id: str) -> bool:
+def reconcile_customer_card_usage(customer_id: str, *, excluded_coarse_keys: set[str] | None = None) -> bool:
     """按活动日期重排客户权益使用记录。
 
     同一天能用的卡里，先扣到期更早的那张，次数用完再扣下一张。
@@ -1053,6 +1099,9 @@ def reconcile_customer_card_usage(customer_id: str) -> bool:
     if not _tracking_matches_expected(customer_id, expected_keys):
         _rebuild_activity_tracking(customer_id, expected_keys)
         changed = True
+    # 即使应扣流水键完整，旧版本也可能已经把抵扣改成同一课程的欠卡。
+    recovery_keys = [key for key in expected_keys if key not in (excluded_coarse_keys or set())]
+    changed = _recover_coarse_offsets(customer_id, recovery_keys) or changed
 
     records = list(_deductions.get(customer_id, []))
     kept = []
@@ -1147,8 +1196,7 @@ def reconcile_customer_card_usage(customer_id: str) -> bool:
 
     changed = changed or remaining_debts != previous_debt_keys or len(remaining_debts) != previous_debt_count
     if changed:
-        _save_deductions()
-        _save_debts()
+        _save_customer_usage(customer_id)
     return changed
 
 
@@ -1362,7 +1410,7 @@ def get_debt_record(customer_id: str) -> dict:
 def list_debt_records() -> list:
     """列出所有欠卡记录（会员卡），返回 [{customer_id, nickname, member_type, total_count, deducted_count, debt_count, activity_labels}]"""
     result = []
-    for customer_id, activity_keys in _debt_activities.items():
+    for customer_id, activity_keys in list(_debt_activities.items()):
         if not activity_keys:
             continue
         result.append(get_debt_record(customer_id))

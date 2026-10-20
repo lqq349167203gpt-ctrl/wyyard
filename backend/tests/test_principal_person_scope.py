@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from app.api import principal as api
 from app.api import statistics
 from app.models.principal import PrincipalQuery
+from app.services import course_service, course_type_service
 from app.services import principal_service as service
 from app.services.principal_mobile_service import compact_breakdown, overview_metrics
 from app.services.principal_response_service import detail_page
@@ -155,8 +156,8 @@ def personal_courses(personal_data, monkeypatch):
     monkeypatch.setattr(service, "collect_data", collect_course_data)
     organizations, _, _ = service.scope(request)
     monkeypatch.setattr(service.organization_service, "list_organizations", lambda: organizations)
-    monkeypatch.setattr(service.course_service, "list_courses", lambda: [NS(id="course", organization_id="org"), NS(id="hidden", organization_id="hidden")])
-    monkeypatch.setattr(service.course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(course_service, "list_courses", lambda: [NS(id="course", organization_id="org"), NS(id="hidden", organization_id="hidden")])
+    monkeypatch.setattr(course_type_service, "list_course_types", lambda: [])
     monkeypatch.setattr(service.project_deduction_service, "list_deductions", lambda: [])
     monkeypatch.setattr(service.project_deduction_service, "coarse_customer_ids_by_activity", lambda: {("class", "shared"): {"new", "other"}})
     monkeypatch.setattr(service, "PRODUCTS", ())
