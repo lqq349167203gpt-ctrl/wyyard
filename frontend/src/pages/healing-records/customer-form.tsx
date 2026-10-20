@@ -12,6 +12,7 @@ import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { useReadResource } from "@/hooks/use-read-resource"
 import { LoadError } from "@/components/load-error"
 import { CUSTOMER_INCOME_FIELDS } from "@/lib/customer-income"
+import { customerReferrers } from "@/lib/customer-referrers"
 
 const emptyCustomer: Record<string, any> = {
   nickname: "", name: "", gender: "", phone: "", wechat: "", age: "", age_range: "", referrer: "", referral_date: "",
@@ -22,7 +23,7 @@ const emptyCustomer: Record<string, any> = {
 
 const UPDATE_FIELDS = [
   "nickname", "name", "gender", "phone", "wechat", "age",
-  "service_teacher", "referrer", "referral_date", "referrer_handler",
+  "service_teacher", "referrer", "referrers", "referral_date", "referrer_handler",
   "follow_up_status",
   "customer_quality",
   "traffic_source", "traffic_source_detail",
@@ -53,6 +54,7 @@ function buildPayload(form: Record<string, any>, changedFields?: Record<string, 
     }
   }
   data.age = ageValue
+  if (data.referrers !== undefined) delete data.referrer
   delete data.age_range
   return data
 }
@@ -96,6 +98,7 @@ export default function CustomerFormPage() {
   const [revealedContacts, setRevealedContacts] = useState({ phone: false, wechat: false })
   const [copiedContact, setCopiedContact] = useState<"phone" | "wechat" | null>(null)
   const initializedRef = useRef(false)
+  const initialReferrersRef = useRef<string[]>([])
   const initialTagIdsRef = useRef<string[]>([])
 
   // 加载草稿或客户数据
@@ -125,6 +128,7 @@ export default function CustomerFormPage() {
     // 编辑模式：从服务器加载
     setLoading(true)
     customerApi.get(id).then(c => {
+      initialReferrersRef.current = customerReferrers(c)
       const ageParts = (c.age || "").match(/^(\d+)(?:\s*\(([^)]+)\))?$/)
       const isRangeOnly = /^\d+~\d+\+?$|^\d+\+$/.test(c.age || "")
       setForm({
@@ -195,7 +199,7 @@ export default function CustomerFormPage() {
 
   const handleSave = useCallback(async () => {
     // 验证引流人/承接人
-    if (form.referrer?.trim() && !customers.some(c => c.nickname === form.referrer.trim())) {
+    if (customerReferrers(form).some(name => !initialReferrersRef.current.includes(name) && !customers.some(c => c.nickname === name))) {
       setReferrerError("引流人不存在")
       return
     }
@@ -411,7 +415,7 @@ export default function CustomerFormPage() {
               <div className="flex items-center gap-2">
                 <label className="text-[12px] text-[#4e535a] font-light w-12 flex-shrink-0 text-right">引流人</label>
                 <div className="w-[200px]">
-                  <CustomerSearchInput customers={customers} value={form.referrer || ""} onChange={(v) => { setField("referrer", typeof v === "string" ? v : v[0] || ""); setReferrerError("") }} placeholder="请搜索" excludeIds={form.id ? [form.id] : []} filterSelected={false} onBlur={() => validateReferrer(form.referrer || "", "referrer")} />
+                  <CustomerSearchInput customers={customers} multi compactMulti compactSearch value={customerReferrers(form)} onChange={(v) => { const names = Array.isArray(v) ? v : v ? [v] : []; setForm(prev => ({ ...prev, referrers: names, referrer: names.join("、") })); setReferrerError("") }} placeholder="搜索引流人（可多选）" excludeIds={form.id ? [form.id] : []} />
                 </div>
               </div>
               {referrerError && <p className="text-[11px] text-[#f54a45] mt-0.5 ml-[60px]">{referrerError}</p>}

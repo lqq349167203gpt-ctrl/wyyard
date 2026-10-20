@@ -27,6 +27,7 @@ def selected_customers(breakdown: dict, picks: list[str], *, source="traffic") -
         prefix, _, value = pick.partition(":")
         selected.setdefault(prefix, set()).add(value)
     rows = []
+    by_id = {}
     for group in breakdown.get(source, breakdown.get("traffic", [])):
         for customer in group.get("customers", []):
             row = {**customer, "referrer": group["label"]}
@@ -46,7 +47,16 @@ def selected_customers(breakdown: dict, picks: list[str], *, source="traffic") -
             applicable_levels = levels if breakdown.get("purchase_rules_configured") else levels[-1:]
             if selected.get("upsell") and not any(level["key"] in selected["upsell"] for level in applicable_levels):
                 continue
-            rows.append(row)
+            customer_id = row.get("id")
+            if customer_id and customer_id in by_id:
+                existing = by_id[customer_id]
+                existing["referrer"] = "、".join(dict.fromkeys([*existing["referrers"], group["label"]]))
+                existing["referrers"] = list(dict.fromkeys([*existing["referrers"], group["label"]]))
+            else:
+                row["referrers"] = [group["label"]]
+                rows.append(row)
+                if customer_id:
+                    by_id[customer_id] = row
     return rows
 
 

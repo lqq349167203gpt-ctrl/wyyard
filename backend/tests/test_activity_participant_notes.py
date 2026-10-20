@@ -18,6 +18,7 @@ def test_course_participant_notes_work_without_visit_record(client, created_cust
         for category, content in (
             ("customer_info", "今天表达比之前更放松"),
             ("follow_up", "三天后确认睡眠情况"),
+            ("customer_feedback", "客户说愿意继续参加"),
         ):
             response = client.post(
                 "/api/class-records/participant-notes",
@@ -27,6 +28,8 @@ def test_course_participant_notes_work_without_visit_record(client, created_cust
                     "customer_id": created_customer["id"],
                     "category": category,
                     "content": content,
+                    **({"next_follow_up_person_id": created_customer["id"],
+                        "next_follow_up_date": "2026-09-11"} if category == "follow_up" else {}),
                 },
             )
             assert response.status_code == 200, response.text
@@ -47,8 +50,13 @@ def test_course_participant_notes_work_without_visit_record(client, created_cust
         } == {
             ("customer_info", "今天表达比之前更放松"),
             ("follow_up", "三天后确认睡眠情况"),
+            ("customer_feedback", "客户说愿意继续参加"),
         }
         assert all(item["can_edit"] is True for item in listed.json())
+        assert all(item["feedback_person"] == "不闹" for item in listed.json())
+        follow_up = next(item for item in listed.json() if item["category"] == "follow_up")
+        assert follow_up["next_follow_up_person_id"] == created_customer["id"]
+        assert follow_up["next_follow_up_date"] == "2026-09-11"
 
         dashboard = client.get(
             "/api/class-records/dashboard",
@@ -70,7 +78,7 @@ def test_course_participant_notes_work_without_visit_record(client, created_cust
             for item in detail.json()["activity_participant_notes"]
             if item["session_id"] == course_id
         ]
-        assert len(course_notes) == 2
+        assert len(course_notes) == 3
         assert all(item["activity_name"] == "参与人记录测试课" for item in course_notes)
     finally:
         for note_id in note_ids:

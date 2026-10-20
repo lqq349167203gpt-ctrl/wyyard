@@ -9,7 +9,7 @@ from starlette.requests import Request as StarletteRequest
 from app.middleware.jwt_auth import require_admin
 from app.middleware.rate_limit import limiter
 from app.models.base import StrictBaseModel
-from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerQuality, CustomerUpdate
+from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerQuality, CustomerUpdate, customer_referrers
 from app.services import (
     customer_access_service,
     customer_contact_service,
@@ -125,7 +125,7 @@ def _customer_list_base(customer) -> dict:
     _SLIM_FIELDS = (
         "id", "nickname", "name", "gender", "phone", "wechat", "age",
         "member_type", "positions", "self_tags", "paid_content",
-        "referrer", "referral_date", "referrer_handler", "service_teacher",
+        "referrer", "referrers", "referral_date", "referrer_handler", "service_teacher",
         "follow_up_status",
         "customer_quality",
         "traffic_source", "traffic_source_detail",
@@ -288,7 +288,7 @@ async def list_customers(
     if referrers:
         allowed_refs = [r.strip() for r in referrers.split(",") if r.strip()]
         if allowed_refs:
-            items = [c for c in items if (c.get("referrer") or "").strip() in allowed_refs]
+            items = [c for c in items if set(customer_referrers(c)).intersection(allowed_refs)]
     if tag_ids:
         requested_tag_ids = [tag_id.strip() for tag_id in tag_ids.split(",") if tag_id.strip()]
         try:
@@ -408,6 +408,7 @@ async def list_customers_light(request: Request, purpose: Literal['full', 'selec
             "traffic_source": c.traffic_source or "",
             "traffic_source_detail": c.traffic_source_detail or "",
             "referrer": c.referrer or "",
+            "referrers": customer_referrers(c),
             "service_teacher": c.service_teacher or "",
             "referral_date": c.referral_date or "",
             "position_sort_orders": c.position_sort_orders or {},

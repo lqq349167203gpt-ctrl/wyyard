@@ -15,6 +15,7 @@ from openpyxl.utils import get_column_letter
 
 from app.config.settings import settings
 from app.models.custom_analysis import DAY_TYPE_OPERATORS, VALUELESS_OPERATORS, AnalysisCondition, AnalysisPlan
+from app.models.customer import customer_referrers
 from app.services import (
     class_record_service,
     communication_record_service,
@@ -273,6 +274,7 @@ def _payment_events() -> list[dict[str, Any]]:
         (payment_loader("emotional-releases"), "amount", "情绪释放", ""),
         (payment_loader("energy-knots"), "amount", "深度情绪释放", ""),
         (payment_loader("internal-courses"), "price", "沙龙技能学习", "course_type"),
+        (payment_loader("online-tea"), "amount", "线上茶疗", ""),
         (payment_loader("offline-courses"), "amount", "落地课程", "course_type"),
         (payment_loader("oh-card-readings"), "amount", "OH卡诊断", "reading_type"),
         (payment_loader("tea-seat-fees"), "amount", "茶位费", ""),
@@ -564,6 +566,7 @@ def build_customer_dataset(
             "customer_tags": [str(tag.get("name") or "") for tag in tags if tag.get("name")],
             "traffic_source": customer.traffic_source or "",
             "referrer": customer.referrer or "",
+            "_referrers": customer_referrers(customer),
             "referrer_handler": customer.referrer_handler or "",
             "service_teacher": customer.service_teacher or "",
             "created_by": customer.created_by or "",
@@ -653,7 +656,7 @@ def _matches(
     date_from: str = "",
     date_to: str = "",
 ) -> bool:
-    actual = row.get(condition.field)
+    actual = row.get("_referrers", row.get(condition.field)) if condition.field == "referrer" else row.get(condition.field)
     if condition.inherit_period:
         if not date_from and not date_to:
             return True
@@ -1109,7 +1112,7 @@ def _build_cards(rows: list[dict[str, Any]], plan: AnalysisPlan) -> list[dict[st
     else:
         grouped_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for row in rows:
-            value = row.get(plan.card_dimension)
+            value = row.get("_referrers", row.get("referrer")) if plan.card_dimension == "referrer" else row.get(plan.card_dimension)
             values = value if isinstance(value, list) else [value]
             if not values:
                 values = [""]
@@ -1717,6 +1720,8 @@ def metadata(
                 values = (
                     follow_up_status_service.reporting_names()
                     if field_name == "follow_up_status"
+                    else sorted({name for row in rows for name in row.get("_referrers", [row.get("referrer")]) if name})
+                    if field_name == "referrer"
                     else sorted({str(row.get(field_name) or "") for row in rows if row.get(field_name)})
                 )
                 value_type = "select" if values and len(values) <= 500 else "text"

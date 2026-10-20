@@ -154,6 +154,9 @@ def upsert_note(
     end_time: str,
     actor_id: str,
     actor_name: str,
+    feedback_person_id: str = "",
+    feedback_person: str = "",
+    follow_up_plan: dict | None = None,
 ) -> ActivityParticipantNote:
     normalized_content = content.strip()
     if not normalized_content:
@@ -175,6 +178,9 @@ def upsert_note(
             return update_note_content(
                 note_id=existing.id, content=normalized_content,
                 actor_id=actor_id, actor_name=actor_name,
+                feedback_person_id=feedback_person_id,
+                feedback_person=feedback_person,
+                follow_up_plan=follow_up_plan,
             )
         note = ActivityParticipantNote(
             id=existing.id if existing else str(uuid.uuid4())[:12],
@@ -189,6 +195,9 @@ def upsert_note(
             end_time=end_time,
             created_by_id=actor_id,
             created_by=actor_name,
+            feedback_person_id=feedback_person_id,
+            feedback_person=feedback_person or actor_name,
+            **(follow_up_plan or {}),
             created_at=existing.created_at if existing else now,
             updated_at=now,
         )

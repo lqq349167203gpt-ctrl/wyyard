@@ -981,9 +981,12 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
               <span className="text-[12px] text-[#4e535a] font-light block text-right tracking-widest pt-2.5">引流人</span>
               <CustomerSearchInput rounded="2px"
                 customers={customerList as any[]}
-                value={customerForm.referrer || ""}
-                onChange={(v) => setCustomerForm({ ...customerForm, referrer: typeof v === "string" ? v : v[0] || "" })}
-                placeholder="请搜索"
+                multi
+                compactMulti
+                compactSearch
+                value={customerForm.referrers || (customerForm.referrer ? [customerForm.referrer] : [])}
+                onChange={(v) => { const names = Array.isArray(v) ? v : v ? [v] : []; setCustomerForm({ ...customerForm, referrers: names, referrer: names.join("、") }) }}
+                placeholder="搜索引流人（可多选）"
                 filterSelected={false}
               />
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest pt-2.5">承接人</span>

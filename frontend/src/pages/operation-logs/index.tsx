@@ -130,7 +130,7 @@ const FIELD_CN: Record<string, string> = {
   arrived: "到店", cancelled: "邀约状态", arrival_time: "到店时间", experience: "客户反馈", feedback: "深度需求",
   needs: "来访需求", receptionist: "接待人", goal: "目标",
   visit_date: "到访日期", visit_time: "预计时间", visit_count: "到店次数",
-  referrer: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
+  referrer: "引流人", referrers: "引流人", referral_date: "引流日期", traffic_source: "流量来源", paid_content: "付费内容",
   basic_info: "基础信息", assessment: "客户评估", tags: "标签", self_tags: "个人标签",
   work_status: "工作状态", work_description: "工作描述",
   income_stability: "收入是否稳定", personal_annual_income: "个人年收入", household_annual_income: "家庭年收入",

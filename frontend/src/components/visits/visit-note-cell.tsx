@@ -34,8 +34,12 @@ function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim()
 }
 
-function noteText(note: VisitNote): string {
-  return [(note.need_tags || []).map(tag => tag.name).join("、"), note.content].filter(Boolean).join("\n")
+function NoteContent({ note, compact = false, showTags, showDetail }: { note: VisitNote; compact?: boolean; showTags: boolean; showDetail: boolean }) {
+  if (note.category !== "visit_need") return <span className={compact ? "min-w-0 truncate" : undefined}>{compact ? compactText(note.content) : note.content}</span>
+  return <span className={`inline-flex max-w-full gap-x-1 gap-y-1 align-middle ${compact ? "min-w-0 items-center overflow-hidden" : "flex-wrap items-start"}`}>
+    {showTags && (note.need_tags || []).map(tag => <span key={tag.id} className="inline-block max-w-full shrink-0 truncate rounded-[4px] border border-[#dce5f2] bg-[#f2f6fc] px-1.5 text-[11px] leading-[18px] text-[#526886]" title={tag.name}>{tag.name}</span>)}
+    {showDetail && note.content && <span className={compact ? "min-w-0 truncate" : "w-full whitespace-pre-wrap break-words"}>{compact ? compactText(note.content) : note.content}</span>}
+  </span>
 }
 
 function authorKey(note: VisitNote): string {
@@ -325,13 +329,10 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
       <span className={`min-w-0 flex-1 ${expanded ? "flex flex-col gap-1" : "truncate"} ${latest ? "text-[#2b2f36]" : "text-[#c9cdd4]"}`}>
         {latest ? expanded ? categoryNotes.map((note) => (
           <span key={note.id} className="whitespace-pre-wrap break-words leading-5">
-            {privateToCreator ? noteText(note) : <><span>{feedbackPersonName(note)}</span><span>：{noteText(note)}</span></>}
+            {!privateToCreator && <span>{feedbackPersonName(note)}：</span>}<NoteContent note={note} showTags={showTags} showDetail={showDetail} />
           </span>
         )) : (
-          privateToCreator ? compactText(noteText(latest)) : <>
-            <span>{feedbackPersonName(latest)}</span>
-            <span>：{compactText(noteText(latest))}</span>
-          </>
+          <span className="flex min-w-0 items-center">{!privateToCreator && <span className="shrink-0">{feedbackPersonName(latest)}：</span>}<NoteContent note={latest} compact showTags={showTags} showDetail={showDetail} /></span>
         ) : ""}
       </span>
       {!privateToCreator && categoryNotes.length > 0 && (
@@ -357,10 +358,10 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
               <div key={note.id} className={`border-b border-[#f0f0f0] py-1 last:border-b-0 ${category === "follow_up" ? "" : "flex items-baseline gap-2"}`}>
                 {category === "follow_up" ? <>
                   <div className="text-[12px] leading-5"><NoteFeedbackMeta author={feedbackPersonName(note)} plan={note} inline /></div>
-                  <div className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-5">{noteText(note)}</div>
+                  <div className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-5"><NoteContent note={note} showTags={showTags} showDetail={showDetail} /></div>
                 </> : <>
                 <span className="max-w-[132px] shrink-0 truncate text-[12px] text-[#2b2f36]" title={feedbackPersonName(note)}><span className="font-normal text-[#a4abb4]">反馈：</span>{feedbackPersonName(note)}</span>
-                <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#2b2f36]">{noteText(note)}</span>
+                <span className="min-w-0 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#2b2f36]"><NoteContent note={note} showTags={showTags} showDetail={showDetail} /></span>
                 </>}
               </div>
             ))}
@@ -381,13 +382,6 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
           </DialogHeader>
 
           <div className="max-h-[70vh] overflow-y-auto px-[18px] pb-4 pt-3.5">
-            {category === "visit_need" && showTags && <div className="mb-4">
-              <div className="mb-2 text-[12px] text-[#646a73]">来访需求 <span className="text-[11px] text-[#a8b1bd]">（可多选）</span></div>
-              <div className="flex flex-wrap gap-2">
-                {[...needOptions, ...(myNote?.need_tags || []).filter(tag => !needOptions.some(option => option.id === tag.id))].map(tag => <button key={tag.id} type="button" aria-pressed={needTagIds.includes(tag.id)} disabled={saving} className={`rounded-[4px] border px-2.5 py-1 text-[12px] ${needTagIds.includes(tag.id) ? "border-[#adc4f5] bg-[#f2f6ff] text-[#3370ff]" : "border-[#e5e7eb] bg-white text-[#646a73]"}`} onClick={() => { const next = needTagIds.includes(tag.id) ? needTagIds.filter(id => id !== tag.id) : [...needTagIds, tag.id]; setNeedTagIds(next); void persistDraft(undefined, next) }}>{tag.name}</button>)}
-                {!needOptions.length && !myNote?.need_tags?.length && <span className="text-[11px] text-[#a8b1bd]">暂未配置公共来访需求</span>}
-              </div>
-            </div>}
             <div className="mb-1.5 flex items-baseline gap-2">
               <span className="text-[12px] font-medium text-[#1f2329]">我填写的</span>
               <span className="text-[11px] text-[#8f959e]">
@@ -433,6 +427,13 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
                 </div>
               </div>
             </div>
+            {category === "visit_need" && showTags && <div className="mb-4">
+              <div className="mb-2 text-[12px] text-[#646a73]">来访标签 <span className="text-[11px] text-[#a8b1bd]">（可多选）</span></div>
+              <div className="flex flex-wrap gap-2">
+                {[...needOptions, ...(myNote?.need_tags || []).filter(tag => !needOptions.some(option => option.id === tag.id))].map(tag => <button key={tag.id} type="button" aria-pressed={needTagIds.includes(tag.id)} disabled={saving} className={`rounded-[4px] border px-2.5 py-1 text-[12px] ${needTagIds.includes(tag.id) ? "border-[#adc4f5] bg-[#f2f6ff] text-[#3370ff]" : "border-[#e5e7eb] bg-white text-[#646a73]"}`} onClick={() => { const next = needTagIds.includes(tag.id) ? needTagIds.filter(id => id !== tag.id) : [...needTagIds, tag.id]; setNeedTagIds(next); void persistDraft(undefined, next) }}>{tag.name}</button>)}
+                {!needOptions.length && !myNote?.need_tags?.length && <span className="text-[11px] text-[#a8b1bd]">暂未配置公共来访需求</span>}
+              </div>
+            </div>}
             {category === "follow_up" && (
               <div className="mb-2 grid grid-cols-2 gap-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -527,7 +528,7 @@ export function VisitNoteCell({ visitId, customerId = "", visitDate = "", nickna
                           <span className="max-w-[130px] truncate" title={`${authorName(note)} 创建`}>{authorName(note)}<span className="ml-1 font-normal">创建</span></span>
                         </span>
                       </div>
-                      <div className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-[#2b2f36]">{noteText(note)}</div>
+                      <div className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-[#2b2f36]"><NoteContent note={note} showTags={showTags} showDetail={showDetail} /></div>
                     </div>
                   ))}
                 </div>

@@ -14,6 +14,7 @@ from app.services import payment_sources
     ("emotional-releases", "emotional_release_service", "list_releases"),
     ("energy-knots", "energy_knot_service", "list_knots"),
     ("internal-courses", "internal_course_service", "list_courses"),
+    ("online-tea", "online_tea_service", "list_records"),
     ("oh-card-readings", "oh_card_reading_service", "list_readings"),
     ("offline-courses", "offline_course_service", "list_courses"),
     ("tea-seat-fees", "tea_seat_fee_service", "list_fees"),
@@ -34,9 +35,9 @@ def test_statistics_preserves_existing_product_scope(monkeypatch):
     monkeypatch.setattr(payment_sources, "list_payment_records", lambda key: [key])
     assert statistics._payment_record_groups() == [[key] for key in (
         "membership-cards", "group-cases", "emotional-releases", "energy-knots",
-        "internal-courses", "offline-courses", "oh-card-readings", "other-projects",
+        "internal-courses", "online-tea", "offline-courses", "oh-card-readings", "other-projects",
     )]
-    assert len(list(payment_sources.payment_record_groups())) == 9
+    assert len(list(payment_sources.payment_record_groups())) == 10
 
 
 def test_unknown_product_is_not_silently_skipped():

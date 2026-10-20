@@ -160,7 +160,7 @@ def _extra_payment_counts(identities) -> dict:
     categories = {cat for identity in identities for condition in identity.conditions
                   for cat in _get_payment_categories(condition)}
     counts: dict[str, dict[str, int]] = {}
-    from app.services import offline_course_service, project_deduction_service, tea_seat_fee_service
+    from app.services import offline_course_service, online_tea_service, project_deduction_service, tea_seat_fee_service
 
     sources = {}
     if "粗门次卡" in categories:
@@ -168,6 +168,8 @@ def _extra_payment_counts(identities) -> dict:
                              if row.project_name == project_deduction_service.COARSE_DOOR_CARD_TYPE]
     if "茶位费" in categories:
         sources["茶位费"] = tea_seat_fee_service.list_fees()
+    if "线上茶疗" in categories:
+        sources["线上茶疗"] = online_tea_service.list_records()
     if "线下课程" in categories:
         sources["线下课程"] = offline_course_service.list_courses()
     for category, rows in sources.items():
@@ -252,7 +254,7 @@ def _check_condition(condition, customer_id: str,
                 total = sum(c.purchase_count for c in customer_oh_card_readings)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True
-            elif cat in ("粗门次卡", "茶位费", "线下课程"):
+            elif cat in ("粗门次卡", "茶位费", "线下课程", "线上茶疗"):
                 total = (extra_payment_counts or {}).get(cat, 0)
                 if _compare_count(total, condition.count_op, condition.count_value):
                     return True

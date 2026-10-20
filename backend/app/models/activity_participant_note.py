@@ -16,12 +16,14 @@ ActivityParticipantNoteSource = Literal[
 ActivityParticipantNoteCategory = Literal["customer_info", "follow_up", "customer_feedback"]
 
 
-class ActivityParticipantNoteUpsert(StrictBaseModel):
+class ActivityParticipantNoteUpsert(FollowUpPlanFields, StrictBaseModel):
     activity_source: ActivityParticipantNoteSource
     session_id: str = Field(min_length=1, max_length=100)
     customer_id: str = Field(min_length=1, max_length=100)
     category: ActivityParticipantNoteCategory
     content: str = Field(min_length=1, max_length=5000)
+    feedback_person_id: str = ""
+    feedback_person: str = ""
 
 
 class ActivityParticipantNote(FollowUpPlanFields):

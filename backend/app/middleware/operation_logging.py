@@ -73,6 +73,7 @@ SECTION_MAP = {
     "/api/activity-history": "课表",
     "/api/visit-history": "邀约",
     "/api/communication-records": "沟通记录",
+    "/api/online-tea": "付费项目",
     "/api/offline-courses": "付费项目",
     "/api/offline-course-records": "落地课程",
     "/api/tea-seat-fees": "付费项目",
@@ -119,6 +120,7 @@ GETTER_MAP = {
     "/api/activity-themes": ("活动安排", "activity_theme_service", "get_theme"),
     "/api/organizations": ("组织信息", "organization_service", "get_organization"),
     "/api/communication-records": ("沟通记录", "communication_record_service", "get_record"),
+    "/api/online-tea": ("付费项目", "online_tea_service", "get_record"),
     "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
     "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
 }
@@ -189,6 +191,7 @@ PAGE_LABELS: dict[str, str] = {
     "organizations": "组织信息",
     "activity-history": "课表",
     "visit-history": "邀约",
+    "online-tea": "付费项目",
     "offline-courses": "付费项目",
     "expenses": "支出项",
     "financial-overview": "财务数据",
@@ -284,7 +287,7 @@ FIELD_NAMES = {
     "customer_name": "用户", "customer_nickname": "用户昵称", "contact_field": "联系方式",
     "password": "密码", "old_password": "旧密码", "new_password": "新密码",
     "positions": "疗愈老师",
-    "referrer": "引流人", "traffic_source": "流量来源", "age": "年龄",
+    "referrer": "引流人", "referrers": "引流人", "traffic_source": "流量来源", "age": "年龄",
     "visit_count": "到店次数", "paid_content": "付费内容",
     "work_status": "工作状态", "work_description": "工作描述",
     "income_stability": "收入是否稳定", "personal_annual_income": "个人年收入", "household_annual_income": "家庭年收入",
@@ -787,6 +790,8 @@ def _build_set_summary(after: dict) -> str:
     """当没有 before 数据时，描述 after 中主要设置了哪些字段。"""
     parts = []
     for key, new_val in after.items():
+        if key == "referrer" and "referrers" in after:
+            continue
         if key in ("id", "created_at", "updated_at"):
             continue
         if key == "edit_permissions" and isinstance(new_val, dict):
@@ -828,6 +833,8 @@ def build_change_description(before: dict, after: dict) -> str:
 
     changes = []
     for key, new_val in after.items():
+        if key == "referrer" and "referrers" in after:
+            continue
         if key in ("id", "created_at", "updated_at") or key in skip_keys:
             continue
         old_val = before.get(key)
@@ -935,7 +942,7 @@ def _build_create_summary(body: dict) -> str:
         "member_type", "card_type", "course_type", "purchase_count",
         "diagnosis_duration", "reading_type", "quantity", "amount", "price", "closer_name",
         "deal_date", "effective_date", "record_date", "settlement_organization_id",
-        "role", "username", "referrer", "positions",
+        "role", "username", "referrers" if "referrers" in body else "referrer", "positions",
     ]:
         val = body.get(key)
         if val is not None and val != "" and val != []:
@@ -984,7 +991,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     payment_paths = (
         "/api/membership-cards", "/api/group-cases", "/api/emotional-releases",
         "/api/energy-knots", "/api/oh-card-readings", "/api/tea-seat-fees",
-        "/api/offline-courses", "/api/internal-courses", "/api/other-projects",
+        "/api/online-tea", "/api/offline-courses", "/api/internal-courses", "/api/other-projects",
         "/api/project-deductions",
     )
     if any(path == prefix or path.startswith(prefix + "/") for prefix in payment_paths):
@@ -1190,7 +1197,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "深度情绪释放",
-                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
+                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "online-tea": "线上茶疗", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)
@@ -1255,7 +1262,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "深度情绪释放",
-                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "offline-courses": "线下落地课程",
+                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "online-tea": "线上茶疗", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)

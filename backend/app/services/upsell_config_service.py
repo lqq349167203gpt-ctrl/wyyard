@@ -27,7 +27,7 @@ _load()
 
 def list_levels() -> list[dict]:
     if _rules is not None:
-        return [{"id": rule.key, "name": PURCHASE_RULE_LABELS[rule.key], "products": list(dict.fromkeys(condition.product for condition in rule.conditions))} for rule in _rules]
+        return [{"id": rule.key, "name": PURCHASE_RULE_LABELS[rule.key], "products": list(dict.fromkeys(product for condition in rule.conditions for product in (condition.products or [condition.product])))} for rule in _rules]
     return [level.model_dump(mode="json") for level in _levels]
 
 
@@ -35,9 +35,20 @@ def rules_configured() -> bool:
     return _rules is not None
 
 
+def _rule_dict(rule):
+    result = rule.model_dump(mode="json")
+    for condition in result["conditions"]:
+        for key, default in (("products", []), ("count_scope", "subtype"), ("first_purchase", False), ("previous_products", [])):
+            if condition[key] == default:
+                condition.pop(key)
+        if not condition.get("product"):
+            condition.pop("product", None)
+    return result
+
+
 def list_rules() -> list[dict]:
     by_key = {rule.key: rule for rule in (_rules or [])}
-    return [by_key.get(key, PurchaseRule(key=key)).model_dump(mode="json") for key in PURCHASE_RULE_LABELS]
+    return [_rule_dict(by_key.get(key, PurchaseRule(key=key))) for key in PURCHASE_RULE_LABELS]
 
 
 def replace_rules(rules: list[PurchaseRule]) -> list[dict]:
@@ -48,36 +59,74 @@ def replace_rules(rules: list[PurchaseRule]) -> list[dict]:
         normalized = [by_key[key].model_copy(deep=True) for key in PURCHASE_RULE_LABELS]
         save_data(UPSELL_FILE, {"order": {
             "levels": [level.model_dump(mode="json") for level in _levels],
-            "rules": [rule.model_dump(mode="json") for rule in normalized],
+            "rules": [_rule_dict(rule) for rule in normalized],
         }})
         _rules = normalized
     return list_rules()
 
 
+def recommended_rules() -> list[dict]:
+    """可预览、保存的业务方案，不自动覆盖数据库中的规则。"""
+    from app.utils.payment_types import MEMBERSHIP_CARD_TYPES
+
+    big = [f"membership:{name}" for name in MEMBERSHIP_CARD_TYPES if name not in {"次卡", "体验会员"}]
+    big += ["group_case", "emotional", "online_tea", "energy", "internal", "offline"]
+    return [
+        {"key": "experience", "conditions": [{"products": ["membership:次卡", "coarse"], "operator": "gte", "count": 1, "count_scope": "group"}]},
+        {"key": "conversion", "conditions": [
+            {"product": "membership:体验会员", "operator": "gte", "count": 1},
+            {"products": big, "operator": "gte", "count": 1, "count_scope": "group", "first_purchase": True},
+        ]},
+        {"key": "upsell", "conditions": [{"products": big, "operator": "gte", "count": 1, "count_scope": "group", "previous_products": ["membership:体验会员"]}]},
+        {"key": "repurchase", "conditions": [{"products": big, "operator": "gte", "count": 2, "count_scope": "group"}]},
+    ]
+
+
 def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> None:
-    """按全历史的具体子类型计第几笔，再由调用方按成交日期筛选周期。"""
+    """先按完整成交历史分类，再由调用方筛选周期；组合计数允许跨项目累计。"""
     from collections import defaultdict
 
-    counts: dict[tuple[str, str, str], int] = defaultdict(int)
+    counts = defaultdict(int)
+    previous_counts = defaultdict(dict)
+    group_counts = defaultdict(int)
+    customer_counts = defaultdict(int)
     configured = list_rules() if rules is None else rules
     timeline = sorted(events, key=lambda item: (
         (item.get("deal_date") or "") if item.get("kind") == "coarse_usage" else item.get("date", ""),
         item.get("recorded_at", ""), item.get("id", ""),
     ))
+
+    def matches_item(item, product, subtype):
+        selected_product, selected_subtype = parse_item(item)
+        return selected_product == product and (not selected_subtype or selected_subtype == subtype)
+
     for event in timeline:
-        product, subtype = event["product"], event.get("subtype") or ""
-        counter_key = (event["customer_id"], product, subtype)
-        counts[counter_key] += 1
-        occurrence = counts[counter_key]
+        product, subtype, customer = event["product"], event.get("subtype") or "", event["customer_id"]
+        occurrence = counts[(customer, product, subtype)] + 1
         matches = []
-        for rule in configured:
-            for condition in rule["conditions"]:
-                selected_product, selected_subtype = parse_item(condition["product"])
-                if selected_product != product or (selected_subtype and selected_subtype != subtype):
+        for rule_index, rule in enumerate(configured):
+            matched = False
+            for index, condition in enumerate(rule["conditions"]):
+                selected = condition.get("products") or [condition.get("product", "")]
+                if not any(matches_item(item, product, subtype) for item in selected):
                     continue
-                if occurrence == condition["count"] or (condition["operator"] == "gte" and occurrence >= condition["count"]):
-                    matches.append(rule["key"])
-                    break
+                group_key = (customer, rule_index, index)
+                group_counts[group_key] += 1
+                count = group_counts[group_key] if condition.get("count_scope") == "group" else occurrence
+                previous = condition.get("previous_products") or []
+                prior_match = not previous or any(
+                    times > 0 and any(matches_item(item, prior_product, prior_subtype) for item in previous)
+                    for (prior_product, prior_subtype), times in previous_counts[customer].items()
+                )
+                if condition.get("first_purchase") and customer_counts[customer]:
+                    continue
+                if prior_match and (count == condition["count"] or (condition["operator"] == "gte" and count >= condition["count"])):
+                    matched = True
+            if matched:
+                matches.append(rule["key"])
+        counts[(customer, product, subtype)] += 1
+        previous_counts[customer][(product, subtype)] = occurrence
+        customer_counts[customer] += 1
         event["repeat_times"] = occurrence
         event["purchase_rule_keys"] = matches
         event["purchase_rule_labels"] = [PURCHASE_RULE_LABELS[key] for key in matches]

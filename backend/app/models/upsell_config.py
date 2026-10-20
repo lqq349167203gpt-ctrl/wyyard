@@ -35,9 +35,24 @@ PURCHASE_RULE_LABELS = {"experience": "体验", "conversion": "转化", "upsell"
 
 
 class PurchaseCondition(StrictBaseModel):
-    product: str = Field(min_length=1, max_length=160)
+    product: str = Field(default="", max_length=160)
+    products: list[str] = Field(default_factory=list, max_length=100)
+    count_scope: Literal["subtype", "group"] = "subtype"
+    first_purchase: bool = False
+    previous_products: list[str] = Field(default_factory=list, max_length=100)
     operator: Literal["eq", "gte"] = "eq"
     count: int = Field(default=1, ge=1, le=100000)
+
+
+    @model_validator(mode="after")
+    def validate_products(self):
+        if self.first_purchase and self.previous_products:
+            raise ValueError("首次购买不能同时要求此前已购买")
+        if not self.product and not self.products:
+            raise ValueError("请选择付费项目")
+        if self.product and self.products:
+            raise ValueError("单项目与项目组合不能同时配置")
+        return self
 
 
 class PurchaseRule(StrictBaseModel):

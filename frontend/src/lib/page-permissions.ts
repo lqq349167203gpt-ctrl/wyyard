@@ -11,6 +11,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
     "energy-knots",
     "internal-courses",
     "tea-seat-fees",
+    "online-tea",
     "offline-courses",
     "other-projects",
   ],

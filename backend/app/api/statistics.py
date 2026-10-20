@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.api.customer_detail import _build_activities, _build_payment_records
+from app.models.customer import customer_referrers
 from app.services import (
     class_record_service,
     course_service,
@@ -26,6 +27,7 @@ from app.services import (
     membership_card_service,
     offline_course_service,
     oh_card_reading_service,
+    online_tea_service,
     organization_service,
     other_project_service,
     position_edit_permission_service,
@@ -84,7 +86,7 @@ def _payment_record_groups() -> list[list]:
     # 保留该统计入口原有产品范围和顺序，不因公共读取而增加茶位费。
     return list(payment_record_groups((
         "membership-cards", "group-cases", "emotional-releases", "energy-knots",
-        "internal-courses", "offline-courses", "oh-card-readings", "other-projects",
+        "internal-courses", "online-tea", "offline-courses", "oh-card-readings", "other-projects",
     )))
 
 
@@ -376,7 +378,7 @@ def get_overview(
         c = customers_map.get(customer_id)
         if type_filter and (not c or (c.member_type or "") not in type_filter):
             return False
-        if referrer_filter and ((c.referrer if c else "") or "").strip() != referrer_filter:
+        if referrer_filter and referrer_filter not in customer_referrers(c):
             return False
         return True
 
@@ -545,15 +547,14 @@ def get_details(
             ):
                 c = customers_map.get(customer_id)
                 c_member_type = c.member_type if c and c.member_type else ""
-                c_referrer = ((c.referrer if c else "") or "").strip()
                 if c_member_type:
                     option_member_types.add(c_member_type)
-                if c_referrer:
-                    option_referrer_counts[c_referrer] += 1
+                for name in customer_referrers(c):
+                    option_referrer_counts[name] += 1
                 # 成交记录的会员类型和引流人均看客户资料
                 if type_filter and c_member_type not in type_filter:
                     continue
-                if referrer_filter and c_referrer != referrer_filter:
+                if referrer_filter and referrer_filter not in customer_referrers(c):
                     continue
                 # 按类型取项目名称
                 if type_name == "membership-cards":
@@ -582,7 +583,7 @@ def get_details(
                     "name": name,
                     "quantity": quantity,
                     "member_type": c_member_type,
-                    "referrer_handler": c_referrer,
+                    "referrer_handler": "、".join(customer_referrers(c)),
                     "amount": getattr(r, "fee", None) or getattr(r, "price", None) or getattr(r, "amount", None) or 0,
                 })
 
@@ -643,6 +644,7 @@ PRODUCT_TYPE_MAP = {
     "oh-card-readings": "OH卡诊断",
     "energy-knots": "深度情绪释放",
     "internal-courses": "沙龙技能学习",
+    "online-tea": "线上茶疗",
     "offline-courses": "落地课程",
     "other-projects": "其他项目",
 }
@@ -706,6 +708,7 @@ def get_products(
         ("oh-card-readings", oh_card_reading_service.list_readings()),
         ("energy-knots", energy_knot_service.list_knots()),
         ("internal-courses", internal_course_service.list_courses()),
+        ("online-tea", online_tea_service.list_records()),
         ("offline-courses", offline_course_service.list_courses()),
         ("other-projects", other_project_service.list_projects()),
     ]
@@ -776,10 +779,11 @@ def get_products(
             voided = getattr(r, "voided", False)
             if deal_date and not voided and date_from <= deal_date <= date_to:
                 # 引流人筛选
-                c_referrer = ((customers_map.get(customer_id).referrer if customers_map.get(customer_id) else None) or "").strip()
-                if c_referrer and c_referrer in active_nicknames:
-                    option_referrer_counts[c_referrer] += 1
-                if referrer_filter and c_referrer != referrer_filter:
+                referrers = customer_referrers(customers_map.get(customer_id))
+                for name in referrers:
+                    if name in active_nicknames:
+                        option_referrer_counts[name] += 1
+                if referrer_filter and referrer_filter not in referrers:
                     continue
                 if teacher_filter and not _record_matches_teacher(r, teacher_filter, teacher_names):
                     continue
@@ -1023,7 +1027,7 @@ def get_product_details(
         if customer_id not in visible_customer_ids:
             return False
         customer = customers_map.get(customer_id)
-        if referrer_filter and ((customer.referrer if customer else "") or "").strip() != referrer_filter:
+        if referrer_filter and referrer_filter not in customer_referrers(customer):
             return False
         return _record_matches_teacher(record, teacher_filter, teacher_names)
 
@@ -1111,6 +1115,7 @@ def get_product_details(
             ("oh-card-readings", oh_card_reading_service.list_readings()),
             ("energy-knots", energy_knot_service.list_knots()),
             ("internal-courses", internal_course_service.list_courses()),
+            ("online-tea", online_tea_service.list_records()),
             ("offline-courses", offline_course_service.list_courses()),
             ("other-projects", other_project_service.list_projects()),
         ]
@@ -1121,6 +1126,7 @@ def get_product_details(
             "oh-card-readings": "OH卡诊断",
             "energy-knots": "深度情绪释放",
             "internal-courses": "沙龙技能学习",
+            "online-tea": "线上茶疗",
             "offline-courses": "落地课程",
             "other-projects": "其他项目",
         }
@@ -1464,7 +1470,7 @@ def get_member_statistics(
     can_view_payment = customer_access_service.can_view_transaction_summary(role)
     customers = [
         c for c in all_customers
-        if not referrer or (c.referrer or "").strip() == referrer
+        if not referrer or referrer in customer_referrers(c)
     ]
 
     # 引流人选项（只统计选定时间范围内有数据的引流人，按人数降序排列）
@@ -1473,9 +1479,9 @@ def get_member_statistics(
         time_key = _get_time_key(c)
         if not time_key or not (date_from <= time_key <= date_to):
             continue
-        name = (c.referrer or "").strip()
-        if name and name in active_nicknames:
-            referrer_counts[name] += 1
+        for name in customer_referrers(c):
+            if name in active_nicknames:
+                referrer_counts[name] += 1
     referrer_names = [
         name for name, _ in sorted(referrer_counts.items(), key=lambda item: (-item[1], item[0]))
     ]
@@ -2508,9 +2514,9 @@ def get_referral_statistics(
             continue
         if not (date_from <= referral_date <= date_to):
             continue
-        referrer_name = (customer.referrer or "").strip()
-        if referrer_name and referrer_name in active_nicknames:
-            referrer_counts[referrer_name] += 1
+        for referrer_name in customer_referrers(customer):
+            if referrer_name in active_nicknames:
+                referrer_counts[referrer_name] += 1
     referrer_names = [
         name
         for name, _count in sorted(
@@ -2537,7 +2543,7 @@ def get_referral_statistics(
     scoped_customers = [
         customer
         for customer in all_customers
-        if (not referrer or (customer.referrer or "").strip() == referrer)
+        if (not referrer or referrer in customer_referrers(customer))
         and (not type_filter or (customer.member_type or "") in type_filter)
     ]
     visible_tags_by_customer = customer_tag_service.visible_tags_by_customer(actor_id)

@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
-from app.models.customer import Customer, CustomerCreate, CustomerUpdate
+from app.models.customer import Customer, CustomerCreate, CustomerUpdate, customer_referrers
 from app.services.storage import commit_pending_writes, load_data, save_data, save_item
 
 FILENAME = "customers.json"
@@ -120,6 +120,12 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
         if not customer or customer.is_deleted:
             return None
         update_data = data.model_dump(exclude_unset=True)
+        if "referrers" in update_data:
+            update_data["referrer"] = "、".join(update_data["referrers"])
+        elif "referrer" in update_data:
+            # 旧端原样回传展示字符串时保留多人关系；单人变更仍兼容。
+            update_data["referrers"] = customer_referrers(customer) if update_data["referrer"] == customer.referrer else customer_referrers({"referrer": update_data["referrer"]})
+            update_data["referrer"] = "、".join(update_data["referrers"])
 
         # 检查昵称、微信号、手机号唯一性（排除自身，忽略空值）
         new_nickname = update_data.get("nickname")

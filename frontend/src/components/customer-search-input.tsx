@@ -23,6 +23,8 @@ export interface CustomerSearchInputProps {
   multi?: boolean
   /** Compact multi-select display for narrow table columns */
   compactMulti?: boolean
+  /** Add name/nickname search to the compact multi-select dropdown */
+  compactSearch?: boolean
   /** Filter customers by position (e.g., "成就君") */
   positionFilter?: string
   /** Customer IDs to exclude from results */
@@ -61,6 +63,7 @@ export function CustomerSearchInput({
   placeholder = "",
   multi = false,
   compactMulti = false,
+  compactSearch = false,
   positionFilter,
   excludeIds = [],
   disabled = false,
@@ -88,7 +91,7 @@ export function CustomerSearchInput({
     const el = ref.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    const h = compactMulti ? 220 : 192
+    const h = compactMulti ? compactSearch ? 320 : 220 : 192
     const below = window.innerHeight - r.bottom
     const above = r.top
     const width = dropdownWidth ?? r.width
@@ -106,7 +109,7 @@ export function CustomerSearchInput({
       s.maxHeight = Math.min(h, above - 8)
     }
     setPos(s)
-  }, [compactMulti, dropdownWidth])
+  }, [compactMulti, compactSearch, dropdownWidth])
 
   // Click outside to close
   useEffect(() => {
@@ -173,10 +176,12 @@ export function CustomerSearchInput({
 
   const compactOptions = useMemo(() => {
     const seen = new Set<string>()
+    const query = compactSearch ? search.trim().toLowerCase() : ""
     return customers.filter((customer) => {
       if (!customer.nickname || seen.has(customer.nickname)) return false
       if (excludeIds.includes(customer.id)) return false
       if (positionFilter && !(customer.positions || []).includes(positionFilter)) return false
+      if (query && !customer.nickname.toLowerCase().includes(query) && !(customer.name || "").toLowerCase().includes(query)) return false
       seen.add(customer.nickname)
       return true
     }).sort((a, b) => {
@@ -185,7 +190,7 @@ export function CustomerSearchInput({
       const orderB = b.position_sort_orders?.[positionFilter] ?? 9999
       return orderA - orderB
     })
-  }, [customers, excludeIds, positionFilter])
+  }, [customers, excludeIds, positionFilter, compactSearch, search])
 
   const selectItem = (customer: CustomerSearchOption) => {
     if (multi) {
@@ -253,6 +258,7 @@ export function CustomerSearchInput({
                 setSearch("")
               } else {
                 setOpen(true)
+                if (compactSearch) requestAnimationFrame(() => inputRef.current?.focus())
               }
             } else {
               setOpen(true)
@@ -351,11 +357,26 @@ export function CustomerSearchInput({
       {open && !disabled && compactMulti && createPortal(
         <div
           ref={dropdownRef}
-          className="overflow-hidden border border-[#dee0e3] bg-white shadow-md"
+          className="flex flex-col overflow-hidden border border-[#dee0e3] bg-white shadow-md"
           style={{ ...pos, borderRadius: radiusValue }}
           onPointerDown={(event) => event.stopPropagation()}
         >
-          <div className="grid max-h-[210px] grid-cols-3 gap-1 overflow-y-auto p-2">
+          {compactSearch && selectedNames.length > 0 && <div role="group" aria-label="已选人员" className="shrink-0 border-b border-[#f0f0f0] p-2">
+            <div className="mb-1.5 text-[11px] text-[#8f959e]">已选（{selectedNames.length}）</div>
+            <div className="flex max-h-[80px] flex-wrap gap-1 overflow-y-auto">
+              {selectedNames.map(name => <button key={name} type="button" aria-label={`取消选择${name}`} title={`取消选择${name}`}
+                className="inline-flex max-w-full items-center gap-1 rounded-[4px] border border-[#dce5f2] bg-[#f2f6fc] px-1.5 py-0.5 text-[12px] text-[#526886] hover:border-[#a8c1ff]"
+                onMouseDown={event => event.preventDefault()} onClick={() => onChange(selectedNames.filter(selected => selected !== name))}>
+                <span className="min-w-0 truncate">{name}</span><X aria-hidden="true" className="h-3 w-3 shrink-0" />
+              </button>)}
+            </div>
+          </div>}
+          {compactSearch && <div className="shrink-0 border-b border-[#f0f0f0] p-2">
+            <input ref={inputRef} aria-label="搜索姓名或昵称" placeholder="输入姓名或昵称搜索" value={search}
+              className="h-7 w-full min-w-0 rounded-[4px] border border-[#dee0e3] px-2 text-[12px] outline-none placeholder:text-[#c0c4cc] focus:border-[#3370ff]"
+              onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation() } }} />
+          </div>}
+          <div className={`grid min-h-0 gap-1 overflow-y-auto p-2 ${compactSearch ? "max-h-[160px] grid-cols-1" : "max-h-[210px] grid-cols-3"}`}>
             {compactOptions.slice(0, MAX_VISIBLE).map((customer) => {
               const selected = selectedNames.includes(customer.nickname)
               return (
@@ -363,6 +384,7 @@ export function CustomerSearchInput({
                   key={customer.id}
                   type="button"
                   title={customer.nickname}
+                  aria-pressed={selected}
                   className={`flex h-7 min-w-0 items-center gap-1 rounded-[4px] border px-1.5 text-left text-[12px] ${selected
                     ? "border-[#a8c1ff] bg-[#f0f5ff] text-[#3370ff]"
                     : "border-[#e8eaed] bg-white text-[#2b2f36] hover:bg-[#f7f8fa]"
@@ -372,14 +394,16 @@ export function CustomerSearchInput({
                   <span className={`inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-[2px] border ${selected ? "border-[#3370ff] bg-[#3370ff]" : "border-[#c9cdd4] bg-white"}`}>
                     {selected && <Check className="h-2.5 w-2.5 text-white" />}
                   </span>
-                  <span className="whitespace-nowrap">{customer.nickname}</span>
+                  <span className={compactSearch ? "min-w-0 truncate" : "whitespace-nowrap"}>{customer.nickname}</span>
+                  {compactSearch && customer.name && customer.name !== customer.nickname && <span className="min-w-0 truncate text-[11px] text-[#8f959e]">（{customer.name}）</span>}
                 </button>
               )
             })}
             {compactOptions.length === 0 && (
-              <div className="col-span-3 py-4 text-center text-[12px] text-[#8f959e]">无匹配结果</div>
+              <div className={`${compactSearch ? "" : "col-span-3"} py-4 text-center text-[12px] text-[#8f959e]`}>无匹配结果</div>
             )}
           </div>
+          {compactSearch && compactOptions.length > MAX_VISIBLE && <div className="shrink-0 border-t border-[#f0f0f0] px-2 py-1.5 text-[11px] text-[#8f959e]">共 {compactOptions.length} 人，输入姓名或昵称缩小范围</div>}
         </div>,
         portalContainer || document.body
       )}

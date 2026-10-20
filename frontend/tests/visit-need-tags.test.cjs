@@ -3,6 +3,9 @@ const { readFileSync } = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 const { test } = require('node:test')
+const ts = require('typescript')
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
 const root = path.resolve(__dirname, '../..')
 
 function setup() {
@@ -20,6 +23,7 @@ function setup() {
       if (name === '../../utils/feedback-person') return { attributionFromPicker: () => ({ feedback_person: '甲' }) }
       if (name === '../../utils/read-scope') return require(path.join(root, 'miniprogram/utils/read-scope.js'))
       if (name === '../../utils/note-feedback-meta') return { formatNoteTime: () => '' }
+      if (name === '../../utils/note-permissions') return require(path.join(root, 'miniprogram/utils/note-permissions.js'))
       throw new Error(name)
     },
   })
@@ -57,4 +61,40 @@ test('停用需求标签的历史选项仍回显，只读模式禁止保存', as
   instance.properties.readOnly = true
   await instance.onSubmit()
   assert.equal(writes.length, 0)
+})
+
+function renderCell({ tags = true, detail = true, expanded = true, content = '具体情况' } = {}) {
+  const exports = {}
+  const source = readFileSync(path.join(root, 'frontend/src/components/visits/visit-note-cell.tsx'), 'utf8')
+  const wrapper = ({ children, render }) => render || children || null
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: {
+    target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX,
+  } }).outputText, { exports, require(name) {
+    if (name === 'react') return { useMemo: fn => fn(), useRef: current => ({ current }), useState: initial => [initial, () => {}] }
+    if (name === 'react/jsx-runtime') return require(name)
+    if (name === '@/hooks/use-edit-permissions') return { useEditPermissions: () => ({ customer_access: { tags, detail } }) }
+    if (name === '@/lib/note-permissions') return { canViewNote: () => tags || detail,
+      canViewNotePart: (access, key) => key === 'visit_need_tags' ? access.tags : access.detail }
+    if (name === '@/components/visits/feedback-person-select') return { currentFeedbackPersonName: () => '本人', FeedbackPersonSelect: () => React.createElement('input', { 'aria-label': '反馈人' }) }
+    if (name === '@/lib/note-time') return { formatNoteTime: () => '' }
+    return new Proxy({}, { get: () => wrapper })
+  } })
+  return renderToStaticMarkup(exports.VisitNoteCell({ visitId: 'v', nickname: '客户', title: '来访需求', category: 'visit_need', expanded,
+    notes: [{ id: 'note', category: 'visit_need', content, need_tags: [{ id: 'a', name: '关系' }], created_by: '别人' }], onNotesChange() {} }))
+}
+
+test('PC 缩略、展开和详情均把标签与正文分开渲染，选择区位于反馈人下方', () => {
+  for (const expanded of [false, true]) {
+    const html = renderCell({ expanded })
+    assert.match(html, /<span[^>]*title="关系"[^>]*>关系<\/span>/)
+    assert.ok(html.includes('具体情况'))
+    assert.ok(html.indexOf('aria-label="反馈人"') < html.indexOf('来访标签'))
+  }
+  assert.match(renderCell({ content: '' }), /title="关系"/)
+})
+
+test('PC 标签与正文分别遵从查看权限', () => {
+  assert.ok(!renderCell({ tags: false }).includes('关系'))
+  assert.ok(!renderCell({ detail: false }).includes('具体情况'))
+  assert.equal(renderCell({ tags: false, detail: false }), '')
 })

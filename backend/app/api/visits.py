@@ -241,6 +241,11 @@ async def list_visits_light(
             item["visit_notes"] = note_map.get(str(item.get("id") or ""), [])
         protected = [customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"]) for item in items]
         for item in protected:
+            # 保留已按权限过滤的需求标签和正文，供轻量列表分别展示；不携带其他备注。
+            item["visit_need_entries"] = [
+                {key: note.get(key) for key in ("id", "content", "need_tags", "feedback_person", "created_by")}
+                for note in item.get("visit_notes", []) if note.get("category") == "visit_need"
+            ]
             item.pop("visit_notes", None)  # 轻量列表只返回过滤后的汇总，不重复携带全部备注正文。
         return protected
     except Exception as e:

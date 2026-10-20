@@ -32,6 +32,7 @@ from app.services import (
     offline_course_record_service,
     offline_course_service,
     oh_card_reading_service,
+    online_tea_service,
     operation_log_service,
     other_project_service,
     project_deduction_service,
@@ -653,6 +654,14 @@ def _build_purchase_summary(customer_id: str) -> list:
             "activity_mode": p.activity_mode or "线下",
         })
 
+    for record in online_tea_service.list_records():
+        if record.customer_id == customer_id:
+            current = record.effective_date <= today <= record.expiry_date
+            summary.append({"type": "线上茶疗", "name": "线上茶疗", "total_purchased": 1,
+                "total_amount": None, "amount_recorded": False, "remaining": "-", "used": "-",
+                "current_remaining": 1 if current else 0, "current_total": 1 if current else 0,
+                "effective_date": record.effective_date, "expiry_date": record.expiry_date, "validity_value": record.validity_value})
+
     # 线下落地课程
     oc_courses = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]
     oc_attendance_counts = _match_offline_course_attendance(customer_id, oc_courses)
@@ -1162,6 +1171,15 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
             "notes": r.notes or "",
             "diagnosis_teacher": getattr(r, "diagnosis_teacher", None) or "",
         })
+
+    for record in online_tea_service.list_records():
+        if record.customer_id == customer_id and (not date or record.deal_date == date):
+            records.append({"source_id": record.id, "source_created_at": record.created_at.isoformat(),
+                "type": "线上茶疗", "name": "线上茶疗", "quantity": f"{record.validity_value} 个月",
+                "amount": None, "amount_recorded": False, "deal_date": record.deal_date,
+                "effective_date": record.effective_date, "expiry_date": record.expiry_date,
+                "closer_name": "、".join(c.get("name", "") for c in record.closers) or record.closer_name or "",
+                "created_at": record.created_at.strftime("%Y-%m-%d"), "notes": record.notes})
 
     # 线下落地课程
     oc = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]

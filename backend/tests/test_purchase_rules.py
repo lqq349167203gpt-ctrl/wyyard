@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 from types import SimpleNamespace as NS
 
 import pytest
+
 from app.models.membership_card import MembershipCard
 from app.models.principal import PrincipalQuery
 from app.models.upsell_config import PURCHASE_RULE_LABELS, PurchaseRule
@@ -132,3 +133,68 @@ def test_offline_course_subtypes_roundtrip_and_filter(client, created_customer, 
     assert items[0]["course_type"] == course_type
     invalid = client.patch(f"/api/offline-courses/{response.json()['id']}", json={"course_type": "错误类型"})
     assert invalid.status_code == 400
+
+
+def test_recommended_journey_supports_first_big_prerequisite_and_cross_product_repeat():
+    events = [purchase('trial','2026-01-01',subtype='次卡'),
+              purchase('exp','2026-01-02'),
+              purchase('big','2026-01-03',subtype='30次卡'),
+              purchase('cross','2026-01-04',product='energy',subtype=''),
+              purchase('online','2026-01-05',product='online_tea',subtype=''),
+              purchase('direct','2026-01-01',product='emotional',subtype='',customer='direct'),
+              purchase('direct-second','2026-01-02',product='offline',subtype='主理人训练',customer='direct')]
+    upsell_config_service.classify_purchases(events, upsell_config_service.recommended_rules())
+    by_id={item['id']:item for item in events}
+    assert by_id['trial']['purchase_rule_keys']==['experience']
+    assert by_id['exp']['purchase_rule_keys']==['conversion']
+    assert by_id['big']['purchase_rule_keys']==['upsell']
+    assert by_id['cross']['purchase_rule_keys']==['upsell','repurchase']
+    assert by_id['online']['purchase_rule_keys']==['upsell','repurchase']
+    assert by_id['direct']['purchase_rule_keys']==['conversion']
+    assert by_id['direct-second']['purchase_rule_keys']==['repurchase']
+    assert by_id['cross']['repeat_times']==1  # 同类次数不冒充跨项目次数。
+
+
+def test_reverse_sequence_does_not_make_prior_upsell_and_trial_is_not_a_big_order():
+    events=[purchase('a','2026-01-01',product='energy',subtype=''),purchase('b','2026-01-02'),
+            purchase('c','2026-01-03',subtype='次卡'),purchase('d','2026-01-04',subtype='60次卡')]
+    upsell_config_service.classify_purchases(events, upsell_config_service.recommended_rules())
+    assert events[0]['purchase_rule_keys']==['conversion']
+    assert events[1]['purchase_rule_keys']==['conversion']
+    assert events[2]['purchase_rule_keys']==['experience']
+    assert events[3]['purchase_rule_keys']==['upsell','repurchase']
+
+
+def test_advanced_rules_roundtrip_validated_without_activating_on_read(client):
+    response=client.get('/api/upsell-config').json()
+    assert response['configured'] is False
+    rules=response['recommended_rules']
+    assert 'online_tea' in {item['key'] for item in response['products']}
+    response=client.put('/api/upsell-config',json={'rules':rules})
+    assert response.status_code==200,response.text
+    upsell_config_service._load()
+    saved=upsell_config_service.list_rules()
+    assert saved[3]['conditions'][0]['count_scope']=='group'
+    assert saved[2]['conditions'][0]['previous_products']==['membership:体验会员']
+    assert saved[1]['conditions'][1]['first_purchase'] is True
+    saved[2]['conditions'][0]['previous_products']=['invalid']
+    assert client.put('/api/upsell-config',json={'rules':saved}).status_code==400
+
+
+def test_saved_rules_invalidate_analysis_cache_and_count_big_orders_before_period(client, monkeypatch):
+    events = [purchase('exp', '2026-01-01'),
+              purchase('big', '2026-01-02', product='energy', subtype=''),
+              purchase('online', '2026-02-03', product='online_tea', subtype='')]
+    permissions = {'customer_access': {'transaction_access': 'detail'}}
+    monkeypatch.setattr(principal_service, 'collect_data', lambda _: ([NS(id='org', name='小院')], permissions, deepcopy(events), []))
+    params = {'tab': 'orders', 'organization_id': 'org', 'date_from': '2026-02-01', 'date_to': '2026-02-28', 'order_filter': 'repurchase'}
+    before = client.post('/api/principal/query', json=params)
+    assert before.status_code == 200, before.text
+    assert before.json()['total'] == 0
+    saved = client.put('/api/upsell-config', json={'rules': upsell_config_service.recommended_rules()})
+    assert saved.status_code == 200, saved.text
+    after = client.post('/api/principal/query', json=params)
+    assert after.status_code == 200, after.text
+    assert after.json()['total'] == 1
+    assert after.json()['items'][0]['classification'] == '升单、复购'
+    assert after.json()['items'][0]['product'] == 'online_tea'

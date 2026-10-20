@@ -27,6 +27,7 @@ PAYMENT_ITEMS = (
     ("group_case", "觉醒游戏", ""),
     ("emotional", "情绪释放", ""),
     ("oh", "OH卡诊断", "oh"),
+    ("online_tea", "线上茶疗", ""),
     ("energy", "深度情绪释放", ""),
     ("internal", "沙龙技能学习", "internal"),
     ("tea", "茶位费", ""),
@@ -83,14 +84,17 @@ def _describe(levels: list[dict], labels: dict[str, str]) -> str:
 
 def _rule_snapshot(rules: list[dict], labels: dict[str, str]) -> dict:
     return {PURCHASE_RULE_LABELS[rule["key"]]: [
-        {"付费项目": labels.get(item["product"], item["product"]), "购买次数": f"第{item['count']}次{'及以上' if item['operator'] == 'gte' else ''}"}
+        {"付费项目": "、".join(labels.get(product, product) for product in (item.get("products") or [item.get("product", "")])), "购买次数": f"第{item['count']}次{'及以上' if item['operator'] == 'gte' else ''}",
+         **({"累计方式": "所选项目合计"} if item.get("count_scope") == "group" else {}),
+         **({"首次购买": "是"} if item.get("first_purchase") else {}),
+         **({"此前购买": "、".join(labels.get(product, product) for product in item["previous_products"])} if item.get("previous_products") else {})}
         for item in rule["conditions"]
     ] for rule in rules}
 
 
 @router.get("")
 def get_config():
-    return {"levels": upsell_config_service.list_levels(), "rules": upsell_config_service.list_rules(), "configured": upsell_config_service.rules_configured(), "products": _products()}
+    return {"levels": upsell_config_service.list_levels(), "rules": upsell_config_service.list_rules(), "configured": upsell_config_service.rules_configured(), "products": _products(), "recommended_rules": upsell_config_service.recommended_rules()}
 
 
 @router.put("")
@@ -99,13 +103,13 @@ def save_config(data: UpsellConfigUpdate, request: Request):
     if data.rules is not None:
         for rule in data.rules:
             for condition in rule.conditions:
-                if condition.product not in labels:
+                if any(product not in labels for product in [*(condition.products or [condition.product]), *condition.previous_products]):
                     raise HTTPException(status_code=400, detail="请选择有效的付费项目或子类型")
         previous_rules = upsell_config_service.list_rules()
         rules = upsell_config_service.replace_rules(data.rules)
         descriptions = []
         for rule in rules:
-            conditions = [f"{labels[item['product']]}·第{item['count']}次{'及以上' if item['operator'] == 'gte' else ''}" for item in rule["conditions"]]
+            conditions = [f"{entry['付费项目']}·{entry['购买次数']}" for entry in _rule_snapshot([rule], labels)[PURCHASE_RULE_LABELS[rule["key"]]]]
             descriptions.append(f"{PURCHASE_RULE_LABELS[rule['key']]}：{'；'.join(conditions) or '未配置'}")
         request.state.skip_operation_log = True
         operation_log_service.create_log(OperationLogCreate(section="信息配置", content=("更新购买规则：" + " / ".join(descriptions))[:9500]), extra={

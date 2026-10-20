@@ -391,6 +391,39 @@ def test_course_participants_only_loads_notes_for_requested_page(monkeypatch):
     assert result["items"][0]["participants"][0]["arrived"] is True
 
 
+def test_course_participants_show_course_note_without_visit(monkeypatch):
+    from starlette.requests import Request
+
+    from app.api import service_teacher_customers, statistics
+    from app.models.activity_participant_note import ActivityParticipantNote
+    from app.services import activity_participant_note_service, visit_note_service, visit_service
+
+    now = datetime.now(timezone.utc)
+    course = {"id": "course-without-visit", "date": "2026-09-09", "name": "沙龙活动",
+              "activity_type": "class", "activity_type_label": "沙龙活动",
+              "participants": [{"id": "cust1", "nickname": "小安", "arrived": True,
+                                "member_type": "", "identity_group": "老人", "daily_visit_id": ""}]}
+    note = ActivityParticipantNote(id="note1", activity_source="class_record",
+        session_id=course["id"], customer_id="cust1", category="customer_feedback",
+        content="愿意再次参加", activity_date=course["date"], created_by="老师",
+        feedback_person="反馈老师", created_at=now, updated_at=now)
+    monkeypatch.setattr(statistics, "get_course_statistics", lambda **_: {"courses": [course]})
+    monkeypatch.setattr(visit_service, "list_visits", lambda: [])
+    monkeypatch.setattr(visit_note_service, "group_notes_by_visit", lambda _: {})
+    monkeypatch.setattr(activity_participant_note_service, "list_notes", lambda source, session_id, customer_ids:
+        [note] if source == "class_record" and session_id == course["id"] and customer_ids == {"cust1"} else [])
+
+    result = service_teacher_customers.list_course_participants(
+        request=Request({"type": "http", "path": "/api/service-teacher-customers/course-participants",
+                         "headers": [], "state": {"user_role": "超级管理员"}}),
+        teacher_id="", date_from=None, date_to=None, all_dates=False,
+        activity_type="all", keyword="", member_type="", identity_group="", page=1, page_size=20)
+    row = result["items"][0]["participants"][0]
+    assert row["visit_id"] == ""
+    assert row["customer_feedback_entries"][0]["content"] == "愿意再次参加"
+    assert row["customer_feedback_entries"][0]["author"] == "反馈老师"
+
+
 def test_available_teachers_includes_current_account_owner():
     teachers = service_teacher_customer_service.available_teachers(
         [_customer("c1", "婷婷"), _customer("c2", "潘潘"), _customer("c3", "潘潘")],

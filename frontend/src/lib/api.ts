@@ -420,7 +420,7 @@ const SHARED_READ_RESOURCES = new Set([
   "customers", "statistics", "daily-report", "principal", "communication-records", "followup-records", "offline-course-records",
   "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions",
   "positions", "accounts", "position-permissions", "membership-cards", "group-cases",
-  "emotional-releases", "energy-knots", "internal-courses", "oh-card-readings", "tea-seat-fees", "offline-courses", "other-projects",
+  "emotional-releases", "energy-knots", "internal-courses", "oh-card-readings", "tea-seat-fees", "offline-courses", "online-tea", "other-projects",
   "visits", "class-records", "daily-groupings", "visit-verifications", "consumption-records",
   "activity-orders", "activity-themes", "visit-history", "activity-history",
 ])
@@ -725,6 +725,7 @@ export interface Customer {
   wechat: string
   age: string
   referrer: string
+  referrers?: string[]
   referral_date: string
   referrer_handler: string
   follow_up_status: CustomerFollowUpStatus
@@ -780,6 +781,7 @@ export interface CustomerLight {
   traffic_source: string
   traffic_source_detail: string
   referrer: string
+  referrers?: string[]
   service_teacher?: string
   referral_date: string
   space_id: string
@@ -1042,8 +1044,8 @@ export const followUpStatusApi = {
 // 升单配置：若干「大类」（名字 + 一组付费项目），数组顺序＝升单先后
 export interface UpsellLevel { id: string; name: string; products: string[] }
 export type PurchaseRuleKey = "experience" | "conversion" | "upsell" | "repurchase"
-export interface PurchaseRule { key: PurchaseRuleKey; conditions: { product: string; operator: "eq" | "gte"; count: number }[] }
-export interface UpsellConfig { levels: UpsellLevel[]; rules: PurchaseRule[]; configured: boolean; products: { key: string; label: string }[] }
+export interface PurchaseRule { key: PurchaseRuleKey; conditions: { product?: string; products?: string[]; operator: "eq" | "gte"; count: number; count_scope?: "subtype" | "group"; first_purchase?: boolean; previous_products?: string[] }[] }
+export interface UpsellConfig { recommended_rules?: PurchaseRule[]; levels: UpsellLevel[]; rules: PurchaseRule[]; configured: boolean; products: { key: string; label: string }[] }
 export const upsellConfigApi = {
   get: () => request<UpsellConfig>("/api/upsell-config"),
   save: (levels: UpsellLevel[]) =>
@@ -1909,6 +1911,16 @@ export const teaSeatFeeApi = {
   searchCustomers: (keyword: string) => request<CustomerSearchResult[]>(`/api/tea-seat-fees/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
+// 线上茶疗：只登记购买，不记录金额。
+export interface OnlineTea extends Omit<OfflineCourse, "amount" | "validity_unit" | "course_type"> { expiry_date: string; amount_recorded: false }
+export const onlineTeaApi = {
+  list: () => request<OnlineTea[]>("/api/online-tea"),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<OnlineTea>>(`/api/online-tea?${paymentListQuery(page, pageSize, params)}`),
+  create: (data: Record<string, unknown>) => request<OnlineTea>("/api/online-tea", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Record<string, unknown>) => request<OnlineTea>(`/api/online-tea/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/online-tea/${id}`, { method: "DELETE" }),
+}
+
 // Offline Courses
 export interface OfflineCourse {
   course_type?: string
@@ -2592,7 +2604,7 @@ export interface PaymentExportParams {
 export const paymentExportApi = {
   courseOptions: (date: string, customerId = "") => request<Array<{ key: string; name: string; date: string }>>(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}${customerId ? `&customer_id=${encodeURIComponent(customerId)}` : ""}`),
   records: (page: number, pageSize: number, nickname: string, closerName: string) =>
-    request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
+    request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "online_tea" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
   download: async (params: PaymentExportParams) => {
     const query = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {

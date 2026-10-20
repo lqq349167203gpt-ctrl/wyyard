@@ -1,9 +1,9 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { canViewNote, canViewNotePart } from "@/lib/note-permissions"
 import { Download } from "lucide-react"
 import { CourseRosterNames } from "@/components/course-roster-names"
-import { NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
+import { followUpPlanText, NoteFeedbackMeta } from "@/components/visits/note-feedback-meta"
 import { loadExcel } from "@/lib/excel"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -162,11 +162,40 @@ function courseCoarseCustomerNames(course: CourseRow): string {
   return (course.coarse_customers || []).map(customer => customer.nickname).filter(Boolean).join("、")
 }
 
+/** 按上课日期分组，日期顺序沿用列表（新的在前）。同一天按开始时间从早到晚，没有时间的排在后面。 */
+function groupCoursesByDay(courses: CourseRow[]): Array<{ date: string; courses: CourseRow[] }> {
+  const groups: Array<{ date: string; courses: CourseRow[] }> = []
+  const byDate = new Map<string, CourseRow[]>()
+  for (const course of courses) {
+    const date = course.date || ""
+    let bucket = byDate.get(date)
+    if (!bucket) {
+      bucket = []
+      byDate.set(date, bucket)
+      groups.push({ date, courses: bucket })
+    }
+    bucket.push(course)
+  }
+  for (const group of groups) {
+    group.courses.sort((left, right) => (left.start_time || "99:99").localeCompare(right.start_time || "99:99") || left.id.localeCompare(right.id))
+  }
+  return groups
+}
+
 function CourseNames({ course, group }: { course: CourseRow; group: "new" | "old" | "absent" }) {
   const people = course.participants
     .filter(person => group === "absent" ? person.arrived === false : person.arrived && (group === "new" ? person.identity_group === "新人" : person.identity_group !== "新人"))
     .map(person => ({ id: person.id, name: person.nickname, arrived: person.arrived }))
   return <CourseRosterNames people={people} />
+}
+
+function IdentityTag({ value }: { value: string }) {
+  const tone = value === "新人"
+    ? "border-[#d7e4ff] bg-[#f5f8ff] text-[#3370ff]"
+    : value === "老人"
+      ? "border-[#e5e6eb] bg-[#f7f8fa] text-[#646a73]"
+      : "border-transparent bg-[#f2f3f5] text-[#646a73]"
+  return <span className={`inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-[3px] border px-1.5 py-0.5 align-middle text-[11px] leading-4 ${tone}`} title={value}>{value}</span>
 }
 
 function EmptyDash() {
@@ -192,7 +221,7 @@ function NoteContent({ author, content, expanded }: { author: string; content: s
 
 /**
  * 参与者备注：同一条备注可能是不同人分别填写的，按填写人逐行展示。
- * 单人填写的保留三行预览，多人填写的每人最多两行，超过三条时提示剩余条数。
+ * 自己填写的收起时，「反馈」和昵称连同内容一共三行；展开后显示全文。
  */
 function ParticipantNoteLines({
   entries,
@@ -210,12 +239,12 @@ function ParticipantNoteLines({
       <div className="space-y-1.5">
         {list.map((entry, index) => (
           <div key={`${entry.author}-${index}`} className="border-b border-[#eceef0] pb-1.5 last:border-b-0 last:pb-0">
-            <div className="flex min-w-0 items-baseline gap-2">
-              {entry.author && <span className="min-w-0 flex-1 text-[12px] leading-5"><NoteFeedbackMeta author={entry.author} plan={entry} inline /></span>}
-              <span className="ml-auto flex shrink-0 items-center gap-2 text-right text-[11px] text-[#8f959e]">
+            <div className="min-w-0">
+              {entry.author && <div className="truncate text-[12px] leading-5"><NoteFeedbackMeta author={entry.author} plan={entry} inline /></div>}
+              {(entry.at || entry.created_by) && <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-5 text-[#8f959e]">
                 {entry.at && <span className="tabular-nums">{formatDateTime(entry.at)}</span>}
-                {entry.created_by && <span className="max-w-[145px] truncate" title={`${entry.created_by} 创建`}>{entry.created_by}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>}
-              </span>
+                {entry.created_by && <span className="max-w-full truncate" title={`${entry.created_by} 创建`}>{entry.created_by}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>}
+              </div>}
             </div>
             <div className="mt-0.5 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a]">{entry.content}</div>
           </div>
@@ -223,27 +252,27 @@ function ParticipantNoteLines({
       </div>
     )
   }
-  const visible = list.slice(0, 3)
-  const lineClamp = list.length > 1 ? 2 : 3
   return (
-    <div className="space-y-0.5">
-      {visible.map((entry, index) => (
-        <div key={`${entry.author}-${index}`} className="min-w-0 border-t border-[#eceef0] pt-1.5 first:border-t-0 first:pt-0">
-          {entry.author && (
-            <span className="block text-[12px] leading-5"><NoteFeedbackMeta author={entry.author} plan={entry} inline /></span>
-          )}
-          <span
-            className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a] group-hover:text-[#3370ff]"
-            style={{ display: "-webkit-box", WebkitLineClamp: lineClamp, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-            title={entry.content}
-          >
+    <div
+      className="line-clamp-3 whitespace-pre-wrap break-words text-[12px] leading-5 text-[#4e535a] group-hover:text-[#3370ff]"
+      title={list.map(entry => entry.content).filter(Boolean).join("\n")}
+    >
+      {list.map((entry, index) => {
+        const next = followUpPlanText(entry)
+        return (
+          <span key={`${entry.author}-${index}`}>
+            {index > 0 ? "\n" : ""}
+            {entry.author && (
+              <span className="text-[#2b2f36]">
+                <span className="text-[#a4abb4]">反馈：</span>{entry.author}
+                {next && <><span className="ml-2 text-[#a4abb4]">下次跟进：</span>{next}</>}
+                {"\n"}
+              </span>
+            )}
             {entry.content}
           </span>
-        </div>
-      ))}
-      {list.length > visible.length && (
-        <div className="text-[11px] text-[#9aa1a9]">还有 {list.length - visible.length} 条，点击查看全部</div>
-      )}
+        )
+      })}
     </div>
   )
 }
@@ -280,9 +309,6 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [courseActivityType, setCourseActivityType] = useState("all")
   const showCourseOwner = !["class", "ics"].includes(courseActivityType)
   const showCourseBodyParts = courseActivityType === "all" || courseActivityType === "eks"
-  // 名单四列分配剩余宽度；课程缩短50px后，向新人/老人名单各分配25px。
-  const courseFixedWidth = 691 + (showCourseOwner ? 60 : 0) + (showCourseBodyParts ? 68 : 0)
-  const courseNameListWidth = `calc(25% - ${courseFixedWidth / 4 - 25}px)`
   const [courseData, setCourseData] = useState<CourseStatistics | null>(null)
   const [courseLoading, setCourseLoading] = useState(false)
   const [courseError, setCourseError] = useState("")
@@ -322,6 +348,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   const [participantEditorError, setParticipantEditorError] = useState("")
   const [participantEditorReadFailed, setParticipantEditorReadFailed] = useState(false)
   const [participantSaving, setParticipantSaving] = useState(false)
+  const [participantContentExpanded, setParticipantContentExpanded] = useState(false)
 
   const followUpDefinition: ServiceTeacherFollowUpDefinition = includeCustomerInfo && includeFollowUp
     ? "both"
@@ -404,7 +431,9 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   }, [activeTab, courseActivityType, courseDateFrom, courseDateTo, courseRangePreset, metadataLoaded, selectedTeacherId, teacher])
 
   const courseRows = useMemo(() => courseData?.courses || [], [courseData?.courses])
+  const courseDayGroups = useMemo(() => groupCoursesByDay(courseRows), [courseRows])
   const coursePagination = usePagination(courseRows, { pageSize: COURSE_PAGE_SIZE })
+  const courseDayPagination = usePagination(courseDayGroups, { pageSize: COURSE_PAGE_SIZE })
   const reviewRows = useMemo(
     () => courseRows.filter(course => (course.course_review || "").trim()),
     [courseRows],
@@ -417,7 +446,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
   }, [])
 
   const reviewPagination = usePagination(reviewRows, { pageSize: COURSE_PAGE_SIZE })
-  const activeCoursePagination = courseViewTab === "reviews" ? reviewPagination : coursePagination
+  const activeCoursePagination = courseViewTab === "reviews" ? reviewPagination : courseViewTab === "courses" ? courseDayPagination : coursePagination
 
   // 折叠状态下测量：内容宽度超过可视宽度就算这条需要展开；展开中的行沿用上一次判定
   useLayoutEffect(() => {
@@ -569,6 +598,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
 
   useEffect(() => {
     coursePagination.goToPage(1)
+    courseDayPagination.goToPage(1)
     reviewPagination.goToPage(1)
   }, [courseActivityType, courseDateFrom, courseDateTo, selectedTeacherId])
 
@@ -1020,15 +1050,26 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
               {reviewContentExpanded ? "缩略" : "展开"}
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={exportCourseRecords}
-              disabled={!teacher || courseLoading || courseRows.length === 0 || courseExporting}
-              className="flex h-7 items-center gap-1 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:text-[#b7bdc6]"
-            >
-              <Download className="h-3.5 w-3.5" />
-              {courseExporting ? "导出中" : "导出"}
-            </button>
+            <div className="flex items-center gap-2">
+              {courseViewTab === "participants" && (
+                <button
+                  type="button"
+                  onClick={() => setParticipantContentExpanded(current => !current)}
+                  className="h-7 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+                >
+                  {participantContentExpanded ? "缩略" : "展开"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={exportCourseRecords}
+                disabled={!teacher || courseLoading || courseRows.length === 0 || courseExporting}
+                className="flex h-7 items-center gap-1 rounded-[4px] border border-input px-3 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7] disabled:cursor-not-allowed disabled:text-[#b7bdc6]"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {courseExporting ? "导出中" : "导出"}
+              </button>
+            </div>
           )}
         </div>
 
@@ -1081,12 +1122,18 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                                   {row.participant_role === "案主" && <span className="rounded-[3px] border border-[#f1e2d2] bg-[#fffaf5] px-1.5 py-0.5 text-[10px] leading-none text-[#a8794f]">案主</span>}
                                 </div>
                               </td>
-                              <td className="break-words px-3 py-2.5 text-[12px] text-[#4e535a]">{row.member_type || row.identity_group || <EmptyDash />}</td>
+                              <td className="px-3 py-2.5">
+                                {row.member_type || row.identity_group
+                                  ? <IdentityTag value={row.member_type || row.identity_group} />
+                                  : <EmptyDash />}
+                              </td>
                               <td className="px-3 py-2.5 text-[12px] tabular-nums text-[#4e535a]">{row.same_course_count ? `${row.same_course_count} 次` : <EmptyDash />}</td>
                               {(["visit_need", "customer_info", "follow_up", "customer_feedback"] as const).filter(field => canViewNote(noteAccess, field)).map(field => {
                                 const entries = row[`${field}_entries`] || []
                                 const mine = entries.filter(isOwnParticipantNote)
                                 const others = entries.filter(entry => !isOwnParticipantNote(entry))
+                                const otherEntries = others.length ? others : (!entries.length && row[field] ? [{ author: "", content: row[field], at: "" }] : [])
+                                const otherLine = otherEntries.map(entry => `${entry.author?.trim() ? `${entry.author.trim()}：` : ""}${entry.content.replace(/\s+/g, " ").trim()}`).filter(Boolean).join("；")
                                 return (
                                   <td key={field} className="px-3 py-2.5">
                                     {mine.length > 0 ? (
@@ -1094,20 +1141,21 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                                         type="button"
                                         onClick={() => openParticipantEditor(row, field)}
                                         className="group block w-full text-left"
-                                        title="点击填写自己的内容"
+                                        title="点击修改自己的内容"
                                       >
-                                        <ParticipantNoteLines entries={mine} fallback="" />
+                                        <ParticipantNoteLines entries={mine} fallback="" expanded={participantContentExpanded} />
                                       </button>
                                     ) : (
                                       <button
                                         type="button"
                                         onClick={() => openParticipantEditor(row, field)}
                                         className="flex h-7 w-full items-center rounded-[4px] border border-[#e8eaed] bg-white px-2.5 text-left text-[11px] leading-none text-[#a8b0ba] transition-colors hover:border-[#b9cdf8] hover:text-[#4e535a]"
-                                      >点击填写</button>
+                                      >待填写</button>
                                     )}
-                                    {(others.length > 0 || (!entries.length && row[field])) && <div className="mt-2 border-t border-[#f0f0f0] pt-2">
-                                      <div className="mb-1 text-[11px] text-[#a8b0ba]">别人填写的</div>
-                                      <ParticipantNoteLines entries={others} fallback={!entries.length ? row[field] || "" : ""} />
+                                    {otherEntries.length > 0 && <div className={mine.length || participantContentExpanded ? "mt-2 border-t border-[#f0f0f0] pt-2" : "mt-1.5"}>
+                                      {participantContentExpanded
+                                        ? <ParticipantNoteLines entries={otherEntries} fallback="" expanded />
+                                        : <div className="truncate text-[12px] leading-5 text-[#8f959e]" title={otherLine}>{otherLine}</div>}
                                     </div>}
                                   </td>
                                 )
@@ -1211,59 +1259,57 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
           ) : courseRows.length === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">所选时间范围内暂无课程记录</div>
           ) : (
-            <div className="overflow-x-auto">
-            <Table className="min-w-[1080px] table-fixed">
-              <TableHeader className="bg-[#fafafa] [&_tr]:border-[#f0f0f0]">
-                <TableRow className="h-9 bg-[#fafafa] hover:bg-[#fafafa]">
-                  <TableHead className="h-9 w-[92px] px-3 pl-4 text-[11px] font-normal">上课日期</TableHead>
-                  <TableHead className="h-9 w-[105px] px-3 text-[11px] font-normal">上课时间</TableHead>
-                  <TableHead className="h-9 w-[150px] px-3 text-[11px] font-normal">课程</TableHead>
-                  <TableHead className="h-9 w-[80px] px-3 text-[11px] font-normal">课程类型</TableHead>
-                  <TableHead className="h-9 w-[56px] px-3 text-right text-[11px] font-normal">课时</TableHead>
-                  <TableHead className="h-9 w-[90px] px-3 text-[11px] font-normal">老师/成就君</TableHead>
-                  {showCourseOwner && <TableHead className="h-9 w-[60px] px-3 text-[11px] font-normal">案主</TableHead>}
-                  {showCourseBodyParts && <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">部位数</TableHead>}
-                  <TableHead className="h-9 w-[68px] px-3 text-right text-[11px] font-normal">参与人数</TableHead>
-                  <TableHead style={{ width: courseNameListWidth }} className="h-9 px-3 text-[11px] font-normal">新人名单</TableHead>
-                  <TableHead style={{ width: courseNameListWidth }} className="h-9 px-3 text-[11px] font-normal">老人名单</TableHead>
-                  <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">粗门客户</TableHead>
-                  <TableHead className="h-9 px-3 pr-4 text-[11px] font-normal">未到店</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {coursePagination.paginatedItems.map(course => {
-                  const newNames = courseParticipantNames(course, "new")
-                  const oldNames = courseParticipantNames(course, "old")
-                  const coarseNames = courseCoarseCustomerNames(course)
-                  return (
-                  <TableRow key={course.id} className="group h-11 border-[#f0f0f0] text-[12px] last:border-b-0 hover:bg-[#f7f8fa]">
-                    <TableCell className="h-11 px-3 py-0 pl-4 text-[12px] tabular-nums text-[#8f959e]">{course.date || <EmptyDash />}</TableCell>
-                    <TableCell className="h-11 px-3 py-0 text-[12px] tabular-nums text-[#8f959e]">{formatCourseTime(course) || <EmptyDash />}</TableCell>
-                    <TableCell className="h-11 overflow-hidden px-3 py-0">
-                      <span
-                        className="block truncate text-[12px] font-medium text-[#2b2f36]"
-                        title={course.name || undefined}
-                      >
-                        {course.name || <EmptyDash />}
-                      </span>
-                    </TableCell>
-                    <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.activity_type_label || <EmptyDash />}</TableCell>
-                    <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.class_hours}</TableCell>
-                    <TableCell className="h-11 max-w-[90px] truncate px-3 py-0 text-[12px] text-[#4e535a]" title={course.teachers.join("、") || undefined}>
-                      {course.teachers.join("、") || <EmptyDash />}
-                    </TableCell>
-                    {showCourseOwner && <TableCell className="h-11 px-3 py-0 text-[12px] text-[#4e535a]">{course.owner_name || <EmptyDash />}</TableCell>}
-                    {showCourseBodyParts && <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.body_part_count ?? <EmptyDash />}</TableCell>}
-                    <TableCell className="h-11 px-3 py-0 text-right text-[12px] tabular-nums text-[#4e535a]">{course.participant_count}人</TableCell>
-                    <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{newNames ? <CourseNames course={course} group="new" /> : <EmptyDash />}</TableCell>
-                    <TableCell className="whitespace-normal break-words px-3 py-2 text-[12px] leading-5 text-[#4e535a]">{oldNames ? <CourseNames course={course} group="old" /> : <EmptyDash />}</TableCell>
-                    <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{coarseNames || <EmptyDash />}</TableCell>
-                    <TableCell className="whitespace-normal break-words px-3 py-2 pr-4 text-[12px] leading-5 text-[#4e535a]">{courseParticipantNames(course, "absent") || <EmptyDash />}</TableCell>
-                  </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+            <div className="space-y-5 px-4 py-3">
+              {courseDayPagination.paginatedItems.map(day => (
+                <section key={day.date || "undated"}>
+                  <div className="mb-2 flex items-baseline justify-between gap-3">
+                    <h3 className="text-[13px] font-medium tabular-nums text-[#1f2329]">{day.date || "未排日期"}</h3>
+                    <span className="shrink-0 text-[11px] text-[#8f959e]">{day.courses.length} 堂</span>
+                  </div>
+                  <div className="space-y-2">
+                    {day.courses.map(course => {
+                      const teachers = course.teachers.join("、")
+                      const time = formatCourseTime(course)
+                      const absentNames = courseParticipantNames(course, "absent")
+                      const newNames = courseParticipantNames(course, "new")
+                      const oldNames = courseParticipantNames(course, "old")
+                      const coarseNames = courseCoarseCustomerNames(course)
+                      const hasOwner = Boolean(showCourseOwner && course.owner_name)
+                      const hasPeople = hasOwner || Boolean(absentNames || newNames || oldNames || coarseNames)
+                      const roster: Array<{ label: string; value: ReactNode }> = [
+                        ...(hasOwner ? [{ label: "案主", value: course.owner_name }] : []),
+                        ...(showCourseBodyParts && course.body_part_count != null ? [{ label: "部位", value: course.body_part_count }] : []),
+                        ...(absentNames ? [{ label: "未到店", value: <CourseNames course={course} group="absent" /> }] : []),
+                        ...(newNames ? [{ label: "新人", value: <CourseNames course={course} group="new" /> }] : []),
+                        ...(oldNames ? [{ label: "老人", value: <CourseNames course={course} group="old" /> }] : []),
+                        ...(coarseNames ? [{ label: "粗门", value: coarseNames }] : []),
+                      ]
+                      return (
+                        <article key={course.id} className="overflow-hidden rounded-[6px] border border-[#eceef0]">
+                          <div className="flex items-center gap-3 bg-[#fafbfc] px-3 py-2">
+                            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#2b2f36]" title={course.name || undefined}>{course.name || "未命名课程"}</span>
+                            <span className="flex shrink-0 items-center gap-1.5 text-[12px]">
+                              <span className="text-[#8f959e]" title={course.activity_type_label || undefined}>{course.activity_type_label || <EmptyDash />}</span>
+                              <span className="max-w-[120px] truncate text-[#4e535a]" title={teachers || undefined}>{teachers || <EmptyDash />}</span>
+                              <span className="tabular-nums text-[#4e535a]">{course.class_hours} 课时</span>
+                            </span>
+                            <span className="w-[132px] shrink-0 text-right text-[11px] tabular-nums text-[#9aa1a9]">{time || "未排时间"} · {course.participant_count} 人</span>
+                          </div>
+                          {(roster.length > 0 || !hasPeople) && <div>
+                            {roster.map(line => (
+                              <div key={line.label} className="flex gap-3 border-t border-[#f5f6f7] px-3 py-1.5 text-[12px] leading-5">
+                                <span className="w-12 shrink-0 text-[#8f959e]">{line.label}</span>
+                                <div className="min-w-0 flex-1 break-words text-[#4e535a]">{line.value}</div>
+                              </div>
+                            ))}
+                            {!hasPeople && <div className="border-t border-[#f5f6f7] px-3 py-1.5 text-[12px] leading-5 text-[#8f959e]">这场活动没有人参与</div>}
+                          </div>}
+                        </article>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </div>
@@ -1274,7 +1320,7 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
           startIndex={activeCoursePagination.startIndex}
           endIndex={activeCoursePagination.endIndex}
           onPageChange={activeCoursePagination.goToPage}
-          unit={courseListUnit}
+          unit={courseViewTab === "courses" ? "天" : courseListUnit}
         />
         </div>
       </section>
@@ -1473,10 +1519,37 @@ export function ServiceTeacherRecords({ mode }: { mode: ServiceTeacherTab }) {
                   : <span className="text-[11px] text-[#a8b0ba]">暂无公共来访需求标签，可在客户标签中配置</span>}
               </div>}
               <div className="mb-1 text-[11px] text-[#8f959e]">我填写的内容</div>
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-[12px] text-[#646a73]">反馈人</span>
-                <FeedbackPersonSelect options={participantFeedbackPeople} value={participantFeedbackPerson} onChange={setParticipantFeedbackPerson} />
+              <div className={`${participantEditing?.field === "follow_up" ? "mb-2" : "mb-3"} grid grid-cols-2 gap-3`}>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="w-12 shrink-0 text-[12px] text-[#646a73]">反馈人</span>
+                  <div className="min-w-0 flex-1">
+                    <FeedbackPersonSelect options={participantFeedbackPeople} value={participantFeedbackPerson} onChange={setParticipantFeedbackPerson} compact />
+                  </div>
+                </div>
               </div>
+              {participantEditing?.field === "visit_need" && canViewNotePart(noteAccess, "visit_need_tags") && <div className="mb-3 flex flex-wrap gap-2">
+                {participantNeedTags.length ? participantNeedTags.map(tag => <button key={tag.id} type="button"
+                  disabled={participantEditorLoading || participantEditorReadFailed}
+                  onClick={() => setParticipantNeedTagIds(ids => ids.includes(tag.id) ? ids.filter(id => id !== tag.id) : [...ids, tag.id])}
+                  className={`rounded-[4px] border px-2 py-1 text-[12px] ${participantNeedTagIds.includes(tag.id) ? "border-[#b9cdf8] bg-[#f0f5ff] text-[#3370ff]" : "border-[#e1e4e7] text-[#646a73]"}`}>{tag.name}</button>)
+                  : <span className="text-[11px] text-[#a8b0ba]">暂无公共来访需求标签，可在客户标签中配置</span>}
+              </div>}
+              {participantEditing?.field === "follow_up" && <div className="mb-2 grid grid-cols-2 gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="w-12 shrink-0 text-[12px] text-[#646a73]">下次跟进</span>
+                  <div className="min-w-0 flex-1">
+                    <CustomerSearchInput customers={participantFollowUpPeople} value={participantPlan.next_follow_up_person || ""} selectionOnly
+                      placeholder="搜索昵称" className="h-[26px] text-[12px]"
+                      onChange={value => { if (!value) setParticipantPlan(plan => ({ ...plan, next_follow_up_person_id: "", next_follow_up_person: "" })) }}
+                      onSelectItem={person => setParticipantPlan(plan => ({ ...plan, next_follow_up_person_id: person.id, next_follow_up_person: person.nickname }))} />
+                  </div>
+                </div>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 text-[12px] text-[#646a73]">跟进时间</span>
+                  <Input type="date" value={participantPlan.next_follow_up_date || ""} onChange={event => setParticipantPlan(plan => ({ ...plan, next_follow_up_date: event.target.value }))}
+                    className={`h-[26px] min-w-0 flex-1 text-[12px] ${participantPlan.next_follow_up_date ? "text-[#2b2f36]" : "text-[#c0c4cc] [&::-webkit-datetime-edit]:text-[#c0c4cc]"}`} />
+                </div>
+              </div>}
               <textarea
                 hidden={participantEditing?.field === "visit_need" && !canViewNotePart(noteAccess, "visit_need_detail")}
                 value={participantDraft}

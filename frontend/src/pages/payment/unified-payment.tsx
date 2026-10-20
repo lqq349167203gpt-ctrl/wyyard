@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   customerApi, membershipCardApi, groupCaseApi, emotionalReleaseApi,
-  ohCardReadingApi, teaSeatFeeApi, offlineCourseApi, energyKnotApi, internalCourseApi, otherProjectApi, projectRefundApi, paymentExportApi,
+  ohCardReadingApi, teaSeatFeeApi, onlineTeaApi, offlineCourseApi, energyKnotApi, internalCourseApi, otherProjectApi, projectRefundApi, paymentExportApi,
   type CustomerLight, type MembershipCard, type GroupCase, type EmotionalRelease,
   type OhCardReading, type TeaSeatFee, type OfflineCourse, type EnergyKnot, type InternalCourse, type OtherProject,
 } from "@/lib/api"
@@ -46,6 +46,7 @@ const PROJECT_TYPES = {
   energy_knot:       { label: "深度情绪释放", color: "#e02020", icon: Zap, api: energyKnotApi },
   internal_course:   { label: "沙龙技能学习", color: "#34c724", icon: GraduationCap, api: internalCourseApi },
   tea_seat_fee:      { label: "茶位费", color: "#c8a96e", icon: Coffee, api: teaSeatFeeApi },
+  online_tea:        { label: "线上茶疗", color: "#646a73", icon: Coffee, api: onlineTeaApi },
   offline_course:    { label: "线下落地课程", color: "#e8794a", icon: BookOpen, api: offlineCourseApi },
   other:             { label: "其他项目", color: "#8f959e", icon: Package, api: otherProjectApi },
 } as const
@@ -59,6 +60,7 @@ const PROJECT_TYPE_TO_REFUND_KEY: Record<ProjectTypeKey, string> = {
   oh_card_reading: "oh-card-readings",
   energy_knot: "energy-knots",
   tea_seat_fee: "tea-seat-fees",
+  online_tea: "online-tea",
   offline_course: "offline-courses",
   internal_course: "internal-courses",
   other: "other-projects",
@@ -192,6 +194,8 @@ function toUnified(item: any, type: ProjectTypeKey): UnifiedItem {
       return { ...base, detail: item.course_type?.split("：")[0] || "", price: item.price, effective_date: item.effective_date, expiry_date: item.expiry_date, validity_value: item.validity_value, course_type: item.course_type, created_by: item.created_by, notes: item.notes }
     case "tea_seat_fee":
       return { ...base, detail: `${item.quantity || 1} 位`, price: item.amount, quantity: item.quantity, amount: item.amount, created_by: item.created_by, notes: item.notes }
+    case "online_tea":
+      return { ...base, detail: `${item.validity_value || 1} 个月`, effective_date: item.effective_date, expiry_date: item.expiry_date, validity_value: item.validity_value, notes: item.notes }
     case "offline_course": {
       let expiry_date: string | null = null
       if (item.effective_date && item.validity_value) {
@@ -688,6 +692,7 @@ export function UnifiedPaymentContent({
         setFormTeaAmount(String(item.amount || 68))
         setFormNotes(item.notes || "")
         break
+      case "online_tea":
       case "offline_course":
         setFormCourseType(item.course_type || "")
         setFormOfflineEffectiveDate(item.effective_date || today)
@@ -720,6 +725,7 @@ export function UnifiedPaymentContent({
       case "oh_card_reading": return parseFloat(formOhAmount) || 0
       case "internal_course": return formCourseAmount || 0
       case "tea_seat_fee": return parseFloat(formTeaAmount) || 0
+      case "online_tea": return 0
       case "offline_course": return parseFloat(formOfflineAmount) || 0
       case "other": return parseFloat(formFee) || 0
     }
@@ -740,6 +746,7 @@ export function UnifiedPaymentContent({
     if (formDealCourse === UNSET_DEAL_COURSE) { window.alert("请选择成交课程"); return }
     if (formType === "oh_card_reading" && !formReadingType && !editingItem) { window.alert("请选择诊断类型"); return }
     if (formType === "offline_course" && !formCourseType && !editingItem) { window.alert("请选择课程类型"); return }
+    if (formType === "online_tea" && (!formOrganizationId || !formOfflineEffectiveDate || !formDealDate || !Number.isInteger(Number(formOfflineValidityValue)) || Number(formOfflineValidityValue) < 1)) { window.alert("请选择成交归属、日期并填写正整数月有效期"); return }
     if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
     if (formType === "other" && !formProjectName) return
     setConfirmOpen(true)
@@ -846,6 +853,9 @@ export function UnifiedPaymentContent({
           ...(editingItem ? {} : { created_by: createdBy }),
           notes: formNotes || "",
         }
+      case "online_tea":
+        return { customer_id: formCustomerId, nickname: formNickname, deal_date, organization_id,
+          effective_date: formOfflineEffectiveDate, validity_value: Number(formOfflineValidityValue), closer_id, closer_name, closers, notes: formNotes || "" }
       case "offline_course": {
         let expiry_date: string | null = null
         const val = parseInt(formOfflineValidityValue)
@@ -984,6 +994,15 @@ export function UnifiedPaymentContent({
       { header: "课程类型", key: "course_type", width: 22, example: "主理人训练" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-06-19" },
       { header: "有效期（月）", key: "validity_value", width: 10, example: "3" },
+    ],
+    online_tea: [
+      { header: "成交日期", key: "deal_date", width: 12, example: "2026-10-19" },
+      { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
+      { header: "成交归属", key: "organization", width: 14, example: "无忧茶院" },
+      { header: "生效日期", key: "effective_date", width: 12, example: "2026-10-19" },
+      { header: "有效期（月）", key: "validity_value", width: 12, example: "1" },
+      { header: "成交人", key: "closer_name", width: 12, example: "" },
+      { header: "备注", key: "notes", width: 20, example: "" },
     ],
     other: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-06-19" },
@@ -1190,6 +1209,11 @@ export function UnifiedPaymentContent({
         dupKey = `${base.customer_id}|${type}|${dealDate}|${amount}`
         break
       }
+      case "online_tea": {
+        payload = { ...base, effective_date: get("生效日期") || dealDate, validity_value: parseInt(get("有效期（月）")) || 1, notes: get("备注") }
+        dupKey = `${base.customer_id}|${type}|${dealDate}|${payload.effective_date}`
+        break
+      }
       case "offline_course": {
         const vv = parseInt(get("有效期（月）")) || offlineCourseDefaultMonths(get("课程类型"))
         payload = { ...base, course_type: get("课程类型"), effective_date: get("生效日期") || today, validity_value: vv, amount }
@@ -1230,6 +1254,9 @@ export function UnifiedPaymentContent({
           switch (type) {
             case "membership_card":
               key = `${item.customer_id}|${type}|${item.deal_date || ""}|${item.card_type || ""}|${item.price || 0}`
+              break
+            case "online_tea":
+              key = `${item.customer_id}|${type}|${item.deal_date || ""}|${item.effective_date || ""}`
               break
             case "internal_course":
             case "offline_course":
@@ -1434,6 +1461,8 @@ export function UnifiedPaymentContent({
     } else if (formType === "tea_seat_fee") {
       rows.push({ label: "数量", value: `${formTeaQuantity || "1"} 位` })
       if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formTeaAmount || "0").toLocaleString()}` })
+    } else if (formType === "online_tea") {
+      rows.push({ label: "生效日期", value: formOfflineEffectiveDate || "—" }, { label: "有效期", value: `${formOfflineValidityValue || 1} 个月` })
     } else if (formType === "offline_course") {
       rows.push({ label: "课程类型", value: formCourseType || "-" })
       rows.push({ label: "生效日期", value: formOfflineEffectiveDate || "-" })
@@ -1473,7 +1502,7 @@ export function UnifiedPaymentContent({
     if (needsAgreement) rows.push({ label: "协议签订", value: formAgreementStatus === "signed" ? "已签" : "未签" })
     if (!hidePaymentDetails) {
       rows.push({ label: "成交人合计", value: `¥${formClosers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0).toLocaleString()}` })
-      if (!["oh_card_reading", "tea_seat_fee", "offline_course"].includes(formType)) {
+      if (!["oh_card_reading", "tea_seat_fee", "offline_course", "online_tea"].includes(formType)) {
         rows.push({ label: "支付方式", value: formPaymentMethod || "-" })
       }
     }
@@ -1589,10 +1618,10 @@ export function UnifiedPaymentContent({
                 {activeType === "oh_card_reading" && <TableHead style={{ width: "120px" }}>诊断类型</TableHead>}
                 {activeType === "oh_card_reading" && <TableHead style={{ width: "100px" }}>诊断老师</TableHead>}
                 {(activeType === "all" || activeType === "membership_card" || activeType === "internal_course" || activeType === "offline_course" || activeType === "other") && <TableHead style={{ width: activeType === "offline_course" ? "120px" : "110px" }}>{activeType === "offline_course" ? "课程类型" : "项目名称"}</TableHead>}
-                {activeType !== "offline_course" && <TableHead style={{ width: "70px" }}>{activeType === "oh_card_reading" ? "诊断时长" : activeType === "energy_knot" ? "购买部位" : activeType === "tea_seat_fee" ? "数量" : "购买场次"}</TableHead>}
+                {activeType !== "offline_course" && activeType !== "online_tea" && <TableHead style={{ width: "70px" }}>{activeType === "oh_card_reading" ? "诊断时长" : activeType === "energy_knot" ? "购买部位" : activeType === "tea_seat_fee" ? "数量" : "购买场次"}</TableHead>}
                 {activeType !== "oh_card_reading" && activeType !== "tea_seat_fee" && <TableHead style={{ width: "80px" }}>有效期</TableHead>}
                 <TableHead style={{ width: "60px" }}>状态</TableHead>
-                {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && <TableHead style={{ width: "70px" }}>{activeType === "energy_knot" ? "剩余部位" : "剩余次数"}</TableHead>}
+                {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && activeType !== "online_tea" && <TableHead style={{ width: "70px" }}>{activeType === "energy_knot" ? "剩余部位" : "剩余次数"}</TableHead>}
                 <TableHead style={{ width: "90px" }}>成交人</TableHead>
                 <TableHead style={{ width: "130px" }}>成交课程</TableHead>
                 <TableHead style={{ width: "80px" }}>协议签订</TableHead>
@@ -1620,7 +1649,7 @@ export function UnifiedPaymentContent({
                           : (item.detail || <EmptyValue />)}
                       </TableCell>
                     )}
-                    {activeType !== "offline_course" && (
+                    {activeType !== "offline_course" && activeType !== "online_tea" && (
                       <TableCell className="text-[#2b2f36] truncate">
                         {item.type === "oh_card_reading" && (
                           item.diagnosis_duration ? `${item.diagnosis_duration * 0.5}小时` : <EmptyValue />
@@ -1649,8 +1678,8 @@ export function UnifiedPaymentContent({
                     <TableCell className="text-[12px] truncate">
                       {(() => {
                         const today = new Date().toLocaleDateString("sv-SE")
-                        if (item.type !== "membership_card" && refundStatusLoading) return <span className="text-[#8f959e]">状态加载中…</span>
-                        if (item.type !== "membership_card" && refundStatusError) return <button type="button" className="text-destructive" onClick={event => { event.stopPropagation(); refresh() }}>状态加载失败，重试</button>
+                        if (item.type !== "membership_card" && item.type !== "online_tea" && refundStatusLoading) return <span className="text-[#8f959e]">状态加载中…</span>
+                        if (item.type !== "membership_card" && item.type !== "online_tea" && refundStatusError) return <button type="button" className="text-destructive" onClick={event => { event.stopPropagation(); refresh() }}>状态加载失败，重试</button>
                         const refunded = item.type === "membership_card"
                           ? item.voided
                           : refundedKeys.has(`${PROJECT_TYPE_TO_REFUND_KEY[item.type]}:${item.id}`)
@@ -1662,7 +1691,7 @@ export function UnifiedPaymentContent({
                         return <EmptyValue />
                       })()}
                     </TableCell>
-                    {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && <TableCell className="text-[#2b2f36] truncate">
+                    {activeType !== "oh_card_reading" && activeType !== "internal_course" && activeType !== "tea_seat_fee" && activeType !== "offline_course" && activeType !== "online_tea" && <TableCell className="text-[#2b2f36] truncate">
                       {item.type === "membership_card" ? (
                         item.voided
                           ? <span className="text-[#c4506a]">已退费</span>
@@ -2007,12 +2036,12 @@ export function UnifiedPaymentContent({
             )}
 
             {/* ===== 线下课程专属字段 ===== */}
-            {formType === "offline_course" && (
+            {(formType === "offline_course" || formType === "online_tea") && (
               <>
-                <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+                {formType === "offline_course" && <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">课程类型</span>
                   <SelectDropdown value={formCourseType} options={OFFLINE_COURSE_TYPES.map(type => ({ value: type, label: type }))} onChange={value => { setFormCourseType(value); setFormOfflineValidityValue(String(offlineCourseDefaultMonths(value))) }} placeholder="选择课程类型" />
-                </div>
+                </div>}
                 <div className="grid grid-cols-[70px_1fr] items-center gap-2">
                   <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">生效日期</span>
                   <Input type="date" value={formOfflineEffectiveDate} onChange={(e) => setFormOfflineEffectiveDate(e.target.value)} className="h-8 text-xs" />

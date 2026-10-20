@@ -56,6 +56,14 @@ def test_single_field_visibility_across_visit_detail_report_and_course_entries(c
         response = client.get(path, params=params)
         assert response.status_code == 200, (path, response.text)
         payloads.append(response.text)
+        if path == "/api/visits/light":
+            entries = response.json()[0]["visit_need_entries"]
+            if "visit_need_tags" not in allowed and "visit_need_detail" not in allowed:
+                assert entries == []
+            else:
+                assert entries[0]["need_tags"] == ([{"id": tag["id"], "name": tag["name"]}] if "visit_need_tags" in allowed else [])
+                assert entries[0]["content"] == ("秘密_visit_need" if "visit_need_detail" in allowed else "")
+            assert "visit_notes" not in response.json()[0]
     for payload in payloads:
         assert (tag["name"] in payload) == ("visit_need_tags" in allowed)
         for category in ("visit_need", "customer_info", "follow_up", "customer_feedback"):

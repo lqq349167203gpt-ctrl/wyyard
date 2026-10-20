@@ -1,8 +1,8 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+from typing import Annotated, Dict, List, Literal, Optional
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from app.models.base import SafeBaseModel, StrictBaseModel
 
@@ -10,6 +10,16 @@ IncomeStability = Literal["", "收入稳定", "收入不稳定"]
 PersonalAnnualIncome = Literal["", "10w以下", "10~20w", "20~30w", "30~50w", "50w以上"]
 HouseholdAnnualIncome = Literal["", "20w以下", "20~30w", "30~40w", "40~50w", "50~100w", "100w以上"]
 CustomerQuality = Literal["正常", "忽视"]
+ReferrerName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+
+
+def customer_referrers(customer) -> list[str]:
+    """引流关系统一读取数组；旧记录的昵称整体保留，不能按标点误拆姓名。"""
+    read = customer.get if isinstance(customer, dict) else lambda key, default=None: getattr(customer, key, default)
+    names = read("referrers")
+    if names is None:
+        names = [read("referrer", "")]
+    return list(dict.fromkeys(name.strip() for name in names if isinstance(name, str) and name.strip()))
 
 
 def _validate_iso_date(value: str) -> str:
@@ -72,7 +82,8 @@ class CustomerBase(SafeBaseModel):
     wechat: str = Field(default="", max_length=80)
     age: str = Field(default="", max_length=10)
     service_teacher: str = Field(default="", max_length=50)
-    referrer: str = Field(default="", max_length=50)
+    referrer: str = Field(default="", max_length=2000)  # 兼容旧端展示；关系以 referrers 为准。
+    referrers: List[ReferrerName] = Field(default_factory=list, max_length=20)
     referral_date: str = Field(default="", max_length=10)
     referrer_handler: str = Field(default="", max_length=50)
     follow_up_status: str = Field(default=FollowUpStatus.UNCONFIGURED.value, max_length=30)
@@ -102,6 +113,19 @@ class CustomerBase(SafeBaseModel):
     position_sort_orders: Dict[str, int] = {}
     space_id: str = Field(default="", max_length=50)
     created_by: str = Field(default="", max_length=50)
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_legacy_referrer(cls, values):
+        if isinstance(values, dict) and "referrers" not in values:
+            values = {**values, "referrers": customer_referrers(values)}
+        return values
+
+    @model_validator(mode="after")
+    def sync_referrer_display(self):
+        self.referrers = list(dict.fromkeys(self.referrers))
+        self.referrer = "、".join(self.referrers)
+        return self
 
     @field_validator("position_sort_orders")
     @classmethod
@@ -167,7 +191,8 @@ class CustomerUpdate(StrictBaseModel):
     wechat: Optional[str] = Field(default=None, max_length=80)
     age: Optional[str] = Field(default=None, max_length=10)
     service_teacher: Optional[str] = Field(default=None, max_length=50)
-    referrer: Optional[str] = Field(default=None, max_length=50)
+    referrer: Optional[str] = Field(default=None, max_length=2000)
+    referrers: Optional[List[ReferrerName]] = Field(default=None, max_length=20)
     referral_date: Optional[str] = Field(default=None, max_length=10)
     referrer_handler: Optional[str] = Field(default=None, max_length=50)
     follow_up_status: Optional[str] = Field(default=None, max_length=30)
@@ -196,6 +221,13 @@ class CustomerUpdate(StrictBaseModel):
     tracking_plan: Optional[str] = Field(default=None, max_length=2000)
     position_sort_orders: Optional[Dict[str, int]] = None
     space_id: Optional[str] = Field(default=None, max_length=50)
+
+    @field_validator("referrers")
+    @classmethod
+    def validate_referrers(cls, value):
+        if value is None:
+            raise ValueError("引流人不能为空值，请使用空列表清空")
+        return list(dict.fromkeys(value))
 
     @field_validator("income_stability", "personal_annual_income", "household_annual_income", mode="before")
     @classmethod

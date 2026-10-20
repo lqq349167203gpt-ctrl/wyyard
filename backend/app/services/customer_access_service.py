@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.models.customer import customer_referrers
 from app.services import position_edit_permission_service
 from app.utils.request_roles import get_request_roles, normalize_roles
 
@@ -175,7 +176,7 @@ def can_view_customer(role: str | Iterable[str], owner_name: str, customer: Any)
     # 仅自己引流、仅自己承接都要能看到本人这条客户资料，不要求本人同时是自己的引流人或承接人。
     if (relations["referrer"] or relations["referrer_handler"]) and _is_account_owner(owner, customer):
         return True
-    if relations["referrer"] and (getattr(customer, "referrer", "") or "").strip() == owner:
+    if relations["referrer"] and owner in customer_referrers(customer):
         return True
     if relations["referrer_handler"] and (getattr(customer, "referrer_handler", "") or "").strip() == owner:
         return True

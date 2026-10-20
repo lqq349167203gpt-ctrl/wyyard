@@ -22,6 +22,7 @@ const TABS = [
   { key: "energy_knot", label: "深度情绪释放" },
   { key: "internal_course", label: "沙龙技能学习" },
   { key: "tea_seat_fee", label: "茶位费" },
+  { key: "online_tea", label: "线上茶疗" },
   { key: "offline_course", label: "线下落地课程" },
   { key: "other", label: "其他项目" },
 ]

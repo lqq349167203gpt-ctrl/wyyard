@@ -92,6 +92,23 @@ def test_no_new_referrals_still_has_invites_activities_and_deals(personal_data):
     assert detail_page(result["breakdown"], query(overview_detail="invite_arrivals"))["total"] == 2
 
 
+def test_shared_referral_belongs_to_both_people_but_organization_counts_customer_once(personal_data):
+    request, people, _ = personal_data
+    people["new"].referrers = ["引流甲", "引流乙"]
+    people["new"].referrer = "引流甲、引流乙"
+    second = service.analyze(request, query().model_copy(update={"referrer_id": "b"}))
+    assert second["summary"]["引流人数"] == 2
+    assert {row["id"] for row in second["breakdown"]["traffic"][0]["customers"]} == {"new", "other"}
+    organizations, _, _ = service.scope(request)
+    organizations[0].member_ids.append("b")
+    result = service.analyze(request, PrincipalQuery(organization_id="org", date_from=date(2026, 1, 1), date_to=date(2026, 1, 31)))
+    assert result["summary"]["引流人数"] == 2
+    groups = {group["label"]: group for group in result["breakdown"]["traffic"]}
+    assert {row["id"] for row in groups["引流甲"]["customers"]} == {"new"}
+    assert {row["id"] for row in groups["引流乙"]["customers"]} == {"new", "other"}
+    assert overview_metrics(result["breakdown"], [])["traffic_count"] == 2
+
+
 def test_missing_selection_is_empty_instead_of_all_clients(personal_data):
     request, _, _ = personal_data
     result = service.analyze(request, query().model_copy(update={"referrer_id": ""}))

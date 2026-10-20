@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 
+from app.models.customer import customer_referrers
 from app.models.principal import PrincipalQuery
 from app.services import (
     account_service,
@@ -51,6 +52,7 @@ PRODUCTS = (
     ("internal", "沙龙技能学习", payment_loader("internal-courses"), "course_type"),
     ("other", "其他项目", payment_loader("other-projects"), "project_name"),
     ("tea", "茶位费", payment_loader("tea-seat-fees"), ""),
+    ("online_tea", "线上茶疗", payment_loader("online-tea"), ""),
     ("offline", "线下课程", payment_loader("offline-courses"), "course_type"),
 )
 
@@ -89,7 +91,7 @@ def require_participant_profile_access(request, customer_id: str, course_id: str
         require_statistics_view(permissions, "person")
         names = {item["name"] for item in permitted_referrers(request, organizations, directory, permissions)}
         customer = directory.get(customer_id)
-        if not customer or (getattr(customer, "referrer", "") or "").strip() not in names:
+        if not customer or not names.intersection(customer_referrers(customer)):
             raise HTTPException(403, "没有查看该客户的权限")
     organizations, _, _, courses = collect_data(request)
     matched = [course for course in courses
@@ -657,9 +659,10 @@ def referrer_options(organizations, customers, *, own_scope=False) -> list[dict]
     """列出有历史引流客户的个人；仅本人范围仍受可见组织的引流归属限制。"""
     allowed_names = set().union(*(org_referrer_names(org, customers) for org in organizations))
     today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
-    counts = Counter((getattr(customer, "referrer", "") or "").strip() for customer in customers.values()
+    counts = Counter(name for customer in customers.values()
                      if not valid_day(getattr(customer, "referral_date", ""))
-                     or valid_day(getattr(customer, "referral_date", "")) <= today)
+                     or valid_day(getattr(customer, "referral_date", "")) <= today
+                     for name in customer_referrers(customer))
     by_name = defaultdict(list)
     for cid, customer in customers.items():
         name = (customer.nickname or customer.name or "").strip()
@@ -672,16 +675,15 @@ def referrer_options(organizations, customers, *, own_scope=False) -> list[dict]
     )
 
 
-
 def permitted_referrers(request, organizations, customers, permissions) -> list[dict]:
-    """个人列表沿用组织范围，再叠加仅自己限制。"""
+    """个人仍沿用组织范围，再叠加仅本人限制。"""
     if not position_edit_permission_service.principal_views(permissions)["person"]:
         return []
     options = referrer_options(organizations, customers, own_scope=permissions["principal_scope"] == "own")
     if permissions.get("principal_person_scope", "all") == "own":
         account = account_service.get_account(getattr(request.state, "user_id", ""))
         owner = (getattr(account, "owner", "") or "").strip()
-        matches = [customer.id for customer in customers.values() if owner and owner in {customer.nickname, customer.name}]
+        matches = [c.id for c in customers.values() if owner and owner in {c.nickname, c.name}]
         own_id = matches[0] if len(matches) == 1 else None
         options = [item for item in options if item["id"] == own_id]
     return options
@@ -690,6 +692,7 @@ def permitted_referrers(request, organizations, customers, permissions) -> list[
 def require_statistics_view(permissions, scope_type):
     if not position_edit_permission_service.principal_views(permissions).get(scope_type, False):
         raise HTTPException(403, "没有查看个人统计的权限" if scope_type == "person" else "没有查看组织/俱乐部统计的权限")
+
 
 def course_participant_rows(courses, organizations, participant_scope="", customers=None, history=None):
     """每人每课一行；被课程所属组织/俱乐部的引流人引流来的客户算内部。
@@ -712,8 +715,7 @@ def course_participant_rows(courses, organizations, participant_scope="", custom
         owner_ids = set(course.get("service_owner_ids", course.get("owner_ids", [])) or [])
         for cid in dict.fromkeys([*owner_ids, *(course.get("participant_ids") or [])]):
             customer = people.get(cid)
-            referrer = (getattr(customer, "referrer", "") or "").strip() if customer else ""
-            category = "internal" if referrer and referrer in referrer_names else "external"
+            category = "internal" if set(customer_referrers(customer)).intersection(referrer_names) else "external"
             if participant_scope and category != participant_scope:
                 continue
             label = "内部人员" if category == "internal" else "外部人员"
@@ -942,7 +944,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         personal_name = option["name"] if option else ""
         today_text = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
         personal_customers = {cid: customer for cid, customer in directory.items()
-                              if personal_name and (getattr(customer, "referrer", "") or "").strip() == personal_name
+                              if personal_name and personal_name in customer_referrers(customer)
                               and (not valid_day(getattr(customer, "referral_date", ""))
                                    or valid_day(getattr(customer, "referral_date", "")) <= today_text)}
         organizations, permissions, events, courses = collect_data(request, course_customer_ids=set(personal_customers))
@@ -1123,7 +1125,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
             ))
             participation_ids = {
                 customer.id for customer in customers.values()
-                if (getattr(customer, "referrer", "") or "").strip() in participation_referrers
+                if set(customer_referrers(customer)).intersection(participation_referrers)
             }
         participation = _member_participation_breakdown(participation_ids, start, end, customers, query.breakdown)
         breakdown["participation"] = participation
@@ -1280,12 +1282,14 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
             return start <= day <= end if day else not (query.date_from or query.date_to)
 
         for customer in customers.values():
-            referrer = (getattr(customer, "referrer", "") or "").strip()
-            if not referrer:
+            referrers = customer_referrers(customer)
+            if not referrers:
                 if not include_unassigned:
                     continue
-                referrer = UNASSIGNED_REFERRER
-            elif referrer not in member_names:
+                referrers = [UNASSIGNED_REFERRER]
+            else:
+                referrers = [name for name in referrers if name in member_names]
+            if not referrers:
                 continue
             # 引流人数按「引流时间」落在统计周期内才计入；未限定日期时全量纳入
             referral_day = valid_day(getattr(customer, "referral_date", ""))
@@ -1293,8 +1297,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 continue
             counts = customer_products.get(customer.id, Counter())
             subtypes = customer_subtypes.get(customer.id, Counter())
-            referrer_products[referrer].update(counts)
-            referred[referrer].append({
+            entry = {
                 "id": customer.id,
                 "name": customer.nickname or customer.name or "未命名",
                 "referral_date": valid_day(getattr(customer, "referral_date", "")),
@@ -1316,7 +1319,10 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 "tags": [tag.get("name", "") for tag in visible_tags.get(customer.id, []) if tag.get("name")],
                 "referrer_handler": (getattr(customer, "referrer_handler", "") or "").strip(),
                 **_profile_field_values(customer, allowed_profile_fields),
-            })
+            }
+            for referrer in referrers:
+                referrer_products[referrer].update(counts)
+                referred[referrer].append(entry)
         traffic_entries = [
             {**item, "referrer": referrer}
             for referrer, items in referred.items() for item in items
@@ -1453,12 +1459,16 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
 
         def traffic_facet(prefix: str, values_of) -> list[dict]:
             counter = Counter()
+            seen = set()
             for entry in traffic_entries:
                 if personal_scope and not referral_in_period(entry["referral_date"]):
                     continue
                 if matched(entry, prefix):
                     for value in values_of(entry):
-                        counter[value] += 1
+                        key = (entry["id"], value)
+                        if key not in seen:
+                            seen.add(key)
+                            counter[value] += 1
             return [{"key": name, "label": name, "count": count} for name, count in counter.most_common()]
 
         # 发起邀约列表：按邀约人汇总，同时保留每一笔日期、客户和状态。
@@ -1598,7 +1608,8 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         breakdown["purchase_rules_configured"] = upsell_config_service.rules_configured()
         # 前端「列表设置」按这个决定哪些敏感列可以出现
         breakdown["traffic_profile_fields"] = allowed_profile_fields
-        summary["引流人数"] = sum(referral_in_period(entry["referral_date"]) for entry in traffic_entries) if personal_scope else sum(len(items) for items in referred.values())
+        summary["引流人数"] = len({entry["id"] for entry in traffic_entries
+                                 if not personal_scope or referral_in_period(entry["referral_date"])})
         summary["课程当日成交数"] = sum(c.get("same_day_deals", 0) for c in selected_courses)
         summary["课程关联成交数"] = sum(c.get("related_deals", 0) for c in selected_courses)
     if query.tab == "conversion":

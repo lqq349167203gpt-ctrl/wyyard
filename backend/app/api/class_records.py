@@ -151,11 +151,15 @@ def _activity_note_actor(request: Request) -> tuple[str, str]:
 
 def _ensure_activity_note_editable(request: Request) -> None:
     roles = get_request_roles(request)
+    pages = position_permission_service.get_permissions(roles)
     if (
         "超级管理员" not in roles
-        and "daily-activities" not in position_permission_service.get_permissions(roles)
+        and "daily-activities" not in pages
+        and "course-statistics" not in pages
     ):
-        raise HTTPException(status_code=403, detail="没有课表页面权限")
+        raise HTTPException(status_code=403, detail="没有课表或课程记录页面权限")
+    if "course-statistics" in pages:
+        return
     permissions = position_edit_permission_service.get_permissions(roles)
     if (
         "超级管理员" not in roles
@@ -339,11 +343,13 @@ def list_activity_participant_notes(
     customer_ids: str = "",
 ):
     roles = get_request_roles(request)
+    pages = position_permission_service.get_permissions(roles)
     if (
         "超级管理员" not in roles
-        and "daily-activities" not in position_permission_service.get_permissions(roles)
+        and "daily-activities" not in pages
+        and "course-statistics" not in pages
     ):
-        raise HTTPException(status_code=403, detail="没有课表页面权限")
+        raise HTTPException(status_code=403, detail="没有课表或课程记录页面权限")
     context = _activity_note_context(activity_source, session_id)
     visible_ids = _visible_customer_ids(request) or set()
     allowed_ids = context["participant_ids"].intersection(visible_ids)
@@ -381,6 +387,20 @@ def save_activity_participant_note(
         action="记录信息到",
     )
     actor_id, actor_name = _activity_note_actor(request)
+    from app.api.visit_notes import _follow_up_plan, _resolve_feedback_person
+
+    existing = next((note for note in activity_participant_note_service.list_notes(
+        data.activity_source, data.session_id, {data.customer_id},
+    ) if note.customer_id == data.customer_id and note.category == data.category
+        and activity_participant_note_service.can_manage_note(note, actor_id, actor_name)), None)
+    if {"feedback_person_id", "feedback_person"}.intersection(data.model_fields_set) or existing is None:
+        feedback_person_id, feedback_person = _resolve_feedback_person(
+            request, data.feedback_person_id, data.feedback_person, existing,
+        )
+    else:
+        feedback_person_id = existing.feedback_person_id
+        feedback_person = existing.feedback_person or existing.created_by
+    follow_up_plan = _follow_up_plan(request, data, data.category, existing)
     try:
         note = activity_participant_note_service.upsert_note(
             activity_source=data.activity_source,
@@ -394,6 +414,9 @@ def save_activity_participant_note(
             end_time=context["end_time"],
             actor_id=actor_id,
             actor_name=actor_name,
+            feedback_person_id=feedback_person_id,
+            feedback_person=feedback_person,
+            follow_up_plan=follow_up_plan,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -402,7 +425,11 @@ def save_activity_participant_note(
         "content": (
             f"保存课程参与人{ACTIVITY_NOTE_CATEGORY_LABELS[note.category]}："
             f"课程：{note.activity_name}｜日期：{note.activity_date}｜"
-            f"客户：{customer.nickname or customer.name or customer.id}｜内容：{note.content}"
+            f"客户：{customer.nickname or customer.name or customer.id}｜"
+            f"反馈人：{note.feedback_person or note.created_by}｜"
+            + (f"下次跟进人：{note.next_follow_up_person or '未设置'}｜"
+               f"跟进时间：{note.next_follow_up_date or '未设置'}｜" if note.category == "follow_up" else "")
+            + f"内容：{note.content}"
         ),
         "entity_id": note.id,
         "after_data": result,

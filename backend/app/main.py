@@ -55,6 +55,7 @@ from app.api.miniapp_ai_config import router as miniapp_ai_config_router
 from app.api.offline_course_records import router as offline_course_records_router
 from app.api.offline_courses import router as offline_courses_router
 from app.api.oh_card_readings import router as oh_card_readings_router
+from app.api.online_tea import router as online_tea_router
 from app.api.operation_logs import router as operation_logs_router
 from app.api.organizations import router as organizations_router
 from app.api.other_projects import router as other_projects_router
@@ -138,6 +139,7 @@ app.include_router(internal_courses_router)
 app.include_router(other_projects_router)
 app.include_router(tea_seat_fees_router)
 app.include_router(offline_courses_router)
+app.include_router(online_tea_router)
 app.include_router(emotional_release_sessions_router)
 app.include_router(oh_card_readings_router)
 

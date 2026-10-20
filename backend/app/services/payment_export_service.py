@@ -19,6 +19,7 @@ PROJECT_SOURCES = (
     ("energy_knot", "深度情绪释放", payment_loader("energy-knots")),
     ("internal_course", "沙龙技能学习", payment_loader("internal-courses")),
     ("tea_seat_fee", "茶位费", payment_loader("tea-seat-fees")),
+    ("online_tea", "线上茶疗", payment_loader("online-tea")),
     ("offline_course", "线下落地课程", payment_loader("offline-courses")),
     ("other", "其他项目", payment_loader("other-projects")),
 )
@@ -84,7 +85,7 @@ def _project_quantity(item: dict, project_type: str) -> str:
         return f"{(item.get('diagnosis_duration') or 1) * 0.5:g}小时"
     if project_type == "tea_seat_fee":
         return f"{item.get('quantity') or 1}位"
-    if project_type == "offline_course":
+    if project_type in {"offline_course", "online_tea"}:
         unit = "天" if item.get("validity_unit") == "day" else "个月"
         return f"{item.get('validity_value') or 1}{unit}"
     if project_type == "other":
@@ -96,6 +97,8 @@ def _project_quantity(item: dict, project_type: str) -> str:
 
 
 def _amount(item: dict, project_type: str) -> float:
+    if project_type == "online_tea":
+        return ""
     if project_type in {"membership_card", "internal_course"}:
         return float(item.get("price") or 0)
     if project_type == "other":

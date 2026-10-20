@@ -13,6 +13,7 @@ from app.models.login_record import LoginRecord
 from app.models.operation_log import OperationLogCreate
 from app.services import (
     account_service,
+    activity_participant_note_service,
     customer_access_service,
     customer_service,
     login_record_service,
@@ -377,9 +378,22 @@ def list_course_participants(
     notes_by_visit = visit_note_service.group_notes_by_visit(
         [row["visit_id"] for row in page_rows if row["visit_id"]]
     )
+    activity_sources = {"class": "class_record", "gcs": "group_case", "ers": "emotional_release",
+                        "eks": "energy_knot", "ics": "internal_course"}
+    notes_by_course = {}
+    for course in page_courses:
+        source = activity_sources.get(course["activity_type"])
+        if not source:
+            continue
+        customer_ids = {row["customer_id"] for row in rows_by_course[course["id"]]}
+        grouped = defaultdict(lambda: defaultdict(list))
+        for note in activity_participant_note_service.list_notes(source, course["id"], customer_ids):
+            grouped[note.customer_id][note.category].append(visit_note_service.note_entry(note))
+        notes_by_course[course["id"]] = grouped
     for row in page_rows:
         for field in ("visit_need", "customer_info", "follow_up", "customer_feedback"):
-            entries = (notes_by_visit.get(row["visit_id"]) or {}).get(field, [])
+            entries = ((notes_by_visit.get(row["visit_id"]) or {}).get(field, []) if row["visit_id"]
+                       else notes_by_course.get(row["course_id"], {}).get(row["customer_id"], {}).get(field, []))
             row.setdefault(field, "")
             if not entries and row[field]:
                 # 兼容还没有独立填写记录的历史内容
