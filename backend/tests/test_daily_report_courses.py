@@ -1,18 +1,21 @@
 """日报与课表同源回归：日期、五类来源、客户范围和退课。"""
 
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace as NS
 
 import pytest
 
 from app.api import class_records, daily_report
+from app.models.group_case_session import GroupCaseSession
 from app.services import (
+    customer_service,
     emotional_release_session_service,
     energy_knot_session_service,
     group_case_session_service,
     internal_course_session_service,
     space_service,
+    visit_service,
 )
 
 
@@ -91,3 +94,25 @@ def test_report_keeps_absent_roster_but_counts_only_arrived_and_links_coarse_by_
     assert all(row["arrived_participant_ids"] == ["arrived"] and row["participant_count"] == 1 for row in result)
     assert result[0]["coarse_customers"] == [{"id": "arrived", "nickname": "到店客户"}]
     assert result[1]["coarse_customers"] == []
+
+
+def test_finance_sources_reads_session_models(monkeypatch):
+    """财务来源要能读 list_sessions 返回的 Pydantic 模型（有案主活动的日期曾整体 500）。"""
+    now = datetime(2026, 10, 12, 9, 0, 0)
+    session = GroupCaseSession(
+        id="gcs-1", date="2026-10-12", owner_id="owner", owner_name="案主",
+        participant_ids=["member"], created_at=now, updated_at=now,
+    )
+    monkeypatch.setattr(daily_report.customer_access_service, "require_transaction_access", lambda *_, **__: "detail")
+    monkeypatch.setattr(daily_report.customer_access_service, "visible_customer_ids", lambda *_: {"owner", "member"})
+    monkeypatch.setattr(customer_service, "list_customers", lambda: [])
+    monkeypatch.setattr(visit_service, "list_visits", lambda *_, **__: [])
+    monkeypatch.setattr(daily_report, "list_payment_records", lambda _: [])
+    monkeypatch.setattr(daily_report.project_deduction_service, "list_deductions", lambda *_, **__: [])
+    monkeypatch.setattr(daily_report.class_record_service, "list_records", lambda _: [])
+    monkeypatch.setattr(daily_report.group_case_sessions, "list_sessions", lambda **_: [session])
+    monkeypatch.setattr(daily_report.emotional_release_sessions, "list_sessions", lambda **_: [])
+    monkeypatch.setattr(daily_report.energy_knot_sessions, "list_sessions", lambda **_: [])
+
+    result = daily_report.read_finance_sources(NS(state=NS()), date(2026, 10, 12))
+    assert result["sessions"]["gcs"] == [session.model_dump(mode="json")]

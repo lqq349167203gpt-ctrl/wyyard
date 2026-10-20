@@ -150,8 +150,10 @@ def read_finance_sources(request: Request, date: date, mobile: bool = False):
             relevant_ids.update([group.leader_id, group.deputy_id, *group.member_ids])
     for items in session_sources.values():
         for item in items:
-            relevant_ids.add(item.get("owner_id") or "")
-            relevant_ids.update(item.get("participant_ids") or [])
+            # list_sessions 返回 Pydantic 模型而非字典，直接 .get 会抛 AttributeError 导致 500。
+            data = item.model_dump() if hasattr(item, "model_dump") else item
+            relevant_ids.add(data.get("owner_id") or "")
+            relevant_ids.update(data.get("participant_ids") or [])
     for items in sources.values():
         relevant_ids.update(i["customer_id"] for i in items if i.get("deal_date") == day)
     relevant_ids.update(i["customer_id"] for i in deductions if i.get("deduction_date") == day)
