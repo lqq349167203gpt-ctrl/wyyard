@@ -131,6 +131,7 @@ Page({
     financeError: '',
     hasFinance: false,
     visits: [],
+    customerGroups: [],
     activities: [],
     financeRows: [],
     financeTotal: '¥0',
@@ -385,6 +386,8 @@ Page({
         identityText: v.member_type || '',
         hasIdentity: !!v.member_type,
         arrived: !!v.arrived,
+        cancelled: !!v.cancelled,
+        cancelReason: v.cancel_reason || '',
         amountText: this._paymentData ? this._buildPaymentRecords(v.customer_id, date).length + '笔' : '—',
         hasAmount: this._buildPaymentRecords(v.customer_id, date).length > 0,
         invitedCount: v.invitation_count || 0,
@@ -403,8 +406,11 @@ Page({
         open: false,
       }
     })
-    // 默认排序：已到店在前，未到店在后（与 PC 端 arrived desc 一致）
-    customerRows.sort((a, b) => (b.arrived ? 1 : 0) - (a.arrived ? 1 : 0))
+    const customerGroups = [
+      { key: 'arrived', label: '已到店', rows: customerRows.filter(v => v.arrived && !v.cancelled) },
+      { key: 'pending', label: '未到店未取消', rows: customerRows.filter(v => !v.arrived && !v.cancelled) },
+      { key: 'cancelled', label: '已取消', rows: customerRows.filter(v => v.cancelled) },
+    ]
 
     // 财务 tab
     const finance = this._buildFinance(payment, date, customerMap)
@@ -414,6 +420,7 @@ Page({
 
     return {
       visits: customerRows,
+      customerGroups,
       activities,
       financeRows: finance.rows,
       financeTotal: finance.total,
@@ -760,8 +767,9 @@ Page({
   },
 
   onVisitToggle(e) {
-    const idx = e.currentTarget.dataset.index
-    this.setData({ [`visits[${idx}].open`]: !this.data.visits[idx].open })
+    const { groupIndex, index } = e.currentTarget.dataset
+    const row = this.data.customerGroups[groupIndex].rows[index]
+    this.setData({ [`customerGroups[${groupIndex}].rows[${index}].open`]: !row.open })
   },
 
   onActivityToggle(e) {
@@ -797,7 +805,7 @@ Page({
       ],
       cancelled: [
         { text: '日期', cls: 'c1' }, { text: '邀约人', cls: 'c2' }, { text: '来访需求', cls: 'c3' },
-        { text: '深度需求', cls: 'c4' }, { text: '跟进点', cls: 'c5' }, { text: '客户反馈', cls: 'c6' },
+        ...(this.data.noteVisibility && this.data.noteVisibility.follow_up ? [{ text: '取消原因', cls: 'c4' }] : []),
       ],
       activity_today: [
         { text: '日期', cls: 'a-c1' }, { text: '类型', cls: 'a-c2' }, { text: '活动名称', cls: 'a-c3' },
@@ -840,9 +848,11 @@ Page({
                 { text: v.visit_date || '', cls: 'c1', cancelled: type === 'invited' && !!v.cancelled, unarrived: type === 'invited' && !v.arrived && !v.cancelled },
                 { text: v.referrer_handler || '', cls: 'c2' },
                 { text: v.needs || '', cls: 'c3' },
-                { text: v.feedback || '', cls: 'c4' },
-                { text: reportFollowUpText(v), cls: 'c5' },
-                { text: v.experience || '', cls: 'c6' },
+                ...(type === 'cancelled' ? (this.data.noteVisibility && this.data.noteVisibility.follow_up ? [{ text: v.cancel_reason || '', cls: 'c4' }] : []) : [
+                  { text: v.feedback || '', cls: 'c4' },
+                  { text: reportFollowUpText(v), cls: 'c5' },
+                  { text: v.experience || '', cls: 'c6' },
+                ]),
               ]
               return { rowClass: 'detail-row', expanded: false, overflow: rowOverflow(cols), cols }
             })

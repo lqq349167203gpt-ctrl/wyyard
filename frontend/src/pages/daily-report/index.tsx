@@ -217,12 +217,22 @@ export default function DailyReportPage() {
     </style>`
     let html = `<html><head><meta charset="utf-8">${style}</head><body>`
     // 第一部分：当日客户
-    const widths = [60, 50, 80, 60, 50, 50, 50, 50, 50, 60, 120, 120, 100, 100, 70, 50, 40]
-      .filter((_, index) => index < 10 || index > 13 || canViewNote(permissions.customer_access, (["visit_need", "customer_info", "follow_up", "customer_feedback"] as const)[index - 10]))
+    for (const group of visitGroups) {
+    const isCancelled = group.key === "cancelled"
+    const widths = [60, 50, 80, 60, 50, 50, 50, 50, 50, 60,
+      ...(canViewNote(permissions.customer_access, "visit_need") ? [120] : []),
+      ...(isCancelled
+        ? canViewNote(permissions.customer_access, "follow_up") ? [180] : []
+        : [
+          ...(canViewNote(permissions.customer_access, "customer_info") ? [120] : []),
+          ...(canViewNote(permissions.customer_access, "follow_up") ? [100] : []),
+          ...(canViewNote(permissions.customer_access, "customer_feedback") ? [100] : []),
+        ]),
+      70, 50, 40]
     html += `<table><colgroup>${widths.map(width => `<col width="${width}">`).join("")}</colgroup>`
-    html += `<tr class="section"><td colspan="${widths.length}">当日客户（${sortedVisits.length}人）</td></tr>`
-    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th>${canViewNote(permissions.customer_access, "visit_need") ? "<th>来访需求</th>" : ""}${canViewNote(permissions.customer_access, "customer_info") ? "<th>深度需求</th>" : ""}${canViewNote(permissions.customer_access, "follow_up") ? "<th>跟进点</th>" : ""}${canViewNote(permissions.customer_access, "customer_feedback") ? "<th>客户反馈</th>" : ""}<th>今日成交</th><th>邀约</th><th>到场</th></tr>`
-    for (const v of sortedVisits) {
+    html += `<tr class="section"><td colspan="${widths.length}">当日客户｜${group.label}（${group.records.length}人）</td></tr>`
+    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th>${canViewNote(permissions.customer_access, "visit_need") ? "<th>来访需求</th>" : ""}${isCancelled ? canViewNote(permissions.customer_access, "follow_up") ? "<th>取消原因</th>" : "" : `${canViewNote(permissions.customer_access, "customer_info") ? "<th>深度需求</th>" : ""}${canViewNote(permissions.customer_access, "follow_up") ? "<th>跟进点</th>" : ""}${canViewNote(permissions.customer_access, "customer_feedback") ? "<th>客户反馈</th>" : ""}`}<th>今日成交</th><th>邀约</th><th>到场</th></tr>`
+    for (const v of group.records) {
       html += `<tr>
         <td>${esc(v.referrer || "-")}</td>
         <td>${esc(v.visit_time || "-")}</td>
@@ -235,15 +245,17 @@ export default function DailyReportPage() {
         <td>${todayActivityCountMap[v.customer_id] || 0}场</td>
         <td>${!financeReady ? "-" : !hasCardSet.has(v.customer_id) ? "未办卡" : v.remaining_count == null || v.remaining_count === -999 ? "不限" : v.remaining_count + "次"}</td>
         ${canViewNote(permissions.customer_access, "visit_need") ? `<td class="wrap">${esc(v.needs || "-")}</td>` : ""}
+        ${isCancelled ? canViewNote(permissions.customer_access, "follow_up") ? `<td class="wrap">${esc(v.cancel_reason || "-")}</td>` : "" : `
         ${canViewNote(permissions.customer_access, "customer_info") ? `<td class="wrap">${esc(v.feedback || "-")}</td>` : ""}
         ${canViewNote(permissions.customer_access, "follow_up") ? `<td class="wrap">${esc(reportFollowUpText(v) || "-")}</td>` : ""}
-        ${canViewNote(permissions.customer_access, "customer_feedback") ? `<td class="wrap">${esc(v.experience || "-")}</td>` : ""}
+        ${canViewNote(permissions.customer_access, "customer_feedback") ? `<td class="wrap">${esc(v.experience || "-")}</td>` : ""}`}
         <td>${(transactionCounts[v.customer_id] || 0) > 0 ? transactionCounts[v.customer_id] + "笔" : "-"}</td>
         <td>${esc(v.referrer_handler || "-")}</td>
         <td>${v.arrived ? "✓" : "✗"}</td>
       </tr>`
     }
     html += `</table><br>`
+    }
     // 第二部分：当日活动
     html += `<table><colgroup><col width="180"><col width="80"><col width="100"><col width="80"><col width="60"><col width="150"><col width="150"><col width="120"><col width="120"></colgroup>`
     html += `<tr class="section"><td colspan="9">当日活动（${activities.length}场）</td></tr>`
@@ -359,6 +371,11 @@ export default function DailyReportPage() {
     })
     return sorted
   }, [visits, sortField, sortDir, transactionCounts, todayActivityCountMap])
+  const visitGroups = [
+    { key: "arrived", label: "已到店", records: sortedVisits.filter(v => v.arrived && !v.cancelled) },
+    { key: "pending", label: "未到店未取消", records: sortedVisits.filter(v => !v.arrived && !v.cancelled) },
+    { key: "cancelled", label: "已取消", records: sortedVisits.filter(v => v.cancelled) },
+  ] as const
 
   const dateRange = useMemo(() => Array.from({ length: 21 }, (_, i) => formatDate(addDays(new Date(dateRangeStart), i))), [dateRangeStart])
 
@@ -753,7 +770,7 @@ export default function DailyReportPage() {
         </div>
       </div>
 
-      {/* 第一部分：当日深度需求 */}
+      {/* 第一部分：当日客户 */}
       <div className="min-w-0 mt-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[13px] font-medium text-[#1f2329]">当日客户{coreReady && <span className="text-[#8f959e] font-normal">（{sortedVisits.length}人）</span>}</span>
@@ -778,7 +795,11 @@ export default function DailyReportPage() {
         ) : visits.length === 0 ? (
           <div className="text-[12px] text-[#8f959e] py-8 text-center">{loadError ? "邀约数据尚未加载成功" : "当日无邀约记录"}</div>
         ) : (
-          <div className="overflow-x-auto scrollbar-visible">
+          <div className="space-y-4">
+            {visitGroups.map(group => (
+            <section key={group.key}>
+              <div className="mb-1.5 text-[12px] font-medium text-[#4e535a]">{group.label}<span className="ml-1 font-normal text-[#8f959e]">（{group.records.length}人）</span></div>
+              {group.records.length === 0 ? <div className="py-2 text-[11px] text-[#a0a4ab]">暂无客户</div> : <div className="overflow-x-auto scrollbar-visible">
             <table className="text-[11px] w-full" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
               <thead>
                 <tr className="bg-[#f7f8fa] text-[#8f959e]">
@@ -793,16 +814,20 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("today_activity")}><span className="inline-flex items-center gap-0">今日<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "today_activity" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "today_activity" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[57px] border-b-[0.5px] border-[#e8eaed]">剩余次数</th>
                   <th hidden={!canViewNote(permissions.customer_access, "visit_need")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">来访需求</th>
-                  <th hidden={!canViewNote(permissions.customer_access, "customer_info")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">深度需求</th>
-                  <th hidden={!canViewNote(permissions.customer_access, "follow_up")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">跟进点</th>
-                  <th hidden={!canViewNote(permissions.customer_access, "customer_feedback")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户反馈</th>
+                  {group.key === "cancelled" ? (
+                    <th hidden={!canViewNote(permissions.customer_access, "follow_up")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">取消原因</th>
+                  ) : <>
+                    <th hidden={!canViewNote(permissions.customer_access, "customer_info")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">深度需求</th>
+                    <th hidden={!canViewNote(permissions.customer_access, "follow_up")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">跟进点</th>
+                    <th hidden={!canViewNote(permissions.customer_access, "customer_feedback")} className="px-[5px] py-2 text-left font-normal border-b-[0.5px] border-[#e8eaed]">客户反馈</th>
+                  </>}
                   <th className="px-[5px] py-2 text-left font-normal w-[74px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("daily_amount")}><span className="inline-flex items-center gap-0">今日成交<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "daily_amount" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "daily_amount" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="pl-[5px] pr-0 py-2 text-left font-normal w-[36px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("referrer_handler")}><span className="inline-flex items-center gap-0">邀约<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "referrer_handler" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "referrer_handler" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="pl-0 pr-[5px] py-2 text-center font-normal w-[56px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("arrived")}><span className="inline-flex items-center gap-0">到场<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "arrived" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "arrived" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                 </tr>
               </thead>
               <tbody>
-                {sortedVisits.map((v, i) => (
+                {group.records.map((v, i) => (
                   <tr key={v.id} className={i % 2 === 0 ? "bg-white hover:bg-[#f7f8fa]" : "bg-[#fcfcfd] hover:bg-[#f0f1f3]"}>
                     <td className="px-[5px] py-2 text-[#8b9198] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#92989e] text-center border-b-[0.5px] border-[#e8eaed]">{v.visit_time || <span className="text-[#c9cdd4]">-</span>}</td>
@@ -815,9 +840,13 @@ export default function DailyReportPage() {
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("activity_today", v.customer_id, v.nickname)}>{todayActivityCountMap[v.customer_id] || 0}场</td>
                     <td className="px-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">{!financeReady ? <EmptyDash /> : !hasCardSet.has(v.customer_id) ? <span className="text-[#c9cdd4]">未办卡</span> : v.remaining_count == null || v.remaining_count === -999 ? <span className="text-[#4e535a]">不限</span> : <span className="text-[#4e535a]">{v.remaining_count}次</span>}</td>
                     <td hidden={!canViewNote(permissions.customer_access, "visit_need")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.needs || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td hidden={!canViewNote(permissions.customer_access, "customer_info")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || <span className="text-[#c9cdd4]">-</span>}</td>
-                    <td hidden={!canViewNote(permissions.customer_access, "follow_up")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}><ReportFollowUp visit={v} /></td>
-                    <td hidden={!canViewNote(permissions.customer_access, "customer_feedback")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.experience || <EmptyDash />}</td>
+                    {group.key === "cancelled" ? (
+                      <td hidden={!canViewNote(permissions.customer_access, "follow_up")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.cancel_reason || <EmptyDash />}</td>
+                    ) : <>
+                      <td hidden={!canViewNote(permissions.customer_access, "customer_info")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.feedback || <EmptyDash />}</td>
+                      <td hidden={!canViewNote(permissions.customer_access, "follow_up")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}><ReportFollowUp visit={v} /></td>
+                      <td hidden={!canViewNote(permissions.customer_access, "customer_feedback")} className={`px-[5px] py-2 text-[10px] text-[#4e535a] border-b-[0.5px] border-[#e8eaed] ${viewMode === "summary" ? "truncate" : "whitespace-pre-wrap break-words"}`}>{v.experience || <EmptyDash />}</td>
+                    </>}
                     <td className="px-[5px] py-2 text-[#1f2329] border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => (transactionCounts[v.customer_id] || 0) > 0 && openDetail("payment", v.customer_id, v.nickname)}>{(transactionCounts[v.customer_id] || 0) > 0 ? `${transactionCounts[v.customer_id]}笔` : <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[5px] pr-[1px] py-2 text-[#6b7178] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer_handler || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="pl-[1px] pr-[5px] py-2 text-center border-b-[0.5px] border-[#e8eaed]">
@@ -831,6 +860,9 @@ export default function DailyReportPage() {
                 ))}
               </tbody>
             </table>
+            </div>}
+            </section>
+            ))}
           </div>
         )}
       </div>
@@ -1054,9 +1086,7 @@ export default function DailyReportPage() {
                   <span className="w-40 shrink-0">日期</span>
                   <span className="w-20 shrink-0">邀约人</span>
                   <span className="w-24 shrink-0">来访需求</span>
-                  <span className="flex-1">深度需求</span>
-                  <span className="w-24 shrink-0">跟进点</span>
-                  <span className="w-24 shrink-0">客户反馈</span>
+                  {canViewNote(permissions.customer_access, "follow_up") && <span className="flex-1">取消原因</span>}
                   <span className="w-11 shrink-0" />
                 </div>
                 {records.map(v => {
@@ -1067,9 +1097,7 @@ export default function DailyReportPage() {
                       <span className="w-40 shrink-0">{v.visit_date}</span>
                       <span data-ov-key={v.id} className="w-20 shrink-0 truncate">{v.referrer_handler || <EmptyDash />}</span>
                       <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.needs || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.feedback || <EmptyDash />}</span>
-                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}><ReportFollowUp visit={v} /></span>
-                      <span data-ov-key={v.id} className={`w-24 shrink-0 ${rowTextClass(expanded)}`}>{v.experience || <EmptyDash />}</span>
+                      {canViewNote(permissions.customer_access, "follow_up") && <span data-ov-key={v.id} className={`flex-1 min-w-0 ${rowTextClass(expanded)}`}>{v.cancel_reason || <EmptyDash />}</span>}
                       {showToggle ? <button className="w-11 shrink-0 text-right text-[11px] text-[#8f959e] hover:underline" onClick={() => toggleDetailRow(v.id)}>{expanded ? "缩略" : "展开"}</button> : <span className="w-11 shrink-0" />}
                     </div>
                   )

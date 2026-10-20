@@ -12,8 +12,6 @@ from app.models.customer import customer_referrers
 from app.models.principal import PrincipalQuery
 from app.services import (
     account_service,
-    course_service,
-    course_type_service,
     customer_access_service,
     customer_service,
     customer_tag_service,
@@ -182,13 +180,14 @@ def _member_participation_breakdown(member_ids: set[str], start: str, end: str, 
             for org in orgs:
                 for member_id in org.member_ids:
                     member_orgs[member_id].add(org.id)
+            from app.services.course_organization_service import build_salon_organization_resolver
+
             course_context = (
-                {course.id: course.organization_id for course in course_service.list_courses()},
-                {item["name"]: item.get("organization_id", "") for item in course_type_service.list_course_types()},
+                build_salon_organization_resolver(),
                 member_orgs, {org.id: org.name for org in orgs},
             )
-        configured_courses, configured_types, member_orgs, org_names = course_context
-        explicit = configured_courses.get(getattr(activity, "course_id", "")) or configured_types.get(getattr(activity, "course_type", ""))
+        resolve_salon, member_orgs, org_names = course_context
+        explicit = resolve_salon(activity)
         candidates = {explicit} if explicit else set().union(*(member_orgs[tid] for tid in _course_activity_teacher_ids(activity)))
         organization = org_names.get(next(iter(candidates)), "未配置组织") if len(candidates) == 1 else "归属不明确" if candidates else "未配置组织"
         # 二级统计按沙龙类型（读书会、呼吸禅茶），不按某一场的活动名称。
@@ -375,8 +374,9 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
     for org in all_orgs:
         for member_id in org.member_ids:
             member_orgs[member_id].add(org.id)
-    configured_courses = {c.id: c.organization_id for c in course_service.list_courses()}
-    configured_types = {c["name"]: c.get("organization_id", "") for c in course_type_service.list_course_types()}
+    from app.services.course_organization_service import build_salon_organization_resolver
+
+    resolve_salon = build_salon_organization_resolver()
     events, courses = [], []
     def customer_name(cid):
         return (customers[cid].nickname or customers[cid].name or "未命名") if cid in customers else ""
@@ -390,7 +390,7 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
             if not day or day > today or getattr(activity, "is_deleted", False):
                 continue
             teachers = _course_activity_teacher_ids(activity)
-            explicit = configured_courses.get(getattr(activity, "course_id", "")) or configured_types.get(getattr(activity, "course_type", ""))
+            explicit = resolve_salon(activity)
             candidates = {explicit} if explicit else set().union(*(member_orgs[t] for t in teachers))
             # 没有明确归属且老师跨组织时，不能猜测归属或重复计课。
             if len(candidates) != 1:

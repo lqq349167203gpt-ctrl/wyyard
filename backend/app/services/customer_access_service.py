@@ -21,7 +21,7 @@ SENSITIVE_FIELD_MAP = {
 NOTE_PERMISSION_KEYS = ("visit_need_tags", "visit_need_detail", "customer_info", "follow_up", "customer_feedback")
 NOTE_FIELD_MAP = {"needs": "visit_need", "feedback": "customer_info", "healing_notes": "follow_up", "experience": "customer_feedback",
                   "customer_info": "customer_info", "visit_need": "visit_need", "follow_up": "follow_up",
-                  "customer_feedback": "customer_feedback"}
+                  "customer_feedback": "customer_feedback", "cancel_reason": "follow_up"}
 
 
 def _note_access(roles, permissions):

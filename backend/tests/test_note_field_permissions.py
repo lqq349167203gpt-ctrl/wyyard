@@ -79,6 +79,30 @@ def test_single_field_visibility_across_visit_detail_report_and_course_entries(c
         assert client.post("/api/visit-notes", json={"visit_id": visit["id"], "category": blocked, "content": "越权写入"}).status_code == 403
 
 
+def test_cancel_reason_in_customer_follow_up_respects_visibility(client, created_customer, monkeypatch):
+    visit = _create_visit(client, created_customer["id"])
+    cancelled = client.patch(f"/api/visits/{visit['id']}", json={"cancelled": True, "cancel_reason": "客户临时改期"})
+    assert cancelled.status_code == 200, cancelled.text
+
+    for allowed, expected in [("visit_need_detail", ""), ("follow_up", "客户临时改期")]:
+        monkeypatch.setattr(access, "get_customer_permissions", lambda _, key=allowed: configured(key))
+        detail = client.get(f"/api/customer-detail/{created_customer['id']}", params={"section": "healing"})
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["visit_records"][0]["cancel_reason"] == expected
+        report = client.get("/api/daily-report", params={"date": visit["visit_date"]})
+        assert report.status_code == 200, report.text
+        assert next(row for row in report.json()["visits"] if row["id"] == visit["id"])["cancel_reason"] == expected
+        visit_detail = client.get(f"/api/visits/{visit['id']}")
+        assert visit_detail.status_code == 200, visit_detail.text
+        assert visit_detail.json()["cancel_reason"] == expected
+
+    restored = client.patch(f"/api/visits/{visit['id']}", json={"cancelled": False})
+    assert restored.status_code == 200, restored.text
+    detail = client.get(f"/api/customer-detail/{created_customer['id']}", params={"section": "healing"})
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["visit_records"][0]["cancel_reason"] == ""
+
+
 @pytest.mark.parametrize("entry", ["visit-notes", "customer-follow-ups"])
 @pytest.mark.parametrize("visible", ["visit_need_tags", "visit_need_detail"])
 def test_partial_edit_preserves_hidden_part(client, created_customer, monkeypatch, entry, visible):

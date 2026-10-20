@@ -379,7 +379,7 @@ def test_visit_and_all_schedule_types_use_field_level_creator_permissions(client
             assert forbidden_visit_update.status_code == 403
         cancel_visit = client.patch(
             f"/api/visits/{visit_id}",
-            json={"cancelled": True},
+            json={"cancelled": True, "cancel_reason": "客户行程调整"},
             headers=other_headers,
         )
         assert cancel_visit.status_code == 200

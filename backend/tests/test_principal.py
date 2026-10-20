@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from app.api import principal as principal_api
 from app.models.custom_analysis import AnalysisCondition
 from app.models.principal import ConversionAction, ConversionRule, PrincipalQuery
+from app.services import course_service, course_type_service
 from app.services import principal_service as service
 from app.services.principal_conversion_service import calculate_conversion
 
@@ -836,8 +837,8 @@ def test_collector_uses_course_org_and_excludes_hidden_voided_and_withdrawn(monk
     permissions = {"principal_scope": "all", "customer_access": {"transaction_access": "detail"}}
     monkeypatch.setattr(service, "scope", lambda _: ([org], people, permissions))
     monkeypatch.setattr(service.organization_service, "list_organizations", lambda: [org, NS(id="b", name="乙组织", member_ids=["teacher"])])
-    monkeypatch.setattr(service.course_service, "list_courses", lambda: [NS(id="course", organization_id="a")])
-    monkeypatch.setattr(service.course_type_service, "list_course_types", lambda: [])
+    monkeypatch.setattr(course_service, "list_courses", lambda: [NS(id="course", organization_id="a")])
+    monkeypatch.setattr(course_type_service, "list_course_types", lambda: [])
     course = ClassRecord(id="course-record", date="2026-01-01", course_id="course", course_name="公益", teacher_ids=["teacher"], participant_ids=["c1", "c2", "c3", "hidden"], withdrawn_participant_ids=["c2"], membership_deduction_count=0, created_at="2026-01-01T00:00:00Z", updated_at="2026-01-01T00:00:00Z")
     owner_sessions = {
         kind: NS(id=f"{kind}-session", date="2026-01-01", course_id="course", name=label,

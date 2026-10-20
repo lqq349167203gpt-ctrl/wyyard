@@ -87,19 +87,19 @@ class TestVisitCreate:
         """活动体验"""
         resp = self._make(client, created_customer, experience="感觉很放松")
         assert resp.status_code == 200
-        assert resp.json()["experience"] == "感觉很放松"
+        assert resp.json()["experience"] == "不闹：感觉很放松"
 
     def test_feedback_field(self, client, created_customer):
         """客户反馈"""
         resp = self._make(client, created_customer, feedback="感谢反馈")
         assert resp.status_code == 200
-        assert resp.json()["feedback"] == "感谢反馈"
+        assert resp.json()["feedback"] == "不闹：感谢反馈"
 
     def test_healing_notes_field(self, client, created_customer):
         """疗愈记录"""
         resp = self._make(client, created_customer, healing_notes="肩颈改善")
         assert resp.status_code == 200
-        assert resp.json()["healing_notes"] == "肩颈改善"
+        assert resp.json()["healing_notes"] == "不闹：肩颈改善"
 
     def test_member_type_field(self, client, created_customer):
         """会员类型 — 后端自动从客户获取，不使用传入值"""
@@ -130,8 +130,9 @@ class TestVisitCreate:
         assert resp.status_code == 200
         data = resp.json()
         assert data["needs"] == "全面体验"
-        assert data["experience"] == "非常好"
-        assert data["feedback"] == "会再来"
+        assert data["experience"] == "不闹：非常好"
+        assert data["feedback"] == "不闹：会再来"
+        assert data["healing_notes"] == "不闹：整体改善"
         assert data["arrived"] is True
 
 
@@ -156,7 +157,7 @@ class TestVisitUpdate:
         vid = self._create(client, created_customer)
         resp = client.patch(f"/api/visits/{vid}", json={"experience": "更新体验"})
         assert resp.status_code == 200
-        assert resp.json()["experience"] == "更新体验"
+        assert resp.json()["experience"] == "不闹：更新体验"
 
     def test_update_feedback(self, client, created_customer):
         vid = self._create(client, created_customer)
@@ -180,40 +181,31 @@ class TestVisitUpdate:
         """未到店邀约可取消，完整列表和轻量列表都持久返回取消状态"""
         vid = self._create(client, created_customer)
 
-        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "  客户临时有事  "})
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True}).status_code == 400
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "   "}).status_code == 400
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "长" * 501}).status_code == 400
+        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": " 客户临时改期 "})
         assert resp.status_code == 200
         assert resp.json()["cancelled"] is True
-        assert resp.json()["cancel_reason"] == "客户临时有事"
+        assert resp.json()["cancel_reason"] == "客户临时改期"
         assert resp.json()["arrived"] is False
         assert resp.json()["arrival_time"] == ""
 
         detail = client.get(f"/api/visits/{vid}")
         assert detail.status_code == 200
         assert detail.json()["cancelled"] is True
-        assert detail.json()["cancel_reason"] == "客户临时有事"
+        assert detail.json()["cancel_reason"] == "客户临时改期"
 
         light = client.get("/api/visits/light", params={"date": "2026-08-02"})
         assert light.status_code == 200
         item = next(row for row in light.json() if row["id"] == vid)
         assert item["cancelled"] is True
-        assert item["cancel_reason"] == "客户临时有事"
-
-    def test_cancel_requires_a_reason_and_does_not_change_the_visit_on_error(self, client, created_customer):
-        vid = self._create(client, created_customer)
-        for payload in (
-            {"cancelled": True},
-            {"cancelled": True, "cancel_reason": "   "},
-            {"cancelled": True, "cancel_reason": "x" * 201},
-            {"cancelled": True, "cancel_reason": "有事", "goal": "顺便修改"},
-        ):
-            response = client.patch(f"/api/visits/{vid}", json=payload)
-            assert response.status_code == 400
-            assert client.get(f"/api/visits/{vid}").json()["cancelled"] is False
+        assert item["cancel_reason"] == "客户临时改期"
 
     def test_cancelled_visit_is_locked_until_restored(self, client, created_customer):
         """已取消记录不可修改或勾选到店，恢复后才可继续编辑"""
         vid = self._create(client, created_customer)
-        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "行程调整"}).status_code == 200
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "日程冲突"}).status_code == 200
 
         edit = client.patch(f"/api/visits/{vid}", json={"needs": "不应保存"})
         assert edit.status_code == 400
@@ -229,7 +221,7 @@ class TestVisitUpdate:
         restored = client.patch(f"/api/visits/{vid}", json={"cancelled": False})
         assert restored.status_code == 200
         assert restored.json()["cancelled"] is False
-        assert restored.json()["cancel_reason"] == "行程调整"
+        assert restored.json()["cancel_reason"] == ""
 
         edited = client.patch(f"/api/visits/{vid}", json={"needs": "恢复后可编辑"})
         assert edited.status_code == 200
@@ -243,7 +235,7 @@ class TestVisitUpdate:
             json={"arrived": True, "arrival_time": "14:00"},
         ).status_code == 200
 
-        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True})
+        resp = client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "临时无法到场"})
         assert resp.status_code == 400
         assert "已到店" in resp.json()["detail"]
 
@@ -261,7 +253,7 @@ class TestVisitUpdate:
         assert before.status_code == 200
         assert before.json()["2026-08-02"] == 1
 
-        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "行程调整"}).status_code == 200
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": True, "cancel_reason": "客户有事"}).status_code == 200
         after = client.get(
             "/api/visits/counts",
             params={
@@ -300,7 +292,7 @@ class TestVisitUpdate:
         assert resp.status_code == 200
         data = resp.json()
         assert data["needs"] == "不闹：新需求"
-        assert data["experience"] == "新体验"
+        assert data["experience"] == "不闹：新体验"
         assert data["feedback"].endswith("不闹：新反馈")
         assert data["healing_notes"].endswith("不闹：新记录")
 

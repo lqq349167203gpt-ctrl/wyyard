@@ -28,6 +28,7 @@ function page(file, api, globals = {}) {
     '../../utils/note-feedback-meta': load('miniprogram/utils/note-feedback-meta.js'),
     '../../utils/visit-groups': load('miniprogram/utils/visit-groups.js'),
     '../../utils/record-ownership': { canEditRecord: () => true },
+    '../../utils/note-permissions': load('miniprogram/utils/note-permissions.js', {}, { wx: { getStorageSync: () => ({}) } }),
     '../../utils/customer-access': {}, '../../utils/customer-search': {},
     '../../utils/permissions': {} }, { Page: value => { instance = value }, wx: {}, ...globals })
   instance.data = structuredClone(instance.data)
@@ -123,6 +124,30 @@ test('日报普通内容不等待财务，财务失败可重试且不显示假�
   api.dailyReportApi.finance = async () => ({ sources: {}, deductions: [] })
   await p.retryFinance(); assert.equal(p.data.financeReady, true)
   assert.equal(p.data.visits[0].amountText, '0笔')
+})
+
+test('日报客户分三组，取消记录保留取消原因', () => {
+  const p = page('miniprogram/pages/daily-report/index.js', {})
+  p._customerMap = {}
+  p._memberIdentities = []
+  p._paymentData = null
+  const result = p._assemble({ visits: [
+    { id: 'c', customer_id: 'c', nickname: '取消', cancelled: true, cancel_reason: '客户改期' },
+    { id: 'p', customer_id: 'p', nickname: '待到店' },
+    { id: 'a', customer_id: 'a', nickname: '已到店', arrived: true },
+  ], activities: [], dashboard: {} }, '2026-10-01')
+  assert.deepEqual(Array.from(result.customerGroups, group => group.key), ['arrived', 'pending', 'cancelled'])
+  assert.deepEqual(Array.from(result.customerGroups, group => group.rows.map(row => row.id).join(',')), ['a', 'p', 'c'])
+  assert.equal(result.customerGroups[2].rows[0].cancelReason, '客户改期')
+  assert.equal(result.tabCounts.customers, 3)
+  p.data.customerGroups = result.customerGroups
+  p.setData = updates => {
+    const key = Object.keys(updates)[0]
+    const [, group, row] = key.match(/customerGroups\[(\d+)\]\.rows\[(\d+)\]\.open/)
+    p.data.customerGroups[group].rows[row].open = updates[key]
+  }
+  p.onVisitToggle({ currentTarget: { dataset: { groupIndex: 2, index: 0 } } })
+  assert.equal(p.data.customerGroups[2].rows[0].open, true)
 })
 
 test('日报旧日期和无交易权限不请求、不覆盖财务来源', async () => {
