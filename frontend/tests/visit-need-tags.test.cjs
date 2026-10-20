@@ -8,10 +8,11 @@ const React = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
 const root = path.resolve(__dirname, '../..')
 
-function setup() {
+function setup(notes = []) {
   let component
   const writes = []
   const api = {
+    list: async () => notes,
     create: async data => writes.push({ action: 'create', ...data }),
     update: async (id, content, data) => writes.push({ action: 'update', id, content, ...data }),
     delete: async id => writes.push({ action: 'delete', id }),
@@ -30,7 +31,7 @@ function setup() {
   const instance = { ...component.methods, properties: { visitId: 'v', category: 'visit_need', readOnly: false },
     data: JSON.parse(JSON.stringify(component.data)), setData(update) { Object.assign(this.data, update) }, loadNotes: async () => {} }
   instance.data.editorOpen = true
-  return { instance, writes }
+  return { instance, writes, loadNotes: component.methods.loadNotes }
 }
 
 test('来访需求可多选后只保存标签，编辑可以减少或清空标签', async () => {
@@ -61,6 +62,19 @@ test('停用需求标签的历史选项仍回显，只读模式禁止保存', as
   instance.properties.readOnly = true
   await instance.onSubmit()
   assert.equal(writes.length, 0)
+})
+
+test('小程序读取本人和他人需求时保留独立标签，正文不混入标签名称', async () => {
+  const notes = [
+    { id: 'mine', category: 'visit_need', created_by_id: 'me', can_edit: true, content: '具体情况', need_tags: [{ id: 'a', name: '关系' }] },
+    { id: 'other', category: 'visit_need', created_by_id: 'other', content: '', need_tags: [{ id: 'b', name: '工作' }] },
+  ]
+  const { instance, loadNotes } = setup(notes)
+  await loadNotes.call(instance)
+  assert.equal(instance.data.myNote.content, '具体情况')
+  assert.equal(instance.data.myNote.need_tags[0].name, '关系')
+  assert.equal(instance.data.otherNotes[0].content, '')
+  assert.equal(instance.data.otherNotes[0].need_tags[0].name, '工作')
 })
 
 function renderCell({ tags = true, detail = true, expanded = true, content = '具体情况' } = {}) {
@@ -97,4 +111,25 @@ test('PC 标签与正文分别遵从查看权限', () => {
   assert.ok(!renderCell({ tags: false }).includes('关系'))
   assert.ok(!renderCell({ detail: false }).includes('具体情况'))
   assert.equal(renderCell({ tags: false, detail: false }), '')
+})
+
+test('小程序邀约卡片分离需求标签与正文，并遵从独立查看权限', () => {
+  let component
+  let visibility = { visit_need_tags: true, visit_need_detail: true }
+  vm.runInNewContext(readFileSync(path.join(root, 'miniprogram/components/visit-card/index.js'), 'utf8'), {
+    Component(value) { component = value }, require() { return { noteVisibility: () => visibility } },
+  })
+  const instance = { data: {}, setData(update) { Object.assign(this.data, update) } }
+  const visit = { visit_need_entries: [{ id: 'n', feedback_person: '甲', content: '详情', need_tags: [{ id: 'a', name: '关系' }] }] }
+  component.observers.visit.call(instance, visit)
+  assert.equal(instance.data.needEntries[0].tags[0].name, '关系')
+  assert.equal(instance.data.needEntries[0].content, '详情')
+  visibility = { visit_need_tags: false, visit_need_detail: true }
+  component.observers.visit.call(instance, visit)
+  assert.equal(instance.data.needEntries[0].tags.length, 0)
+  visibility = { visit_need_tags: true, visit_need_detail: false }
+  component.observers.visit.call(instance, visit)
+  assert.equal(instance.data.needEntries[0].content, '')
+  component.observers.visit.call(instance, {})
+  assert.equal(instance.data.hasStructuredNeeds, false)
 })

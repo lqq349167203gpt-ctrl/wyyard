@@ -628,6 +628,8 @@ def list_visits_light(date: Optional[str] = None, space_id: Optional[str] = None
                 "is_leader": r.is_leader,
                 "space_id": r.space_id or "",
                 "member_type": member_type,
+                "card_status": getattr(customer, "card_status", "") if customer else "",
+                "card_status_tone": getattr(customer, "card_status_tone", "neutral") if customer else "neutral",
                 "remaining_count": remaining_count,
                 "activity_count": all_activity_counts.get(r.customer_id, 0),
                 "visit_count": len(all_visit_dates.get(r.customer_id, set())),
@@ -1080,6 +1082,8 @@ def search_customers(keyword: str) -> List[CustomerSearchResult]:
                 nickname=c.nickname,
                 name=c.name or "",
                 member_type=c.member_type or "",
+                card_status=c.card_status,
+                card_status_tone=c.card_status_tone,
                 visit_count=count_customer_visits(c.id),
             ))
     return results

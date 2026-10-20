@@ -205,6 +205,7 @@ def get_customer_detail(customer_id: str, request: Request, date: str | None = N
                 "need_tags": getattr(note, "need_tags", []),
                 "created_by_id": note.created_by_id,
                 "created_by": note.created_by,
+                "feedback_person": getattr(note, "feedback_person", ""),
                 "created_at": note.created_at,
                 "updated_at": note.updated_at,
             }
@@ -660,7 +661,8 @@ def _build_purchase_summary(customer_id: str) -> list:
             summary.append({"type": "线上茶疗", "name": "线上茶疗", "total_purchased": 1,
                 "total_amount": None, "amount_recorded": False, "remaining": "-", "used": "-",
                 "current_remaining": 1 if current else 0, "current_total": 1 if current else 0,
-                "effective_date": record.effective_date, "expiry_date": record.expiry_date, "validity_value": record.validity_value})
+                "effective_date": record.effective_date, "expiry_date": record.expiry_date,
+                "validity_value": record.validity_value, "validity_unit": record.validity_unit})
 
     # 线下落地课程
     oc_courses = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]
@@ -721,6 +723,15 @@ def _build_activities(
 ) -> list:
     """合并客户参与的活动，可按活动日期过滤；不按客户端发布状态过滤。"""
     from app.api.statistics import _course_activity_name
+    from app.services import course_attendance_service
+
+    confirmations = course_attendance_service.snapshot()
+
+    def confirmed_in_course(source, record):
+        legacy = {customer_id} if record.date in arrived_dates else set()
+        return customer_id in course_attendance_service.attended_ids(
+            source, record.id, legacy, record=record, confirmations=confirmations,
+        )
 
     # 未指定到达日期时，从到访记录自动计算
     if arrived_dates is None:
@@ -792,7 +803,7 @@ def _build_activities(
             participant_ids=registered_participants,
         )
         if role:
-            attended = r.date in arrived_dates and not withdrawn
+            attended = confirmed_in_course("class", r) and not withdrawn
             membership_count = usage_labels.get(f"class:{r.id}", {}).get("会员卡扣卡", 0) if attended else 0
             activities.append({
                 "type": "沙龙类型",
@@ -833,7 +844,7 @@ def _build_activities(
         )
         if role:
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
-            attended = s.date in arrived_dates and not withdrawn
+            attended = confirmed_in_course("gcs", s) and not withdrawn
             membership_count = usage_labels.get(f"gcs:{s.id}", {}).get("会员卡扣卡", 0) if attended else 0
             activities.append({
                 "type": "觉醒游戏",
@@ -874,7 +885,7 @@ def _build_activities(
         )
         if role:
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
-            attended = s.date in arrived_dates and not withdrawn
+            attended = confirmed_in_course("ers", s) and not withdrawn
             membership_count = usage_labels.get(f"ers:{s.id}", {}).get("会员卡扣卡", 0) if attended else 0
             activities.append({
                 "type": "情绪释放",
@@ -913,7 +924,7 @@ def _build_activities(
         )
         if role:
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
-            attended = s.date in arrived_dates and not withdrawn
+            attended = confirmed_in_course("eks", s) and not withdrawn
             project_count = energy_knot_session_service.get_session_deduction_count(s, customer_id) if role == "案主" else 0
             activities.append({
                 "type": "深度情绪释放",
@@ -948,7 +959,7 @@ def _build_activities(
         )
         if role:
             withdrawn = customer_id in set(s.withdrawn_participant_ids or [])
-            attended = s.date in arrived_dates and not withdrawn
+            attended = confirmed_in_course("ics", s) and not withdrawn
             activities.append({
                 "type": "沙龙技能学习",
                 "date": s.date,
@@ -1175,7 +1186,8 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
     for record in online_tea_service.list_records():
         if record.customer_id == customer_id and (not date or record.deal_date == date):
             records.append({"source_id": record.id, "source_created_at": record.created_at.isoformat(),
-                "type": "线上茶疗", "name": "线上茶疗", "quantity": f"{record.validity_value} 个月",
+                "type": "线上茶疗", "name": "线上茶疗",
+                "quantity": f"{record.validity_value}{'天' if record.validity_unit == 'day' else '个月'}",
                 "amount": None, "amount_recorded": False, "deal_date": record.deal_date,
                 "effective_date": record.effective_date, "expiry_date": record.expiry_date,
                 "closer_name": "、".join(c.get("name", "") for c in record.closers) or record.closer_name or "",

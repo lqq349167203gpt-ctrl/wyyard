@@ -1,4 +1,7 @@
-const { activityParticipantNoteApi, activityThemeApi, activityWithdrawalApi, classRecordApi, spaceApi } = require('../../utils/api')
+const { onWorkflowTap, applyCourseWorkflow } = require('../../utils/schedule-workflow')
+const { activityParticipantNoteApi, activityThemeApi, activityWithdrawalApi, classRecordApi, spaceApi, visitNoteApi } = require('../../utils/api')
+const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
+const { followUpPlanText } = require('../../utils/note-feedback-meta')
 const { formatDate } = require('../../utils/util')
 const { BADGE_COLORS } = require('../../utils/activity-constants')
 const { canEditActivityContent, canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
@@ -121,6 +124,7 @@ function buildParticipantList(raw, source, visitMap) {
     const expectedTime = visit && visit.visit_time ? visit.visit_time : '未填写'
     const metaItems = []
     if (memberType !== '未记录') metaItems.push(memberType)
+    if (visit && visit.card_status) metaItems.push(visit.card_status)
     if (remainingText !== '未记录') metaItems.push(remainingText)
     if (inviter !== '未记录') metaItems.push(`${inviter}邀约`)
     if (expectedTime !== '未填写') metaItems.push(`预计 ${expectedTime}`)
@@ -157,39 +161,56 @@ function buildParticipantList(raw, source, visitMap) {
   return participants
 }
 
-function decorateParticipantNotes(participants, notes) {
+const PARTICIPANT_NOTE_FIELDS = [
+  { category: 'customer_info', prefix: 'customerInfo' },
+  { category: 'follow_up', prefix: 'followUp' },
+  { category: 'customer_feedback', prefix: 'customerFeedback' },
+]
+
+function decorateParticipantNotes(participants, notes, feedbackOptions = [], followUpPeople = [], defaultFollowUpIndex = 0, currentPerson = {}) {
   const allNotes = Array.isArray(notes) ? notes : []
   return participants.map(function(participant) {
     const participantNotes = allNotes.filter(function(note) {
       return note.customer_id === participant.id
     })
-    const customerInfoNotes = participantNotes.filter(function(note) {
-      return note.category === 'customer_info'
+    const fields = {}
+    PARTICIPANT_NOTE_FIELDS.forEach(function(field) {
+      const categoryNotes = participantNotes.filter(note => note.category === field.category)
+      const own = categoryNotes.find(note => note.can_edit) || null
+      const prefix = field.prefix
+      fields[`${prefix}NoteId`] = own ? own.id : ''
+      fields[`${prefix}Value`] = own ? own.content : ''
+      fields[`${prefix}Original`] = own ? own.content : ''
+      fields[`${prefix}FeedbackIndex`] = pickerData({ options: feedbackOptions, current_person: currentPerson }, own).index
+      fields[`${prefix}FeedbackName`] = (feedbackOptions[fields[`${prefix}FeedbackIndex`]] || {}).name || '选择反馈人'
+      fields[`${prefix}FeedbackOriginal`] = own ? (own.feedback_person_id || own.feedback_person || '') : ''
+      fields[`${prefix}OtherNotes`] = categoryNotes.filter(note => !note.can_edit).map(note => ({
+        ...note,
+        author: note.feedback_person || note.created_by || '其他同事',
+        followUpText: followUpPlanText(note),
+      }))
+      fields[`has${prefix[0].toUpperCase()}${prefix.slice(1)}`] = categoryNotes.length > 0
     })
-    const followUpNotes = participantNotes.filter(function(note) {
-      return note.category === 'follow_up'
-    })
-    const ownCustomerInfo = customerInfoNotes.find(function(note) { return note.can_edit }) || null
-    const ownFollowUp = followUpNotes.find(function(note) { return note.can_edit }) || null
-    return Object.assign({}, participant, {
-      customerInfoNoteId: ownCustomerInfo ? ownCustomerInfo.id : '',
-      customerInfoValue: ownCustomerInfo ? ownCustomerInfo.content : '',
-      customerInfoOriginal: ownCustomerInfo ? ownCustomerInfo.content : '',
-      customerInfoOtherNotes: customerInfoNotes.filter(function(note) { return !note.can_edit }),
-      followUpNoteId: ownFollowUp ? ownFollowUp.id : '',
-      followUpValue: ownFollowUp ? ownFollowUp.content : '',
-      followUpOriginal: ownFollowUp ? ownFollowUp.content : '',
-      followUpOtherNotes: followUpNotes.filter(function(note) { return !note.can_edit }),
-      hasCustomerInfo: customerInfoNotes.length > 0,
-      hasFollowUp: followUpNotes.length > 0,
-      isComplete: customerInfoNotes.length > 0 && followUpNotes.length > 0,
-    })
+    const ownFollowUp = participantNotes.find(note => note.category === 'follow_up' && note.can_edit)
+    const planId = ownFollowUp && ownFollowUp.next_follow_up_person_id || ''
+    const planName = ownFollowUp && ownFollowUp.next_follow_up_person || ''
+    fields.followUpPersonIndex = ownFollowUp
+      ? Math.max(0, followUpPeople.findIndex(person => planId ? person.id === planId : person.nickname === planName))
+      : defaultFollowUpIndex
+    fields.followUpPersonName = (followUpPeople[fields.followUpPersonIndex] || {}).nickname || '不指定'
+    fields.followUpPersonOriginal = planId || planName
+    fields.followUpDate = ownFollowUp && ownFollowUp.next_follow_up_date || ''
+    fields.followUpDateOriginal = fields.followUpDate
+    fields.isComplete = fields.hasCustomerInfo && fields.hasFollowUp
+    return Object.assign({}, participant, fields)
   })
 }
 
 Page({
+  onWorkflowTap,
   data: {
     hasPagePermission: true,
+    courseMode: 'schedule',
     currentDate: '',
     currentDateShort: '',
     currentWeekday: '',
@@ -229,6 +250,8 @@ Page({
     participantSheetExpandedId: '',
     participantSheetOnlyIncomplete: false,
     participantSheetEditable: true,
+    participantFeedbackOptions: [],
+    participantFollowUpPeople: [],
     loading: true,
     isViewOnly: false,
     isDayLocked: false,
@@ -263,6 +286,7 @@ Page({
 
   onShow() {
     if (!getApp().checkLogin()) return
+    applyCourseWorkflow.call(this)
     this.refreshActionPermissions()
     const sharedDate = readScheduleDate(this.data.currentDate)
     if (sharedDate && this.data.currentDate && sharedDate !== this.data.currentDate && parseLocalDate(sharedDate)) {
@@ -583,10 +607,8 @@ Page({
         if (r.isPublicWelfare) metaParts.push('扣卡 0 次')
         else if (r.deductionCount > 0) metaParts.push(`扣卡 ${r.deductionCount} 次`)
         r.metaText = metaParts.join(' · ')
-        r.rosterCount = rosterParticipants.length
-        r.participantRosterText = rosterParticipants.length
-          ? `${rosterParticipants.length} 人 · ${rosterParticipants.map(function(item) { return item.nickname }).join('、')}`
-          : '0 人'
+        r.rosterCount = rosterParticipants.filter(item => !item.withdrawn).length
+        r.participantRosterText = `${r.rosterCount} 人参与`
       })
       const timeGroups = groupByTimeSlot(records)
 
@@ -679,6 +701,7 @@ Page({
   // ---------- 导航 ----------
 
   onActivityTap(e) {
+    if (this.data.courseMode === 'completion') { this.onParticipantsOpen(e); return }
     const record = e.currentTarget.dataset.record
     if (!record || !record.id) return
     const raw = this._rawMap[`${record.source}_${record.id}`]
@@ -689,33 +712,10 @@ Page({
     wx.navigateTo({ url: '/pages/activity-detail/index' })
   },
 
-  async onParticipantsOpen(e) {
+  onParticipantsOpen(e) {
     const record = e.currentTarget.dataset.record
     if (!record || !record.id) return
-    const raw = this._rawMap && this._rawMap[`${record.source}_${record.id}`]
-    if (!raw) return
-
-    const participants = buildParticipantList(raw, record.source, this._visitMap)
-    this._participantSheetRecord = record
-    this._participantSheetParticipants = participants
-
-    this.setData({
-      showParticipantSheet: true,
-      participantSheetTitle: record.displayName || record.name || record.badge || '课程参与人员',
-      participantSheetMeta: [record.displayName || record.name || record.badge || '', (record.time || '').replace('-', '–')]
-        .filter(Boolean)
-        .join(' · '),
-      participantSheetList: decorateParticipantNotes(participants, []),
-      participantSheetVisibleList: decorateParticipantNotes(participants, []),
-      participantSheetCompletedCount: 0,
-      participantSheetTotalCount: participants.filter(function(item) { return !item.withdrawn }).length,
-      participantSheetLoading: true,
-      participantSheetSavingId: '',
-      participantSheetExpandedId: '',
-      participantSheetOnlyIncomplete: false,
-      participantSheetEditable: this.data.canEditParticipantNotes,
-    })
-    await this._loadParticipantNotes()
+    wx.navigateTo({ url: `/pages/course-roster/index?source=${encodeURIComponent(record.source)}&id=${encodeURIComponent(record.id)}` })
   },
 
   async _loadParticipantNotes(expandedId) {
@@ -724,15 +724,37 @@ Page({
     if (!record || !record.id) return []
     const requestKey = `${record.source}_${record.id}`
     try {
-      const notes = await activityParticipantNoteApi.list(
-        record.source,
-        record.id,
-        participants.map(function(item) { return item.id }),
-      )
+      const [notes, feedbackResponse, followUpResponse] = await Promise.all([
+        activityParticipantNoteApi.list(record.source, record.id, participants.map(item => item.id)),
+        visitNoteApi.feedbackPeople(),
+        visitNoteApi.followUpPeople(),
+      ])
       const currentRecord = this._participantSheetRecord
       if (!currentRecord || `${currentRecord.source}_${currentRecord.id}` !== requestKey) return []
-      const list = decorateParticipantNotes(participants, notes)
+      const feedbackOptions = (feedbackResponse.options || []).slice()
+      const currentPerson = feedbackResponse.current_person || {}
+      if (currentPerson.name && !feedbackOptions.some(option => option.customer_id === currentPerson.customer_id && option.name === currentPerson.name)) feedbackOptions.unshift(currentPerson)
+      notes.forEach(note => {
+        if (note.feedback_person && !feedbackOptions.some(option => note.feedback_person_id ? option.customer_id === note.feedback_person_id : option.name === note.feedback_person)) {
+          feedbackOptions.push({ customer_id: note.feedback_person_id || '', name: note.feedback_person })
+        }
+      })
+      const followUpPeople = [{ id: '', nickname: '不指定' }].concat(followUpResponse || [])
+      let defaultFollowUpIndex = followUpPeople.findIndex(person => currentPerson.customer_id
+        ? person.id === currentPerson.customer_id : person.nickname === currentPerson.name)
+      if (defaultFollowUpIndex < 0 && currentPerson.name) {
+        followUpPeople.splice(1, 0, { id: currentPerson.customer_id || '', nickname: currentPerson.name })
+        defaultFollowUpIndex = 1
+      }
+      notes.forEach(note => {
+        if (note.next_follow_up_person && !followUpPeople.some(person => note.next_follow_up_person_id ? person.id === note.next_follow_up_person_id : person.nickname === note.next_follow_up_person)) {
+          followUpPeople.push({ id: note.next_follow_up_person_id || '', nickname: note.next_follow_up_person })
+        }
+      })
+      const list = decorateParticipantNotes(participants, notes, feedbackOptions, followUpPeople, Math.max(0, defaultFollowUpIndex), currentPerson)
       this._applyParticipantSheetList(list, {
+        participantFeedbackOptions: feedbackOptions,
+        participantFollowUpPeople: followUpPeople,
         participantSheetLoading: false,
         participantSheetExpandedId: expandedId === undefined
           ? this.data.participantSheetExpandedId
@@ -776,7 +798,7 @@ Page({
   onParticipantNoteInput(e) {
     const customerId = e.currentTarget.dataset.id
     const field = e.currentTarget.dataset.field
-    if (!customerId || !['customerInfoValue', 'followUpValue'].includes(field)) return
+    if (!customerId || !PARTICIPANT_NOTE_FIELDS.some(item => `${item.prefix}Value` === field)) return
     const list = this.data.participantSheetList.map(function(item) {
       return item.id === customerId
         ? Object.assign({}, item, { [field]: e.detail.value })
@@ -785,17 +807,66 @@ Page({
     this._applyParticipantSheetList(list)
   },
 
+  onParticipantFeedbackChange(e) {
+    if (!this.data.participantSheetEditable) return
+    const prefix = e.currentTarget.dataset.prefix
+    const index = Number(e.detail.value)
+    this._updateParticipantFields(e.currentTarget.dataset.id, {
+      [`${prefix}FeedbackIndex`]: index,
+      [`${prefix}FeedbackName`]: (this.data.participantFeedbackOptions[index] || {}).name || '选择反馈人',
+    })
+  },
+
+  onParticipantFollowUpPerson(e) {
+    if (!this.data.participantSheetEditable) return
+    const index = Number(e.detail.value)
+    this._updateParticipantFields(e.currentTarget.dataset.id, {
+      followUpPersonIndex: index,
+      followUpPersonName: (this.data.participantFollowUpPeople[index] || {}).nickname || '不指定',
+    })
+  },
+
+  onParticipantFollowUpDate(e) {
+    if (!this.data.participantSheetEditable) return
+    this._updateParticipantField(e.currentTarget.dataset.id, 'followUpDate', e.detail.value)
+  },
+
+  onParticipantClearFollowUpDate(e) {
+    if (!this.data.participantSheetEditable) return
+    this._updateParticipantField(e.currentTarget.dataset.id, 'followUpDate', '')
+  },
+
+  _updateParticipantField(customerId, field, value) {
+    this._updateParticipantFields(customerId, { [field]: value })
+  },
+
+  _updateParticipantFields(customerId, values) {
+    if (!customerId) return
+    this._applyParticipantSheetList(this.data.participantSheetList.map(item => item.id === customerId
+      ? { ...item, ...values } : item))
+  },
+
   async _saveParticipantNoteCategory(participant, category) {
     if (!this.data.noteVisibility[category]) return
     const record = this._participantSheetRecord
-    const isCustomerInfo = category === 'customer_info'
-    const valueField = isCustomerInfo ? 'customerInfoValue' : 'followUpValue'
-    const originalField = isCustomerInfo ? 'customerInfoOriginal' : 'followUpOriginal'
-    const noteIdField = isCustomerInfo ? 'customerInfoNoteId' : 'followUpNoteId'
+    const prefix = PARTICIPANT_NOTE_FIELDS.find(field => field.category === category).prefix
+    const valueField = `${prefix}Value`
+    const originalField = `${prefix}Original`
+    const noteIdField = `${prefix}NoteId`
     const content = String(participant[valueField] || '').trim()
     const original = String(participant[originalField] || '').trim()
     const noteId = participant[noteIdField]
-    if (content === original) return
+    const feedback = attributionFromPicker(this.data.participantFeedbackOptions, participant[`${prefix}FeedbackIndex`])
+    const feedbackChanged = (feedback.feedback_person_id || feedback.feedback_person) !== participant[`${prefix}FeedbackOriginal`]
+    const planPerson = this.data.participantFollowUpPeople[participant.followUpPersonIndex] || {}
+    const plan = category === 'follow_up' ? {
+      next_follow_up_person_id: planPerson.id || '',
+      next_follow_up_person: participant.followUpPersonIndex ? planPerson.nickname : '',
+      next_follow_up_date: participant.followUpDate || '',
+    } : {}
+    const planChanged = category === 'follow_up' && ((plan.next_follow_up_person_id || plan.next_follow_up_person) !== participant.followUpPersonOriginal
+      || plan.next_follow_up_date !== participant.followUpDateOriginal)
+    if (content === original && !feedbackChanged && !planChanged) return
     if (!content) {
       if (noteId) await activityParticipantNoteApi.delete(noteId)
       return
@@ -806,6 +877,8 @@ Page({
       customer_id: participant.id,
       category,
       content,
+      ...feedback,
+      ...plan,
     })
   },
 
@@ -815,20 +888,15 @@ Page({
       return item.id === customerId
     })
     if (!participant || participant.withdrawn || this.data.participantSheetSavingId) return
-    const hasInput = String(participant.customerInfoValue || '').trim()
-      || String(participant.followUpValue || '').trim()
-      || participant.customerInfoNoteId
-      || participant.followUpNoteId
+    const hasInput = PARTICIPANT_NOTE_FIELDS.some(field => String(participant[`${field.prefix}Value`] || '').trim()
+      || participant[`${field.prefix}NoteId`])
     if (!hasInput) {
       wx.showToast({ title: '请至少填写一项内容', icon: 'none' })
       return
     }
     this.setData({ participantSheetSavingId: customerId })
     try {
-      await Promise.all([
-        this._saveParticipantNoteCategory(participant, 'customer_info'),
-        this._saveParticipantNoteCategory(participant, 'follow_up'),
-      ])
+      for (const field of PARTICIPANT_NOTE_FIELDS) await this._saveParticipantNoteCategory(participant, field.category)
       const refreshed = await this._loadParticipantNotes('')
       const currentIndex = refreshed.findIndex(function(item) { return item.id === customerId })
       const next = refreshed.slice(currentIndex + 1)

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import { Button } from "@/components/ui/button"
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   classRecordApi,
@@ -66,6 +67,8 @@ export function AuditEditDrawer({
 }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const [cancelReasonOpen, setCancelReasonOpen] = useState(false)
+  const [pendingCancelReason, setPendingCancelReason] = useState("")
   // 参与人候选：已选的人 + 当天有邀约的人（不是把全部客户都堆进去），并带上当天到店状态
   const [visitMap, setVisitMap] = useState<Record<string, { arrived: boolean; cancelled: boolean }> | null>(null)
   // 沙龙类型选项和课表页同一份（课程类型里去掉「其他」）
@@ -251,23 +254,23 @@ export function AuditEditDrawer({
         // 后端要求取消/恢复必须单独提交，所以按方向决定先后顺序。
         const wantsCancelled = Boolean(draft.cancelled)
         const cancelledChanged = wantsCancelled !== visit.cancelled
-        const cancelReason = String(draft.cancel_reason || "").trim()
-        if (wantsCancelled && (!visit.cancelled || Object.keys(payload).length > 0 || cancelReason !== visit.cancel_reason) && !cancelReason) {
-          setError("请输入取消原因")
+        const reason = String(draft.cancel_reason || "").trim()
+        if (wantsCancelled && (!reason || reason.length > 500)) {
+          setError("请填写不超过500字的取消原因")
           return
         }
         const applyFields = async () => {
           if (Object.keys(payload).length > 0) await visitApi.update(visit.id, payload)
         }
-        if (visit.cancelled && (Object.keys(payload).length > 0 || cancelledChanged || cancelReason !== visit.cancel_reason)) {
+        if (visit.cancelled && (cancelledChanged || Object.keys(payload).length > 0)) {
           // 已取消的记录：先恢复 → 改内容 → 用户还要保持取消就再取消回去
           // （后端规定已取消的记录只允许「恢复」这一个动作）
           await visitApi.update(visit.id, { cancelled: false })
           await applyFields()
-          if (wantsCancelled) await visitApi.update(visit.id, { cancelled: true, cancel_reason: cancelReason })
+          if (wantsCancelled) await visitApi.update(visit.id, { cancelled: true, cancel_reason: reason })
         } else {
           await applyFields()
-          if (cancelledChanged) await visitApi.update(visit.id, wantsCancelled ? { cancelled: true, cancel_reason: cancelReason } : { cancelled: false })
+          if (cancelledChanged) await visitApi.update(visit.id, { cancelled: wantsCancelled, cancel_reason: reason })
         }
       } else if (course) {
         const recordId = course.id.split(":")[1] || ""
@@ -383,25 +386,26 @@ export function AuditEditDrawer({
                     type="checkbox"
                     checked={Boolean(draft.cancelled)}
                     disabled={!canEdit("cancelled") || (!draft.cancelled && Boolean(draft.arrived))}
-                    onChange={event => set("cancelled", event.target.checked)}
+                    onChange={event => {
+                      if (event.target.checked) {
+                        setPendingCancelReason(String(draft.cancel_reason || ""))
+                        setCancelReasonOpen(true)
+                      } else {
+                        set("cancelled", false)
+                        set("cancel_reason", "")
+                      }
+                    }}
                     className="h-4 w-4 accent-[#3370ff]"
                   />
                   已取消邀约
                 </label>
               </Field>
-              {Boolean(draft.cancelled) && (
-                <Field label="取消原因">
-                  <textarea
-                    value={String(draft.cancel_reason || "")}
-                    disabled={!canEdit("cancelled")}
-                    onChange={event => set("cancel_reason", event.target.value)}
-                    maxLength={200}
-                    rows={3}
-                    placeholder="请输入取消原因"
-                    className="w-full resize-none rounded-[4px] border-[0.5px] border-[#e1e4e7] px-2 py-1.5 text-[12px] leading-5 outline-none focus:border-[#b9cdf8]"
-                  />
-                </Field>
-              )}
+              {Boolean(draft.cancelled) && <Field label="取消原因">
+                <textarea value={String(draft.cancel_reason || "")} maxLength={500} rows={2}
+                  disabled={!canEdit("cancelled")}
+                  onChange={event => set("cancel_reason", event.target.value)}
+                  className="w-full resize-none rounded-[4px] border-[0.5px] border-[#e1e4e7] px-2 py-1.5 text-[12px] leading-5 outline-none focus:border-[#b9cdf8]" />
+              </Field>}
             </>
           ) : course ? (
             <>
@@ -550,6 +554,24 @@ export function AuditEditDrawer({
           </Button>
         </div>
       </SheetContent>
+      <AlertDialog open={cancelReasonOpen} onOpenChange={setCancelReasonOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>取消邀约</AlertDialogTitle>
+            <AlertDialogDescription>请填写取消原因，保存后生效。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <textarea autoFocus value={pendingCancelReason} maxLength={500} rows={3}
+            onChange={event => setPendingCancelReason(event.target.value)} placeholder="请输入取消原因"
+            className="w-full resize-none rounded-[4px] border border-[#dfe2e6] px-3 py-2 text-[12px] outline-none focus:border-[#3370ff]" />
+          <AlertDialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setCancelReasonOpen(false)}>返回</Button>
+            <Button size="sm" disabled={!pendingCancelReason.trim()} onClick={() => {
+              setDraft(current => ({ ...current, cancelled: true, cancel_reason: pendingCancelReason.trim() }))
+              setCancelReasonOpen(false)
+            }}>确认</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   )
 }

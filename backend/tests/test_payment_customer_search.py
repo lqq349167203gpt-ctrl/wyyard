@@ -9,7 +9,7 @@ from app.services import customer_access_service, customer_service, project_dedu
     ("group-cases", {"purchase_count": 1, "amount": 0}),
     ("emotional-releases", {"purchase_count": 1, "amount": 0}),
     ("energy-knots", {"purchase_count": 1, "amount": 0}),
-    ("oh-card-readings", {"reading_type": "OH卡情感梳理", "amount": 0}),
+    ("oh-card-readings", {"reading_type": "OH卡情感梳理", "diagnosis_teacher": "老师甲", "amount": 0}),
     ("tea-seat-fees", {"quantity": 1, "amount": 0}),
     ("offline-courses", {"course_type": "主理人训练", "amount": 0}),
     ("internal-courses", {"course_type": "OH卡技能梳理", "price": 0}),

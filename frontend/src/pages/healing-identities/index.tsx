@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useState } from "react"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
 import { Users, Zap, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react"
@@ -216,7 +217,7 @@ export default function HealingIdentitiesPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs">{member.name || "-"}</TableCell>
-                      <TableCell className="text-xs">{member.member_type || "-"}</TableCell>
+                      <TableCell className="text-xs"><MemberLabels customer={member} /></TableCell>
                       <TableCell className="text-xs">{member.visit_count || 0}</TableCell>
                       <TableCell className="text-right pr-4">
                         <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => { setDeletingMember(member); setDeleteDialogOpen(true) }}>

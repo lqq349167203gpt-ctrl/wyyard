@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "邀约",
-  "navigationBarBackgroundColor": "#f3f7ff",
+  "navigationBarBackgroundColor": "#c6e4fe",
   "navigationBarTextStyle": "black",
   "usingComponents": {
     "visit-card": "/components/visit-card/index",

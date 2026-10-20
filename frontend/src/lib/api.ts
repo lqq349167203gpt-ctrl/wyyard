@@ -118,6 +118,8 @@ export interface PrincipalBreakdownCustomer {
   upsell_levels?: PrincipalBreakdownItem[]
   /** 会员身份（未到店 / 398卡 / 30次卡 …） */
   identity?: string
+  card_status?: string
+  card_status_tone?: string
   /** 承接人 */
   referrer_handler?: string
   follow_up_status?: string
@@ -257,6 +259,8 @@ export interface PrincipalBreakdown {
       customer: string
       name: string
       identity: string
+      card_status?: string
+      card_status_tone?: string
       referrer?: string
       referrer_handler?: string
       follow_up_status?: string
@@ -288,6 +292,7 @@ export interface PrincipalBreakdown {
     upsell?: PrincipalBreakdownItem[]
     /** 会员身份人数（跟着当前所有筛选走，本身不是筛选项） */
     identity?: PrincipalBreakdownItem[]
+    card_status?: PrincipalBreakdownItem[]
   }
   /** 当前角色能看到哪些客户档案隐私字段（到访目的 / 创伤经历 / 当下卡点 / 工作情况 / 其他信息） */
   traffic_profile_fields?: string[]
@@ -729,7 +734,7 @@ export interface Customer {
   referral_date: string
   referrer_handler: string
   follow_up_status: CustomerFollowUpStatus
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   service_teacher: string
   paid_content: PaidContentItem[]
   visit_count: number
@@ -755,6 +760,7 @@ export interface Customer {
   other_info: string
   traffic_source: string
   traffic_source_detail: string
+  traffic_post_name?: string
   tracking_plan: string
   position_sort_orders: Record<string, number>
   space_id: string
@@ -774,7 +780,7 @@ export interface CustomerLight {
   gender?: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   positions: string[]
   position_sort_orders: Record<string, number>
   created_at: string
@@ -783,6 +789,7 @@ export interface CustomerLight {
   referrer: string
   referrers?: string[]
   service_teacher?: string
+  referrer_handler?: string
   referral_date: string
   space_id: string
 }
@@ -791,7 +798,7 @@ export interface DisabledCustomer {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   phone: string
   deleted_at: string
   deleted_by: string
@@ -815,8 +822,49 @@ function customerLightScope() {
   return JSON.stringify(["authToken", "userPermissions", "userEditPermissions"].map(key => localStorage.getItem(key)))
 }
 
+export interface CustomerExportParams {
+  card_statuses: string[]
+  member_types: string[]
+  service_teachers: string[]
+  referrers: string[]
+  referrer_handlers: string[]
+  date_from?: string
+  date_to?: string
+  columns?: string[]
+}
+
+export interface CustomerExportColumn { key: string; label: string; group: string; default: boolean }
+
 export const customerApi = {
+  assignmentOptions: () => request<CustomerLight[]>("/api/customers/assignment-options"),
   list: () => request<Customer[]>("/api/customers"),
+  exportOptions: () => request<CustomerExportColumn[]>("/api/customers/export-options"),
+  export: async (filters: CustomerExportParams) => {
+    const query = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (Array.isArray(value)) value.forEach(item => query.append(key, item))
+      else if (value) query.set(key, value)
+    })
+    const res = await fetch(`${API_BASE}/api/customers/export?${query}`, { headers: getAuthHeaders() })
+    applyNewToken(res)
+    if (res.status === 401) {
+      handle401()
+      throw new Error("登录已过期")
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      const detail = data.detail
+      throw new Error(Array.isArray(detail)
+        ? detail.map((item: { msg?: string }) => cleanValidationMessage(item.msg, "参数错误")).join("；")
+        : detail || "导出失败，请重试")
+    }
+    const encodedFilename = res.headers.get("Content-Disposition")?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    let filename = `客户资料_${new Date().toLocaleDateString("sv-SE")}.xlsx`
+    if (encodedFilename) {
+      try { filename = decodeURIComponent(encodedFilename) } catch { /* 使用默认文件名 */ }
+    }
+    return { blob: await res.blob(), filename }
+  },
   light: (forceRefresh = false) => {
     const scope = customerLightScope()
     if (forceRefresh || scope !== _customerLightScope) {
@@ -845,12 +893,13 @@ export const customerApi = {
   },
   batch: (ids: string[]) => request<CustomerLight[]>("/api/customers/batch", { method: "POST", body: JSON.stringify({ ids }) }),
   bulkUpdate: (ids: string[], changes: { customer_quality?: "正常" | "忽视"; service_teacher?: string }) => request<{ updated_count: number }>("/api/customers/bulk-update", { method: "PATCH", body: JSON.stringify({ ids, ...changes }) }),
-  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; referrer?: string; referrer_handler?: string; service_teacher?: string; customer_quality?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
+  listPaginated: (page: number, pageSize: number, filters?: { nickname?: string; member_type?: string; card_status?: string; card_status_tone?: string; referrer?: string; referrer_handler?: string; service_teacher?: string; customer_quality?: string; member_types?: string; tag_ids?: string; tag_match?: "any" | "all"; sort_by?: string; sort_order?: string }) => {
     const params = new URLSearchParams()
     params.set("page", String(page))
     params.set("page_size", String(pageSize))
     if (filters?.nickname) params.set("nickname", filters.nickname)
     if (filters?.member_type) params.set("member_type", filters.member_type)
+    if (filters?.card_status) params.set("card_status", filters.card_status)
     if (filters?.referrer) params.set("referrer", filters.referrer)
     if (filters?.referrer_handler) params.set("referrer_handler", filters.referrer_handler)
     if (filters?.service_teacher) params.set("service_teacher", filters.service_teacher)
@@ -886,7 +935,7 @@ export interface ServiceTeacherCustomerItem {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   follow_up_status: string
   service_teacher: string
   last_follow_up_at: string
@@ -937,7 +986,7 @@ export interface CourseParticipantRow {
   activity_type_label: string
   customer_id: string
   nickname: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   identity_group: string
   visit_need: string
   customer_info: string
@@ -971,7 +1020,7 @@ export const serviceTeacherCustomerApi = {
     all_dates?: boolean
     activity_type?: string
     keyword?: string
-    member_type?: string
+    member_type?: string; card_status?: string; card_status_tone?: string
     identity_group?: string
     page: number
     page_size: number
@@ -1044,13 +1093,14 @@ export const followUpStatusApi = {
 // 升单配置：若干「大类」（名字 + 一组付费项目），数组顺序＝升单先后
 export interface UpsellLevel { id: string; name: string; products: string[] }
 export type PurchaseRuleKey = "experience" | "conversion" | "upsell" | "repurchase"
-export interface PurchaseRule { key: PurchaseRuleKey; conditions: { product?: string; products?: string[]; operator: "eq" | "gte"; count: number; count_scope?: "subtype" | "group"; first_purchase?: boolean; previous_products?: string[] }[] }
+export interface PurchaseRule { key: PurchaseRuleKey; previous_stage?: "" | "experience" | "conversion" | "upsell"; once?: boolean; conditions: { product?: string; products?: string[]; operator: "eq" | "gte"; count: number; count_scope?: "subtype" | "group"; first_purchase?: boolean; previous_products?: string[]; excluded_previous_products?: string[] }[] }
 export interface UpsellConfig { recommended_rules?: PurchaseRule[]; levels: UpsellLevel[]; rules: PurchaseRule[]; configured: boolean; products: { key: string; label: string }[] }
 export const upsellConfigApi = {
   get: () => request<UpsellConfig>("/api/upsell-config"),
   save: (levels: UpsellLevel[]) =>
     request<UpsellConfig>("/api/upsell-config", { method: "PUT", body: JSON.stringify({ levels }) }),
   saveRules: (rules: PurchaseRule[]) => request<UpsellConfig>("/api/upsell-config", { method: "PUT", body: JSON.stringify({ rules }) }),
+  previewRules: (rules: PurchaseRule[]) => request<{ items: { journey: string; classification: string }[] }>("/api/upsell-config/preview", { method: "POST", body: JSON.stringify({ rules }) }),
 }
 
 // AI Config
@@ -1224,7 +1274,7 @@ export interface VisitRecord {
   visit_time: string
   customer_id: string
   nickname: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   customer_tags?: CustomerTag[]
   /** 本条邀约来访需求中的可见标签，服务端统一去重，不是客户档案标签。 */
   visit_need_tags?: string[]
@@ -1261,7 +1311,7 @@ export interface VisitRecordCreate {
   visit_date: string
   visit_time?: string
   customer_id: string
-  member_type?: string
+  member_type?: string; card_status?: string; card_status_tone?: string
   daily_card_usage?: number
   needs?: string
   referrer_handler?: string
@@ -1295,7 +1345,7 @@ export interface CustomerSearchResult {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   visit_count: number
   remaining?: number
 }
@@ -1428,11 +1478,11 @@ export interface Organization {
   name: string
   member_ids: string[]
   /** 服务端解析好的成员信息（不受客户可见范围影响） */
-  members?: Array<{ id: string; nickname: string; name: string; member_type: string; visit_count: number; missing?: boolean }>
+  members?: Array<{ id: string; nickname: string; name: string; member_type: string; card_status?: string; card_status_tone?: string; visit_count: number; missing?: boolean }>
   /** 服务端解析好的引流人信息 */
-  referrers?: Array<{ id: string; nickname: string; name: string; member_type: string; visit_count: number; missing?: boolean }>
+  referrers?: Array<{ id: string; nickname: string; name: string; member_type: string; card_status?: string; card_status_tone?: string; visit_count: number; missing?: boolean }>
   /** 服务端解析好的整体数据查阅人信息 */
-  data_viewers?: Array<{ id: string; nickname: string; name: string; member_type: string; visit_count: number; missing?: boolean }>
+  data_viewers?: Array<{ id: string; nickname: string; name: string; member_type: string; card_status?: string; card_status_tone?: string; visit_count: number; missing?: boolean }>
   /** 引流归属：member＝按组织成员（默认）、all＝所有人、selected＝指定人员 */
   referrer_mode?: "member" | "all" | "selected"
   /** referrer_mode = selected 时的引流人客户 ID */
@@ -1806,7 +1856,7 @@ export interface GroupCaseCustomerSearchResult {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   remaining: number
   positions?: string[]
 }
@@ -1912,7 +1962,7 @@ export const teaSeatFeeApi = {
 }
 
 // 线上茶疗：只登记购买，不记录金额。
-export interface OnlineTea extends Omit<OfflineCourse, "amount" | "validity_unit" | "course_type"> { expiry_date: string; amount_recorded: false }
+export interface OnlineTea extends Omit<OfflineCourse, "amount" | "course_type"> { expiry_date: string; amount_recorded: false }
 export const onlineTeaApi = {
   list: () => request<OnlineTea[]>("/api/online-tea"),
   listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<OnlineTea>>(`/api/online-tea?${paymentListQuery(page, pageSize, params)}`),
@@ -2114,7 +2164,7 @@ export interface EmotionalReleaseCustomerSearchResult {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   remaining: number
   positions?: string[]
 }
@@ -2187,7 +2237,7 @@ export interface EnergyKnotCustomerSearchResult {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   remaining: number
 }
 
@@ -2256,7 +2306,7 @@ export interface InternalCourseSessionCustomerSearchResult {
   id: string
   nickname: string
   name: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
 }
 
 export const internalCourseSessionApi = {
@@ -2596,6 +2646,7 @@ export type PaymentExportRangeType = "day" | "month" | "year" | "custom"
 
 export interface PaymentExportParams {
   range_type: PaymentExportRangeType
+  types?: string
   period?: string
   date_from?: string
   date_to?: string
@@ -2707,7 +2758,7 @@ export const reminderApi = {
 
 // Member Identity
 export interface IdentityCondition {
-  type: "invitation" | "arrival" | "activity" | "card" | "course" | "payment" | "teacher" | "fixed" | "amount"
+  type: "invitation" | "arrival" | "activity" | "card" | "course" | "payment" | "teacher" | "fixed" | "amount" | "remaining"
   payment_categories: string[]
   items: string[]
   count_op: ">" | "=" | "<" | ">=" | "<="
@@ -2716,9 +2767,14 @@ export interface IdentityCondition {
   activity_scope: "all" | "welfare"
   /** 邀约情况：active＝正常邀约；cancelled＝已取消的邀约 */
   invitation_scope?: "active" | "cancelled"
+  remaining_state?: "range" | "unlimited" | "never" | "expired" | "pending" | "voided"
+  remaining_min?: number
+  remaining_max?: number | null
 }
 
 export interface MemberIdentity {
+  group?: "identity" | "card_status"
+  tone?: "neutral" | "warning"
   id: string
   name: string
   type: string
@@ -2730,6 +2786,8 @@ export interface MemberIdentity {
 }
 
 export interface MemberIdentityCreate {
+  group?: "identity" | "card_status"
+  tone?: "neutral" | "warning"
   name: string
   type?: string
   conditions: IdentityCondition[]
@@ -2738,7 +2796,8 @@ export interface MemberIdentityCreate {
 }
 
 export const memberIdentityApi = {
-  list: () => request<MemberIdentity[]>("/api/member-identities"),
+  cardStatusPreset: () => request<MemberIdentity[]>("/api/member-identities/card-status/preset", { method: "POST" }),
+  list: (group: "identity" | "card_status" | "all" = "identity") => request<MemberIdentity[]>(`/api/member-identities?group=${group}`),
   create: (data: MemberIdentityCreate) => request<MemberIdentity>("/api/member-identities", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<MemberIdentityCreate>) => request<MemberIdentity>(`/api/member-identities/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   delete: (id: string) => request<{ message: string }>(`/api/member-identities/${id}`, { method: "DELETE" }),
@@ -2788,7 +2847,7 @@ export const healingRecordApi = {
   update: (id: string, data: HealingRecordUpdate) => request<HealingRecord>(`/api/healing-records/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   getByCustomerDate: (customerId: string, date: string) => request<HealingRecord | null>(`/api/healing-records/by-customer-date?customer_id=${customerId}&date=${date}`),
   delete: (id: string) => request<{ message: string }>(`/api/healing-records/${id}`, { method: "DELETE" }),
-  searchCustomers: (keyword: string) => request<{ id: string; nickname: string; name: string; member_type: string }[]>(`/api/healing-records/search-customers?q=${encodeURIComponent(keyword)}`),
+  searchCustomers: (keyword: string) => request<{ id: string; nickname: string; name: string; member_type: string; card_status?: string; card_status_tone?: string }[]>(`/api/healing-records/search-customers?q=${encodeURIComponent(keyword)}`),
 }
 
 // Customer Detail (聚合)
@@ -2819,6 +2878,7 @@ export interface PurchaseSummaryItem {
   expiry_date?: string
   activity_mode?: string
   validity_value?: number
+  validity_unit?: string
   voided?: boolean
   voided_at?: string
   earliest_expiry?: string
@@ -3188,6 +3248,7 @@ export interface CustomerAccessPermissions {
   relations: {
     referrer: boolean
     referrer_handler: boolean
+    service_teacher?: boolean
   }
   sensitive_fields: {
     visit_purpose: boolean
@@ -3211,6 +3272,7 @@ export interface CustomerAccessPermissions {
   transaction_access: TransactionAccess
 }
 export interface PositionEditPermissions {
+  customer_workspaces?: ("referral" | "handoff" | "sales")[]
   principal_views?: { organization: boolean; person: boolean }
   principal_person_scope?: "own" | "all"
   principal_external_access?: CustomerAccessPermissions
@@ -3472,7 +3534,7 @@ export interface AuditCheckVisitRow {
   customer_id: string
   time: string
   nickname: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   is_leader: boolean
   has_leader: boolean
   leader_name: string
@@ -3760,7 +3822,7 @@ export interface CourseStatistics {
     participants: Array<{
       id: string
       nickname: string
-      member_type: string
+      member_type: string; card_status?: string; card_status_tone?: string
       identity_group: "新人" | "老人" | string
       participation_role: string
       arrived?: boolean
@@ -3787,7 +3849,7 @@ export interface ReferralStatistics {
     id: string
     nickname: string
     referral_date: string
-    member_type: string
+    member_type: string; card_status?: string; card_status_tone?: string
     referrer: string
     traffic_source: string
     referrer_handler: string
@@ -3821,6 +3883,7 @@ export type AnalysisField =
   | "gender"
   | "age"
   | "member_type"
+  | "card_status"
   | "follow_up_status"
   | "customer_tags"
   | "traffic_source"
@@ -3866,7 +3929,7 @@ export type AnalysisField =
   | "other_info"
 
 export type AnalysisOperator = "eq" | "ne" | "contains" | "in" | "gt" | "gte" | "lt" | "lte" | "between" | "is_empty" | "is_not_empty" | "is_weekday" | "is_weekend"
-export type AnalysisCardDimension = "none" | "invitation_day_type" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
+export type AnalysisCardDimension = "card_status" | "none" | "invitation_day_type" | "gender" | "follow_up_status" | "member_type" | "customer_tags" | "traffic_source" | "referrer" | "referrer_handler" | "service_teacher" | "inviter_names" | "activity_types" | "purchased_projects"
 export type AnalysisMetric = "total_customers" | "created_customers" | "referred_customers" | "invited_customers" | "arrived_customers" | "arrival_visits" | "activity_customers" | "activity_participations" | "converted_customers" | "payment_orders" | "payment_amount"
 export type AnalysisRowDisplayMode = "unique_customers" | "arrival_visits" | "activity_participations"
 
@@ -4140,7 +4203,7 @@ export interface CommunicationRecordCreate {
 }
 
 export const communicationRecordApi = {
-  listPaginated: (filters: { nickname: string; member_type: string; creator: string }, page: number, pageSize: number) =>
+  listPaginated: (filters: { nickname: string; member_type: string; card_status?: string; card_status_tone?: string; creator: string }, page: number, pageSize: number) =>
     request<PaginatedResponse<CommunicationRecord> & { creators: string[] }>(`/api/communication-records?${new URLSearchParams({ ...filters, page: String(page), page_size: String(pageSize) })}`),
   list: (customer_nickname?: string) => request<CommunicationRecord[]>(`/api/communication-records${customer_nickname ? `?customer_nickname=${encodeURIComponent(customer_nickname)}` : ""}`),
   create: (data: CommunicationRecordCreate) => request<CommunicationRecord>("/api/communication-records", { method: "POST", body: JSON.stringify(data) }),
@@ -4254,7 +4317,7 @@ export interface DebtCourseRecord {
   debt_type: string
   customer_id: string
   nickname: string
-  member_type: string
+  member_type: string; card_status?: string; card_status_tone?: string
   source_key: string
   course_name: string
   course_date: string
@@ -4285,4 +4348,25 @@ export const debtRecordApi = {
   summary: () => request<Record<string, number>>("/api/debt-records/summary"),
   update: (id: string, data: { action: "confirm" | "reset"; note: string }) => request<DebtCourseRecord>(`/api/debt-records/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
   establishBaseline: (type: string) => request<{ updated: number }>(`/api/debt-records/baseline/${encodeURIComponent(type)}`, { method: "POST" }),
+}
+
+
+// 活动大类图标，所有课程按固定类型键复用。
+export interface ActivityTypeIcon { key: string; label: string; url: string; default_url: string; custom: boolean }
+export const activityIconApi = {
+  list: () => request<{ items: ActivityTypeIcon[]; can_edit: boolean }>("/api/activity-icons"),
+  reset: (key: string) => request<ActivityTypeIcon>(`/api/activity-icons/${encodeURIComponent(key)}/image`, { method: "DELETE" }),
+  upload: async (key: string, file: File): Promise<ActivityTypeIcon> => {
+    const headers = getAuthHeaders()
+    delete headers["Content-Type"]
+    const body = new FormData(); body.append("file", file)
+    const response = await fetch(`${API_BASE}/api/activity-icons/${encodeURIComponent(key)}/image`, { method: "POST", headers, body })
+    applyNewToken(response)
+    if (response.status === 401) { handle401(); throw new Error("登录已过期") }
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(typeof error.detail === "string" ? error.detail : "图标上传失败，请重试")
+    }
+    return response.json()
+  },
 }

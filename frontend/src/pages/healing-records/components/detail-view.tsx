@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { uploadApi, customerApi, customerTagApi, followUpStatusApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type FollowUpStatusConfig, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem, type VisitNoteSummary } from "@/lib/api"
+import { uploadApi, customerApi, customerTagApi, healingRecordApi, customerDetailApi, communicationRecordApi, type Customer, type CustomerLight, type CustomerTag, type Material, type CustomerDetail, type CommunicationRecord, type ActivityRecord, type PurchaseSummaryItem, type VisitNoteSummary } from "@/lib/api"
 import { CustomerSearchInput } from "@/components/customer-search-input"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -61,7 +62,7 @@ function VisitNoteRows({ notes }: { notes: VisitNoteSummary[] }) {
             {visitNoteAuthorName(note)}<span className="ml-1 font-normal text-[#c0c4cc]">反馈</span>
           </span>
           <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[12px] text-[#3a4150]">{[(note.need_tags || []).map(tag => tag.name).join("、"), note.content].filter(Boolean).join("\n")}</span>
-          <span className="ml-auto shrink-0 text-right text-[11px] text-[#8f959e]"><span className="mr-2 tabular-nums">{formatNoteTime(note.updated_at || note.created_at)}</span>{note.created_by || "未知"}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>
+          <span className="ml-auto shrink-0 text-right text-[12px] text-[#8f959e]"><span className="mr-2 tabular-nums">{formatNoteTime(note.updated_at || note.created_at)}</span>{note.created_by || "未知"}<span className="ml-1 font-normal text-[#c0c4cc]">创建</span></span>
         </div>
       ))}
     </div>
@@ -140,7 +141,6 @@ export default function DetailView({
   const [activityTypeFilter, setActivityTypeFilter] = useState<string>("全部")
   const [activityRoleFilter, setActivityRoleFilter] = useState<string>("全部")
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
-  const [followUpStatuses, setFollowUpStatuses] = useState<FollowUpStatusConfig[]>([])
   const [paymentEntryOpen, setPaymentEntryOpen] = useState(false)
   const loadSeqRef = useRef(0)
   const canEditVisits = useMemo(() => {
@@ -164,7 +164,6 @@ export default function DetailView({
 
   useEffect(() => {
     customerApi.light().then(setCustomerList).catch(() => {})
-    followUpStatusApi.list().then(setFollowUpStatuses).catch(() => setFollowUpStatuses([]))
   }, [])
   // 客户到店日期集合（用于标记未参加活动）
   const arrivedDates = new Set((detail?.visit_records || []).filter(v => v.arrived).map(v => v.visit_date))
@@ -443,7 +442,7 @@ export default function DetailView({
                 {(c.nickname || c.name || "客").charAt(0)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[17px] font-extrabold leading-[1.3] text-[#212631] truncate">{c.nickname || <span className="text-[#d0d3d6]">-</span>}</div>
+                <div className="text-[14px] font-medium leading-[1.3] text-[#212631] truncate">{c.nickname || <span className="text-[#d0d3d6]">-</span>}</div>
                 <div className="mt-0.5 text-[12px] text-[#79838f] truncate">
                   {(() => {
                     const parts: React.ReactNode[] = []
@@ -472,24 +471,17 @@ export default function DetailView({
             <div className="mt-3 border-t border-[#f0f0f0] pt-1">
               <div className="flex items-center gap-2.5 border-b border-[#f3f4f5] py-[7px]">
                 <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">会员身份</span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={c.member_type || undefined}>
-                  {c.member_type || <DvEmpty />}
+                <span className="min-w-0 flex-1 text-[12px] font-normal text-[#212631]" title={c.member_type || undefined}>
+                  <MemberLabels customer={c} />
                 </span>
-                <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">系统判定</span>
+                <span className="shrink-0 text-[12px] text-[#b7bdc6]">系统判定</span>
               </div>
               <div className="flex items-center gap-2.5 border-b border-[#f3f4f5] py-[7px]">
-                <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">服务老师</span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={c.service_teacher || undefined}>
+                <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">Sales</span>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#212631]" title={c.service_teacher || undefined}>
                   {c.service_teacher || <DvEmpty />}
                 </span>
-                <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">人工分配</span>
-              </div>
-              <div className="flex items-center gap-2.5 pb-1 pt-[7px]">
-                <span className="w-14 shrink-0 text-[12px] text-[#a8b1bd]">跟进阶段</span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[#212631]" title={followUpStatuses.find(status => status.name === c.follow_up_status)?.description || c.follow_up_status || undefined}>
-                  {c.follow_up_status && c.follow_up_status !== "未配置" ? c.follow_up_status : <DvEmpty />}
-                </span>
-                <span className="shrink-0 text-[10.5px] text-[#b7bdc6]">人工设置</span>
+                <span className="shrink-0 text-[12px] text-[#b7bdc6]">人工分配</span>
               </div>
             </div>
             <div className="border-t border-[#f0f0f0] pt-2">
@@ -497,28 +489,28 @@ export default function DetailView({
               <div className="mb-2 flex items-center gap-2 text-[12px]"><span className="text-[#a8b1bd]">客户质量</span><span className="rounded border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[#646a73]">{c.customer_quality || "正常"}</span></div>
               <div className="flex min-w-0 flex-wrap gap-1.5">
                 {customerTags.length > 0 ? customerTags.map(tag => (
-                  <span key={tag.id} className="inline-flex max-w-[108px] items-center rounded-full border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[10.5px] font-normal text-[#646a73]">
+                  <span key={tag.id} className="inline-flex max-w-[108px] items-center rounded-full border border-[#e1e4e7] bg-[#fafbfc] px-2 py-0.5 text-[12px] font-normal text-[#646a73]">
                     <span className="truncate">{tag.name}</span>
                   </span>
-                )) : <span className="text-[11px] text-[#a8b1bd]">暂无客户标签</span>}
+                )) : <span className="text-[12px] text-[#a8b1bd]">暂无客户标签</span>}
               </div>
             </div>
             {/* 指标：累计到店 → 参与活动 → 交易笔数（.stat 左对齐，padding 9/12/8） */}
             <div className="grid grid-cols-3 gap-2 mt-3">
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
-                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{c.visit_count}<span className="text-[10.5px] font-semibold"> 次</span></div>
-                <div className="text-[#a8b1bd] text-[10.5px] mt-px">累计到店</div>
+                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{c.visit_count}<span className="text-[12px] font-semibold"> 次</span></div>
+                <div className="text-[#a8b1bd] text-[12px] mt-px">累计到店</div>
               </div>
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
-                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{access?.detail_tabs.activities === false ? "—" : arrivedActivityCount}{access?.detail_tabs.activities !== false && <span className="text-[10.5px] font-semibold"> 场</span>}</div>
-                <div className="text-[#a8b1bd] text-[10.5px] mt-px">参与活动</div>
+                <div className="text-[#a3c0ff] text-[14px] font-extrabold leading-[1.25] tabular-nums">{access?.detail_tabs.activities === false ? "—" : arrivedActivityCount}{access?.detail_tabs.activities !== false && <span className="text-[12px] font-semibold"> 场</span>}</div>
+                <div className="text-[#a8b1bd] text-[12px] mt-px">参与活动</div>
               </div>
               <div className="bg-[#212631] rounded-[10px] px-3 pt-[9px] pb-2">
-                <div className="text-[#a3c0ff] text-[14px] font-medium leading-[1.25] tabular-nums">{transactionCount === null ? "—" : <>{transactionCount}<span className="text-[10.5px] font-medium"> 笔</span></>}</div>
-                <div className="text-[#a8b1bd] text-[10.5px] mt-px">交易笔数</div>
+                <div className="text-[#a3c0ff] text-[14px] font-medium leading-[1.25] tabular-nums">{transactionCount === null ? "—" : <>{transactionCount}<span className="text-[12px] font-medium"> 笔</span></>}</div>
+                <div className="text-[#a8b1bd] text-[12px] mt-px">交易笔数</div>
               </div>
             </div>
-            <div className="mt-[11px] pt-[9px] border-t border-dashed border-[#eceef0] space-y-[7px] text-[11.5px] text-[#a8b1bd]">
+            <div className="mt-[11px] pt-[9px] border-t border-dashed border-[#eceef0] space-y-[7px] text-[12px] text-[#a8b1bd]">
               <div className="flex items-baseline justify-between">
                 <span>引流日期</span>
                 <b className="text-[#212631] font-semibold tabular-nums">{c.referral_date || <DvEmpty />}</b>
@@ -532,7 +524,7 @@ export default function DetailView({
 
           {/* 联系与来源 */}
           <div className="bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-4 py-3 shrink-0">
-            <h3 className="text-[12.5px] font-bold text-[#212631] mb-0.5">联系与来源</h3>
+            <h3 className="text-[12px] font-bold text-[#212631] mb-0.5">联系与来源</h3>
             {([
               { field: "phone" as const, label: "电话", value: c.phone },
               { field: "wechat" as const, label: "微信", value: c.wechat },
@@ -545,7 +537,7 @@ export default function DetailView({
                   {item.value && permission?.view && !revealedContacts[item.field] && (
                     <button
                       type="button"
-                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]"
+                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[12px] text-[#646a73] hover:bg-[#f5f6f7]"
                       onClick={() => accessContact(item.field, "view")}
                     >
                       <Eye className="h-3 w-3" />查看
@@ -554,7 +546,7 @@ export default function DetailView({
                   {item.value && permission?.copy && (
                     <button
                       type="button"
-                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[11px] text-[#646a73] hover:bg-[#f5f6f7]"
+                      className="inline-flex h-6 shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[12px] text-[#646a73] hover:bg-[#f5f6f7]"
                       onClick={() => accessContact(item.field, "copy")}
                     >
                       <Copy className="h-3 w-3" />{copiedContact === item.field ? "已复制" : "复制"}
@@ -569,13 +561,16 @@ export default function DetailView({
                 <span className="text-[#212631] font-medium text-right truncate">{v || <DvEmpty />}</span>
               </div>
             ))}
+            {["小红书", "抖音", "公众号", "视频号"].includes(c.traffic_source) && <div className="flex items-center justify-between gap-2 py-2 text-[12px]">
+              <span className="shrink-0 text-[#a8b1bd]">帖子名称</span><span className="min-w-0 break-words text-right text-[#212631]">{c.traffic_post_name || <DvEmpty />}</span>
+            </div>}
             <div className="flex items-center justify-between gap-2.5 py-[6px] text-[12px]">
               <span className="text-[#a8b1bd] shrink-0">{trafficLabel}</span>
               {c.traffic_source_detail ? (
                 <span className="flex items-center gap-1.5 min-w-0">
                   <span className="text-[#2f5cc4] truncate max-w-[106px]" title={c.traffic_source_detail}>{c.traffic_source_detail}</span>
                   <button
-                    className="shrink-0 flex items-center gap-1 border border-[#e3e6e9] bg-[#f8f9fa] text-[#79838f] hover:text-[#212631] hover:bg-[#eef0f2] text-[10.5px] px-[7px] py-px rounded-md"
+                    className="shrink-0 flex items-center gap-1 border border-[#e3e6e9] bg-[#f8f9fa] text-[#79838f] hover:text-[#212631] hover:bg-[#eef0f2] text-[12px] px-[7px] py-px rounded-md"
                     onClick={() => { navigator.clipboard.writeText(c.traffic_source_detail); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
                   >
                     <Copy className="h-3 w-3" />{copied ? "已复制" : "复制"}
@@ -590,7 +585,7 @@ export default function DetailView({
           {/* 次数余量摘要卡：填充左栏剩余空间，无数据时整卡隐藏 */}
           {remainSummary.length > 0 && (
             <div className="bg-white rounded-[14px] shadow-[0_2px_4px_rgba(33,38,49,.05)] px-4 pt-3 pb-[13px] flex-1">
-              <h3 className="text-[12.5px] font-bold text-[#212631] mb-0.5">次数余量</h3>
+              <h3 className="text-[12px] font-bold text-[#212631] mb-0.5">次数余量</h3>
               {remainSummary.map((s, i) => {
                 const eff = s.type === "会员卡"
                   ? s.remaining
@@ -601,12 +596,12 @@ export default function DetailView({
                 <div key={i} className="pt-[7px] pb-[9px] border-b border-[#f3f4f5] last:border-b-0">
                   <div className="flex items-baseline justify-between gap-2 mb-[5px] text-[12px]">
                     <span className="font-semibold text-[#212631] truncate" title={s.name || s.type}>{s.name || s.type}</span>
-                    <span className="tabular-nums text-[#79838f] text-[11px] shrink-0">
+                    <span className="tabular-nums text-[#79838f] text-[12px] shrink-0">
                       {unlimited
                         ? (s.type === "线下落地课程"
-                          ? <><b className="text-[13px] font-extrabold text-[#212631]">{s.effective_date || "?"} ~ {s.expiry_date || "?"}</b></>
-                          : <><b className="text-[13px] font-extrabold text-[#212631]">∞</b> 不限次</>)
-                        : <>剩余 <b className={`text-[13px] font-extrabold ${typeof eff === "number" && eff < 0 ? "text-[#c4506a]" : typeof eff === "number" && eff <= 1 ? "text-[#f08a3c]" : "text-[#212631]"}`}>{typeof eff === "number" ? eff : eff}</b> / {effTotal}</>
+                          ? <><b className="text-[12px] font-extrabold text-[#212631]">{s.effective_date || "?"} ~ {s.expiry_date || "?"}</b></>
+                          : <><b className="text-[12px] font-extrabold text-[#212631]">∞</b> 不限次</>)
+                        : <>剩余 <b className={`text-[12px] font-extrabold ${typeof eff === "number" && eff < 0 ? "text-[#c4506a]" : typeof eff === "number" && eff <= 1 ? "text-[#f08a3c]" : "text-[#212631]"}`}>{typeof eff === "number" ? eff : eff}</b> / {effTotal}</>
                       }
                     </span>
                   </div>
@@ -623,14 +618,14 @@ export default function DetailView({
                     )
                   )}
                   {s.earliest_expiry && s.earliest_expiry_count ? (
-                    <div className="mt-[5px] text-[10.5px] tabular-nums text-[#a8b1bd]">最快 {s.earliest_expiry_count} 次 {s.earliest_expiry} 到期</div>
+                    <div className="mt-[5px] text-[12px] tabular-nums text-[#a8b1bd]">最快 {s.earliest_expiry_count} 次 {s.earliest_expiry} 到期</div>
                   ) : s.expiry_date && (
-                    <div className="mt-[5px] text-[10.5px] tabular-nums text-[#a8b1bd]">{s.expiry_date} 到期</div>
+                    <div className="mt-[5px] text-[12px] tabular-nums text-[#a8b1bd]">{s.expiry_date} 到期</div>
                   )}
                 </div>
                 )
               })}
-              <div className="mt-[9px] pt-2 border-t border-dashed border-[#eceef0] text-[10.5px] text-[#a8b1bd]">详细见卡次统计 tab</div>
+              <div className="mt-[9px] pt-2 border-t border-dashed border-[#eceef0] text-[12px] text-[#a8b1bd]">详细见卡次统计 tab</div>
             </div>
           )}
         </aside>
@@ -643,7 +638,7 @@ export default function DetailView({
               <div key={label} className="flex gap-[14px] py-2.5 border-b border-[rgba(33,38,49,0.06)] last:border-b-0">
                 <span className="w-[64px] shrink-0 text-[12px] font-semibold text-[#a8b1bd] pt-px">{label}</span>
                 {value ? (
-                  <p className="flex-1 min-w-0 text-[12.5px] leading-[1.6] text-[#3a4150] whitespace-pre-wrap max-h-[88px] overflow-y-auto dv-scroll pr-[5px]">{value}</p>
+                  <p className="flex-1 min-w-0 text-[12px] leading-[1.6] text-[#3a4150] whitespace-pre-wrap max-h-[88px] overflow-y-auto dv-scroll pr-[5px]">{value}</p>
                 ) : (
                   <span className="flex-1 min-w-0 flex items-center"><DvEmpty /></span>
                 )}
@@ -684,7 +679,7 @@ export default function DetailView({
                       setFollowupsPage(1)
                       setOfflineCoursePage(1)
                     }}
-                    className={`relative px-3.5 pt-3 pb-2.5 text-[13px] whitespace-nowrap transition-colors ${
+                    className={`relative px-3.5 pt-3 pb-2.5 text-[12px] whitespace-nowrap transition-colors ${
                       activeTab === tab.key
                         ? "text-[#212631] font-medium"
                         : "text-[#79838f] font-normal hover:text-[#212631]"
@@ -692,7 +687,7 @@ export default function DetailView({
                   >
                     {tab.label}
                     {typeof tab.cnt === "number" && (
-                      <span className="ml-[3px] text-[10.5px] font-medium text-[#a8b1bd] tabular-nums">{tab.cnt}</span>
+                      <span className="ml-[3px] text-[12px] font-medium text-[#a8b1bd] tabular-nums">{tab.cnt}</span>
                     )}
                     {activeTab === tab.key && (
                       <span className="absolute left-3.5 right-3.5 -bottom-px h-[3px] rounded-t-[3px] bg-[#3370ff]" />
@@ -751,13 +746,13 @@ export default function DetailView({
                   return (
                   <div key={v.id} className="mb-[9px] rounded-[4px] border-[0.5px] border-[#eef0f1] bg-[#fafbfc] px-3.5 py-2.5 last:mb-0">
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="text-[13px] font-medium text-[#212631] tabular-nums">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{(v.arrival_time || v.visit_time) && ` ${v.arrival_time || v.visit_time}`}</span>
+                      <span className="text-[12px] font-medium text-[#212631] tabular-nums">{(() => { const [y, m, d] = v.visit_date.split("-"); return `${y}/${parseInt(m)}/${parseInt(d)}` })()}{(v.arrival_time || v.visit_time) && ` ${v.arrival_time || v.visit_time}`}</span>
                       {v.cancelled ? (
-                        <span className="rounded-[4px] bg-[#fdeeee] px-2 py-px text-[11px] text-[#c4506a]">已取消</span>
+                        <span className="rounded-[4px] bg-[#fdeeee] px-2 py-px text-[12px] text-[#c4506a]">已取消</span>
                       ) : v.arrived ? (
-                        <span className="rounded-[4px] bg-[#dcf5e4] px-2 py-px text-[11px] text-[#157a3c]">已到店</span>
+                        <span className="rounded-[4px] bg-[#dcf5e4] px-2 py-px text-[12px] text-[#157a3c]">已到店</span>
                       ) : (
-                        <span className="rounded-[4px] bg-[#f1f0ed] px-2 py-px text-[11px] text-[#79838f]">未到店</span>
+                        <span className="rounded-[4px] bg-[#f1f0ed] px-2 py-px text-[12px] text-[#79838f]">未到店</span>
                       )}
                       {v.referrer_handler && (
                         <span
@@ -770,7 +765,7 @@ export default function DetailView({
                       {canEditVisits && !isViewOnly && (
                         <button
                           type="button"
-                          className="ml-auto text-[11px] text-[#3370ff] hover:underline"
+                          className="ml-auto text-[12px] text-[#3370ff] hover:underline"
                           onClick={() => openVisitEditor(v.visit_date)}
                         >
                           去编辑
@@ -938,7 +933,7 @@ export default function DetailView({
                 : "text-[#79838f] bg-[#f1f0ed]"
             const filterBadge = (label: string, value: string, selected: string, onChange: (v: string) => void) => (
               <button
-                className={`shrink-0 px-2 py-0.5 rounded-[4px] text-[11px] transition-colors ${selected === value ? "bg-[#3370ff] text-white font-medium" : "bg-[#f2f3f5] text-[#4e535a] hover:bg-[#e8eaed]"}`}
+                className={`shrink-0 px-2 py-0.5 rounded-[4px] text-[12px] transition-colors ${selected === value ? "bg-[#3370ff] text-white font-medium" : "bg-[#f2f3f5] text-[#4e535a] hover:bg-[#e8eaed]"}`}
                 onClick={() => { onChange(value); setActivitiesPage(1) }}
               >
                 {label}
@@ -965,14 +960,14 @@ export default function DetailView({
                   <div className="flex items-center gap-3 px-4 pt-2 pb-1 flex-wrap">
                     {allTypes.length > 1 && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] text-[#8f959e] shrink-0">类型</span>
+                        <span className="text-[12px] text-[#8f959e] shrink-0">类型</span>
                         {filterBadge("全部", "全部", activityTypeFilter, setActivityTypeFilter)}
                         {allTypes.map(t => filterBadge(t, t, activityTypeFilter, setActivityTypeFilter))}
                       </div>
                     )}
                     {allRoles.length > 1 && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] text-[#8f959e] shrink-0">角色</span>
+                        <span className="text-[12px] text-[#8f959e] shrink-0">角色</span>
                         {filterBadge("全部", "全部", activityRoleFilter, setActivityRoleFilter)}
                         {allRoles.map(r => filterBadge(r, r, activityRoleFilter, setActivityRoleFilter))}
                       </div>
@@ -993,8 +988,8 @@ export default function DetailView({
                       <div key={g.date} className="relative flex gap-[18px] py-[7px]">
                         {/* 左侧日期栏 */}
                         <div className="w-[78px] shrink-0 pt-[12px] text-right">
-                          <div className={`text-[12.5px] font-extrabold leading-[1.3] tabular-nums ${dayAbsent ? "text-[#79838f]" : "text-[#212631]"}`}>{dateLabel}</div>
-                          <div className="mt-[2px] text-[10.5px] text-[#a8b1bd]">{weekDay}</div>
+                          <div className={`text-[12px] font-extrabold leading-[1.3] tabular-nums ${dayAbsent ? "text-[#79838f]" : "text-[#212631]"}`}>{dateLabel}</div>
+                          <div className="mt-[2px] text-[12px] text-[#a8b1bd]">{weekDay}</div>
                           {g.items.length >= 2 && (
                             <span className="mt-[6px] inline-block whitespace-nowrap rounded-full bg-[#3370ff] px-[8px] py-[3px] text-[10px] font-bold leading-none text-white tabular-nums">当日 {g.items.length} 场</span>
                           )}
@@ -1012,13 +1007,13 @@ export default function DetailView({
                                 ? "rounded-[14px] border border-dashed border-[#e8eaec] bg-[#fbfbfa] px-4 py-3"
                                 : "rounded-[14px] border border-[#f0f1f3] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(33,38,49,.03)]"}>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`min-w-0 flex-1 text-[13.5px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
+                                  <span className={`min-w-0 flex-1 text-[12px] font-bold ${notArrived ? "text-[#79838f]" : "text-[#212631]"}`}>{a.name || <span className="text-[#d0d3d6]">-</span>}</span>
                                   {a.deduction_summary && (
-                                    <span className={`ml-auto shrink-0 text-[11.5px] tabular-nums ${a.withdrawn ? "text-[#c4506a]" : notArrived ? "text-[#9ba2aa]" : "text-[#5d6673]"}`}>{a.deduction_summary}</span>
+                                    <span className={`ml-auto shrink-0 text-[12px] tabular-nums ${a.withdrawn ? "text-[#c4506a]" : notArrived ? "text-[#9ba2aa]" : "text-[#5d6673]"}`}>{a.deduction_summary}</span>
                                   )}
                                   {a.is_public_welfare && <span className="whitespace-nowrap rounded-md bg-[#dcf5e4] px-[7px] py-[3px] text-[10px] font-semibold leading-none text-[#157a3c]">公益</span>}
                                 </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-x-[14px] gap-y-1 text-[11.5px] text-[#79838f]">
+                                <div className="mt-2 flex flex-wrap items-center gap-x-[14px] gap-y-1 text-[12px] text-[#79838f]">
                                   <span className="inline-flex items-center gap-[5px]">
                                     <svg className="h-[12px] w-[12px] shrink-0 stroke-[#a8b1bd]" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                     角色
@@ -1080,7 +1075,7 @@ export default function DetailView({
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="text-[13px] font-medium text-[#2b2f36]">
+                              <span className="text-[12px] font-medium text-[#2b2f36]">
                                 {record.activity_name || "-"}
                               </span>
                               <span className="rounded-[4px] bg-[#f1f3f5] px-1.5 py-0.5 text-[12px] text-[#68717d]">
@@ -1099,7 +1094,7 @@ export default function DetailView({
                             回访于 {formatFollowupTime(record.updated_at)}
                           </span>
                         </div>
-                        <p className="mt-2 rounded-[4px] bg-[#fafafa] px-3 py-2 text-[13px] font-normal leading-[1.65] text-[#3d444d] whitespace-pre-wrap break-words">
+                        <p className="mt-2 rounded-[4px] bg-[#fafafa] px-3 py-2 text-[12px] font-normal leading-[1.65] text-[#3d444d] whitespace-pre-wrap break-words">
                           {record.content}
                         </p>
                       </div>
@@ -1231,7 +1226,7 @@ export default function DetailView({
                   return (
                     <div className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px]">
                       <div className="flex items-baseline gap-[10px] pb-[7px]">
-                        <span className="text-[13px] font-medium text-[#1f2329]">会员卡</span>
+                        <span className="text-[12px] font-medium text-[#1f2329]">会员卡</span>
                         <span className="ml-auto text-[12px] text-[#8f959e] tabular-nums">
                           {memberHasUnlimited
                             ? <>当前剩余 <span className="font-medium text-[#1f2329]">不限次</span> / 总 <span className="font-medium text-[#1f2329]">不限次</span></>
@@ -1256,17 +1251,17 @@ export default function DetailView({
                         else { pillLabel = "生效中"; pillClass = "text-[#157a3c] bg-[#dcf5e4]" }
                         return (
                           <div key={i} className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
-                            <span className={`text-[12.5px] truncate ${voided ? "text-[#c4506a] line-through" : "text-[#212631]"}`}>{s.name}</span>
+                            <span className={`text-[12px] truncate ${voided ? "text-[#c4506a] line-through" : "text-[#212631]"}`}>{s.name}</span>
                             <span className="text-[12px] text-[#8f959e] tabular-nums">
                               {voided
                                 ? <span className="text-[#c4506a]">已退费</span>
                                 : s.remaining === "不限" || s.total_purchased === "不限"
-                                  ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
-                                  : <><b className="text-[12.5px] font-semibold text-[#212631]">{Math.max(0, s.remaining as number)}</b> / {s.total_purchased}</>
+                                  ? <><b className="text-[12px] font-semibold text-[#212631]">不限</b></>
+                                  : <><b className="text-[12px] font-semibold text-[#212631]">{Math.max(0, s.remaining as number)}</b> / {s.total_purchased}</>
                               }
                             </span>
                             <span className="text-[12px] text-[#a8b1bd] tabular-nums">{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
-                            <span className={`text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap ${pillClass}`}>{pillLabel}</span>
+                            <span className={`text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap ${pillClass}`}>{pillLabel}</span>
                           </div>
                         )
                       })}
@@ -1301,7 +1296,7 @@ export default function DetailView({
                       return (
                         <div key={i} className="bg-[#fafbfc] border border-[#eef0f1] rounded-[10px] px-3.5 py-2.5 mb-[9px]">
                           <div className="flex items-baseline gap-[10px] pb-[7px]">
-                            <span className="text-[13px] font-medium text-[#1f2329]">{s.type}</span>
+                            <span className="text-[12px] font-medium text-[#1f2329]">{s.type}</span>
                             <span className="ml-auto text-[12px] text-[#8f959e] tabular-nums">
                               {s.type === "线下落地课程"
                                 ? <>已上课<span className="font-medium text-[#1f2329]">{s.attended_count || 0}</span>次</>
@@ -1322,44 +1317,46 @@ export default function DetailView({
                             const rem = typeof p.remaining === "number" ? p.remaining : p.purchase_count
                             return (
                               <div key={pi} className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
-                                <span className="text-[12.5px] text-[#212631] truncate">
+                                <span className="text-[12px] text-[#212631] truncate">
                                   {s.type === "沙龙技能学习" ? p.name
                                     : s.type === "其他项目" ? <>{p.name}<span className="text-[12px] text-[#a8b1bd] ml-[5px]">{s.activity_mode || "线下"}</span></>
                                     : `购买 ${p.purchase_count} 次`}
                                 </span>
                                 <span className="text-[12px] text-[#8f959e] tabular-nums">
                                   {s.type === "沙龙技能学习"
-                                    ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
-                                    : <><b className="text-[12.5px] font-semibold text-[#212631]">{rem}</b> / {p.purchase_count}</>
+                                    ? <><b className="text-[12px] font-semibold text-[#212631]">不限</b></>
+                                    : <><b className="text-[12px] font-semibold text-[#212631]">{rem}</b> / {p.purchase_count}</>
                                   }
                                 </span>
                                 <span className="text-[12px] text-[#a8b1bd] tabular-nums">{p.effective_date || "-"}~{p.expiry_date || "不限"}</span>
-                                <span className={`text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap ${pillClass}`}>{pillLabel}</span>
+                                <span className={`text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap ${pillClass}`}>{pillLabel}</span>
                               </div>
                             )
                           }) : (
                             <div className="grid grid-cols-[minmax(0,1fr)_80px_190px_auto] items-center gap-[10px] py-2 border-t border-[#f0f1f2]">
-                              <span className="text-[12.5px] text-[#212631] truncate">
+                              <span className="text-[12px] text-[#212631] truncate">
                                 {s.type === "沙龙技能学习" ? s.name
                                   : s.type === "其他项目" ? <>{s.name}<span className="text-[12px] text-[#a8b1bd] ml-[5px]">{s.activity_mode || "线下"}</span></>
                                   : s.name}
                               </span>
                               <span className="text-[12px] text-[#8f959e] tabular-nums">
                                 {s.type === "沙龙技能学习"
-                                  ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
+                                  ? <><b className="text-[12px] font-semibold text-[#212631]">不限</b></>
                                   : s.type === "线下落地课程"
-                                    ? <><b className="text-[12.5px] font-semibold text-[#212631]">{s.validity_value || 1} 个月</b></>
+                                    ? <><b className="text-[12px] font-semibold text-[#212631]">{s.validity_value || 1} 个月</b></>
+                                  : s.type === "线上茶疗"
+                                    ? <><b className="text-[12px] font-semibold text-[#212631]">{s.validity_value || 1} {s.validity_unit === "day" ? "天" : "个月"}</b></>
                                   : s.remaining === "不限"
-                                    ? <><b className="text-[12.5px] font-semibold text-[#212631]">不限</b></>
-                                    : <><b className="text-[12.5px] font-semibold text-[#212631]">{typeof s.remaining === "number" ? s.remaining : String(s.remaining)}</b> / {s.total_purchased}</>
+                                    ? <><b className="text-[12px] font-semibold text-[#212631]">不限</b></>
+                                    : <><b className="text-[12px] font-semibold text-[#212631]">{typeof s.remaining === "number" ? s.remaining : String(s.remaining)}</b> / {s.total_purchased}</>
                                 }
                               </span>
                               <span className="text-[12px] text-[#a8b1bd] tabular-nums">{s.effective_date || "-"}~{s.expiry_date || "不限"}</span>
                               <span>
-                                {expired && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#c4506a] bg-[#fdeeee]">已过期</span>}
-                                {notStarted && !expired && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">未生效</span>}
-                                {!expired && !notStarted && s.type === "线下落地课程" && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#157a3c] bg-[#dcf5e4]">生效中</span>}
-                                {noCount && !expired && !notStarted && <span className="text-[10.5px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">无次数</span>}
+                                {expired && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#c4506a] bg-[#fdeeee]">已过期</span>}
+                                {notStarted && !expired && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">未生效</span>}
+                                {!expired && !notStarted && s.type === "线下落地课程" && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#157a3c] bg-[#dcf5e4]">生效中</span>}
+                                {noCount && !expired && !notStarted && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">无次数</span>}
                               </span>
                             </div>
                           )}
@@ -1464,7 +1461,7 @@ export default function DetailView({
                             <span className="h-5 w-[2px] shrink-0 rounded-[1px] bg-[#3370ff]" />
                             <div className="leading-[1.35]">
                               <div className="font-medium text-[#2b2f36]">粗门次卡</div>
-                              <div className="text-[11px] text-[#8f959e]">课程抵扣</div>
+                              <div className="text-[12px] text-[#8f959e]">课程抵扣</div>
                             </div>
                           </div>
                         ) : r.type}
@@ -1475,7 +1472,7 @@ export default function DetailView({
                             <div className="max-w-[180px] truncate font-medium text-[#2b2f36]" title={r.activity_name || r.name}>
                               {r.activity_name || r.name || "课程抵扣"}
                             </div>
-                            <div className="mt-0.5 flex max-w-[260px] flex-wrap gap-x-2 text-[11px] text-[#8f959e]">
+                            <div className="mt-0.5 flex max-w-[260px] flex-wrap gap-x-2 text-[12px] text-[#8f959e]">
                               <span className="truncate" title={r.settlement_organization_name || ""}>
                                 成交归属：{r.settlement_organization_name || "-"}
                               </span>
@@ -1497,7 +1494,7 @@ export default function DetailView({
                         {isCoarseDoorDeduction ? (
                           <div className="leading-[1.4]">
                             <div>{r.closer_name || <span className="text-[#d0d3d6]">-</span>}</div>
-                            {r.created_by && <div className="text-[11px] text-[#8f959e]">录入：{r.created_by}</div>}
+                            {r.created_by && <div className="text-[12px] text-[#8f959e]">录入：{r.created_by}</div>}
                           </div>
                         ) : (r.closer_name || <span className="text-[#d0d3d6]">-</span>)}
                       </TableCell>

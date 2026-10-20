@@ -1,7 +1,10 @@
 import logging
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Request
-from app.services import member_identity_service
+
 from app.models.member_identity import MemberIdentityCreate, MemberIdentityUpdate
+from app.services import member_identity_service
 
 logger = logging.getLogger(__name__)
 
@@ -9,13 +12,16 @@ router = APIRouter(prefix="/api/member-identities", tags=["member-identities"])
 
 
 @router.get("")
-def list_identities():
-    return member_identity_service.list_identities()
+def list_identities(group: Literal["identity", "card_status", "all"] = "identity"):
+    return member_identity_service.list_identities(group)
 
 
 @router.post("")
 def create_identity(data: MemberIdentityCreate):
-    result = member_identity_service.create_identity(data)
+    try:
+        result = member_identity_service.create_identity(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
         member_identity_service.refresh_all()
     except Exception as e:
@@ -25,7 +31,10 @@ def create_identity(data: MemberIdentityCreate):
 
 @router.put("/{identity_id}")
 def update_identity(identity_id: str, data: MemberIdentityUpdate):
-    identity = member_identity_service.update_identity(identity_id, data)
+    try:
+        identity = member_identity_service.update_identity(identity_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not identity:
         raise HTTPException(status_code=404, detail="记录不存在")
     try:
@@ -50,11 +59,14 @@ def delete_identity(identity_id: str):
 def reorder_identities(data: dict, request: Request = None):
     """批量更新排序，body: {"ids": ["id1", "id2", ...]}"""
     ids = data.get("ids", [])
-    changes = member_identity_service.reorder(ids)
+    try:
+        changes = member_identity_service.reorder(ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     # 记录详细操作日志
     if changes:
-        from app.services.operation_log_service import create_log
         from app.models.operation_log import OperationLogCreate
+        from app.services.operation_log_service import create_log
         operator = ""
         operator_role = ""
         if request:
@@ -87,8 +99,8 @@ def reorder_identities(data: dict, request: Request = None):
 def refresh_all(request: Request):
     member_identity_service.refresh_all()
     # 记录操作日志
-    from app.services.operation_log_service import create_log
     from app.models.operation_log import OperationLogCreate
+    from app.services.operation_log_service import create_log
     operator = ""
     operator_role = ""
     user_id = getattr(request.state, "user_id", "")
@@ -109,3 +121,27 @@ def refresh_all(request: Request):
         "ip": request.client.host if request.client else "",
     })
     return {"message": "刷新完成"}
+
+
+@router.post("/card-status/preset")
+def create_card_status_presets():
+    if member_identity_service.list_identities("card_status"):
+        raise HTTPException(status_code=409, detail="本组已有标签，请直接编辑现有配置")
+    definitions = [
+        ("卡次充足", "range", 6, None, "neutral"),
+        ("即将用完", "range", 1, 5, "warning"),
+        ("次数用完", "range", 0, 0, "warning"),
+        ("不限次数", "unlimited", 0, None, "neutral"),
+        ("尚未办卡", "never", 0, None, "neutral"),
+        ("会员卡过期", "expired", 0, None, "warning"),
+        ("尚未生效", "pending", 0, None, "neutral"),
+        ("卡已作废", "voided", 0, None, "neutral"),
+    ]
+    data = [MemberIdentityCreate(
+            name=name, group="card_status", tone=tone,
+            conditions=[{"type": "remaining", "remaining_state": state, "remaining_min": lower, "remaining_max": upper}],
+        ) for name, state, lower, upper, tone in definitions]
+    try:
+        return member_identity_service.create_card_status_batch(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

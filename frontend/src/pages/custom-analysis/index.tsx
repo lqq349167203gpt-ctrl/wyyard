@@ -38,13 +38,13 @@ const CUSTOM_ANALYSIS_DRAFT_PREFIX = "custom-analysis:last-state:v1"
 
 const FALLBACK_FIELD_LABELS: Partial<Record<AnalysisField, string>> = {
   nickname: "昵称",
-  member_type: "会员身份",
+  member_type: "会员身份", card_status: "当前卡次",
   follow_up_status: "跟进阶段",
   customer_tags: "客户标签",
   traffic_source: "流量来源",
   referrer: "引流人",
   referrer_handler: "承接人",
-  service_teacher: "服务老师",
+  service_teacher: "Sales",
   created_by: "客户录入人",
   referral_date: "引流日期",
   created_at: "创建日期",
@@ -82,7 +82,7 @@ function defaultPlan(): AnalysisPlan {
     card_metric: "total_customers",
     card_dimension: "none",
     columns: [
-      "nickname", "member_type", "follow_up_status", "referrer", "inviter_names",
+      "nickname", "member_type", "card_status", "referrer", "inviter_names",
       "invitation_count_period", "visit_count_period", "payment_projects",
     ],
     sort_by: "referral_date",

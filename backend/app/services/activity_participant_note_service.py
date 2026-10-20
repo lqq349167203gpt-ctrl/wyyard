@@ -35,8 +35,14 @@ def list_notes(
     activity_source: ActivityParticipantNoteSource,
     session_id: str,
     customer_ids: Iterable[str] = (),
+    *, course_only: bool = False,
 ) -> list[ActivityParticipantNote]:
     ids = {customer_id for customer_id in customer_ids if customer_id}
+    if course_only:
+        return sorted((note for note in _notes.values()
+                       if not note.is_deleted and note.activity_source == activity_source
+                       and note.session_id == session_id and (not ids or note.customer_id in ids)),
+                      key=lambda note: (note.updated_at, note.id), reverse=True)
     from app.services import daily_customer_note_service
 
     return sorted(
@@ -157,6 +163,7 @@ def upsert_note(
     feedback_person_id: str = "",
     feedback_person: str = "",
     follow_up_plan: dict | None = None,
+    course_only: bool = False,
 ) -> ActivityParticipantNote:
     normalized_content = content.strip()
     if not normalized_content:
@@ -166,7 +173,7 @@ def upsert_note(
         existing = next(
             (
                 note
-                for note in list_notes(activity_source, session_id, {customer_id})
+                for note in list_notes(activity_source, session_id, {customer_id}, course_only=course_only)
                 if note.customer_id == customer_id
                 and note.category == category
                 and not note.is_deleted

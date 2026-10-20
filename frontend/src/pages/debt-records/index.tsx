@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useEffect, useMemo, useState } from "react"
 
 import { confirmDialog } from "@/components/confirm-dialog"
@@ -45,6 +46,8 @@ interface PersonGroup {
   customerId: string
   nickname: string
   memberType: string
+  card_status?: string
+  card_status_tone?: string
   courses: DebtCourseRecord[]
   debtCount: number
   newCount: number
@@ -85,7 +88,7 @@ export default function DebtRecordsPage({ embedded = false }: { embedded?: boole
       const person = grouped.get(course.customer_id) || {
         customerId: course.customer_id,
         nickname: course.nickname,
-        memberType: course.member_type,
+        memberType: course.member_type, card_status: course.card_status, card_status_tone: course.card_status_tone,
         courses: [],
         debtCount: data?.customer_debt_totals?.[course.customer_id] || 0,
         newCount: data?.customer_pending_totals?.[course.customer_id] || 0,
@@ -177,7 +180,7 @@ export default function DebtRecordsPage({ embedded = false }: { embedded?: boole
                       ? person.courses.filter(course => course.status === "ok")
                       : person.courses
                   return <TableRow key={person.customerId}>
-                      <TableCell className="pl-4"><button type="button" onClick={() => setDetailCustomerId(person.customerId)} className="text-left font-medium text-[#2b2f36] hover:text-[#3370ff]">{person.nickname || "未命名客户"}<span className="ml-1.5 text-[11px] font-normal text-[#8f959e]">{person.memberType || "—"}</span></button></TableCell>
+                      <TableCell className="pl-4"><button type="button" onClick={() => setDetailCustomerId(person.customerId)} className="text-left font-medium text-[#2b2f36] hover:text-[#3370ff]">{person.nickname || "未命名客户"}<span className="ml-1.5 text-[11px] font-normal text-[#8f959e]"><MemberLabels customer={{ member_type: person.memberType, card_status: person.card_status, card_status_tone: person.card_status_tone }} /></span></button></TableCell>
                       <TableCell className="max-w-[280px]"><div className="flex flex-wrap gap-1">{listedCourses.map(course => <span key={course.id} title={`${course.course_name} · ${course.course_date || "日期未填写"}`} className="max-w-[180px] truncate rounded-[3px] border border-[#dee0e3] bg-white px-1.5 py-0.5 text-[11px] text-[#646a73]">{course.course_name || "未命名课程"}</span>)}{!listedCourses.length && <span className="text-[#d0d3d6]">—</span>}</div></TableCell>
                       <TableCell>{person.debtCount}<span className="ml-1 text-[#8f959e]">次</span></TableCell>
                       <TableCell><span className={hasAttention ? "font-medium text-[#d4380d]" : "text-[#8f959e]"}>{person.newCount}</span><span className="ml-1 text-[#8f959e]">次</span></TableCell>

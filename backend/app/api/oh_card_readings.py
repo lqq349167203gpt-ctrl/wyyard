@@ -63,6 +63,11 @@ def update_reading(reading_id: str, data: dict, request: Request):
     if "reading_type" in data and data["reading_type"] not in (*OH_READING_TYPES, ""):
         raise HTTPException(status_code=400, detail="请选择有效的OH卡诊断类型")
     customer_access_service.require_customer_scope(request, existing.customer_id, action="修改")
+    teacher = data.get("diagnosis_teacher", existing.diagnosis_teacher)
+    if not isinstance(teacher, str) or not teacher.strip():
+        raise HTTPException(status_code=400, detail="请选择诊断老师")
+    if "diagnosis_teacher" in data:
+        data["diagnosis_teacher"] = teacher.strip()
     if data.get("customer_id") and data["customer_id"] != existing.customer_id:
         customer_access_service.require_customer_scope(request, data["customer_id"], action="新增付费项目到")
     ensure_payment_closer_total(data, "amount", existing, request)

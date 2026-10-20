@@ -203,7 +203,7 @@ def _member_login_response(customer):
     return {"token": create_customer_token(customer.id, customer.nickname or customer.name),
             "role": "customer", "bound": True, "permissions": [],
             "customer": {"id": customer.id, "nickname": customer.nickname or customer.name,
-                         "member_type": customer.member_type}}
+                         "member_type": customer.member_type, "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral")}}
 
 
 @router.post("/entry-login")
@@ -297,6 +297,6 @@ async def customer_login(data: PhoneLoginRequest):
             "id": customer.id,
             "nickname": customer.nickname,
             "name": customer.name,
-            "member_type": customer.member_type,
+            "member_type": customer.member_type, "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
         },
     }

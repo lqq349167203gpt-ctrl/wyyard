@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useEffect, useState, useMemo, useRef, startTransition } from "react"
 import { ChevronRight, ChevronLeft, ChevronUp, ChevronDown } from "lucide-react"
 import { visitApi, dailyReportApi, customerDetailApi, type VisitRecord, type DailyReportActivity, type CustomerLight as Customer, type MemberIdentity, type CustomerDetail, type ActivityRecord } from "@/lib/api"
@@ -219,7 +220,7 @@ export default function DailyReportPage() {
     // 第一部分：当日客户
     for (const group of visitGroups) {
     const isCancelled = group.key === "cancelled"
-    const widths = [60, 50, 80, 60, 50, 50, 50, 50, 50, 60,
+    const widths = [60, 50, 80, 80, 88, 50, 50, 50, 50, 50, 60,
       ...(canViewNote(permissions.customer_access, "visit_need") ? [120] : []),
       ...(isCancelled
         ? canViewNote(permissions.customer_access, "follow_up") ? [180] : []
@@ -231,13 +232,14 @@ export default function DailyReportPage() {
       70, 50, 40]
     html += `<table><colgroup>${widths.map(width => `<col width="${width}">`).join("")}</colgroup>`
     html += `<tr class="section"><td colspan="${widths.length}">当日客户｜${group.label}（${group.records.length}人）</td></tr>`
-    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>身份</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th>${canViewNote(permissions.customer_access, "visit_need") ? "<th>来访需求</th>" : ""}${isCancelled ? canViewNote(permissions.customer_access, "follow_up") ? "<th>取消原因</th>" : "" : `${canViewNote(permissions.customer_access, "customer_info") ? "<th>深度需求</th>" : ""}${canViewNote(permissions.customer_access, "follow_up") ? "<th>跟进点</th>" : ""}${canViewNote(permissions.customer_access, "customer_feedback") ? "<th>客户反馈</th>" : ""}`}<th>今日成交</th><th>邀约</th><th>到场</th></tr>`
+    html += `<tr><th>引流</th><th>时间</th><th>客户昵称</th><th>会员身份</th><th>当前卡次</th><th>受邀</th><th>取消</th><th>到店</th><th>总参与</th><th>今日</th><th>剩余次数</th>${canViewNote(permissions.customer_access, "visit_need") ? "<th>来访需求</th>" : ""}${isCancelled ? canViewNote(permissions.customer_access, "follow_up") ? "<th>取消原因</th>" : "" : `${canViewNote(permissions.customer_access, "customer_info") ? "<th>深度需求</th>" : ""}${canViewNote(permissions.customer_access, "follow_up") ? "<th>跟进点</th>" : ""}${canViewNote(permissions.customer_access, "customer_feedback") ? "<th>客户反馈</th>" : ""}`}<th>今日成交</th><th>邀约</th><th>到场</th></tr>`
     for (const v of group.records) {
       html += `<tr>
         <td>${esc(v.referrer || "-")}</td>
         <td>${esc(v.visit_time || "-")}</td>
         <td>${esc(v.nickname)}</td>
         <td>${esc(v.member_type || "-")}</td>
+        <td>${esc(v.card_status || "-")}</td>
         <td>${v.invitation_count}次</td>
         <td>${v.cancelled_count}次</td>
         <td>${v.arrived_count}次</td>
@@ -560,7 +562,7 @@ export default function DailyReportPage() {
             break
           case "online_tea":
             itemType = "线上茶疗"
-            itemName = `${item.validity_value || 1} 个月`
+            itemName = `${item.validity_value || 1} ${item.validity_unit === "day" ? "天" : "个月"}`
             break
           case "offline_course":
             itemType = "线下落地课程"
@@ -806,7 +808,8 @@ export default function DailyReportPage() {
                   <th className="px-[5px] py-2 text-left font-normal w-[42px] border-b-[0.5px] border-[#e8eaed]">引流</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[46px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("visit_time")}><span className="inline-flex items-center gap-0">时间<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "visit_time" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "visit_time" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-left font-normal w-[60px] border-b-[0.5px] border-[#e8eaed]">客户昵称</th>
-                  <th className="px-[5px] py-2 text-left font-normal w-[54px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("member_type")}><span className="inline-flex items-center gap-0">身份<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "member_type" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "member_type" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[80px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("member_type")}><span className="inline-flex items-center gap-0">身份<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "member_type" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "member_type" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
+                  <th className="px-[5px] py-2 text-left font-normal w-[88px] border-b-[0.5px] border-[#e8eaed]">当前卡次</th>
                   <th className="px-[5px] py-2 text-center font-normal w-[40px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("invitation_count")}><span className="inline-flex items-center gap-0">受邀<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "invitation_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "invitation_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[40px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("cancelled_count")}><span className="inline-flex items-center gap-0">取消<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "cancelled_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "cancelled_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
                   <th className="px-[5px] py-2 text-center font-normal w-[48px] border-b-[0.5px] border-[#e8eaed] cursor-pointer select-none" onClick={() => handleSort("arrived_count")}><span className="inline-flex items-center gap-0">到店<span className="inline-flex flex-col leading-none"><span className={`text-[7px] ${sortField === "arrived_count" && sortDir === "asc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▲</span><span className={`text-[7px] -mt-[0px] ${sortField === "arrived_count" && sortDir === "desc" ? "text-[#1f2329]" : "text-[#d0d3d6]"}`}>▼</span></span></span></th>
@@ -829,10 +832,11 @@ export default function DailyReportPage() {
               <tbody>
                 {group.records.map((v, i) => (
                   <tr key={v.id} className={i % 2 === 0 ? "bg-white hover:bg-[#f7f8fa]" : "bg-[#fcfcfd] hover:bg-[#f0f1f3]"}>
-                    <td className="px-[5px] py-2 text-[#8b9198] truncate border-b-[0.5px] border-[#e8eaed]">{v.referrer || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-[#8b9198] border-b-[0.5px] border-[#e8eaed]">{v.referrer || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-[#92989e] text-center border-b-[0.5px] border-[#e8eaed]">{v.visit_time || <span className="text-[#c9cdd4]">-</span>}</td>
                     <td className="px-[5px] py-2 text-black truncate border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => { setSelectedCustomerId(v.customer_id); setCustomerDetailOpen(true) }}>{v.nickname}</td>
-                    <td className="px-[5px] py-2 text-[#8b9198] truncate border-b-[0.5px] border-[#e8eaed]">{v.member_type || <span className="text-[#c9cdd4]">-</span>}</td>
+                    <td className="px-[5px] py-2 text-[#8b9198] border-b-[0.5px] border-[#e8eaed]"><MemberLabels customer={{ member_type: v.member_type }} /></td>
+                    <td className="px-[5px] py-2 border-b-[0.5px] border-[#e8eaed]"><MemberLabels customer={{ card_status: v.card_status, card_status_tone: v.card_status_tone }} /></td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("invited", v.customer_id, v.nickname)}>{v.invitation_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("cancelled", v.customer_id, v.nickname)}>{v.cancelled_count}次</td>
                     <td className="px-[5px] py-2 text-[#1f2329] text-center border-b-[0.5px] border-[#e8eaed] cursor-pointer hover:underline" onClick={() => openDetail("visit", v.customer_id, v.nickname)}>{v.arrived_count}次</td>

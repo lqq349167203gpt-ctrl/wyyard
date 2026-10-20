@@ -1,8 +1,9 @@
-const { customerApi, customerTagApi, followUpStatusApi } = require('../../utils/api')
+const { customerApi, customerTagApi } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 const { readSource, retrySources } = require('../../utils/source-state')
 const { disposeReads } = require('../../utils/read-scope')
 const { CUSTOMER_INCOME_FIELDS } = require('../../utils/customer-income')
+const { customerReferrers } = require('../../utils/customer-referrers')
 
 const TRAFFIC_SOURCES = ['小红书', '抖音', '公众号', '视频号', '朋友圈', '美团', '大众点评', '好友推荐', '粗门']
 const TRAFFIC_NEED_LINK = ['小红书', '抖音', '公众号', '视频号']
@@ -52,12 +53,13 @@ Page({
     age: '',
     service_teacher: '',
     referrer: '',
+    referrers: [],
     referral_date: getTodayDate(),
     referrer_handler: '',
-    follow_up_status: '未配置',
     customer_quality: '正常',
     traffic_source: '',
     traffic_source_detail: '',
+    traffic_post_name: '',
     needTrafficDetail: false,
     work_status: '',
     work_description: '',
@@ -69,7 +71,6 @@ Page({
     tags: '',
     other_info: '',
     trafficSources: TRAFFIC_SOURCES,
-    followUpStatuses: [],
     customerTags: [],
     selectedTagIds: [],
     selectedTagText: '',
@@ -100,11 +101,12 @@ Page({
       wx.setNavigationBarTitle({ title: '编辑客户' })
       this.loadCustomer(options.id)
     } else {
-      this.setData({ referral_date: getTodayDate() })
+      const owner = (getApp().globalData.currentUser || {}).owner || ''
+      const assigned = !owner ? {} : options.workspace === 'referral' ? { referrer: owner, referrers: [owner] } : options.workspace === 'sales' ? { service_teacher: owner } : options.workspace === 'handoff' ? { referrer_handler: owner } : {}
+      this.setData({ referral_date: getTodayDate(), ...assigned })
       wx.setNavigationBarTitle({ title: '新增客户' })
     }
     this.loadCustomerTags(options.id || '')
-    this.loadFollowUpStatuses()
     this.loadCustomers()
 
     // 语音录入预填
@@ -124,12 +126,6 @@ Page({
         getApp().globalData._voicePrefill = null
       }
     }
-  },
-
-  async loadFollowUpStatuses() {
-    return readSource(this, 'statuses', () => followUpStatusApi.list(), statuses => {
-      this.setData({ followUpStatuses: (statuses || []).map(item => item.name) })
-    })
   },
 
   async loadCustomerTags(customerId) {
@@ -219,7 +215,7 @@ Page({
   },
 
   async loadCustomers() {
-    return readSource(this, 'people', () => customerApi.selector(), list => {
+    return readSource(this, 'people', () => customerApi.assignmentOptions(), list => {
       this.setData({ allCustomers: list })
     })
   },
@@ -248,12 +244,13 @@ Page({
         age: c.age || '',
         service_teacher: c.service_teacher || '',
         referrer: c.referrer || '',
+        referrers: customerReferrers(c),
         referral_date: c.referral_date || '',
         referrer_handler: c.referrer_handler || '',
-        follow_up_status: c.follow_up_status || '',
         customer_quality: c.customer_quality || '正常',
         traffic_source: ts,
         traffic_source_detail: c.traffic_source_detail || '',
+        traffic_post_name: c.traffic_post_name || '',
         needTrafficDetail: TRAFFIC_NEED_LINK.includes(ts),
         work_status: c.work_status || '',
         work_description: c.work_description || '',
@@ -267,8 +264,9 @@ Page({
     })
   },
 
-  retrySources() { return retrySources(this, { customer: () => this.loadCustomer(this.data.id), statuses: () => this.loadFollowUpStatuses(), tags: () => this.loadCustomerTags(this.data.id), people: () => this.loadCustomers() }) },
   onUnload() { disposeReads(this) },
+
+  retrySources() { return retrySources(this, { customer: () => this.loadCustomer(this.data.id), tags: () => this.loadCustomerTags(this.data.id), people: () => this.loadCustomers() }) },
 
   onInput(e) {
     const field = e.currentTarget.dataset.field
@@ -319,12 +317,9 @@ Page({
     this.setData({
       traffic_source: source,
       traffic_source_detail: '',
+      traffic_post_name: '',
       needTrafficDetail: TRAFFIC_NEED_LINK.includes(source),
     })
-  },
-
-  onFollowUpStatusChange(e) {
-    this.setData({ follow_up_status: this.data.followUpStatuses[e.detail.value] })
   },
 
   onQualityChange(e) {
@@ -350,14 +345,14 @@ Page({
   // 搜索选择弹窗
   onPickerOpen(e) {
     const field = e.currentTarget.dataset.field
-    const titleMap = { service_teacher: '服务老师', referrer: '引流人', referrer_handler: '承接人', traffic_source_detail: this.data.traffic_source === '好友推荐' ? '推荐好友' : '所属人' }
+    const titleMap = { service_teacher: 'Sales', referrer: '引流人', referrer_handler: '承接人', traffic_source_detail: this.data.traffic_source === '好友推荐' ? '推荐好友' : '所属人' }
     const current = this.data[field] || ''
     this.setData({
       showPicker: true,
       pickerField: field,
       pickerTitle: titleMap[field] || field,
       pickerKeyword: '',
-      pickerList: this.data.allCustomers.filter(c => c.nickname !== this.data.nickname),
+      pickerList: this.data.allCustomers.filter(c => c.nickname !== this.data.nickname).map(c => ({ ...c, selected: field === 'referrer' && this.data.referrers.includes(c.nickname) })),
     })
   },
 
@@ -372,12 +367,17 @@ Page({
       if (!keyword) return true
       return c.nickname.includes(keyword) || (c.name && c.name.includes(keyword))
     })
-    this.setData({ pickerKeyword: keyword, pickerList: list })
+    this.setData({ pickerKeyword: keyword, pickerList: list.map(c => ({ ...c, selected: this.data.pickerField === 'referrer' && this.data.referrers.includes(c.nickname) })) })
   },
 
   onPickerSelect(e) {
     const nickname = e.currentTarget.dataset.nickname
     const field = this.data.pickerField
+    if (field === 'referrer') {
+      const names = this.data.referrers.includes(nickname) ? this.data.referrers.filter(name => name !== nickname) : this.data.referrers.concat(nickname)
+      this.setData({ referrers: names, referrer: names.join('、'), pickerList: this.data.pickerList.map(c => ({ ...c, selected: names.includes(c.nickname) })) })
+      return
+    }
     this.setData({
       [field]: nickname,
       showPicker: false,
@@ -388,7 +388,14 @@ Page({
 
   onPickerClear(e) {
     const field = e.currentTarget.dataset.field
-    this.setData({ [field]: '' })
+    this.setData({ [field]: '', ...(field === 'referrer' ? { referrers: [] } : {}) })
+  },
+
+  onRemoveReferrer(e) {
+    if (this.data.pickerField !== 'referrer') return
+    const nickname = e.currentTarget.dataset.nickname
+    const names = this.data.referrers.filter(name => name !== nickname)
+    this.setData({ referrers: names, referrer: names.join('、'), pickerList: this.data.pickerList.map(c => ({ ...c, selected: names.includes(c.nickname) })) })
   },
 
   onDelete() {
@@ -430,13 +437,13 @@ Page({
         wechat: this.data.wechat.trim(),
         age: this.data.age.trim(),
         service_teacher: this.data.service_teacher.trim(),
-        referrer: this.data.referrer.trim(),
+        referrers: customerReferrers(this.data.referrers.length ? this.data : { referrer: this.data.referrer }),
         referral_date: this.data.referral_date,
         referrer_handler: this.data.referrer_handler.trim(),
-        follow_up_status: this.data.follow_up_status,
         customer_quality: this.data.customer_quality,
         traffic_source: this.data.traffic_source.trim(),
         traffic_source_detail: this.data.traffic_source_detail.trim(),
+        traffic_post_name: this.data.needTrafficDetail ? this.data.traffic_post_name.trim() : '',
         work_status: this.data.work_status,
         work_description: this.data.work_description.trim(),
         ...this.data.incomeValues,

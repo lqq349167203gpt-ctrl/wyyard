@@ -17,6 +17,7 @@ ActivityParticipantNoteCategory = Literal["customer_info", "follow_up", "custome
 
 
 class ActivityParticipantNoteUpsert(FollowUpPlanFields, StrictBaseModel):
+    course_only: bool = False
     activity_source: ActivityParticipantNoteSource
     session_id: str = Field(min_length=1, max_length=100)
     customer_id: str = Field(min_length=1, max_length=100)

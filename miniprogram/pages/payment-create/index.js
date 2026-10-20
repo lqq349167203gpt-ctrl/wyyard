@@ -7,7 +7,8 @@ Page({
   onLoad(options) {
     if (!getApp().checkLogin()) return
     if (getApp().trackUsagePage) getApp().trackUsagePage('/pages/payment-create/index')
-    this.setData({ type: options.type || 'membership_card' })
+    this.setData({ type: options.type || 'membership_card',
+      presetCustomer: options.customerId ? { id: options.customerId, nickname: options.nickname || '' } : null })
   },
 
   onPickerState(e) {

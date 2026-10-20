@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { Fragment, useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react"
 import { Plus, Trash2, FileText, GripVertical, CalendarX2, CalendarSync, ChevronDown, ChevronUp, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -25,6 +26,8 @@ interface Row {
   customer_id: string
   nickname: string
   member_type: string
+  card_status?: string
+  card_status_tone?: string
   is_new_customer?: boolean
   remaining_count: number | null
   is_leader: boolean
@@ -43,7 +46,7 @@ interface Row {
 let nextKey = 1
 
 function emptyRow(): Row {
-  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", receptionist: "", goal: "", arrived: false, cancelled: false, cancel_reason: "", feedback: "", healing_notes: "", activities: "" }
+  return { key: nextKey++, visit_id: "", created_by_id: "", created_by: "", visit_time: "", customer_id: "", nickname: "", member_type: "", card_status: "", card_status_tone: "neutral", remaining_count: null, is_leader: false, needs: "", referrer_handler: "", receptionist: "", goal: "", arrived: false, cancelled: false, cancel_reason: "", feedback: "", healing_notes: "", activities: "" }
 }
 
 export interface VisitChangedCell {
@@ -67,6 +70,8 @@ export interface VisitRowSummary {
   customer_id: string
   nickname: string
   member_type: string
+  card_status?: string
+  card_status_tone?: string
   cancelled: boolean
 }
 
@@ -119,7 +124,7 @@ const VISIT_CREATOR_ONLY_FIELDS = new Set<keyof Row>([
   "referrer_handler",
 ])
 
-const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 102, 80, 64, 207, 203, 203, 203, 60, 60, 74, 84, 180, 74, 76, 76] as const
+const VISIT_COLUMN_WIDTHS = [24, 36, 64, 64, 102, 160, 64, 207, 203, 203, 203, 60, 60, 74, 84, 180, 74, 76, 76] as const
 
 function visitTimeSlot(time: string): number {
   const match = /^(\d{1,2}):[0-5]\d$/.exec(time)
@@ -132,10 +137,10 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({})
   const [savedCount, setSavedCount] = useState(0)
   const [deleteKey, setDeleteKey] = useState<number | null>(null)
-  const [cancelTarget, setCancelTarget] = useState<Row | null>(null)
+  const [cancelRow, setCancelRow] = useState<Row | null>(null)
   const [cancelReason, setCancelReason] = useState("")
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
   const [cancelError, setCancelError] = useState("")
-  const [cancelSaving, setCancelSaving] = useState(false)
   const [dailyTotals, setDailyTotals] = useState<Record<string, number>>({})
   const [notesByVisitId, setNotesByVisitId] = useState<Record<string, VisitNote[]>>({})
   const [dragOverKey, setDragOverKey] = useState<number | null>(null)
@@ -416,7 +421,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           id: row.visit_id,
           customer_id: row.customer_id,
           nickname: row.nickname,
-          member_type: row.member_type,
+          member_type: row.member_type, card_status: row.card_status, card_status_tone: row.card_status_tone,
           cancelled: row.cancelled,
         })),
     )
@@ -464,7 +469,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           visit_time: v.visit_time || "",
           customer_id: v.customer_id,
           nickname: v.nickname,
-          member_type: v.member_type || "",
+          member_type: v.member_type || "", card_status: v.card_status, card_status_tone: v.card_status_tone,
           is_new_customer: v.is_new_customer,
           remaining_count: v.remaining_count ?? null,
           is_leader: v.is_leader || false,
@@ -631,12 +636,11 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
   const cancelVisit = useCallback(async (row: Row, reason: string) => {
     const visitId = savedVisitIds.current[row.key]
-    if (!visitId || row.arrived || row.cancelled || isViewOnly || verified) return
+    if (!visitId || row.arrived || row.cancelled || isViewOnly || verified) return false
     if (timersRef.current[row.key]) {
       clearTimeout(timersRef.current[row.key])
       delete timersRef.current[row.key]
     }
-    setCancelSaving(true)
     setRowStatus(prev => ({ ...prev, [row.key]: "saving" }))
     try {
       await visitApi.update(visitId, { cancelled: true, cancel_reason: reason })
@@ -649,14 +653,12 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       })
       setRowStatus(prev => ({ ...prev, [row.key]: "saved" }))
       pushHistory("取消了邀约", [row.key], `取消了「${row.nickname || "未命名"}」的邀约`, undefined, [{ rowKey: row.key, fields: ["cancelled", "cancel_reason"] }])
-      setCancelTarget(null)
-      setCancelReason("")
       onSaved()
+      return true
     } catch (error) {
       setRowStatus(prev => ({ ...prev, [row.key]: "error" }))
       setCancelError(error instanceof Error ? error.message : "取消邀约失败")
-    } finally {
-      setCancelSaving(false)
+      return false
     }
   }, [onSaved, pushHistory, isViewOnly, verified])
 
@@ -668,7 +670,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
       await visitApi.update(visitId, { cancelled: false })
       setRows(prev => {
         const updated = prev.map(item => item.key === row.key
-          ? { ...item, cancelled: false }
+          ? { ...item, cancelled: false, cancel_reason: "" }
           : item)
         // 恢复后回到未取消区域，已取消的仍排在末尾
         return [...updated.filter(r => !r.cancelled), ...updated.filter(r => r.cancelled)]
@@ -804,7 +806,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
 
     const memberType = customer.member_type || ""
     // 卡次由保存响应返回，与刷新列表同源；等待时不展示旧客户的余量。
-    setRows(prev => prev.map(r => r.key === key ? { ...r, nickname: customer.nickname, customer_id: customer.id, member_type: memberType, remaining_count: null, is_new_customer: undefined } : r))
+    setRows(prev => prev.map(r => r.key === key ? { ...r, nickname: customer.nickname, customer_id: customer.id, member_type: memberType, card_status: customer.card_status, card_status_tone: customer.card_status_tone, remaining_count: null, is_new_customer: undefined } : r))
     scheduleSave(key)
   }, [scheduleSave])
 
@@ -999,13 +1001,13 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                         excludeIds={rows.filter(r => r.key !== row.key && r.customer_id).map(r => r.customer_id)}
                         onChange={(v) => {
                           const name = typeof v === "string" ? v : v[0] || ""
-                          if (!name) { updateRow(row.key, "nickname", ""); updateRow(row.key, "customer_id", ""); setRows(prev => prev.map(r => r.key === row.key ? { ...r, member_type: "", remaining_count: null } : r)) }
+                          if (!name) { updateRow(row.key, "nickname", ""); updateRow(row.key, "customer_id", ""); setRows(prev => prev.map(r => r.key === row.key ? { ...r, member_type: "", card_status: "", card_status_tone: "neutral", remaining_count: null } : r)) }
                         }}
                         onSelectItem={(c) => handleCustomerSelect(row.key, c)}
                         onNoResultsClick={(text) => onCreateCustomer?.(text.trim())}
                         onBlur={(v) => {
                           if (v && !customers.some(c => c.nickname === v)) {
-                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, nickname: "", customer_id: "", member_type: "", remaining_count: null } : r))
+                            setRows(prev => prev.map(r => r.key === row.key ? { ...r, nickname: "", customer_id: "", member_type: "", card_status: "", card_status_tone: "neutral", remaining_count: null } : r))
                             scheduleSave(row.key)
                           }
                         }}
@@ -1016,7 +1018,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                     </div>{row.customer_id && row.is_new_customer === true && <span title="邀约当天之前暂无实际到店记录" className="shrink-0 rounded bg-[#fff8e8] px-1 text-[10px] leading-5 text-[#a78a4d]">新</span>}</div>
                   </td>
                   <td className="px-1.5 py-1.5">
-                    {row.member_type && <span className="inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-[3px] bg-[#f2f3f5] px-1.5 py-0.5 align-middle text-[11px] leading-4 text-[#646a73]" title={row.member_type}>{row.member_type}</span>}
+                    <MemberLabels customer={row} empty="" />
                   </td>
                   <td className="px-1.5 py-1.5">
                     <span className="text-[12px] text-[#4e535a]">{row.nickname ? formatRemaining(row.remaining_count) : ""}</span>
@@ -1146,10 +1148,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                             <TooltipTrigger
                               render={
                                 <button
-                                  onClick={() => {
-                                    if (row.cancelled) restoreVisit(row)
-                                    else { setCancelTarget(row); setCancelReason(""); setCancelError("") }
-                                  }}
+                                  onClick={() => row.cancelled ? restoreVisit(row) : (setCancelRow(row), setCancelReason(""), setCancelError(""))}
                                   className="inline-flex h-5 w-5 items-center justify-center text-[#8f959e] hover:text-[#3370ff]"
                                   aria-label={row.cancelled ? "恢复" : "取消"}
                                 >
@@ -1159,7 +1158,7 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
                                 </button>
                               }
                             />
-                            <TooltipContent>{row.cancelled ? (row.cancel_reason ? `恢复｜取消原因：${row.cancel_reason}` : "恢复") : "取消"}</TooltipContent>
+                            <TooltipContent>{row.cancelled ? `恢复${row.cancel_reason ? `（取消原因：${row.cancel_reason}）` : ""}` : "取消"}</TooltipContent>
                           </Tooltip>
                           <span className="h-3 w-px shrink-0 bg-[#d0d3d6]" aria-hidden="true" />
                         </>
@@ -1228,36 +1227,6 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
         </button>
       </div>}
 
-      <AlertDialog open={cancelTarget !== null} onOpenChange={(open) => {
-        if (!open && !cancelSaving) { setCancelTarget(null); setCancelReason(""); setCancelError("") }
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>取消邀约</AlertDialogTitle>
-            <AlertDialogDescription>请输入取消原因，确认后保留这条邀约记录。</AlertDialogDescription>
-          </AlertDialogHeader>
-          <textarea
-            value={cancelReason}
-            onChange={event => { setCancelReason(event.target.value); setCancelError("") }}
-            maxLength={200}
-            rows={3}
-            placeholder="填写取消原因"
-            aria-label="取消原因"
-            className="w-full resize-none rounded-[4px] border border-[#e1e4e7] px-3 py-2 text-[12px] leading-5 outline-none focus:border-[#3370ff]"
-          />
-          {cancelError && <p className="text-[12px] text-[#c4506a]">{cancelError}</p>}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={cancelSaving}>返回</AlertDialogCancel>
-            <AlertDialogAction disabled={cancelSaving} onClick={(event) => {
-              event.preventDefault()
-              const reason = cancelReason.trim()
-              if (!reason) { setCancelError("请输入取消原因"); return }
-              if (cancelTarget) void cancelVisit(cancelTarget, reason)
-            }}>{cancelSaving ? "保存中…" : "确认取消"}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog open={deleteKey !== null} onOpenChange={(open) => !open && setDeleteKey(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1267,6 +1236,29 @@ export function BatchInputTable({ date, customers, spaceId, refreshKey, onSaved,
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={() => { if (deleteKey !== null) removeRow(deleteKey); setDeleteKey(null) }}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={cancelRow !== null} onOpenChange={(open) => { if (!open && !cancelSubmitting) setCancelRow(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>取消邀约</AlertDialogTitle>
+            <AlertDialogDescription>请填写取消「{cancelRow?.nickname || "未命名"}」邀约的原因。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <textarea value={cancelReason} onChange={event => { setCancelReason(event.target.value); setCancelError("") }}
+            maxLength={500} rows={3} autoFocus placeholder="请输入取消原因"
+            className="w-full resize-none rounded-[4px] border border-[#dfe2e6] px-3 py-2 text-[12px] outline-none focus:border-[#3370ff]" />
+          {cancelError && <p className="text-[12px] text-red-600">{cancelError}</p>}
+          <AlertDialogFooter>
+            <Button variant="outline" size="sm" disabled={cancelSubmitting} onClick={() => setCancelRow(null)}>返回</Button>
+            <Button size="sm" disabled={!cancelReason.trim() || cancelSubmitting} onClick={async () => {
+              if (!cancelRow) return
+              setCancelSubmitting(true)
+              const saved = await cancelVisit(cancelRow, cancelReason.trim())
+              setCancelSubmitting(false)
+              if (saved) setCancelRow(null)
+            }}>{cancelSubmitting ? "取消中..." : "确认取消"}</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

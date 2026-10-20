@@ -196,6 +196,10 @@
   color: #b0b5bb;
 }
 
+.need-entry + .need-entry { margin-top: 10rpx; }
+.need-display-tag { display: inline-block; max-width: 100%; box-sizing: border-box; margin: 0 8rpx 6rpx 0; padding: 0 10rpx; border: 1rpx solid #dce5f2; border-radius: 8rpx; background: #f2f6fc; color: #526886; font-size: 23rpx; line-height: 33rpx; vertical-align: middle; }
+.need-detail { white-space: pre-wrap; }
+
 .arrival-badge {
   flex-shrink: 0;
   min-width: 100rpx;

@@ -7,8 +7,11 @@
     "pages/visit-detail/index",
     "pages/activities/index",
     "pages/activity-detail/index",
+    "pages/course-roster/index",
+    "pages/course-participant-record/index",
     "pages/activity-create/index",
     "pages/customers/index",
+    "pages/customer-export/index",
     "pages/customer-search/index",
     "pages/customer-form/index",
     "pages/customer-profile/index",
@@ -72,5 +75,9 @@
   },
   "lazyCodeLoading": "requiredComponents",
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "usingComponents": {
+    "member-labels": "/components/member-labels/index",
+    "activity-type-icon": "/components/activity-type-icon/index"
+  }
 }

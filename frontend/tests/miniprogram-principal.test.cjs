@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '../..')
 const views = require('../../miniprogram/utils/principal-view')
 const settle = () => new Promise(resolve => setImmediate(resolve))
 function deferred() { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b }); return {promise,resolve,reject} }
-function page(query = async () => response()) {
+function page(query = async () => response(), metadata = null) {
   let definition
   const calls = []
   const exports = []
@@ -17,7 +17,7 @@ function page(query = async () => response()) {
     Page: value => { definition=value }, wx: {getStorageSync:()=>({customer_access:{detail_tabs:{follow_up:true}}}),
       showToast(value){toasts.push(value)},env:{USER_DATA_PATH:'/mock'},
       getFileSystemManager:()=>({writeFile:options=>{writes.push(options);options.success()}}),openDocument:options=>options.success()}, getApp:()=>({checkLogin:()=>true}), console,
-    require: key => key.endsWith('/api') ? {principalApi:{query:params=>{calls.push(params);return query(params)},
+    require: key => key.endsWith('/api') ? {principalApi:{metadata:async()=>metadata, query:params=>{calls.push(params);return query(params)},
       export:async params=>{exports.push(params);return {buffer:new ArrayBuffer(0),filename:({traffic:'引流人数',invite:'邀约到店',participation:'活动参与',courses:'课程数据',deals:'成交量'})[params.export_group]+'_2026年10月1日至2026年10月19日.xlsx'}}},customerApi:{}}
       : key.endsWith('/config') ? {BASE_URL:'http://local.invalid'} : require(path.join(root,'miniprogram/pages/principal',key)),
   })
@@ -165,4 +165,37 @@ test('归档组织默认隐藏，包含归档仅改变候选项，取消后清�
   p.toggleArchivedOrganizations();await settle()
   assert.equal(p.data.query.organization_id,'');assert.equal(p.data.includeArchived,false)
   assert.equal(p.data.scopeTargets.length,2)
+})
+
+
+test('仅个人权限首次加载直接查本人，选项索引为零也不会切成组织', async () => {
+  const {page:p,calls}=page(undefined, {scope_types:['person'],referrers:[{id:'self',name:'本人',count:2}],organizations:[],transaction_access:'detail'})
+  await p.initialize()
+  assert.deepEqual(Array.from(p.data.scopeTypes), ['个人'])
+  assert.equal(p.data.scopeTypeIndex,0)
+  assert.equal(calls.length,1)
+  assert.equal(calls[0].scope_type,'person')
+  assert.equal(calls[0].referrer_id,'self')
+  assert.deepEqual(Array.from(p.data.tabs,t=>t.key), ['overview'])
+  p.onScopeType({detail:{value:0}})
+  await settle()
+  p.onScopeTarget({detail:{value:0}})
+  await settle()
+  assert(calls.every(call=>call.scope_type==='person' && call.referrer_id==='self'))
+})
+
+test('没有统计范围时不发送查询', async () => {
+  const {page:p,calls}=page(undefined, {scope_types:[],referrers:[],organizations:[],transaction_access:'detail'})
+  await p.initialize()
+  assert.equal(calls.length,0)
+  assert.match(p.data.error,/未开通统计范围/)
+})
+
+test('仅组织权限没有个人候选，旧权限仍保留两种范围', async () => {
+  for (const scope_types of [['organization'], undefined]) {
+    const {page:p,calls}=page(undefined, {scope_types,referrers:[],organizations:[],transaction_access:'detail'})
+    await p.initialize()
+    assert.deepEqual(Array.from(p.data.scopeTypeKeys),scope_types || ['organization','person'])
+    assert.equal(calls[0].scope_type,'organization')
+  }
 })

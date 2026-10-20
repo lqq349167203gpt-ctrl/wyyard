@@ -256,8 +256,9 @@ def test_export_keeps_all_rows_and_matches_numeric_detail_sort(client, monkeypat
     })
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.content)).active
-    assert sheet.max_row == 26
-    assert sheet["A2"].value == "客户24" and sheet["A26"].value == "客户0"
+    header = next(row for row in range(1, sheet.max_row + 1) if sheet.cell(row, 1).value == "昵称")
+    assert sheet.max_row == header + 25
+    assert sheet.cell(header + 1, 1).value == "客户24" and sheet.cell(header + 25, 1).value == "客户0"
 
 
 def test_shared_metrics_preserve_customer_filtering_rates_and_deduplication():
@@ -316,4 +317,5 @@ def test_pc_export_applies_same_picks_and_quick_filter_as_detail(client, monkeyp
     })
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.content)).active
-    assert [row[0] for row in sheet.iter_rows(min_row=2, values_only=True)] == [row["name"] for row in detail["items"]]
+    header = next(row for row in range(1, sheet.max_row + 1) if sheet.cell(row, 1).value == "昵称")
+    assert [row[0] for row in sheet.iter_rows(min_row=header + 1, values_only=True)] == [row["name"] for row in detail["items"]]

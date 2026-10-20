@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 from app.services import (
     organization_service,
 )
-from app.services.payment_sources import payment_loader
+from app.services.payment_sources import fill_effective_remaining, payment_loader
 
 PROJECT_SOURCES = (
     ("membership_card", "会员卡", payment_loader("membership-cards")),
@@ -30,6 +30,7 @@ HEADERS = [
     "用户昵称",
     "项目内容",
     "数量/期限",
+    "剩余次数",
     "金额",
     "生效日期",
     "到期日期",
@@ -41,7 +42,7 @@ HEADERS = [
     "录入时间",
 ]
 
-COLUMN_WIDTHS = [13, 16, 16, 30, 14, 14, 13, 13, 24, 14, 18, 30, 14, 20]
+COLUMN_WIDTHS = [13, 16, 16, 30, 14, 14, 14, 13, 13, 24, 14, 18, 30, 14, 20]
 
 
 def _offline_expiry(item: dict) -> str:
@@ -96,6 +97,18 @@ def _project_quantity(item: dict, project_type: str) -> str:
     return ""
 
 
+def _remaining_quantity(item: dict, project_type: str) -> str:
+    if project_type not in {"membership_card", "group_case", "emotional_release", "energy_knot", "other"}:
+        return ""
+    fill_effective_remaining(item, project_type)
+    if project_type == "membership_card" and item.get("voided"):
+        return "已退费"
+    remaining = item.get("remaining_count" if project_type == "other" else "effective_remaining")
+    if remaining is None:
+        return "不限" if project_type in {"membership_card", "other"} else ""
+    return f"{remaining}{'个' if project_type == 'energy_knot' else '次'}"
+
+
 def _amount(item: dict, project_type: str) -> float:
     if project_type == "online_tea":
         return ""
@@ -129,6 +142,7 @@ def _build_rows(
     date_from: str | None = None,
     date_to: str | None = None,
     allowed_customer_ids: set[str] | None = None,
+    project_types: set[str] | None = None,
 ) -> list[dict]:
     organization_names = {
         organization.id: organization.name
@@ -136,6 +150,8 @@ def _build_rows(
     }
     rows = []
     for project_type, type_label, list_records in PROJECT_SOURCES:
+        if project_types is not None and project_type not in project_types:
+            continue
         for record in list_records():
             item = record.model_dump(mode="json")
             if (
@@ -162,6 +178,7 @@ def _build_rows(
                 "用户昵称": item.get("nickname") or "",
                 "项目内容": _project_detail(item, project_type, type_label),
                 "数量/期限": _project_quantity(item, project_type),
+                "剩余次数": _remaining_quantity(item, project_type),
                 "金额": _amount(item, project_type),
                 "生效日期": effective_date,
                 "到期日期": expiry_date,
@@ -187,12 +204,14 @@ def build_payment_export(
     date_to: str | None = None,
     *,
     allowed_customer_ids: set[str] | None = None,
+    project_types: set[str] | None = None,
 ) -> tuple[io.BytesIO, int]:
     rows = _build_rows(
         user_role,
         date_from,
         date_to,
         allowed_customer_ids=allowed_customer_ids,
+        project_types=project_types,
     )
     workbook = Workbook()
     worksheet = workbook.active
@@ -222,7 +241,7 @@ def build_payment_export(
             if header == "金额":
                 cell.number_format = '¥#,##0.00'
 
-    worksheet.auto_filter.ref = f"A1:N{max(1, len(rows) + 1)}"
+    worksheet.auto_filter.ref = f"A1:{get_column_letter(len(HEADERS))}{max(1, len(rows) + 1)}"
     output = io.BytesIO()
     workbook.save(output)
     output.seek(0)

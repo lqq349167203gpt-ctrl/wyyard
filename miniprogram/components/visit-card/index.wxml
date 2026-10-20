@@ -16,8 +16,7 @@
           <text class="new-customer-tag" wx:if="{{visit.is_new_customer}}">新</text>
           <text class="leader-tag" wx:if="{{visit.is_leader}}">组长</text>
           <text class="member-tag" wx:if="{{leaderName}}">{{leaderName}}组员</text>
-          <text class="member-summary" wx:if="{{visit.member_type || remainingText}}">{{visit.member_type}}{{visit.member_type && remainingText ? ' · ' : ''}}{{remainingText}}</text>
-          <text class="readonly-mark" wx:if="{{!editable}}">部分只读</text>
+          <member-labels identity="{{visit.member_type}}" status="{{visit.card_status}}" tone="{{visit.card_status_tone}}" /><text class="member-summary" wx:if="{{remainingText}}">{{remainingText}}</text>
         </view>
         <view
           class="arrival-badge {{visit.arrived ? 'arrived' : 'todo'}} {{arrivalEditable ? '' : 'disabled'}}"
@@ -34,13 +33,20 @@
         <text>到店 {{visit.arrived_count || 0}} 次</text>
       </view>
       <view class="visit-details">
-        <view class="needs-row" wx:if="{{noteVisibility.visit_need}}">
-          <text class="needs-label">来访需求</text>
-          <text class="needs-content {{visit.needs ? '' : 'empty'}}">{{visit.needs || '-'}}</text>
-        </view>
         <view class="needs-row" wx:if="{{visit.cancelled && visit.cancel_reason}}">
           <text class="needs-label">取消原因</text>
           <text class="needs-content">{{visit.cancel_reason}}</text>
+        </view>
+        <view class="needs-row" wx:if="{{noteVisibility.visit_need}}">
+          <text class="needs-label">来访需求</text>
+          <view class="needs-content" wx:if="{{hasStructuredNeeds && needEntries.length}}">
+            <view class="need-entry" wx:for="{{needEntries}}" wx:key="id" wx:for-item="note">
+              <text>{{note.author}}：</text>
+              <text class="need-display-tag" wx:for="{{note.tags}}" wx:key="id" wx:for-item="tag">{{tag.name}}</text>
+              <text class="need-detail" wx:if="{{note.content}}">{{note.content}}</text>
+            </view>
+          </view>
+          <text class="needs-content {{hasStructuredNeeds || !visit.needs ? 'empty' : ''}}" wx:else>{{hasStructuredNeeds ? '-' : (visit.needs || '-')}}</text>
         </view>
         <view class="needs-row" wx:if="{{visit.receptionist}}">
           <text class="needs-label">接待人</text>
@@ -52,7 +58,6 @@
         </view>
       </view>
       <view class="card-actions">
-        <text class="creator-text">创建人 {{visit.created_by || '未记录'}}</text>
         <view class="action-list" wx:if="{{!editMode}}">
           <text class="action-btn" wx:if="{{cancelable && !visit.arrived}}" catchtap="onCancelVisitTap">{{visit.cancelled ? '恢复' : '取消'}}</text>
           <text class="action-btn outlined-action" catchtap="onProfileTap">资料</text>

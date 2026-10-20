@@ -40,6 +40,7 @@ class PurchaseCondition(StrictBaseModel):
     count_scope: Literal["subtype", "group"] = "subtype"
     first_purchase: bool = False
     previous_products: list[str] = Field(default_factory=list, max_length=100)
+    excluded_previous_products: list[str] = Field(default_factory=list, max_length=100)
     operator: Literal["eq", "gte"] = "eq"
     count: int = Field(default=1, ge=1, le=100000)
 
@@ -48,6 +49,10 @@ class PurchaseCondition(StrictBaseModel):
     def validate_products(self):
         if self.first_purchase and self.previous_products:
             raise ValueError("首次购买不能同时要求此前已购买")
+        if self.first_purchase and self.count != 1:
+            raise ValueError("从未购买的客户只能匹配第 1 笔购买")
+        if set(self.previous_products) & set(self.excluded_previous_products):
+            raise ValueError("同一项目不能同时要求之前买过和之前没买过")
         if not self.product and not self.products:
             raise ValueError("请选择付费项目")
         if self.product and self.products:
@@ -57,7 +62,17 @@ class PurchaseCondition(StrictBaseModel):
 
 class PurchaseRule(StrictBaseModel):
     key: Literal["experience", "conversion", "upsell", "repurchase"]
+    previous_stage: Literal["", "experience", "conversion", "upsell"] = ""
+    once: bool = False
     conditions: list[PurchaseCondition] = Field(default_factory=list, max_length=100)
+
+
+    @model_validator(mode="after")
+    def validate_stage(self):
+        stages = list(PURCHASE_RULE_LABELS)
+        if self.previous_stage and stages.index(self.previous_stage) >= stages.index(self.key):
+            raise ValueError("前置阶段必须早于当前阶段")
+        return self
 
 
 UpsellConfigUpdate.model_rebuild()

@@ -56,7 +56,7 @@ def summary_rows(result: dict, query, group: str) -> list[list]:
         add("总数", "引流人数", summary.get("引流人数"), "人")
         options("引流人", breakdown.get("traffic"))
         filters = breakdown.get("traffic_filters") or {}
-        for key, label in (("identity", "会员身份"), ("upsell", "升单情况"), ("stage", "跟进阶段"),
+        for key, label in (("identity", "会员身份"), ("card_status", "当前卡次"), ("upsell", "升单情况"),
                            ("source", "流量来源"), ("tag", "客户标签")):
             options(label, filters.get(key))
     elif group == "invite":

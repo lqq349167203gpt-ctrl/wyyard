@@ -1,0 +1,38 @@
+<view class="page">
+  <view class="message" wx:if="{{!hasPagePermission}}">无权限访问此页面</view>
+  <block wx:else>
+    <view class="card">
+      <view class="title">引流日期</view>
+      <view class="modes"><view wx:for="{{rangeModes}}" wx:key="key" class="mode {{mode === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onModeChange">{{item.label}}</view></view>
+      <picker wx:if="{{mode === 'day'}}" mode="date" value="{{day}}" disabled="{{exporting}}" bindchange="onDateChange" data-key="day"><view class="picker"><text>{{day}}</text><view class="chevron"></view></view></picker>
+      <picker wx:if="{{mode === 'month'}}" mode="date" fields="month" value="{{month}}" disabled="{{exporting}}" bindchange="onDateChange" data-key="month"><view class="picker"><text>{{month}}</text><view class="chevron"></view></view></picker>
+      <picker wx:if="{{mode === 'year'}}" mode="date" fields="year" value="{{year}}" disabled="{{exporting}}" bindchange="onDateChange" data-key="year"><view class="picker"><text>{{year}}年</text><view class="chevron"></view></view></picker>
+      <view wx:if="{{mode === 'custom'}}" class="date-range">
+        <picker mode="date" value="{{dateFrom}}" disabled="{{exporting}}" bindchange="onDateChange" data-key="dateFrom"><view class="picker"><text>{{dateFrom}}</text><view class="chevron"></view></view></picker><text>至</text>
+        <picker mode="date" value="{{dateTo}}" disabled="{{exporting}}" bindchange="onDateChange" data-key="dateTo"><view class="picker"><text>{{dateTo}}</text><view class="chevron"></view></view></picker>
+      </view>
+    </view>
+    <view class="message" wx:if="{{loading}}">加载中…</view>
+    <view class="card" wx:if="{{filterGroups.length}}">
+      <view wx:for="{{filterGroups}}" wx:key="key" wx:for-item="group" class="filter-group">
+        <view class="group-head" bindtap="onFilterExpand" data-key="{{group.key}}"><text>{{group.title}}</text><view class="group-meta"><text class="hint">{{filters[group.key].length ? '已选 ' + filters[group.key].length + ' 项' : '全部'}}</text><view class="chevron {{expandedFilter === group.key ? 'expanded' : ''}}"></view></view></view>
+        <view wx:if="{{expandedFilter === group.key}}">
+          <view class="clear" bindtap="onFilterClear" data-key="{{group.key}}">不限</view>
+          <view class="options"><view wx:for="{{group.options}}" wx:for-item="option" wx:key="name" class="option {{option.selected ? 'active' : ''}}" bindtap="onFilterChange" data-key="{{group.key}}" data-name="{{option.name}}">{{option.name}}</view></view>
+          <view class="hint" wx:if="{{!group.options.length}}">暂无可选内容</view>
+        </view>
+      </view>
+    </view>
+    <view class="card" wx:if="{{columns.length}}">
+      <view class="columns-head"><text class="title">导出内容</text><text class="hint">已选 {{selectedColumns.length}} 项</text><text class="clear" bindtap="onColumnsAll" data-mode="all">全选</text><text class="clear" bindtap="onColumnsAll" data-mode="clear">清空</text></view>
+      <view wx:for="{{columnGroups}}" wx:key="title" wx:for-item="group" class="column-group">
+        <view class="group-head" bindtap="onGroupExpand" data-title="{{group.title}}"><text>{{group.title}}</text><view class="group-meta"><text class="hint">{{group.count}}/{{group.columns.length}}</text><view class="chevron {{group.expanded ? 'expanded' : ''}}"></view></view></view>
+        <checkbox-group wx:if="{{group.expanded}}" class="checkboxes" bindchange="onColumnsChange" data-title="{{group.title}}">
+          <label wx:for="{{group.columns}}" wx:for-item="column" wx:key="key" class="checkbox"><checkbox value="{{column.key}}" checked="{{column.selected}}" disabled="{{exporting}}" color="#3370ff"/><text>{{column.label}}</text></label>
+        </checkbox-group>
+      </view>
+    </view>
+    <view class="error" wx:if="{{error}}">{{error}}<text wx:if="{{!columns.length}}" bindtap="loadOptions"> 点击重试</text></view>
+    <view class="footer"><button class="export-button" disabled="{{loading || exporting || !columns.length || !selectedColumns.length}}" bindtap="onExport">{{exporting ? '导出中…' : '导出 Excel'}}</button></view>
+  </block>
+</view>

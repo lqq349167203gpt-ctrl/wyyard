@@ -1,3 +1,4 @@
+@import "../../utils/schedule-workflow.wxss";
 .page {
   min-height: 100vh;
   background-color: #f5f6f8;
@@ -5,7 +6,7 @@
 
 /* 头部 */
 .head {
-  background-color: #f3f7ff;
+  background-color: #c6e4fe;
   position: fixed;
   top: 0;
   left: 0;
@@ -301,10 +302,10 @@
 
 .day-dot.verified { background-color: #34c724; }
 
-/* 活动列表：B 方案，按时段一组一卡 */
+/* 活动列表：按时段分组，内容直接铺开。 */
 .list {
   position: relative;
-  padding: 330rpx 0 20rpx;
+  padding: 462rpx 0 20rpx;
 }
 
 .group-card {
@@ -319,7 +320,7 @@
 
 .schedule-switching-line {
   position: absolute;
-  top: 330rpx;
+  top: 462rpx;
   left: 24rpx;
   z-index: 2;
   width: 34%;
@@ -380,10 +381,10 @@
 
 .group-card {
   overflow: hidden;
-  margin: 0 24rpx;
-  border-radius: 24rpx;
-  background-color: #ffffff;
-  box-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.04);
+  margin: 0;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
 }
 
 .group-card .card {
@@ -406,14 +407,14 @@
   min-height: 94rpx;
   display: flex;
   align-items: center;
-  padding: 16rpx 28rpx 12rpx;
+  padding: 24rpx 32rpx 20rpx;
 }
 
 .card-roster-strip {
   min-width: 0;
   display: flex;
   align-items: center;
-  padding: 16rpx 28rpx 16rpx 142rpx;
+  padding: 0;
   color: #646a73;
   font-size: 22rpx;
 }
@@ -431,22 +432,19 @@
 }
 
 .card-roster-entry {
-  height: 52rpx;
+  min-height: 72rpx;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   flex-shrink: 0;
-  margin-left: 20rpx;
-  padding: 0 20rpx;
-  border-radius: 8rpx;
-  background-color: #f2f3f5;
-  color: #646a73;
-  font-size: 22rpx;
+  gap: 8rpx;
+  margin-left: 16rpx;
+  padding-left: 8rpx;
+  color: #4c5865;
+  font-size: 24rpx;
 }
-
-.card-roster-entry:active {
-  background-color: #e9ebee;
-}
+.roster-chevron { color: #9aa2ab; font-size: 32rpx; }
+.card-roster-entry:active { opacity: .6; }
 
 .group-card .card + .card {
   border-top: 2rpx solid #f5f6f8;
@@ -499,7 +497,7 @@
 .card-mid {
   flex: 1;
   min-width: 0;
-  margin-left: 22rpx;
+  margin-left: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -572,7 +570,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 466rpx 0 0;
+  padding: 620rpx 0 0;
 }
 
 .empty-icon {
@@ -588,7 +586,7 @@
 .loading {
   display: flex;
   justify-content: center;
-  padding: 466rpx 0 0;
+  padding: 620rpx 0 0;
   color: #8f959e;
   font-size: 28rpx;
 }
@@ -1218,14 +1216,61 @@
   font-size: 20rpx;
 }
 
+.participant-note-own-title {
+  display: block;
+  margin: 4rpx 0 8rpx;
+  color: #8f959e;
+  font-size: 22rpx;
+}
+
+.participant-feedback-field,
+.participant-followup-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  margin-bottom: 10rpx;
+  color: #646a73;
+  font-size: 23rpx;
+}
+
+.participant-feedback-field picker,
+.participant-followup-row picker {
+  width: 230rpx;
+}
+
+.participant-feedback-picker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 56rpx;
+  padding: 0 14rpx;
+  border: 1rpx solid #dfe3e8;
+  border-radius: 8rpx;
+  color: #2b2f36;
+  background: #fff;
+  text-align: left;
+}
+
+.participant-feedback-picker text:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participant-feedback-picker text:last-child {
+  flex-shrink: 0;
+  margin-left: 8rpx;
+  color: #9aa1a9;
+}
+
 .participant-note-input {
   width: 100%;
-  height: 132rpx;
+  height: 210rpx;
   box-sizing: border-box;
   padding: 16rpx 18rpx;
-  border: 1rpx solid #dfe3e8;
+  border: 0;
   border-radius: 10rpx;
-  background-color: #ffffff;
+  background-color: #f5f6f7;
   color: #2b2f36;
   font-size: 24rpx;
   line-height: 1.55;
@@ -1261,6 +1306,7 @@
 
 .participant-note-other-author {
   color: #8f959e;
+  display: block;
 }
 
 .participant-note-save {
@@ -1306,3 +1352,55 @@
   font-size: 26rpx;
   text-align: center;
 }
+
+.head-date .wk, .head-date .drop { color: #657b90; }
+
+/* 大类图标与课程文字分列，长标题在原文字起点换行。 */
+.card-mid{flex-direction:row;align-items:flex-start;justify-content:flex-start;gap:20rpx}
+.card-mid > activity-type-icon{flex-shrink:0}
+.card-content{flex:1;min-width:0}
+.card-line1{align-items:flex-start}
+.card-line1 .name{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;line-height:40rpx}
+.card-line1 .welfare-tag{line-height:40rpx}
+
+/* 同一门课保持三层信息，人数与时间成组，名单入口保持轻量。 */
+.course-schedule-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6rpx 16rpx;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+}
+.course-deduction {
+  color: #41464d;
+  font-weight: 500;
+}
+.course-teacher {
+  min-width: 0;
+  color: #79818b;
+  word-break: break-all;
+}
+.course-deduction + .course-teacher {
+  padding-left: 16rpx;
+  border-left: 1rpx solid #dfe3e8;
+}
+.course-attendance-summary {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4rpx 14rpx;
+  padding: 8rpx 0;
+  line-height: 34rpx;
+}
+.course-time {
+  color: #008bd8;
+  font-size: 24rpx;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.card-roster-names { flex: initial; color: #8a929c; white-space: nowrap; }
+.card-line1 .name { font-size: 30rpx; }

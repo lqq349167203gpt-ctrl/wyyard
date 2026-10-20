@@ -38,7 +38,7 @@
       <input class="form-input" placeholder="年龄" placeholder-class="form-input-placeholder" value="{{age}}" bindinput="onInput" data-field="age" />
     </view>
     <view class="form-item" bindtap="onPickerOpen" data-field="service_teacher">
-      <text class="form-label">服务老师</text>
+      <text class="form-label">Sales</text>
       <view class="picker-value-wrap">
         <text class="{{service_teacher ? '' : 'placeholder'}}">{{service_teacher || '选择用户'}}</text>
         <text class="picker-clear" wx:if="{{service_teacher}}" catchtap="onPickerClear" data-field="service_teacher">x</text>
@@ -47,7 +47,7 @@
     <view class="form-item" bindtap="onPickerOpen" data-field="referrer">
       <text class="form-label">引流人</text>
       <view class="picker-value-wrap">
-        <text class="{{referrer ? '' : 'placeholder'}}">{{referrer || '选择用户'}}</text>
+        <text class="referrer-value {{referrer ? '' : 'placeholder'}}">{{referrer || '选择引流人（可多选）'}}</text>
         <text class="picker-clear" wx:if="{{referrer}}" catchtap="onPickerClear" data-field="referrer">x</text>
       </view>
     </view>
@@ -66,12 +66,6 @@
         <text class="{{referrer_handler ? '' : 'placeholder'}}">{{referrer_handler || '选择用户'}}</text>
         <text class="picker-clear" wx:if="{{referrer_handler}}" catchtap="onPickerClear" data-field="referrer_handler">x</text>
       </view>
-    </view>
-    <view class="form-item">
-      <text class="form-label">跟进状态</text>
-      <picker class="form-picker" mode="selector" range="{{followUpStatuses}}" bindchange="onFollowUpStatusChange">
-        <view class="picker-display {{follow_up_status ? '' : 'placeholder'}}">{{follow_up_status || '选择状态'}}</view>
-      </picker>
     </view>
     <view class="form-item">
       <text class="form-label">客户质量</text>
@@ -99,9 +93,9 @@
         <text class="picker-clear" wx:if="{{traffic_source_detail}}" catchtap="onPickerClear" data-field="traffic_source_detail">x</text>
       </view>
     </view>
-    <view class="form-item last" wx:if="{{traffic_source && needTrafficDetail}}">
-      <text class="form-label">内容链接</text>
-      <input class="form-input" placeholder="链接地址" placeholder-class="form-input-placeholder" value="{{traffic_source_detail}}" bindinput="onInput" data-field="traffic_source_detail" />
+    <view class="post-fields" wx:if="{{traffic_source && needTrafficDetail}}">
+      <view class="post-field"><text class="post-label">帖子名称</text><input class="post-input" placeholder="请输入帖子名称" placeholder-class="form-input-placeholder" value="{{traffic_post_name}}" maxlength="200" bindinput="onInput" data-field="traffic_post_name" /></view>
+      <view class="post-field"><text class="post-label">内容链接</text><input class="post-input" placeholder="链接地址" placeholder-class="form-input-placeholder" value="{{traffic_source_detail}}" maxlength="200" bindinput="onInput" data-field="traffic_source_detail" /></view>
     </view>
   </view>
 
@@ -136,10 +130,20 @@
 
   <!-- 搜索选择弹窗 -->
   <view class="picker-mask" wx:if="{{showPicker}}" bindtap="onPickerClose"></view>
-  <view class="picker-popup" wx:if="{{showPicker}}">
+  <view class="picker-popup {{pickerField === 'referrer' ? 'referrer-picker' : ''}}" wx:if="{{showPicker}}">
     <view class="picker-header">
       <text class="picker-title">选择{{pickerTitle}}</text>
-      <text class="picker-close" bindtap="onPickerClose">关闭</text>
+      <text class="picker-close" bindtap="onPickerClose">{{pickerField === 'referrer' ? '完成' : '关闭'}}</text>
+    </view>
+    <view class="picker-selected" wx:if="{{pickerField === 'referrer' && referrers.length}}">
+      <text class="picker-selected-label">已选（{{referrers.length}}）</text>
+      <scroll-view class="picker-selected-scroll" scroll-y style="height:{{referrers.length > 3 ? 128 : 64}}rpx">
+        <view class="picker-selected-chips">
+          <view class="picker-selected-chip" wx:for="{{referrers}}" wx:key="*this" data-nickname="{{item}}" catchtap="onRemoveReferrer">
+            <text class="picker-selected-name">{{item}}</text><text class="picker-selected-remove">×</text>
+          </view>
+        </view>
+      </scroll-view>
     </view>
     <view class="picker-search">
       <input class="picker-search-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
@@ -147,7 +151,10 @@
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-nickname="{{item.nickname}}">
         <text class="picker-item-name">{{item.nickname}}</text>
-        <text class="picker-item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+        <member-labels wx:if="{{(item.member_type || item.card_status) && pickerField !== 'referrer'}}" identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
+        <view class="referrer-check-area" wx:if="{{pickerField === 'referrer'}}">
+          <view class="referrer-checkbox {{item.selected ? 'referrer-checkbox-checked' : ''}}"><view class="referrer-checkmark" wx:if="{{item.selected}}"></view></view>
+        </view>
       </view>
       <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
         <text>无匹配客户</text>

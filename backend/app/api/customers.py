@@ -1,20 +1,27 @@
 import logging
-from datetime import date
+from datetime import date, datetime
+from io import BytesIO
 from typing import Literal
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import Field
 from starlette.requests import Request as StarletteRequest
 
-from app.middleware.jwt_auth import require_admin
+from app.middleware.jwt_auth import require_admin, require_page_permission
 from app.middleware.rate_limit import limiter
 from app.models.base import StrictBaseModel
 from app.models.customer import ChatLogParseRequest, CustomerCreate, CustomerQuality, CustomerUpdate, customer_referrers
+from app.models.operation_log import OperationLogCreate
 from app.services import (
     customer_access_service,
     customer_contact_service,
+    customer_export_service,
     customer_service,
     customer_tag_service,
+    customer_workspace_service,
     emotional_release_service,
     energy_knot_service,
     follow_up_status_service,
@@ -23,6 +30,7 @@ from app.services import (
     member_identity_service,
     membership_card_service,
     oh_card_reading_service,
+    operation_log_service,
     other_project_service,
     project_deduction_service,
     project_refund_service,
@@ -38,7 +46,7 @@ from app.services.visit_service import (
     get_last_visit_date,
 )
 from app.utils.pagination import paginate
-from app.utils.request_context import get_client_ip
+from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
 
 logger = logging.getLogger(__name__)
@@ -124,11 +132,12 @@ def _customer_list_base(customer) -> dict:
     """不查询关联记录，先完成基础筛选与分页。"""
     _SLIM_FIELDS = (
         "id", "nickname", "name", "gender", "phone", "wechat", "age",
-        "member_type", "positions", "self_tags", "paid_content",
+        "member_type", "card_status", "card_status_tone", "positions", "self_tags", "paid_content",
         "referrer", "referrers", "referral_date", "referrer_handler", "service_teacher",
+        "handoff",
         "follow_up_status",
         "customer_quality",
-        "traffic_source", "traffic_source_detail",
+        "traffic_source", "traffic_source_detail", "traffic_post_name",
         "need_tags", "follow_up_node", "follow_up_action",
         "core_situation", "tags", "work_status", "work_description",
         "income_stability", "personal_annual_income", "household_annual_income",
@@ -206,7 +215,7 @@ def _fill_visit_count(customer):
     return data
 
 
-_SORTABLE_FIELDS = {"member_type", "visit_count", "activity_count", "total_payment", "transaction_count", "last_visit_date", "created_at", "referral_date"}
+_SORTABLE_FIELDS = {"member_type", "card_status", "visit_count", "activity_count", "total_payment", "transaction_count", "last_visit_date", "created_at", "referral_date"}
 _NUMERIC_SORT_FIELDS = {"visit_count", "activity_count", "total_payment", "transaction_count"}
 
 
@@ -218,10 +227,12 @@ def _sort_customer_items(items: list[dict], sort_by: str, sort_order: str | None
 
     if sort_by in _NUMERIC_SORT_FIELDS:
         populated.sort(key=lambda item: float(item[sort_by]), reverse=reverse)
-    elif sort_by == "member_type":
+    elif sort_by in {"member_type", "card_status"}:
+        identities = (member_identity_service.list_identities("card_status") if sort_by == "card_status"
+                      else member_identity_service.list_identities())
         identity_order = {
             identity.name: index
-            for index, identity in enumerate(member_identity_service.list_identities())
+            for index, identity in enumerate(identities)
         }
         fallback_order = len(identity_order)
         populated.sort(
@@ -249,6 +260,8 @@ async def list_customers(
     service_teacher: str | None = Query(None),
     customer_quality: CustomerQuality | None = Query(None),
     member_types: str | None = Query(None),
+    card_status: str | None = Query(None),
+    card_statuses: str | None = Query(None),
     tag_ids: str | None = Query(None),
     tag_match: str = Query("any", pattern="^(any|all)$"),
     referrers: str | None = Query(None),
@@ -257,8 +270,12 @@ async def list_customers(
     sort_by: str | None = Query(None),
     sort_order: str | None = Query(None),
     list_view: bool = Query(False),
+    workspace: Literal["all", "referral", "handoff", "sales"] | None = None,
+    workspace_owner: str | None = None,
+    handoff_status: Literal["pending", "accepted", "history", "all"] = "pending",
 ):
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
+    customers = customer_workspace_service.filter_workspace(request, customers, workspace, handoff_status, workspace_owner)
     customers_by_id = {customer.id: customer for customer in customers}
     items = [_customer_list_base(customer) for customer in customers]
 
@@ -273,6 +290,11 @@ async def list_customers(
         ]
     if member_type:
         items = [c for c in items if c.get("member_type") == member_type]
+    if card_status:
+        items = [c for c in items if c.get("card_status") == card_status]
+    if card_statuses:
+        allowed_statuses = {value.strip() for value in card_statuses.split(",") if value.strip()}
+        items = [c for c in items if c.get("card_status") in allowed_statuses]
     if referrer:
         items = [c for c in items if referrer.lower() in (c.get("referrer", "") or "").lower()]
     if referrer_handler:
@@ -338,6 +360,10 @@ async def list_customers(
     else:
         items.sort(key=lambda c: c.get("created_at", ""), reverse=True)
 
+    if workspace == "handoff":
+        items.sort(key=lambda item: (customers_by_id[item["id"]].handoff.assigned_at
+                   if customers_by_id[item["id"]].handoff else customers_by_id[item["id"]].created_at), reverse=True)
+
     # 默认列表先分页再补统计；按统计字段排序时仍先算整批，保证跨页排序正确。
     paginated = paginate(items, page, page_size or 10) if page is not None else None
     if paginated is not None:
@@ -350,6 +376,7 @@ async def list_customers(
     protected_items = []
     for item in items:
         protected = customer_access_service.protect_sensitive_data(item, role)
+        protected["can_accept_handoff"] = workspace == "handoff" and customer_workspace_service.is_handler(request, customers_by_id[item["id"]])
         if not can_view_payment:
             protected["total_payment"] = None
             protected["transaction_count"] = None
@@ -359,6 +386,153 @@ async def list_customers(
     if paginated is not None:
         return {**paginated, "items": items}
     return items
+
+
+@router.get("/workspaces", dependencies=[Depends(require_page_permission("healing-records"))])
+def customer_workspaces(request: Request):
+    return customer_workspace_service.available_workspaces(request)
+
+
+class WorkspaceSettingsUpdate(StrictBaseModel):
+    visible_workspaces: list[Literal["all", "referral", "handoff", "sales"]] = Field(min_length=1, max_length=4)
+    default_workspace: Literal["all", "referral", "handoff", "sales"]
+
+
+@router.get("/workspace-settings", dependencies=[Depends(require_page_permission("healing-records"))])
+def get_workspace_settings(request: Request):
+    return customer_workspace_service.workspace_settings(request)
+
+
+@router.put("/workspace-settings", dependencies=[Depends(require_page_permission("healing-records"))])
+def set_workspace_settings(data: WorkspaceSettingsUpdate, request: Request):
+    result = customer_workspace_service.save_workspace_settings(request, data.visible_workspaces, data.default_workspace)
+    request.state.operation_log_context = {"content": "修改本人客户界面显示偏好"}
+    return result
+
+
+@router.get("/assignment-options", dependencies=[Depends(require_page_permission("healing-records"))])
+async def customer_assignment_options(request: Request):
+    """保留可见客户选项，另补业务人员姓名，不泄露其联系方式或客户档案。"""
+    from app.services import account_service, position_edit_permission_service
+
+    result = await list_customers_light(request, purpose="selector")
+    names = {item["nickname"] for item in result}
+    for account in account_service.list_accounts():
+        if not account.enabled or not account.owner or account.owner in names:
+            continue
+        permissions = position_edit_permission_service.get_permissions(account.roles or [account.role])
+        if not permissions.get("customer_workspaces"):
+            continue
+        names.add(account.owner)
+        result.append({
+            "id": f"staff:{account.id}", "nickname": account.owner, "name": "",
+            "member_type": "", "positions": [], "position_sort_orders": {},
+            "created_at": "", "traffic_source": "", "traffic_source_detail": "",
+            "referrer": "", "referral_date": "", "space_id": "",
+        })
+    return result
+
+
+class AcceptHandoffRequest(StrictBaseModel):
+    assignment_id: str = Field(min_length=1, max_length=100)
+
+
+@router.post("/{customer_id}/accept-handoff", dependencies=[Depends(require_page_permission("healing-records"))])
+def accept_customer_handoff(customer_id: str, data: AcceptHandoffRequest, request: Request):
+    customer = customer_service.get_customer(customer_id)
+    if not customer or customer.is_deleted:
+        raise HTTPException(404, "客户不存在")
+    if not customer_access_service.can_view_customer_for_request(request, customer):
+        raise HTTPException(403, "没有查看该客户的权限")
+    if not customer_workspace_service.filter_workspace(request, [customer], "handoff", "all"):
+        raise HTTPException(403, "只能确认分配给自己的客户")
+    try:
+        customer = customer_service.accept_handoff(
+            customer_id, data.assignment_id, account_id=getattr(request.state, "user_id", ""),
+            owner=customer_access_service.actor_name(request),
+        )
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    request.state.operation_log_context = {
+        "content": f"确认承接客户“{customer.nickname or customer.name}”", "entity_id": customer.id,
+    }
+    return {"handoff": customer.handoff}
+
+
+@router.get("/export-options", dependencies=[Depends(require_page_permission("healing-records"))])
+def customer_export_options(request: Request):
+    return customer_export_service.available_columns(get_request_roles(request))
+
+
+@router.get("/export", dependencies=[Depends(require_page_permission("healing-records"))])
+def export_customers(
+    request: Request,
+    card_statuses: list[str] | None = Query(None),
+    member_types: list[str] | None = Query(None),
+    service_teachers: list[str] | None = Query(None),
+    referrers: list[str] | None = Query(None),
+    referrer_handlers: list[str] | None = Query(None),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    columns: list[str] | None = Query(None),
+    workspace: Literal["all", "referral", "handoff", "sales"] | None = None,
+    workspace_owner: str | None = None,
+    handoff_status: Literal["pending", "accepted", "history", "all"] = "pending",
+):
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, "引流开始日期不能晚于结束日期")
+    filters = {key: list(dict.fromkeys(value.strip() for value in values or [] if value.strip()))
+               for key, values in (("card_statuses", card_statuses), ("member_types", member_types),
+                                   ("service_teachers", service_teachers), ("referrers", referrers),
+                                   ("referrer_handlers", referrer_handlers))}
+    visible = customer_access_service.filter_customers(request, customer_service.list_customers())
+    visible = customer_workspace_service.filter_workspace(request, visible, workspace, handoff_status, workspace_owner)
+    matched = customer_export_service.select_customers(visible, **filters, date_from=date_from, date_to=date_to)
+    if not matched:
+        raise HTTPException(400, "没有符合条件的客户，请调整筛选条件")
+    roles = get_request_roles(request)
+    available = customer_export_service.available_columns(roles)
+    allowed = {column["key"]: column for column in available}
+    selected = list(dict.fromkeys(columns)) if columns is not None else [column["key"] for column in available if column["default"]]
+    if not selected or any(not key for key in selected):
+        raise HTTPException(422, "请至少选择一项导出信息")
+    if any(key not in allowed for key in selected):
+        raise HTTPException(403, "没有导出所选信息的权限，请重新打开导出窗口")
+    selected_columns = [allowed[key] for key in selected]
+    items = _build_enriched_items(matched, list_view=True)
+    visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", ""))
+    for item in items:
+        item["customer_tags"] = visible_tags.get(item["id"], [])
+    from app.api.customer_detail import get_customer_detail
+    from app.services import communication_record_service
+    communications = communication_record_service.list_records() if "communication_records" in selected else []
+    customer_export_service.prepare_items(
+        matched, items, selected_columns, roles,
+        lambda customer_id, section: get_customer_detail(customer_id, request, section=section), communications,
+    )
+    content = customer_export_service.build_workbook(items, columns=selected_columns)
+    labels = {"card_statuses": "卡次状态", "member_types": "会员身份", "service_teachers": "Sales",
+              "referrers": "引流人", "referrer_handlers": "承接人"}
+    summary = {labels[key]: "、".join(values) for key, values in filters.items() if values}
+    if workspace:
+        summary["客户视图"] = customer_workspace_service.ADMIN_WORKSPACES.get(workspace, workspace)
+        if workspace_owner:
+            summary["负责人"] = workspace_owner
+    if date_from or date_to:
+        summary["引流日期"] = f"{date_from or '不限'} 至 {date_to or '不限'}"
+    description = "；".join(f"{key}：{value}" for key, value in summary.items()) or "全部客户"
+    operation_log_service.create_log(
+        OperationLogCreate(section="客户资料", content=f"导出客户资料，共{len(items)}位；{description}"),
+        extra={"operator": customer_access_service.actor_name(request), "operator_role": "、".join(roles),
+               "source": get_client_source(request), "method": "EXPORT", "path": request.url.path,
+               "ip": get_client_ip(request), "after_data": {"筛选条件": summary, "客户数": len(items),
+               "导出信息": [column["label"] for column in selected_columns]}},
+    )
+    filename = f"客户资料_{datetime.now(ZoneInfo('Asia/Shanghai')).date()}.xlsx"
+    return StreamingResponse(BytesIO(content), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"})
 
 
 @router.post("")
@@ -375,7 +549,7 @@ async def create_customer(data: CustomerCreate, request: Request):
         except Exception:
             logger.warning("无法从 JWT 派生 created_by: account_id=%s", account_id)
     try:
-        customer = customer_service.create_customer(data)
+        customer = customer_service.create_customer(data, actor_id=account_id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     # 新建响应可回显刚刚由当前操作者录入的内容；后续查询仍统一脱敏。
@@ -387,9 +561,13 @@ async def create_customer(data: CustomerCreate, request: Request):
 
 
 @router.get("/light")
-async def list_customers_light(request: Request, purpose: Literal['full', 'selector'] = 'full'):
+async def list_customers_light(request: Request, purpose: Literal['full', 'selector'] = 'full',
+                               workspace: Literal['all', 'referral', 'handoff', 'sales'] | None = None,
+                               workspace_owner: str | None = None,
+                               handoff_status: Literal['pending', 'accepted', 'history', 'all'] = 'pending'):
     """轻量端点：只返回常用字段，供人员到场/引流记录等页面使用"""
     customers = customer_access_service.filter_customers(request, customer_service.list_customers())
+    customers = customer_workspace_service.filter_workspace(request, customers, workspace, handoff_status, workspace_owner)
     visit_days: dict[str, set[str]] = {}
     visits = visit_service.list_basic_visits({c.id for c in customers}) if purpose == 'full' else []
     for visit in visits:
@@ -401,7 +579,7 @@ async def list_customers_light(request: Request, purpose: Literal['full', 'selec
             "nickname": c.nickname,
             "name": c.name or "",
             "gender": c.gender or "",
-            "member_type": c.member_type or "",
+            "member_type": c.member_type or "", "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             **({"visit_count": len(visit_days.get(c.id, set()))} if purpose == 'full' else {}),
             "positions": c.positions or [],
             "created_at": c.created_at.isoformat() if c.created_at else "",
@@ -410,6 +588,7 @@ async def list_customers_light(request: Request, purpose: Literal['full', 'selec
             "referrer": c.referrer or "",
             "referrers": customer_referrers(c),
             "service_teacher": c.service_teacher or "",
+            "referrer_handler": c.referrer_handler or "",
             "referral_date": c.referral_date or "",
             "position_sort_orders": c.position_sort_orders or {},
             "space_id": c.space_id or "",
@@ -428,7 +607,7 @@ async def batch_customers(data: BatchRequest, request: Request):
             "id": c.id,
             "nickname": c.nickname,
             "name": c.name or "",
-            "member_type": c.member_type or "",
+            "member_type": c.member_type or "", "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             "positions": c.positions or [],
             "space_id": c.space_id or "",
         }
@@ -445,10 +624,10 @@ async def bulk_update_customers(data: BulkCustomerUpdate, request: Request):
     if "service_teacher" in changes:
         changes["service_teacher"] = changes["service_teacher"].strip()
         if changes["service_teacher"] and not customer_service.get_by_nickname(changes["service_teacher"]):
-            raise HTTPException(status_code=422, detail="服务老师不存在或已停用")
+            raise HTTPException(status_code=422, detail="Sales不存在或已停用")
     ids = list(dict.fromkeys(data.ids))
     before = []
-    labels = {"customer_quality": "客户质量", "service_teacher": "服务老师"}
+    labels = {"customer_quality": "客户质量", "service_teacher": "Sales"}
     for customer_id in ids:
         customer = customer_access_service.require_customer_scope(request, customer_id, action="修改")
         if customer.is_deleted:
@@ -491,7 +670,7 @@ async def list_disabled_customers(request: Request):
             "id": c.id,
             "nickname": c.nickname,
             "name": c.name or "",
-            "member_type": c.member_type or "",
+            "member_type": c.member_type or "", "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             "phone": c.phone or "",
             "deleted_at": c.deleted_at.isoformat() if c.deleted_at else "",
             "deleted_by": c.deleted_by or "",
@@ -574,7 +753,7 @@ async def update_customer(customer_id: str, data: CustomerUpdate, request: Reque
             field_label = "手机号" if field == "phone" else "微信号"
             raise HTTPException(status_code=403, detail=f"没有修改{field_label}的权限")
     try:
-        customer = customer_service.update_customer(customer_id, data)
+        customer = customer_service.update_customer(customer_id, data, actor_id=getattr(request.state, "user_id", ""))
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     if not customer:

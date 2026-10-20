@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useState } from "react"
 import { useEditPermissions } from "@/hooks/use-edit-permissions"
 import { canViewNote } from "@/lib/note-permissions"
@@ -16,6 +17,8 @@ export interface CourseParticipantPerson {
   customer_id: string
   customer: string
   member_type: string
+  card_status?: string
+  card_status_tone?: string
   participant_role: "案主" | "参与者"
   visit_need?: string
   customer_info?: string
@@ -118,10 +121,10 @@ export function CourseParticipantList({ cards, loading, showFeedback, expandedFe
 }) {
   const noteAccess = useEditPermissions().customer_access
   const feedbackFields = FEEDBACK_FIELDS.filter(field => canViewNote(noteAccess, field.key))
-  const gridStyle = showFeedback ? { gridTemplateColumns: `104px 80px 72px ${feedbackFields.length ? `repeat(${feedbackFields.length},minmax(120px,1fr)) ` : ""}64px 64px` } : undefined
+  const gridStyle = showFeedback ? { gridTemplateColumns: `104px 160px 72px ${feedbackFields.length ? `repeat(${feedbackFields.length},minmax(120px,1fr)) ` : ""}64px 64px` } : undefined
   const grid = showFeedback
-    ? "grid-cols-[104px_80px_72px_repeat(4,minmax(120px,1fr))_64px_64px]"
-    : "grid-cols-[minmax(140px,1fr)_80px_72px_80px_80px]"
+    ? "grid-cols-[104px_160px_72px_repeat(4,minmax(120px,1fr))_64px_64px]"
+    : "grid-cols-[minmax(140px,1fr)_160px_72px_80px_80px]"
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [history, setHistory] = useState<{ person: CourseParticipantPerson; card: CourseParticipantCard; query: PrincipalQuery } | null>(null)
   const toggle = (id: string) => setExpanded(current => {
@@ -176,7 +179,7 @@ export function CourseParticipantList({ cards, loading, showFeedback, expandedFe
                         {person.customer || "未命名"}
                       </button>
                     ) : <span className="min-w-0 truncate font-medium text-[#2b2f36]">{person.customer || <EmptyValue />}</span>}
-                    <span title={person.member_type} className="min-w-0 truncate">{person.member_type || <EmptyValue />}</span>
+                    <span title={person.member_type} className="min-w-0"><MemberLabels customer={person} /></span>
                     <span>{person.participant_role === "案主" ? "案主" : "参与者"}</span>
                     {showFeedback && feedbackFields.map(field => <div key={field.key} className="min-w-0">
                       <ParticipantFeedbackCell person={person} field={field} expanded={expandedFeedback} onOpen={() => onOpenFeedback(person, card)} />

@@ -8,8 +8,10 @@ const root = path.resolve(__dirname, '../..')
 function harness() {
   let component
   const requests = []
+  const toasts = []
   vm.runInNewContext(readFileSync(path.join(root, 'miniprogram/components/payment-form/index.js'), 'utf8'), {
     Component(value) { component = value },
+    wx: { showToast(value) { toasts.push(value.title) } },
     require(name) {
       if (name === '../../utils/api') return { paymentApi: { courseOptions(date) {
         return new Promise((resolve, reject) => requests.push({ date, resolve, reject }))
@@ -27,8 +29,26 @@ function harness() {
     }
   } }
   instance.data.selectedCustomer = { id: 'customer-1', nickname: '客户甲' }
-  return { instance, requests }
+  instance.triggerEvent = () => {}
+  return { instance, requests, toasts }
 }
+
+test('OH卡新建和编辑都必须选择诊断老师，填写后才能进入确认', () => {
+  for (const isEdit of [false, true]) {
+    for (const diagnosis_teacher of [undefined, '', '   ']) {
+      const { instance, toasts } = harness()
+      Object.assign(instance.data, { type: 'oh_card_reading', isEdit, dealCourseChosen: true,
+        formData: { reading_type: 'OH卡情感梳理', diagnosis_teacher } })
+      instance.onSubmit()
+      assert.equal(toasts.at(-1), '请选择诊断老师')
+      assert.equal(instance.data.confirmVisible, false)
+      instance.data.formData.diagnosis_teacher = '老师甲'
+      instance._buildConfirmRows = () => []
+      instance.onSubmit()
+      assert.equal(instance.data.confirmVisible, true)
+    }
+  }
+})
 
 test('未选择客户时不查询成交课程，避免展示不属于客户的课程', () => {
   const { instance, requests } = harness()

@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Annotated, Dict, List, Literal, Optional
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import Field, StringConstraints, computed_field, field_validator, model_validator
 
 from app.models.base import SafeBaseModel, StrictBaseModel
 
@@ -86,7 +86,7 @@ class CustomerBase(SafeBaseModel):
     referrers: List[ReferrerName] = Field(default_factory=list, max_length=20)
     referral_date: str = Field(default="", max_length=10)
     referrer_handler: str = Field(default="", max_length=50)
-    follow_up_status: str = Field(default=FollowUpStatus.UNCONFIGURED.value, max_length=30)
+    follow_up_status: str = Field(default=FollowUpStatus.UNCONFIGURED.value, max_length=30)  # 已停用，兼容旧端及历史资料。
     customer_quality: CustomerQuality = "正常"
     member_type: str = Field(default="", max_length=50)
     paid_content: List[PaidContentItem] = Field(default=[], max_length=20)
@@ -108,6 +108,7 @@ class CustomerBase(SafeBaseModel):
     other_info: str = Field(default="", max_length=5000)
     traffic_source: str = Field(default="", max_length=100)
     traffic_source_detail: str = Field(default="", max_length=200)
+    traffic_post_name: str = Field(default="", max_length=200)
     avatar_url: str = Field(default="", max_length=500)
     tracking_plan: str = Field(default="", max_length=2000)
     position_sort_orders: Dict[str, int] = {}
@@ -217,6 +218,7 @@ class CustomerUpdate(StrictBaseModel):
     other_info: Optional[str] = Field(default=None, max_length=5000)
     traffic_source: Optional[str] = Field(default=None, max_length=100)
     traffic_source_detail: Optional[str] = Field(default=None, max_length=200)
+    traffic_post_name: Optional[str] = Field(default=None, max_length=200)
     avatar_url: Optional[str] = Field(default=None, max_length=500)
     tracking_plan: Optional[str] = Field(default=None, max_length=2000)
     position_sort_orders: Optional[Dict[str, int]] = None
@@ -292,13 +294,38 @@ class CustomerUpdate(StrictBaseModel):
         return v
 
 
+class CustomerHandoff(StrictBaseModel):
+    id: str
+    handler: str
+    handler_account_id: str = ""
+    assigned_at: datetime
+    assigned_by: str = ""
+    accepted_at: Optional[datetime] = None
+    accepted_by: str = ""
+
+
 class Customer(CustomerBase):
+    # 服务端维护，旧资料没有交接记录，不能作为新待办。
+    handoff: Optional[CustomerHandoff] = None
+    handoff_history: List[CustomerHandoff] = Field(default_factory=list)
     id: str
     created_at: datetime
     updated_at: datetime
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
     deleted_by: Optional[str] = None
+
+    @computed_field
+    @property
+    def card_status(self) -> str:
+        from app.services.member_card_label_service import label_for
+        return label_for(self.id)["card_status"]
+
+    @computed_field
+    @property
+    def card_status_tone(self) -> str:
+        from app.services.member_card_label_service import label_for
+        return label_for(self.id)["card_status_tone"]
 
 
 class ChatLogParseRequest(StrictBaseModel):

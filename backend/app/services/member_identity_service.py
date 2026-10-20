@@ -1,14 +1,48 @@
+import threading
 import uuid
 from datetime import datetime, timezone
+from functools import wraps
 from typing import Dict, List, Optional
 
 from app.models.customer import CustomerUpdate
 from app.models.member_identity import IdentityCondition, MemberIdentity, MemberIdentityCreate, MemberIdentityUpdate
 from app.services import customer_service
-from app.services.storage import load_data, save_data, save_item
+from app.services.storage import data_revision, load_data, save_data, save_item
 
 FILENAME = "member_identities.json"
 _identities: Dict[str, MemberIdentity] = {}
+_remaining_refresh = threading.local()
+_remaining_refresh_key = None
+_remaining_refresh_lock = threading.RLock()
+_identity_lock = threading.RLock()
+
+
+def _synchronized(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with _identity_lock:
+            return function(*args, **kwargs)
+    return wrapped
+
+
+def ensure_remaining_identities_current():
+    """仅配置了余量规则时，在数据变化或跨日后补刷新第一套身份。"""
+    global _remaining_refresh_key
+    if getattr(_remaining_refresh, "active", False) or not any(
+        condition.type == "remaining" for identity in list_identities() for condition in identity.conditions
+    ):
+        return
+    from app.services.member_card_label_service import _today
+    with _remaining_refresh_lock:
+        key = (data_revision(), _today())
+        if key == _remaining_refresh_key:
+            return
+        _remaining_refresh.active = True
+        try:
+            refresh_all()
+            _remaining_refresh_key = (data_revision(), _today())
+        finally:
+            _remaining_refresh.active = False
 
 
 def _load():
@@ -30,8 +64,27 @@ def _save(identity_id: str = ""):
 _load()
 
 
-def list_identities() -> List[MemberIdentity]:
-    return sorted([v for v in _identities.values() if not v.is_deleted], key=lambda x: x.sort_order)
+def list_identities(group: str = "identity") -> List[MemberIdentity]:
+    return sorted([v for v in _identities.values() if not v.is_deleted and (group == "all" or v.group == group)], key=lambda x: x.sort_order)
+
+
+def _validate_label(data, exclude_id=""):
+    if data.group != "card_status":
+        return
+    if any(item.id != exclude_id and item.name == data.name for item in list_identities(data.group)):
+        raise ValueError("本组已存在同名标签")
+    condition = data.conditions[0]
+    for item in list_identities("card_status"):
+        if item.id == exclude_id:
+            continue
+        other = item.conditions[0]
+        if set(other.items) != set(condition.items) or other.remaining_state != condition.remaining_state:
+            continue
+        if condition.remaining_state != "range" or max(condition.remaining_min, other.remaining_min) <= min(
+            condition.remaining_max if condition.remaining_max is not None else float("inf"),
+            other.remaining_max if other.remaining_max is not None else float("inf"),
+        ):
+            raise ValueError(f"与“{item.name}”的卡次范围重复，请调整")
 
 
 def get_identity(identity_id: str) -> Optional[MemberIdentity]:
@@ -41,9 +94,12 @@ def get_identity(identity_id: str) -> Optional[MemberIdentity]:
     return identity
 
 
+@_synchronized
 def create_identity(data: MemberIdentityCreate) -> MemberIdentity:
     if not data.name or not data.name.strip():
         raise ValueError("身份名称不能为空")
+    data.name = data.name.strip()
+    _validate_label(data)
     now = datetime.now(timezone.utc)
     max_order = max((i.sort_order for i in _identities.values()), default=-1)
     identity_data = data.model_dump()
@@ -62,22 +118,29 @@ def create_identity(data: MemberIdentityCreate) -> MemberIdentity:
 _UPDATE_EXCLUDE_KEYS = {"id", "created_at", "created_by", "sort_order", "is_deleted", "deleted_at"}
 
 
+@_synchronized
 def update_identity(identity_id: str, data: MemberIdentityUpdate) -> Optional[MemberIdentity]:
     identity = _identities.get(identity_id)
     if not identity:
         return None
     update_data = data.model_dump(exclude_unset=True)
+    if "group" in update_data and update_data["group"] != identity.group:
+        raise ValueError("标签不能移到另一组，请在对应分组新增")
     if "name" in update_data and (not update_data["name"] or not update_data["name"].strip()):
         raise ValueError("身份名称不能为空")
+    if "name" in update_data:
+        update_data["name"] = update_data["name"].strip()
+    candidate = MemberIdentity.model_validate({**identity.model_dump(), **update_data})
+    _validate_label(candidate, identity_id)
     old_name = identity.name if "name" in update_data else None
     for key, value in update_data.items():
         if hasattr(identity, key) and key not in _UPDATE_EXCLUDE_KEYS:
-            setattr(identity, key, value)
+            setattr(identity, key, getattr(candidate, key))
     identity.updated_at = datetime.now(timezone.utc)
     _identities[identity_id] = identity
     _save(identity_id)
     # 身份改名时同步权限配置
-    if old_name and old_name != identity.name:
+    if identity.group == "identity" and old_name and old_name != identity.name:
         from app.services.position_customer_permission_service import rename_identity_in_permissions
         rename_identity_in_permissions(old_name, identity.name)
         # 同步活动权限
@@ -89,9 +152,13 @@ def update_identity(identity_id: str, data: MemberIdentityUpdate) -> Optional[Me
     return identity
 
 
+@_synchronized
 def reorder(ids: list) -> list:
     """按传入的 ID 顺序更新 sort_order，返回变更描述列表"""
-    active = sorted([v for v in _identities.values() if not v.is_deleted], key=lambda x: x.sort_order)
+    selected = [get_identity(identity_id) for identity_id in ids]
+    if len(ids) != len(set(ids)) or any(item is None for item in selected) or len({item.group for item in selected}) > 1:
+        raise ValueError("请在同一组内调整标签顺序")
+    active = list_identities(selected[0].group) if selected else []
     before_order = {v.id: i for i, v in enumerate(active)}
 
     changes = []
@@ -107,6 +174,7 @@ def reorder(ids: list) -> list:
     return changes
 
 
+@_synchronized
 def delete_identity(identity_id: str) -> bool:
     identity = _identities.get(identity_id)
     if not identity:
@@ -114,6 +182,8 @@ def delete_identity(identity_id: str) -> bool:
     identity.is_deleted = True
     identity.deleted_at = datetime.now(timezone.utc)
     _save(identity_id)
+    if identity.group != "identity":
+        return True
     # 从权限配置中移除已删除的身份
     try:
         from app.services.position_customer_permission_service import remove_identity_from_permissions
@@ -127,6 +197,27 @@ def delete_identity(identity_id: str) -> bool:
     except Exception:
         pass
     return True
+
+
+@_synchronized
+def create_card_status_batch(data: list[MemberIdentityCreate]):
+    """常用标签一次持久化，失败时不留下半套配置。"""
+    if list_identities("card_status"):
+        raise ValueError("本组已有标签，请直接编辑现有配置")
+    now = datetime.now(timezone.utc)
+    order = max((item.sort_order for item in _identities.values()), default=-1) + 1
+    created = {}
+    for index, item in enumerate(data):
+        if item.group != "card_status":
+            raise ValueError("仅支持批量添加卡次标签")
+        identity = MemberIdentity(**{**item.model_dump(), "sort_order": order + index},
+                                  id=str(uuid.uuid4())[:12], created_at=now, updated_at=now)
+        created[identity.id] = identity
+    save_data(FILENAME, {key: item.model_dump(mode="json") for key, item in {**_identities, **created}.items()})
+    _identities.update(created)
+    from app.services.member_card_label_service import invalidate
+    invalidate()
+    return list_identities("card_status")
 
 
 def _compare_count(actual, op: str, target) -> bool:
@@ -200,7 +291,10 @@ def _check_condition(condition, customer_id: str,
     if isinstance(condition, dict):
         condition = IdentityCondition(**condition)
     t = condition.type
-    if t == "arrival":
+    if t == "remaining":
+        from app.services.member_card_label_service import matches_condition
+        return matches_condition(condition, customer_id)
+    elif t == "arrival":
         return _compare_count(arrival_count, condition.count_op, condition.count_value)
     elif t == "invitation":
         # 邀约情况：只看有没有被邀约 / 取消，和是否到店无关

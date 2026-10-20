@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Check, X } from "lucide-react"
@@ -432,8 +433,8 @@ export function CustomerSearchInput({
                     >
                       <span>{c.nickname}</span>
                       {nameMatch && <span className="text-[10px] text-[#8f959e]">（{c.name}）</span>}
-                      {(rightLabelMap?.[c.id] || c.member_type) && (
-                        <span className={`text-[10px] ml-auto ${warnLabelIds?.includes(c.id) ? "text-[#e02020]" : "text-[#8f959e]"}`}>{rightLabelMap?.[c.id] || c.member_type}</span>
+                      {(rightLabelMap?.[c.id] || c.member_type || c.card_status) && (
+                        <span className={`text-[10px] ml-auto ${warnLabelIds?.includes(c.id) ? "text-[#e02020]" : "text-[#8f959e]"}`}>{rightLabelMap?.[c.id] || <MemberLabels customer={c} />}</span>
                       )}
                     </div>
                   )

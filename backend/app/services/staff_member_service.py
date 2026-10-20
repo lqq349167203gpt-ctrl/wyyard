@@ -64,7 +64,7 @@ def _read_customer(customer, section: str, page: int, page_size: int, *, can_man
     if customer is None:
         return {"bound": False, "message": UNBOUND_MESSAGE, "can_manage": can_manage}
     result = {"bound": True, "can_manage": can_manage,
-              "customer": {"nickname": customer.nickname or customer.name, "member_type": customer.member_type}}
+              "customer": {"nickname": customer.nickname or customer.name, "member_type": customer.member_type, "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral")}}
     if section == "home":
         from app.services import visit_service
 

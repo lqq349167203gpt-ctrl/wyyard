@@ -1,0 +1,1 @@
+<view class="labels"><text wx:if="{{identity}}" class="identity">{{identity}}</text><text wx:if="{{status}}" class="status {{tone}}">{{status}}</text></view>

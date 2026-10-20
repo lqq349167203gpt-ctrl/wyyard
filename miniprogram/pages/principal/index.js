@@ -6,7 +6,7 @@ const { MIN_DATE, clampRange, courseCard, participationRow, organizationScopeOpt
 const TRAFFIC_COLUMNS = [
   { key: 'name', label: '昵称（引流日期）' }, { key: 'referrer', label: '引流人' },
   { key: 'referrer_handler', label: '承接人' }, { key: 'identity', label: '会员身份' },
-  { key: 'follow_up_status', label: '跟进阶段' }, { key: 'traffic_source', label: '流量来源' },
+  { key: 'traffic_source', label: '流量来源' },
   { key: 'tags', label: '客户标签' }, { key: 'deals', label: '交易笔数' },
   { key: 'invite_count', label: '邀约次数' }, { key: 'cancel_count', label: '取消次数' },
   { key: 'arrive_count', label: '到店次数' }, { key: 'visit_interval', label: '平均到店间隔' },
@@ -17,7 +17,6 @@ const INVITE_ARRIVAL_COLUMNS = [
   { key: 'identity', label: '会员身份' },
   { key: 'referrer', label: '引流人', defaultVisible: false },
   { key: 'referrer_handler', label: '承接人', defaultVisible: false },
-  { key: 'follow_up_status', label: '跟进阶段', defaultVisible: false },
   { key: 'traffic_source', label: '流量来源', defaultVisible: false },
   { key: 'tags', label: '客户标签', defaultVisible: false },
   { key: 'deals', label: '交易笔数', defaultVisible: false },
@@ -418,7 +417,7 @@ Page({
       courses: ['type', 'teachers', 'participants', 'hours', 'owner'],
       participant: ['name', 'type', 'teachers', 'hours', 'participant_category'],
       teacher_follow_up: ['teachers', 'name', 'follow_up_status', 'customer_info', 'follow_up', 'visit_need', 'customer_feedback'],
-      traffic: ['referrer', 'referrer_handler', 'identity', 'follow_up_status', 'traffic_source', 'tags'],
+      traffic: ['referrer', 'referrer_handler', 'identity', 'traffic_source', 'tags'],
       invite: ['identity', 'arrive_inviter', 'initiated_count', 'cancel_count', 'no_show_count', 'arrive_count', 'same_day_deals'],
     }[group]
     const titleColumn = columns.find(c => c.key === TITLE_KEY) || columns[0]
@@ -464,6 +463,7 @@ Page({
     return {
       rowTitle: text(titleColumn ? row[titleColumn.key] : '') || '未命名',
       rowIdentity: (parsed.find(item => item.kind === 'identity') || {}).value || '',
+      card_status: row.card_status || '', card_status_tone: row.card_status_tone || 'neutral',
       // 勾选了几列就显示几列（之前只取前 6 个，后面的勾了也不显示）
       rowTags: parsed.filter(item => item.kind === 'category'),
       rowNumbers: parsed.filter(item => item.kind === 'number'),
@@ -764,9 +764,9 @@ Page({
         const upsell = mobile ? item.upsell_count || 0 : customers.filter(customer => Number(customer.deals || 0) > 0 && customer.is_upsell).length
         return { key: item.key, label: item.label, text: `引流 ${item.count} 人`, note: `（${breakdown.purchase_rules_configured ? '体验' : '体验卡'} ${rate(trial, mobile ? item.count : customers.length)} · 升单 ${rate(upsell, consumers)}）` }
       }))))
+      selects.push(select('卡次状态', 'card_status', (filters.card_status || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` }))))
       selects.push(select('会员身份', 'identity', unassignedFirst((filters.identity || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })))))
       selects.push(select('升单情况', 'upsell', (filters.upsell || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })), true))
-      selects.push(select('跟进阶段', 'stage', unassignedFirst((filters.stage || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })))))
       selects.push(select('流量来源', 'source', unassignedFirst((filters.source || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })))))
       selects.push(select('客户标签', 'tag', unassignedFirst((filters.tag || []).map(item => ({ key: item.key, label: item.label, text: `${item.count} 人` })))))
     }
@@ -802,11 +802,11 @@ Page({
   },
   filteredTrafficCustomers(breakdown, picks) {
     const picked = prefix => picks.filter(item => item.startsWith(prefix + ':')).map(item => item.slice(prefix.length + 1))
-    return (breakdown.traffic || []).reduce((all, item) => all.concat((item.customers || []).map(customer => ({ ...customer, referrer: item.label }))), [])
+    const rows = (breakdown.traffic || []).reduce((all, item) => all.concat((item.customers || []).map(customer => ({ ...customer, referrer: item.label }))), [])
       .filter(customer => {
         if (picked('traffic').length && !picked('traffic').includes(customer.referrer)) return false
         if (picked('identity').length && !picked('identity').includes(customer.identity || '')) return false
-        if (picked('stage').length && !picked('stage').includes(customer.follow_up_status || '')) return false
+        if (picked('card_status').length && !picked('card_status').includes(customer.card_status || '')) return false
         if (picked('source').length && !picked('source').includes(customer.traffic_source || '')) return false
         if (picked('tag').length && !picked('tag').some(value => (customer.tags || []).includes(value))) return false
         if (picked('inviter').length && !picked('inviter').some(value => (customer.inviters || []).includes(value))) return false
@@ -818,6 +818,15 @@ Page({
         }
         return true
       })
+    const unique = new Map()
+    rows.forEach((row, index) => {
+      const key = row.id || `row-${index}`
+      const existing = unique.get(key)
+      const names = existing ? existing.referrers.concat(row.referrer) : [row.referrer]
+      const referrers = Array.from(new Set(names))
+      unique.set(key, { ...row, referrers, referrer: referrers.join('、') })
+    })
+    return Array.from(unique.values())
   },
   /** 引流客户列表：引流人 + 身份/阶段/来源/标签一起筛，口径与 PC 一致 */
   buildTrafficRows(breakdown, picks) {

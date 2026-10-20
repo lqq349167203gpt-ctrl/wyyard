@@ -1,4 +1,4 @@
-const { serviceTeacherApi, customerFollowUpApi } = require('./api')
+const { serviceTeacherApi, customerFollowUpApi, activityParticipantNoteApi } = require('./api')
 const { pickerData, attributionFromPicker } = require('./feedback-person')
 const { beginRead, invalidateRead, disposeReads } = require('./read-scope')
 const { followUpPlanText, noteRecordText: recordText } = require('./note-feedback-meta')
@@ -11,6 +11,7 @@ const COURSE_TYPES = [
   { value: 'eks', label: '深度情绪释放' },
   { value: 'ics', label: '沙龙技能学习' },
 ]
+const ACTIVITY_SOURCES = { class: 'class_record', gcs: 'group_case', ers: 'emotional_release', eks: 'energy_knot', ics: 'internal_course' }
 
 const COURSE_RANGE_PRESETS = [
   { value: 'today', label: '当天' },
@@ -583,6 +584,11 @@ module.exports = function createRecordsPage(mode) { return {
     const group = this.data.participantGroups[groupIndex]
     const row = group && group.participants[index]
     if (!row) return
+    const activitySource = ACTIVITY_SOURCES[row.activity_type]
+    if (!row.visit_id && (field === 'visit_need' || !activitySource)) {
+      wx.showToast({ title: '来访需求请在邀约中填写', icon: 'none' })
+      return
+    }
     const titles = { visit_need: '来访需求', customer_info: '深度需求', follow_up: '跟进点', customer_feedback: '客户反馈' }
     const placeholders = { visit_need: '填写来访需求...', customer_info: '填写深度需求...', follow_up: '填写跟进点...', customer_feedback: '填写客户反馈...' }
     const noteEntries = (row[`${field}_entries`] || []).filter(entry => !this.isOwnParticipantNote(entry))
@@ -592,6 +598,7 @@ module.exports = function createRecordsPage(mode) { return {
     this.setData({
       participantEditing: {
         groupIndex, index, field, visitId: row.visit_id,
+        activitySource, courseId: row.course_id, customerId: row.customer_id, courseDate: row.course_date,
         title: titles[field] || '内容',
         placeholder: placeholders[field] || '填写内容...',
         hasReference,
@@ -602,17 +609,18 @@ module.exports = function createRecordsPage(mode) { return {
       participantDraft: '',
       participantNeedTags: [], participantNeedTagIds: [], participantPlan: {},
       participantMyNoteId: '',
-      participantEditorLoading: !!row.visit_id,
+      participantEditorLoading: true,
     })
-    if (!row.visit_id) return
     try {
       const [mine, people, followPeople, tags] = await Promise.all([
-        customerFollowUpApi.myNote(row.visit_id, field),
+        row.visit_id ? customerFollowUpApi.myNote(row.visit_id, field)
+          : activityParticipantNoteApi.list(activitySource, row.course_id, [row.customer_id])
+            .then(notes => (notes || []).find(note => note.category === field && note.can_edit) || null),
         customerFollowUpApi.feedbackPeople(),
         field === 'follow_up' ? customerFollowUpApi.followUpPeople() : Promise.resolve([]),
         field === 'visit_need' && this.data.noteVisibility.visit_need_tags ? customerFollowUpApi.needTags() : Promise.resolve([]),
       ])
-      if (!isCurrent() || !this.data.participantEditing || this.data.participantEditing.visitId !== row.visit_id || this.data.participantEditing.field !== field) return
+      if (!isCurrent() || !this.data.participantEditing || this.data.participantEditing.courseId !== row.course_id || this.data.participantEditing.customerId !== row.customer_id || this.data.participantEditing.field !== field) return
       const picked = pickerData(people, mine)
       const currentName = (getApp().globalData.currentUser || {}).owner || (getApp().globalData.currentUser || {}).username || ''
       const plan = { next_follow_up_person_id: mine && mine.next_follow_up_person_id || '',
@@ -672,11 +680,20 @@ module.exports = function createRecordsPage(mode) { return {
         ...(editing.field === 'follow_up' ? this.data.participantPlan : {}),
         ...(editing.field === 'visit_need' ? { need_tag_ids: this.data.participantNeedTagIds } : {}) }
       let saved
-      if (this.data.participantMyNoteId) saved = await customerFollowUpApi.update(this.data.participantMyNoteId, content, attribution)
-      else if (content || (editing.field === 'visit_need' && this.data.participantNeedTagIds.length)) saved = await customerFollowUpApi.create(editing.visitId, editing.field, content, attribution)
+      if (editing.visitId) {
+        if (this.data.participantMyNoteId) saved = await customerFollowUpApi.update(this.data.participantMyNoteId, content, attribution)
+        else if (content || (editing.field === 'visit_need' && this.data.participantNeedTagIds.length)) saved = await customerFollowUpApi.create(editing.visitId, editing.field, content, attribution)
+      } else if (this.data.participantMyNoteId && !content) {
+        await activityParticipantNoteApi.delete(this.data.participantMyNoteId)
+        saved = { id: this.data.participantMyNoteId, deleted: true }
+      } else if (content) {
+        saved = await activityParticipantNoteApi.save({ activity_source: editing.activitySource,
+          session_id: editing.courseId, customer_id: editing.customerId,
+          category: editing.field, content, ...attribution })
+      }
       const updates = { participantEditing: null, participantDraft: '' }
       if (saved) this.data.participantGroups.forEach((group, gi) => group.participants.forEach((row, index) => {
-        if (row.visit_id !== editing.visitId) return
+        if (row.customer_id !== editing.customerId || row.course_date !== editing.courseDate) return
         const entries = (row[`${editing.field}_entries`] || []).filter(entry => entry.id ? entry.id !== saved.id : !this.isOwnParticipantNote(entry))
         if (!saved.deleted) entries.unshift({ ...saved, author: saved.feedback_person || saved.created_by,
           content: [(saved.need_tags || []).map(tag => tag.name).join('、'), saved.content].filter(Boolean).join('\n'), at: saved.updated_at })

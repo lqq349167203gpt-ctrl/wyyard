@@ -89,7 +89,7 @@
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
         <text class="picker-item-name">{{item.nickname}}</text>
-        <text class="picker-item-type" wx:if="{{item.member_type}}">{{item.member_type}}</text>
+        <member-labels wx:if="{{item.member_type || item.card_status}}" identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
       </view>
       <view class="picker-empty" wx:if="{{pickerList.length === 0 && !(pickerKeyword && pickerField === 'customer')}}">
         <text>无匹配用户</text>

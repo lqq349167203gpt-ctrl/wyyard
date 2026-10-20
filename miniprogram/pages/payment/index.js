@@ -54,6 +54,9 @@ function calcStatus(item, type, expiry) {
   var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
   var eff = item.effective_date ? item.effective_date.slice(0, 10) : ''
   var exp = expiry || (item.expiry_date ? item.expiry_date.slice(0, 10) : '')
+  var remaining = item.effective_remaining !== undefined ? item.effective_remaining : item.remaining_count
+  var countProject = ['membership_card', 'group_case', 'emotional_release', 'energy_knot', 'other'].includes(type)
+  if (countProject && remaining != null && remaining <= 0) return { text: '已用完', color: '#8f959e', bg: '#f2f3f5' }
   if (eff && eff > todayStr) return { text: '未开始', color: '#646a73', bg: '#f2f3f5' }
   if (exp && exp < todayStr) return { text: '已过期', color: '#c4506a', bg: '#faeef1' }
   if (eff || exp) return { text: '生效中', color: '#3370ff', bg: '#eef3ff' }
@@ -84,8 +87,8 @@ function buildDetail(item, type) {
     const qty = item.quantity || 1
     return `${qty}位`
   }
-  if (type === 'offline_course') {
-    return [item.course_type, `${item.validity_value || 1} 个月`].filter(Boolean).join(' · ')
+  if (type === 'offline_course' || type === 'online_tea') {
+    return [item.course_type, `${item.validity_value || 1} ${type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月'}`].filter(Boolean).join(' · ')
   }
   // group_case, emotional_release, energy_knot
   const count = item.purchase_count
@@ -117,7 +120,7 @@ function buildMetaPrimary(item, type, detail) {
     return parts.join(' · ')
   }
   if (type === 'tea_seat_fee') return '数量：' + (item.quantity || 1) + '位'
-  if (type === 'offline_course') return '有效期：' + (item.validity_value || 1) + '个月'
+  if (type === 'offline_course' || type === 'online_tea') return '有效期：' + (item.validity_value || 1) + (type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月')
   return ''
 }
 
@@ -136,11 +139,11 @@ function decorateItems(raw, type, organizations) {
   const isHealing = ['group_case', 'emotional_release', 'energy_knot'].includes(type)
   const isOhCard = type === 'oh_card_reading'
   const isTeaSeat = type === 'tea_seat_fee'
-  const isOffline = type === 'offline_course'
+  const isOffline = type === 'offline_course' || type === 'online_tea'
   const isCountProject = isHealing || type === 'membership_card' || type === 'other'
 
   return raw.map(function(item) {
-    var expiry = isOffline ? calcOfflineExpiry(item) : (item.expiry_date ? item.expiry_date.slice(0, 10) : '')
+    var expiry = type === 'online_tea' ? (item.expiry_date || '') : isOffline ? calcOfflineExpiry(item) : (item.expiry_date ? item.expiry_date.slice(0, 10) : '')
     var status = calcStatus(item, type, expiry)
     var detail = buildDetail(item, type)
     var price = buildPrice(item, type)
@@ -171,7 +174,7 @@ function decorateItems(raw, type, organizations) {
       _status: status.text,
       _statusColor: status.color,
       _statusBg: status.bg,
-      _validity: isOffline ? '有效期：' + (item.validity_value || 1) + '个月' : '',
+      _validity: isOffline ? '有效期：' + (item.validity_value || 1) + (type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月') : '',
       _quantity: isTeaSeat ? '数量：' + (item.quantity || 1) + '位' : '',
       _duration: isOhCard ? '时长：' + formatDuration(item.diagnosis_duration) : '',
     })
@@ -207,6 +210,8 @@ Page({
     selectedCourseKey: '',
     exporting: false,
     exportDialogVisible: false,
+    exportTypeOptions: PAYMENT_PROJECT_TYPES.map(item => ({ key: item.key, label: item.label, selected: true })),
+    exportSelectedTypes: PAYMENT_PROJECT_TYPES.map(item => item.key),
     exportRangeOptions: EXPORT_RANGE_OPTIONS,
     exportRangeType: 'month',
     exportDate: TODAY,
@@ -649,6 +654,31 @@ Page({
     this.setData({ exportRangeType: e.currentTarget.dataset.type }, () => this.updateExportSummary())
   },
 
+  onExportTypesChange(e) {
+    const selected = e.detail.value
+    this.setData({
+      exportSelectedTypes: selected,
+      exportTypeOptions: PAYMENT_PROJECT_TYPES.map(item => ({
+        key: item.key,
+        label: item.label,
+        selected: selected.includes(item.key),
+      })),
+    })
+  },
+
+  onExportSelectAll() {
+    const allSelected = this.data.exportSelectedTypes.length === PAYMENT_PROJECT_TYPES.length
+    const selected = allSelected ? [] : PAYMENT_PROJECT_TYPES.map(item => item.key)
+    this.setData({
+      exportSelectedTypes: selected,
+      exportTypeOptions: PAYMENT_PROJECT_TYPES.map(item => ({
+        key: item.key,
+        label: item.label,
+        selected: !allSelected,
+      })),
+    })
+  },
+
   onExportDateChange(e) {
     this.setData({ exportDate: e.detail.value }, () => this.updateExportSummary())
   },
@@ -689,6 +719,7 @@ Page({
         range_type: 'custom',
         date_from: data.exportDateFrom,
         date_to: data.exportDateTo,
+        types: data.exportSelectedTypes.join(','),
       }
     }
     const periodMap = {
@@ -699,6 +730,7 @@ Page({
     return {
       range_type: data.exportRangeType,
       period: periodMap[data.exportRangeType],
+      types: data.exportSelectedTypes.join(','),
     }
   },
 
@@ -712,6 +744,10 @@ Page({
 
   async onExportConfirm() {
     if (this.data.exporting) return
+    if (this.data.exportSelectedTypes.length === 0) {
+      wx.showToast({ title: '请至少选择一项付费项目', icon: 'none' })
+      return
+    }
     if (this.data.exportRangeType === 'custom' && this.data.exportDateFrom > this.data.exportDateTo) {
       wx.showToast({ title: '开始日期不能晚于结束日期', icon: 'none' })
       return

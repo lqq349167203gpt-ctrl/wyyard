@@ -81,6 +81,7 @@ PAGE_NAMES = {
     # 管理员小程序
     "/pages/customers/index": "客户",
     "/pages/customer-form/index": "客户编辑",
+    "/pages/customer-export/index": "客户资料",
     "/pages/customer-profile/index": "客户详情",
     "/pages/customer-tags/index": "客户标签",
     "/pages/visits/index": "邀约",

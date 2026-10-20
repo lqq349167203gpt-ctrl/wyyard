@@ -1,0 +1,25 @@
+<view class="page">
+  <view wx:if="{{error}}" class="error" bindtap="load">{{error}} · 点击重试</view>
+  <view wx:elif="{{loading}}" class="empty">正在读取本场记录…</view>
+  <block wx:if="{{person && !loading}}">
+    <view class="course-heading"><activity-type-icon source="{{course.source}}" /><view class="course-title">{{course.name}}<text>{{course.date}} · {{course.start_time}}–{{course.end_time}}</text></view></view>
+    <view class="panel">
+      <view class="person-head"><text class="name">{{person.nickname}}</text><text class="sub">{{position}} / {{total}} 位 · {{person.status}}</text></view>
+      <view class="sub"><member-labels identity="{{person.member_type}}" status="{{person.card_status}}" tone="{{person.card_status_tone}}" /> · {{person.role}}<text wx:if="{{course.mode === '线上'}}"> · 线上参与</text></view>
+      <view class="links"><button bindtap="onProfile" disabled="{{saving}}">完整资料</button><picker wx:if="{{canCreatePayment}}" mode="selector" range="{{paymentTypes}}" range-key="label" bindchange="onPayment" disabled="{{saving}}"><view class="link-button">录入交易</view></picker></view>
+    </view>
+    <view class="panel needs-panel"><text class="label">当日来访需求</text><view class="need-text">{{person.needs || '当日未记录来访需求'}}</view><view class="tags" wx:if="{{person.tags.length}}"><text class="tag" wx:for="{{person.tags}}" wx:key="id" wx:for-item="tag">{{tag.name}}</text></view></view>
+    <view class="readonly" wx:if="{{!canEdit}}">当前账号只能查看，或课程已核对锁定</view>
+    <view class="panel" wx:for="{{fields}}" wx:key="category" wx:for-item="field" wx:for-index="fieldIndex">
+      <view class="field-head"><text class="label">{{field.label}}</text><picker mode="selector" range="{{feedbackOptions}}" range-key="name" value="{{field.feedbackIndex}}" data-index="{{fieldIndex}}" bindchange="onFeedback" disabled="{{!canEdit || saving}}"><text class="sub">反馈人：{{field.feedbackName}} ⌄</text></picker></view>
+      <textarea class="note-input" value="{{field.value}}" data-index="{{fieldIndex}}" bindinput="onInput" placeholder="填写本场{{field.label}}" maxlength="5000" disabled="{{!canEdit || saving}}" auto-height cursor-spacing="100"/>
+      <block wx:if="{{field.category === 'follow_up'}}">
+        <view class="plan-row"><text>下次跟进人</text><picker mode="selector" range="{{followUpPeople}}" range-key="nickname" value="{{planPersonIndex}}" bindchange="onPlanPerson" disabled="{{!canEdit || saving}}"><view class="plan-value">{{followUpPeople[planPersonIndex].nickname}} ⌄</view></picker></view>
+        <view class="plan-row"><text>跟进时间</text><picker mode="date" value="{{planDate}}" bindchange="onPlanDate" disabled="{{!canEdit || saving}}"><view class="plan-value">{{planDate || '选择日期'}} ⌄</view></picker><text wx:if="{{planDate && canEdit}}" class="clear" bindtap="onClearPlanDate">清除</text></view>
+      </block>
+      <view class="other-notes" wx:if="{{field.others.length}}"><text class="sub">其他同事记录</text><view class="other-note" wx:for="{{field.others}}" wx:key="id" wx:for-item="note"><text>{{note.author}}：{{note.content}}</text><text class="sub" wx:if="{{note.next_follow_up_person || note.next_follow_up_date}}">下次跟进：{{note.next_follow_up_person || '未指定'}} · {{note.next_follow_up_date || '未定日期'}}</text></view></view>
+    </view>
+    <view class="empty" wx:if="{{!fields.length}}">当前账号没有查看课后记录字段的权限</view>
+    <view class="actions" wx:if="{{canEdit && fields.length}}"><button bindtap="onSave" disabled="{{saving || !!error}}">保存</button><button class="primary" data-next="true" bindtap="onSave" loading="{{saving}}" disabled="{{saving || !!error}}">保存并下一位 ›</button></view>
+  </block>
+</view>

@@ -13,41 +13,23 @@
         <text class="wk">{{currentWeekday}}</text>
         <text class="drop">{{calendarExpanded ? '▴' : '▾'}}</text>
       </view>
-      <view class="head-tools">
-        <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-          <text>{{currentSpaceName}}</text>
-        </picker>
+    </view>
+    <view class="workflow-nav">
+      <view class="workflow-entry " data-action="invite" bindtap="onWorkflowTap" aria-role="button" aria-label="邀约">
+        <view class="workflow-icon"><view class="workflow-symbol workflow-invite"></view></view><text>邀约</text>
+      </view>
+      <view class="workflow-entry {{courseMode !== 'completion' ? 'active' : ''}}" data-action="schedule" bindtap="onWorkflowTap" aria-role="button" aria-label="排课">
+        <view class="workflow-icon"><view class="workflow-symbol workflow-schedule"></view></view><text>排课</text>
+      </view>
+      <view class="workflow-entry {{courseMode === 'completion' ? 'active' : ''}}" data-action="completion" bindtap="onWorkflowTap" aria-role="button" aria-label="完课">
+        <view class="workflow-icon"><view class="workflow-symbol workflow-completion"></view></view><text>完课</text>
       </view>
     </view>
-    <view class="lock-bar {{isDayLocked ? 'locked' : ''}}">
-      <view class="lock-status">
-        <view class="lock-status-icon"></view>
-        <text>{{isDayLocked ? '已核对' : '未核对'}}</text>
-        <text class="lock-operator" wx:if="{{isDayLocked && lockInfo.locked_by}}">· {{lockInfo.locked_by}}</text>
-      </view>
-      <view class="lock-action {{lockSubmitting || !spaceId ? 'disabled' : ''}}" wx:if="{{canManageActivityLock}}" bindtap="onLockToggle">
-        {{lockSubmitting ? '处理中…' : (isDayLocked ? '解锁' : '确认核对')}}
-      </view>
-    </view>
-    <!-- 三槽位周轮播：滑动完成后无感回中，可稳定连续切换前后周 -->
-    <swiper
-      wx:if="{{!calendarExpanded}}"
-      class="week-swiper"
-      current="{{weekSwiperCurrent}}"
-      duration="{{weekSwiperDuration}}"
-      easing-function="easeOutCubic"
-      bindchange="onWeekSwiperChange"
-    >
+    <!-- 周日历：滑动切周，点击切换日期 -->
+    <swiper wx:if="{{!calendarExpanded}}" class="week-swiper" current="{{weekSwiperCurrent}}" duration="{{weekSwiperDuration}}" easing-function="easeOutCubic" bindchange="onWeekSwiperChange">
       <swiper-item wx:for="{{weekPages}}" wx:key="key" wx:for-item="weekPage">
         <view class="week-strip">
-          <view
-            wx:for="{{weekPage.days}}"
-            wx:key="date"
-            wx:for-item="day"
-            class="week-day {{day.isSelected ? 'selected' : ''}}"
-            catchtap="onCalendarDayTap"
-            data-date="{{day.date}}"
-          >
+          <view wx:for="{{weekPage.days}}" wx:key="date" wx:for-item="day" class="week-day {{day.isSelected ? 'selected' : ''}}" catchtap="onCalendarDayTap" data-date="{{day.date}}">
             <text class="week-label">{{day.weekday}}</text>
             <text class="week-number">{{day.day}}</text>
             <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}} {{day.isLocked ? 'verified' : ''}}"></view>
@@ -103,30 +85,27 @@
           data-record="{{item}}"
         >
           <view class="card-top">
-            <view class="card-time">
-              <text class="t1">{{item.startTime || '--'}}</text>
-              <text class="t2">{{item.endTime}}</text>
-            </view>
             <view class="card-mid">
-              <view class="card-line1">
-                <text class="welfare-tag" wx:if="{{item.isBookClubWelfare}}">公益</text>
-                <text class="name">{{item.displayName}}</text>
-                <text class="type" wx:if="{{item.typeText}}">{{item.typeText}}</text>
-              </view>
-              <view class="card-line2">
-                <text wx:if="{{item.metaText}}">{{item.metaText}}</text>
-                <text class="creator-text">创建人 · {{item.createdBy || '未记录'}}</text>
+              <activity-type-icon source="{{item.source}}" size="88" />
+              <view class="card-content">
+                <view class="card-line1">
+                  <text class="welfare-tag" wx:if="{{item.isBookClubWelfare}}">公益</text>
+                  <text class="name">{{item.displayName}}</text>
+                </view>
+                <view class="course-schedule-meta">
+                  <text class="course-deduction" wx:if="{{item.isPublicWelfare || (item.deductionCount != null && item.deductionCount >= 0)}}">扣卡 {{item.isPublicWelfare ? 0 : item.deductionCount}} 次</text>
+                  <text class="course-teacher" wx:if="{{item.teacher}}">{{item.teacher}}</text>
+                  <text class="readonly-status" wx:if="{{isDayLocked || !item.canEdit}}">{{isDayLocked ? '已锁定' : '只读'}}</text>
+                </view>
+                <view class="card-roster-strip" catchtap="onParticipantsOpen" data-record="{{item}}">
+                  <view class="course-attendance-summary">
+                    <text class="course-time">{{item.startTime || '时间待定'}}{{item.endTime ? '–' + item.endTime : ''}}</text>
+                    <text class="card-roster-names">{{item.participantRosterText}}</text>
+                  </view>
+                  <text class="card-roster-entry">名单 <text class="roster-chevron">›</text></text>
+                </view>
               </view>
             </view>
-            <view class="card-right">
-              <view class="card-status-row" wx:if="{{!item.canEdit || item.isPublished}}">
-                <text class="readonly-status" wx:if="{{isDayLocked || !item.canEdit}}">{{isDayLocked ? ((lockInfo.locked_by || '未记录') + '锁定') : ((item.createdBy || '未记录') + '锁定')}}</text>
-              </view>
-            </view>
-          </view>
-          <view class="card-roster-strip" catchtap="onParticipantsOpen" data-record="{{item}}">
-            <text class="card-roster-names">{{item.participantRosterText}}</text>
-            <text class="card-roster-entry">名单 ›</text>
           </view>
         </view>
       </view>
@@ -145,7 +124,7 @@
   </view>
 
   <!-- 添加按钮 -->
-  <draggable-fab wx:if="{{!isViewOnly}}" storage-key="activities-fab-position" bindtap="onCreateTap" bindlongpress="onFabLongPress" />
+  <draggable-fab wx:if="{{!isViewOnly && courseMode !== 'completion'}}" storage-key="activities-fab-position" bindtap="onCreateTap" bindlongpress="onFabLongPress" />
 
   <view class="withdraw-mask" wx:if="{{showWithdrawal}}" bindtap="onWithdrawalClose"></view>
   <view class="withdraw-sheet" wx:if="{{showWithdrawal}}">
@@ -208,7 +187,7 @@
       <view class="participant-sheet-close" bindtap="onParticipantSheetClose" aria-label="关闭">×</view>
     </view>
     <view class="participant-sheet-filter">
-      <text class="participant-sheet-filter-hint">客户信息和跟进点均填写后计为完成</text>
+      <text class="participant-sheet-filter-hint">深度需求和跟进点均填写后计为完成</text>
       <view class="participant-sheet-filter-button {{participantSheetOnlyIncomplete ? 'active' : ''}}" bindtap="onParticipantFilterToggle">
         {{participantSheetOnlyIncomplete ? '查看全部' : '只看未填写'}}
       </view>
@@ -240,8 +219,9 @@
               <text class="participant-needs-value">{{item.needs}}</text>
             </view>
             <view class="participant-note-statuses">
-              <text wx:if="{{noteVisibility.customer_info}}" class="participant-note-status {{item.hasCustomerInfo ? 'filled' : ''}}">客户信息 · {{item.hasCustomerInfo ? '已填' : '未填'}}</text>
+              <text wx:if="{{noteVisibility.customer_info}}" class="participant-note-status {{item.hasCustomerInfo ? 'filled' : ''}}">深度需求 · {{item.hasCustomerInfo ? '已填' : '未填'}}</text>
               <text wx:if="{{noteVisibility.follow_up}}" class="participant-note-status {{item.hasFollowUp ? 'filled' : ''}}">跟进点 · {{item.hasFollowUp ? '已填' : '未填'}}</text>
+              <text wx:if="{{noteVisibility.customer_feedback}}" class="participant-note-status {{item.hasCustomerFeedback ? 'filled' : ''}}">客户反馈 · {{item.hasCustomerFeedback ? '已填' : '未填'}}</text>
               <view class="participant-item-actions">
                 <text class="participant-action participant-action-outline" catchtap="onParticipantProfileTap" data-id="{{item.id}}">资料</text>
                 <text
@@ -256,9 +236,11 @@
         <view class="participant-note-editor" wx:if="{{participantSheetExpandedId === item.id && !item.withdrawn}}">
           <view wx:if="{{noteVisibility.customer_info}}" class="participant-note-field">
             <view class="participant-note-field-head">
-              <text class="participant-note-field-label">客户信息</text>
+              <text class="participant-note-field-label">深度需求</text>
               <text class="participant-note-field-count" wx:if="{{item.customerInfoOtherNotes.length}}">另有 {{item.customerInfoOtherNotes.length}} 人填写</text>
             </view>
+            <text class="participant-note-own-title">我填写的</text>
+            <view class="participant-feedback-field"><text>反馈人</text><picker disabled="{{!participantSheetEditable}}" range="{{participantFeedbackOptions}}" range-key="name" value="{{item.customerInfoFeedbackIndex}}" data-id="{{item.id}}" data-prefix="customerInfo" bindchange="onParticipantFeedbackChange"><view class="participant-feedback-picker"><text>{{item.customerInfoFeedbackName}}</text><text>⌄</text></view></picker></view>
             <textarea
               class="participant-note-input"
               value="{{item.customerInfoValue}}"
@@ -272,7 +254,7 @@
             />
             <view class="participant-note-others" wx:if="{{item.customerInfoOtherNotes.length}}">
               <view class="participant-note-other" wx:for="{{item.customerInfoOtherNotes}}" wx:key="id" wx:for-item="note">
-                <text class="participant-note-other-author">{{note.created_by || '其他同事'}}：</text>
+                <text class="participant-note-other-author">反馈：{{note.author}}<text wx:if="{{note.followUpText}}"> · 下次跟进：{{note.followUpText}}</text></text>
                 <text>{{note.content}}</text>
               </view>
             </view>
@@ -282,6 +264,10 @@
               <text class="participant-note-field-label">跟进点</text>
               <text class="participant-note-field-count" wx:if="{{item.followUpOtherNotes.length}}">另有 {{item.followUpOtherNotes.length}} 人填写</text>
             </view>
+            <text class="participant-note-own-title">我填写的</text>
+            <view class="participant-feedback-field"><text>反馈人</text><picker disabled="{{!participantSheetEditable}}" range="{{participantFeedbackOptions}}" range-key="name" value="{{item.followUpFeedbackIndex}}" data-id="{{item.id}}" data-prefix="followUp" bindchange="onParticipantFeedbackChange"><view class="participant-feedback-picker"><text>{{item.followUpFeedbackName}}</text><text>⌄</text></view></picker></view>
+            <view class="participant-followup-row"><text>下次跟进人</text><picker disabled="{{!participantSheetEditable}}" range="{{participantFollowUpPeople}}" range-key="nickname" value="{{item.followUpPersonIndex}}" data-id="{{item.id}}" bindchange="onParticipantFollowUpPerson"><view class="participant-feedback-picker"><text>{{item.followUpPersonName}}</text><text>⌄</text></view></picker></view>
+            <view class="participant-followup-row"><text>跟进时间</text><picker disabled="{{!participantSheetEditable}}" mode="date" value="{{item.followUpDate}}" data-id="{{item.id}}" bindchange="onParticipantFollowUpDate"><view class="participant-feedback-picker"><text>{{item.followUpDate || '选择日期'}}</text><text>⌄</text></view></picker><text wx:if="{{item.followUpDate && participantSheetEditable}}" data-id="{{item.id}}" bindtap="onParticipantClearFollowUpDate">清空</text></view>
             <textarea
               class="participant-note-input"
               value="{{item.followUpValue}}"
@@ -295,10 +281,17 @@
             />
             <view class="participant-note-others" wx:if="{{item.followUpOtherNotes.length}}">
               <view class="participant-note-other" wx:for="{{item.followUpOtherNotes}}" wx:key="id" wx:for-item="note">
-                <text class="participant-note-other-author">{{note.created_by || '其他同事'}}：</text>
+                <text class="participant-note-other-author">反馈：{{note.author}}<text wx:if="{{note.followUpText}}"> · 下次跟进：{{note.followUpText}}</text></text>
                 <text>{{note.content}}</text>
               </view>
             </view>
+          </view>
+          <view wx:if="{{noteVisibility.customer_feedback}}" class="participant-note-field">
+            <view class="participant-note-field-head"><text class="participant-note-field-label">客户反馈</text><text class="participant-note-field-count" wx:if="{{item.customerFeedbackOtherNotes.length}}">另有 {{item.customerFeedbackOtherNotes.length}} 人填写</text></view>
+            <text class="participant-note-own-title">我填写的</text>
+            <view class="participant-feedback-field"><text>反馈人</text><picker disabled="{{!participantSheetEditable}}" range="{{participantFeedbackOptions}}" range-key="name" value="{{item.customerFeedbackFeedbackIndex}}" data-id="{{item.id}}" data-prefix="customerFeedback" bindchange="onParticipantFeedbackChange"><view class="participant-feedback-picker"><text>{{item.customerFeedbackFeedbackName}}</text><text>⌄</text></view></picker></view>
+            <textarea class="participant-note-input" value="{{item.customerFeedbackValue}}" data-id="{{item.id}}" data-field="customerFeedbackValue" maxlength="5000" disabled="{{!participantSheetEditable}}" placeholder="填写客户反馈…" placeholder-style="color:#b7bdc6" bindinput="onParticipantNoteInput" />
+            <view class="participant-note-others" wx:if="{{item.customerFeedbackOtherNotes.length}}"><view class="participant-note-other" wx:for="{{item.customerFeedbackOtherNotes}}" wx:key="id" wx:for-item="note"><text class="participant-note-other-author">反馈：{{note.author}}</text><text>{{note.content}}</text></view></view>
           </view>
           <view
             class="participant-note-save {{participantSheetSavingId ? 'disabled' : ''}}"

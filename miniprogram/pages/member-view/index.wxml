@@ -6,7 +6,7 @@
       <view class="id-text">
         <text class="id-name">{{customer.nickname || '我的会员资料'}}</text>
         <view class="id-meta">
-          <text class="id-slogan">{{customer.member_type || '会员端'}}</text>
+          <view class="id-slogan"><member-labels wx:if="{{customer.member_type || customer.card_status}}" identity="{{customer.member_type}}" status="{{customer.card_status}}" tone="{{customer.card_status_tone}}" /><text wx:else>会员端</text></view>
           <view wx:if="{{canManage}}" class="return-button" bindtap="onReturn">切换到管理端 <text>›</text></view>
         </view>
       </view>

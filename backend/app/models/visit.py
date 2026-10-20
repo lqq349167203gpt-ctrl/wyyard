@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import field_validator
+from pydantic import computed_field, field_validator
 
 from app.models.base import SafeBaseModel
 
@@ -30,7 +30,7 @@ class VisitRecordBase(SafeBaseModel):
     arrived: bool = False  # 是否到店
     arrival_time: str = ""  # 实际到场时间 HH:MM
     cancelled: bool = False  # 是否已取消邀约；取消后记录保留但锁定
-    cancel_reason: str = ""  # 最近一次取消原因；恢复后保留记录
+    cancel_reason: str = ""  # 本次取消邀约的原因；恢复后清空
     experience: str = ""  # 客户反馈
     feedback: str = ""  # 疗愈师回复
     healing_notes: str = ""  # 跟进记录
@@ -40,8 +40,8 @@ class VisitRecordBase(SafeBaseModel):
 
     @field_validator(
         "visit_time", "member_type", "needs", "referrer_handler", "receptionist", "goal",
-        "space_id", "arrival_time", "cancel_reason", "created_by_id", "created_by",
-        "experience", "feedback", "healing_notes",
+        "space_id", "arrival_time", "created_by_id", "created_by",
+        "experience", "feedback", "healing_notes", "cancel_reason",
         mode="before",
     )
     @classmethod
@@ -68,10 +68,24 @@ class VisitRecord(VisitRecordBase):
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
 
+    @computed_field
+    @property
+    def card_status(self) -> str:
+        from app.services.member_card_label_service import label_for
+        return label_for(self.customer_id)["card_status"]
+
+    @computed_field
+    @property
+    def card_status_tone(self) -> str:
+        from app.services.member_card_label_service import label_for
+        return label_for(self.customer_id)["card_status_tone"]
+
 
 class CustomerSearchResult(SafeBaseModel):
     id: str
     nickname: str
     name: str = ""
     member_type: str = ""
+    card_status: str = ""
+    card_status_tone: str = "neutral"
     visit_count: int = 0  # 自动统计：该客户历史到访总次数

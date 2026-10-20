@@ -436,7 +436,7 @@ def test_overview_initiated_invites_group_by_inviter_with_record_details(monkeyp
     monkeypatch.setattr(service, "collect_data", lambda _: ([org], permissions, [], []))
     monkeypatch.setattr(service, "scope", lambda _: ([org], customers, permissions))
     monkeypatch.setattr(service.customer_service, "list_customers", lambda: list(customers.values()))
-    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda _: visits)
+    monkeypatch.setattr(service.visit_service, "list_basic_visits", lambda *_: visits)
 
     result = service.analyze(
         request,
@@ -774,12 +774,21 @@ def test_rule_fields_endpoint_exposes_first_batch(client):
     assert response.status_code == 200, response.text
     data = response.json()
     names = [field["value"] for field in data["fields"]]
-    assert names == ["gender", "age", "member_type", "follow_up_status", "customer_tags", "traffic_source",
+    assert names == ["gender", "age", "member_type", "customer_tags", "traffic_source",
                      "referrer", "referrer_handler", "service_teacher", "referral_date", "invitation_dates"]
     # 消费金额、期间成交金额等仍未开放
     assert "total_consumption" not in names and "payment_amount_period" not in names
     assert all(field["operators"] for field in data["fields"])
     assert any(item["value"] == "between" for item in data["operators"])
+
+
+def test_conversion_legacy_stage_condition_is_retired():
+    from app.models.principal import ConversionAction
+    action = ConversionAction(conditions=[
+        {"field": "follow_up_status", "operator": "eq", "value": "已成交"},
+        {"field": "member_type", "operator": "eq", "value": "398卡"},
+    ])
+    assert [condition.field for condition in action.conditions] == ["member_type"]
 
 
 def test_conversion_query_with_condition_runs(client):
@@ -1036,9 +1045,10 @@ def test_export_wraps_details_and_escapes_formula(client, monkeypatch):
     response = client.post("/api/principal/export", json={})
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.content)).active
-    assert sheet["A2"].value == "'=1+1"
-    assert sheet["B2"].value == "甲\n乙"
-    assert sheet["B2"].alignment.wrap_text
+    header = next(row for row in range(1, sheet.max_row + 1) if sheet.cell(row, 1).value == "客户")
+    assert sheet.cell(header + 1, 1).value == "'=1+1"
+    assert sheet.cell(header + 1, 2).value == "甲\n乙"
+    assert sheet.cell(header + 1, 2).alignment.wrap_text
 
 
 def test_traffic_export_uses_visible_customers_and_selected_order(client, monkeypatch):
@@ -1061,16 +1071,20 @@ def test_traffic_export_uses_visible_customers_and_selected_order(client, monkey
     })
     assert response.status_code == 200
     sheet = load_workbook(io.BytesIO(response.content)).active
-    assert sheet.max_row == 3
-    assert sheet["A1"].value == "昵称"
-    assert sheet["A2"].value == "'=1+1"
-    assert sheet["A3"].value == "客户甲"
-    assert sheet["C3"].value == "老师甲"
-    assert sheet["I3"].value == 2
+    header = next(row for row in range(1, sheet.max_row + 1) if sheet.cell(row, 1).value == "昵称")
+    assert sheet.max_row == header + 2
+    assert sheet.cell(header + 1, 1).value == "'=1+1"
+    assert sheet.cell(header + 2, 1).value == "客户甲"
+    assert sheet.cell(header + 2, 3).value == "老师甲"
+    headings = {cell.value: cell.column for cell in sheet[header]}
+    assert "跟进阶段" not in headings
+    assert sheet.cell(header + 2, headings["交易笔数"]).value == 2
     empty = client.post("/api/principal/export", json={
         "export_view": "traffic", "export_customer_ids": [],
     })
-    assert load_workbook(io.BytesIO(empty.content)).active.max_row == 1
+    empty_sheet = load_workbook(io.BytesIO(empty.content)).active
+    empty_header = next(row for row in range(1, empty_sheet.max_row + 1) if empty_sheet.cell(row, 1).value == "昵称")
+    assert empty_sheet.max_row == empty_header
 
 
 def test_invite_arrivals_export_respects_display_mode_and_profile_access(client, monkeypatch):
@@ -1100,15 +1114,17 @@ def test_invite_arrivals_export_respects_display_mode_and_profile_access(client,
     once = client.post("/api/principal/export", json={**common, "arrival_view": "customer"})
     assert once.status_code == 200
     once_sheet = load_workbook(io.BytesIO(once.content)).active
-    assert once_sheet.max_row == 2
-    assert [cell.value for cell in once_sheet[1]] == ["到店日期", "昵称"]
+    once_header = next(row for row in range(1, once_sheet.max_row + 1) if once_sheet.cell(row, 1).value == "到店日期")
+    assert once_sheet.max_row == once_header + 1
+    assert [cell.value for cell in once_sheet[once_header][:2]] == ["到店日期", "昵称"]
 
     by_date = client.post("/api/principal/export", json={**common, "arrival_view": "date"})
     assert by_date.status_code == 200
     date_sheet = load_workbook(io.BytesIO(by_date.content)).active
-    assert date_sheet.max_row == 3
-    assert [date_sheet["A2"].value, date_sheet["A3"].value] == ["2026-08-02", "2026-08-01"]
-    assert date_sheet["B2"].value == "客户甲"
+    date_header = next(row for row in range(1, date_sheet.max_row + 1) if date_sheet.cell(row, 1).value == "到店日期")
+    assert date_sheet.max_row == date_header + 2
+    assert [date_sheet.cell(date_header + offset, 1).value for offset in (1, 2)] == ["2026-08-02", "2026-08-01"]
+    assert date_sheet.cell(date_header + 1, 2).value == "客户甲"
 
 
 def test_teacher_follow_up_export_omits_related_details(client, monkeypatch):

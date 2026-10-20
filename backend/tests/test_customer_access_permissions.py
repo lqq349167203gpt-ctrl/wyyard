@@ -315,8 +315,8 @@ def test_external_permissions_persist_merge_and_audit_independently(monkeypatch)
     assert not merged["sensitive_fields"]["trauma_history"]
     assert not merged["detail_tabs"]["communication"]
     changes = _format_edit_permission_changes({}, first)
-    assert "组织/俱乐部外部客户到访目的查看权限(开启)" in changes
-    assert "组织/俱乐部外部客户活动记录查看权限(开启)" in _format_edit_permission_changes({}, second)
+    assert "数据统计外部客户到访目的查看权限(开启)" in changes
+    assert "数据统计外部客户活动记录查看权限(开启)" in _format_edit_permission_changes({}, second)
 
 
 def test_legacy_role_without_customer_access_keeps_previous_visibility():

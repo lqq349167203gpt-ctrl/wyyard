@@ -23,6 +23,7 @@ async def list_organizations(status: Literal["all", "active", "archived"] = "all
             "nickname": (customer.nickname or customer.name or "") if customer else "",
             "name": (customer.name or "") if customer else "",
             "member_type": (customer.member_type or "") if customer else "",
+            "card_status": getattr(customer, "card_status", "") if customer else "", "card_status_tone": getattr(customer, "card_status_tone", "neutral") if customer else "neutral",
             "visit_count": customer.visit_count if customer else 0,
             "missing": customer is None,
         }

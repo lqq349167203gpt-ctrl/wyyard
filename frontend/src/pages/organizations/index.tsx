@@ -1,3 +1,5 @@
+import { ActivityTypeIcons } from "@/components/activity-type-icons"
+import { MemberLabels } from "@/components/member-labels"
 import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { Link } from "react-router-dom"
 import { Plus, Trash2, Edit, ArrowUp, ArrowDown, CircleAlert, ImagePlus, X } from "lucide-react"
@@ -203,7 +205,7 @@ export default function OrganizationsPage() {
           id: item.id,
           nickname: item.nickname,
           name: item.name,
-          member_type: item.member_type,
+          member_type: item.member_type, card_status: item.card_status, card_status_tone: item.card_status_tone,
           visit_count: item.visit_count,
           positions: [], position_sort_orders: {}, created_at: "", traffic_source: "",
           traffic_source_detail: "", referrer: "", referral_date: "", space_id: "",
@@ -677,6 +679,8 @@ export default function OrganizationsPage() {
         </span>
       </div>
 
+      {activeTab === "activities" && <ActivityTypeIcons />}
+
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-[4px] border border-[#e8eaed] bg-white p-0.5" aria-label="组织状态">
           {[{ value: "active", label: "运营中" }, { value: "archived", label: "已归档" }, { value: "all", label: "全部" }].map(item => (
@@ -872,7 +876,7 @@ export default function OrganizationsPage() {
                                   : <EmptyValue />}
                             </TableCell>
                             <TableCell className="text-[12px] text-[#4e535a]">{member?.name || <EmptyValue />}</TableCell>
-                            <TableCell className="text-[12px] text-[#4e535a]">{member?.member_type || <EmptyValue />}</TableCell>
+                            <TableCell className="text-[12px] text-[#4e535a]"><MemberLabels customer={member} /></TableCell>
                             <TableCell className="text-center text-[12px] text-[#4e535a]">{member?.visit_count ?? <EmptyValue />}</TableCell>
                             <TableCell className="pr-4 text-right">
                               {memberId && org.status !== "archived" && (
@@ -897,7 +901,7 @@ export default function OrganizationsPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-[12px] text-[#4e535a]">{row.all ? "全部人员" : (row.customer?.name || <EmptyValue />)}</TableCell>
-                          <TableCell className="text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (row.customer?.member_type || <EmptyValue />)}</TableCell>
+                          <TableCell className="text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (<MemberLabels customer={row.customer} />)}</TableCell>
                           <TableCell className="text-center text-[12px] text-[#4e535a]">{row.all ? <EmptyValue /> : (row.customer?.visit_count ?? <EmptyValue />)}</TableCell>
                           <TableCell className="pr-4 text-right">
                             {org.status !== "archived" && org.referrer_mode === "selected" && row.customer && (

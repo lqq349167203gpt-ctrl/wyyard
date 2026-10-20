@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -121,9 +122,7 @@ export default function DisabledCustomersPage() {
                     <TableCell className="text-[#4e535a]">{c.name || "-"}</TableCell>
                     <TableCell className="text-[#4e535a]">{c.phone || "-"}</TableCell>
                     <TableCell>
-                      {c.member_type ? (
-                        <span className="inline-flex rounded-full border border-[#e1e4e7] bg-white px-2 py-0.5 text-[12px] text-[#4e535a]">{c.member_type}</span>
-                      ) : "-"}
+                      <MemberLabels customer={c} />
                     </TableCell>
                     <TableCell className="text-[12px] text-[#a8b1bd]">
                       {c.deleted_at ? new Date(c.deleted_at).toLocaleDateString("zh-CN") : "-"}

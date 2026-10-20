@@ -33,11 +33,15 @@ _load()
 
 
 def list_customers() -> List[Customer]:
+    from app.services.member_identity_service import ensure_remaining_identities_current
+    ensure_remaining_identities_current()
     return [v for v in _customers.values() if not v.is_deleted]
 
 
 def list_disabled_customers() -> List[Customer]:
     """列出所有已停用（软删除）的客户"""
+    from app.services.member_identity_service import ensure_remaining_identities_current
+    ensure_remaining_identities_current()
     return [v for v in _customers.values() if v.is_deleted]
 
 
@@ -47,6 +51,8 @@ def list_all_customers() -> List[Customer]:
 
 
 def get_customer(customer_id: str) -> Optional[Customer]:
+    from app.services.member_identity_service import ensure_remaining_identities_current
+    ensure_remaining_identities_current()
     return _customers.get(customer_id)
 
 
@@ -86,7 +92,51 @@ def validate_customer_data(data: CustomerCreate, exclude_id: str = "") -> Option
     return None
 
 
-def create_customer(data: CustomerCreate) -> Customer:
+def _update_handoff(customer: Customer, previous_handler: str, actor_id: str) -> None:
+    """只有新指定或实际更换承接人才生成待办；普通编辑不重复生成。"""
+    from app.models.customer import CustomerHandoff
+    from app.services import account_service
+
+    handler = customer.referrer_handler.strip()
+    if handler == (previous_handler or "").strip():
+        return
+    if customer.handoff:
+        customer.handoff_history = [*customer.handoff_history, customer.handoff.model_copy(deep=True)]
+    customer.handoff = None
+    if handler:
+        account = account_service.get_by_owner(handler)
+        customer.handoff = CustomerHandoff(
+            id=str(uuid.uuid4()), handler=handler,
+            handler_account_id=account.id if account else "",
+            assigned_at=datetime.now(timezone.utc), assigned_by=actor_id,
+        )
+
+
+def accept_handoff(customer_id: str, assignment_id: str, *, account_id: str, owner: str) -> Customer:
+    """锁内复核归属与交接版本，防止转交后旧页面误确认。"""
+    with _customer_lock:
+        customer = _customers.get(customer_id)
+        if not customer or customer.is_deleted:
+            raise ValueError("客户不存在或已停用")
+        handoff = customer.handoff
+        if not handoff or handoff.id != assignment_id:
+            raise ValueError("客户交接已变更，请刷新列表")
+        if (handoff.handler_account_id != account_id if handoff.handler_account_id
+                else not owner or handoff.handler != owner):
+            raise PermissionError("只能确认分配给自己的客户")
+        if not handoff.accepted_at:
+            # 持久化成功后再更新缓存；失败时仍可重试。
+            updated = customer.model_copy(deep=True)
+            updated.handoff.accepted_at = datetime.now(timezone.utc)
+            updated.handoff.accepted_by = account_id
+            updated.updated_at = updated.handoff.accepted_at
+            commit_pending_writes([("item", FILENAME, customer_id, updated.model_dump(mode="json"))])
+            _customers[customer_id] = updated
+            return updated
+        return customer
+
+
+def create_customer(data: CustomerCreate, *, actor_id: str = "") -> Customer:
     with _customer_lock:
         # 检查昵称和微信号唯一性
         for c in _customers.values():
@@ -106,6 +156,7 @@ def create_customer(data: CustomerCreate) -> Customer:
             updated_at=now,
             **data.model_dump(),
         )
+        _update_handoff(customer, "", actor_id)
         _customers[customer.id] = customer
         _save(customer.id)
     # 锁外调用，避免 refresh_member_type → update_customer 死锁
@@ -114,7 +165,7 @@ def create_customer(data: CustomerCreate) -> Customer:
     return customer
 
 
-def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer]:
+def update_customer(customer_id: str, data: CustomerUpdate, *, actor_id: str = "") -> Optional[Customer]:
     with _customer_lock:
         customer = _customers.get(customer_id)
         if not customer or customer.is_deleted:
@@ -146,8 +197,10 @@ def update_customer(customer_id: str, data: CustomerUpdate) -> Optional[Customer
             from app.services import communication_record_service
 
             communication_record_service.bind_legacy_customer(customer_id, customer.nickname)
+        previous_handler = customer.referrer_handler
         for key, value in update_data.items():
             setattr(customer, key, value)
+        _update_handoff(customer, previous_handler, actor_id)
         customer.updated_at = datetime.now(timezone.utc)
         _save(customer_id)
         need_refresh = "positions" in update_data

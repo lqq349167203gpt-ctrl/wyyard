@@ -12,49 +12,30 @@
         <text class="wk">{{currentWeekday}}</text>
         <text class="drop">{{calendarExpanded ? '▴' : '▾'}}</text>
       </view>
-      <picker class="head-space" mode="selector" range="{{spaces}}" range-key="name" value="{{spaceIndex}}" bindchange="onSpaceChange">
-        <view class="space-content">
-          <text>{{currentSpaceName}}</text>
-        </view>
-      </picker>
     </view>
-    <view class="lock-bar {{isDayVerified ? 'locked' : ''}}">
-      <view class="lock-status">
-        <view class="lock-status-icon"></view>
-        <text>{{isDayVerified ? '已核对' : '未核对'}}</text>
-        <text class="lock-operator" wx:if="{{isDayVerified && verificationInfo.verified_by}}">· {{verificationInfo.verified_by}}</text>
+    <view class="workflow-nav">
+      <view class="workflow-entry active" data-action="invite" bindtap="onWorkflowTap" aria-role="button" aria-label="邀约">
+        <view class="workflow-icon"><view class="workflow-symbol workflow-invite"></view></view><text>邀约</text>
       </view>
-      <view class="lock-action {{verificationSubmitting || !spaceId ? 'disabled' : ''}}" wx:if="{{canManageVisitVerification}}" bindtap="onVerificationToggle">
-        {{verificationSubmitting ? '处理中…' : (isDayVerified ? '解锁' : '确认核对')}}
+      <view class="workflow-entry " data-action="schedule" bindtap="onWorkflowTap" aria-role="button" aria-label="排课">
+        <view class="workflow-icon"><view class="workflow-symbol workflow-schedule"></view></view><text>排课</text>
+      </view>
+      <view class="workflow-entry " data-action="completion" bindtap="onWorkflowTap" aria-role="button" aria-label="完课">
+        <view class="workflow-icon"><view class="workflow-symbol workflow-completion"></view></view><text>完课</text>
       </view>
     </view>
-    <!-- 三槽位周轮播：滑动完成后无感回中，避免循环克隆长期滑动后出现空白 -->
-    <swiper
-      wx:if="{{!calendarExpanded}}"
-      class="week-swiper"
-      current="{{weekSwiperCurrent}}"
-      duration="{{weekSwiperDuration}}"
-      easing-function="easeOutCubic"
-      bindchange="onWeekSwiperChange"
-    >
+    <!-- 周日历：滑动切周，点击切换日期 -->
+    <swiper wx:if="{{!calendarExpanded}}" class="week-swiper" current="{{weekSwiperCurrent}}" duration="{{weekSwiperDuration}}" easing-function="easeOutCubic" bindchange="onWeekSwiperChange">
       <swiper-item wx:for="{{weekPages}}" wx:key="key" wx:for-item="weekPage">
         <view class="week-strip">
-          <view
-            wx:for="{{weekPage.days}}"
-            wx:key="date"
-            wx:for-item="day"
-            class="week-day {{day.isSelected ? 'selected' : ''}}"
-            catchtap="onCalendarDayTap"
-            data-date="{{day.date}}"
-          >
+          <view wx:for="{{weekPage.days}}" wx:key="date" wx:for-item="day" class="week-day {{day.isSelected ? 'selected' : ''}}" catchtap="onCalendarDayTap" data-date="{{day.date}}">
             <text class="week-label">{{day.weekday}}</text>
             <text class="week-number">{{day.day}}</text>
-            <view class="week-count-dot {{day.isVerified ? 'visible verified' : (day.count > 0 ? 'visible' : '')}}"></view>
+            <view class="week-count-dot {{day.count > 0 ? 'visible' : ''}} {{day.isVerified ? 'verified' : ''}}"></view>
           </view>
         </view>
       </swiper-item>
     </swiper>
-
     <!-- 下拉日历 -->
     <view class="calendar-dropdown" wx:if="{{calendarExpanded}}">
       <view class="calendar-nav">

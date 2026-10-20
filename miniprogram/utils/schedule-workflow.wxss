@@ -1,0 +1,16 @@
+/* 参考浅天蓝顶部，导航区与内容区连续过渡。 */
+.head{background:linear-gradient(180deg,#c6e4fe 0%,#d6ecff 65%,#e0f2fe 100%)}
+.head-date .wk,.head-date .drop{color:#657b90}
+.workflow-nav{display:flex;justify-content:space-around;align-items:flex-start;margin-top:20rpx;padding:0 12rpx}
+.workflow-entry{display:flex;flex-direction:column;align-items:center;gap:12rpx;min-width:100rpx;padding:4rpx 22rpx;color:#566d82;font-size:28rpx}
+.workflow-icon{position:relative;width:92rpx;height:92rpx;border-radius:28rpx;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.67);color:#0095e7}
+.workflow-entry.active{color:#008bd8;font-weight:500}
+.workflow-entry.active .workflow-icon{background:linear-gradient(145deg,#007cf2,#14b9e9);color:#fff}
+.workflow-entry:active{opacity:.72}
+.workflow-symbol{position:relative;box-sizing:border-box;width:42rpx;height:44rpx;border:4rpx solid currentColor;border-radius:8rpx}
+.workflow-symbol::before,.workflow-symbol::after{content:'';position:absolute;box-sizing:border-box}
+.workflow-invite::before{width:12rpx;height:12rpx;border:3rpx solid currentColor;border-radius:50%;left:11rpx;top:6rpx}
+.workflow-invite::after{width:24rpx;height:10rpx;border:3rpx solid currentColor;border-bottom:0;border-radius:12rpx 12rpx 0 0;left:5rpx;bottom:5rpx}
+.workflow-schedule::before{height:4rpx;left:0;right:0;top:10rpx;background:currentColor}
+.workflow-schedule::after{left:7rpx;top:22rpx;width:6rpx;height:6rpx;background:currentColor;box-shadow:13rpx 0 0 currentColor}
+.workflow-completion::before{width:20rpx;height:12rpx;border-left:4rpx solid currentColor;border-bottom:4rpx solid currentColor;left:6rpx;top:10rpx;transform:rotate(-45deg)}

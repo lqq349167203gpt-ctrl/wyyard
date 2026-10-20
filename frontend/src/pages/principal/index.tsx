@@ -1,3 +1,4 @@
+import { MemberLabels } from "@/components/member-labels"
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { Download, GripVertical, Plus, Save, SlidersHorizontal, Trash2, X } from "lucide-react"
@@ -155,7 +156,7 @@ const PAGE_SIZE = 20
 const PARENT_OF: Record<string, string> = { subtype: "deals", course: "type", participation_course: "participation_type" }
 // 这些维度是「附加条件」，可以和别的维度一起用：
 // 成交量那边是购买类型，课程数那边是课程类型 / 具体课程 / 课程老师，引流人数那边是引流人 + 阶段 / 来源 / 标签
-const COMBINABLE_PREFIXES = new Set(["buy", "type", "course", "teacher", "traffic", "identity", "stage", "source", "tag", "upsell", "inviter", "participation_type", "participation_course", "participation_person"])
+const COMBINABLE_PREFIXES = new Set(["buy", "type", "course", "teacher", "traffic", "identity", "card_status", "stage", "source", "tag", "upsell", "inviter", "participation_type", "participation_course", "participation_person"])
 
 // 引流客户列表的列：可在「列表设置」里勾选显示、上下调整顺序
 type TrafficColumnDef = {
@@ -173,8 +174,7 @@ const TRAFFIC_COLUMN_DEFS: TrafficColumnDef[] = [
   { key: "name", label: "昵称（引流日期）", width: "w-[96px]", sortField: "referral_date" },
   { key: "referrer", label: "引流人", width: "w-[76px]", sortField: "referrer" },
   { key: "referrer_handler", label: "承接人", width: "w-[76px]", sortField: "referrer_handler" },
-  { key: "identity", label: "会员身份", width: "w-[84px]", sortField: "identity" },
-  { key: "follow_up_status", label: "跟进阶段", width: "w-[84px]", sortField: "follow_up_status" },
+  { key: "identity", label: "会员身份", width: "w-[160px]", sortField: "identity" },
   { key: "traffic_source", label: "流量来源", width: "w-[84px]", sortField: "traffic_source" },
   { key: "tags", label: "客户标签", width: "w-[110px]", sortField: "tags" },
   { key: "deals", label: "交易笔数", width: "w-[84px]", sortField: "deals", align: "right" as const },
@@ -241,10 +241,9 @@ function loadTrafficColumns(): TrafficColumnConfig[] {
 const INVITE_COLUMN_DEFS: TrafficColumnDef[] = [
   { key: "arrive_date", label: "到店日期", width: "w-[100px]", sortField: "arrive_date" },
   { key: "name", label: "昵称", width: "w-[100px]", sortField: "name" },
-  { key: "identity", label: "会员身份", width: "w-[90px]", sortField: "identity" },
+  { key: "identity", label: "会员身份", width: "w-[160px]", sortField: "identity" },
   { key: "referrer", label: "引流人", width: "w-[76px]", sortField: "referrer", defaultVisible: false },
   { key: "referrer_handler", label: "承接人", width: "w-[76px]", sortField: "referrer_handler", defaultVisible: false },
-  { key: "follow_up_status", label: "跟进阶段", width: "w-[84px]", sortField: "follow_up_status", defaultVisible: false },
   { key: "traffic_source", label: "流量来源", width: "w-[84px]", sortField: "traffic_source", defaultVisible: false },
   { key: "tags", label: "客户标签", width: "w-[110px]", sortField: "tags", defaultVisible: false },
   { key: "deals", label: "交易笔数", width: "w-[84px]", sortField: "deals", align: "right" as const, defaultVisible: false },
@@ -815,7 +814,6 @@ export default function PrincipalPage() {
       for (const item of data.breakdown?.participation?.by_participant ?? []) values.add(`participation_person:${item.key}`)
     } else if (overviewGroup === "traffic") {
       for (const item of data.breakdown?.traffic ?? []) values.add(`traffic:${item.key}`)
-      for (const item of data.breakdown?.traffic_filters?.stage ?? []) values.add(`stage:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.source ?? []) values.add(`source:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.tag ?? []) values.add(`tag:${item.key}`)
       for (const item of data.breakdown?.traffic_filters?.upsell ?? []) values.add(`upsell:${item.key}`)
@@ -1323,6 +1321,7 @@ export default function PrincipalPage() {
         muted: item.key === "未配置",
       }))),
     })
+    panelSelects.push({ label: "卡次状态", prefix: "card_status", placeholder: "全部", items: (breakdown?.traffic_filters?.card_status ?? []).map(item => ({ value: `card_status:${item.key}`, label: item.label, text: `${item.count} 人` })) })
     panelSelects.push({
       label: "会员身份", prefix: "identity", placeholder: "全部",
       items: unassignedFirst((breakdown?.traffic_filters?.identity ?? []).map(item => ({
@@ -1340,15 +1339,6 @@ export default function PrincipalPage() {
           label: item.label,
           text: `${item.count} 人`,
         })),
-      },
-      {
-        label: "跟进阶段", prefix: "stage", placeholder: "全部",
-        items: unassignedFirst((breakdown?.traffic_filters?.stage ?? []).map(item => ({
-          value: `stage:${item.key}`,
-          label: item.label,
-          text: `${item.count} 人`,
-          muted: item.key === "未配置",
-        }))),
       },
       {
         label: "流量来源", prefix: "source", placeholder: "全部",
@@ -1628,7 +1618,7 @@ export default function PrincipalPage() {
       case "referrer_handler":
         return muted(customer.referrer_handler)
       case "identity":
-        return <span className={textCls + " text-[#4e535a]"}>{muted(customer.identity)}</span>
+        return <span className={textCls + " text-[#4e535a]"}><MemberLabels customer={{ member_type: customer.identity, card_status: customer.card_status, card_status_tone: customer.card_status_tone }} /></span>
       case "follow_up_status":
         return <span className={textCls + " text-[#4e535a]"}>{muted(customer.follow_up_status)}</span>
       case "traffic_source":
@@ -2546,7 +2536,7 @@ export default function PrincipalPage() {
                         }
                         if (column.key === "identity") {
                           return (
-                            <TableCell key={column.key} className={`${base} text-[#4e535a]`}>{customer.identity || <EmptyValue />}</TableCell>
+                            <TableCell key={column.key} className={`${base} text-[#4e535a]`}><MemberLabels customer={{ member_type: customer.identity, card_status: customer.card_status, card_status_tone: customer.card_status_tone }} /></TableCell>
                           )
                         }
                         if (["referrer", "referrer_handler", "follow_up_status", "traffic_source", "tags",

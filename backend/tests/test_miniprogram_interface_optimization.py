@@ -157,7 +157,7 @@ def test_payment_invalid_multi_selection_fails_explicitly():
 
 
 def test_customer_selector_retains_complete_visible_directory_without_visit_statistics(monkeypatch):
-    fields = ['nickname', 'name', 'gender', 'member_type', 'traffic_source', 'traffic_source_detail', 'referrer', 'service_teacher', 'referral_date', 'space_id']
+    fields = ['nickname', 'name', 'gender', 'member_type', 'traffic_source', 'traffic_source_detail', 'referrer', 'referrer_handler', 'service_teacher', 'referral_date', 'space_id']
     people = [NS(id=str(i), positions=[], position_sort_orders={}, created_at=None, **dict.fromkeys(fields, '')) for i in range(1001)]
     monkeypatch.setattr(customers.customer_service, 'list_customers', lambda: people)
     monkeypatch.setattr(customer_access_service, 'filter_customers', lambda *_: people[:-1])

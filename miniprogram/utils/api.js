@@ -1,6 +1,6 @@
 // API 请求封装
 // 后端地址由 utils/config.js 的 DEV 总开关决定（上线/提审前切为 false 即指向生产）
-const { BASE_URL } = require('./config')
+const { BASE_URL, DEV } = require('./config')
 console.info('[api] 当前数据源:', BASE_URL)
 
 // 登录态是跟数据源绑定的：本地和正式服务器的 token 互不认，换源必须重新登录
@@ -21,7 +21,7 @@ const SHARED_READ_RESOURCES = new Set([
   'customer-tags', 'follow-up-statuses', 'visits', 'class-records', 'daily-report',
   'communication-records', 'visit-verifications', 'activity-themes',
   'membership-cards', 'group-cases', 'emotional-releases', 'energy-knots',
-  'internal-courses', 'oh-card-readings', 'other-projects', 'tea-seat-fees', 'offline-courses',
+  'internal-courses', 'oh-card-readings', 'other-projects', 'tea-seat-fees', 'online-tea', 'offline-courses',
 ])
 
 function request(path, options = {}) {
@@ -110,6 +110,7 @@ function _saveRenewedToken(headers, requestToken) {
 function _getWxLoginCode() {
   return new Promise((resolve, reject) => {
     wx.login({
+      timeout: 10000,
       success: (result) => {
         if (result && result.code) resolve(result.code)
         else reject(new Error('微信登录凭证为空'))
@@ -127,7 +128,7 @@ function _silentRelogin() {
       url: `${BASE_URL}/api/wechat/login`,
       method: 'POST',
       data: { code, member_only: (wx.getStorageSync('currentUser') || {}).role === 'customer' },
-      timeout: 30000,
+      timeout: 12000,
       header: {
         'Content-Type': 'application/json',
         'X-Client-Type': 'miniprogram',
@@ -439,7 +440,10 @@ async function performRequest(path, options = {}) {
           _clearAuthAndGoLogin(reason)
           reject(new Error('登录状态已失效'))
         } else {
-          const msg = _extractErrorMessage(res.data)
+          const detail = _extractErrorMessage(res.data)
+          const msg = detail === '请求失败' && res.statusCode >= 500
+            ? DEV ? '本地服务连接失败，请检查电脑服务和局域网地址' : '服务器暂时不可用，请稍后重试'
+            : detail
           console.error('[request] 请求失败:', path, 'status:', res.statusCode, 'msg:', msg)
           if (!options.silent) wx.showToast({ title: msg, icon: 'none' })
           reject(new Error(msg))
@@ -459,7 +463,13 @@ async function performRequest(path, options = {}) {
             wx.showToast({ title: '网络错误', icon: 'none' })
           }
         }
-        reject(err)
+        if (options.skipAuth) {
+          const message = reason.indexOf('url not in domain list') >= 0
+            ? '请在手机右上角打开调试后重试'
+            : DEV ? '连接本地服务失败，请确认手机和电脑在同一 Wi-Fi，并重新生成预览'
+              : '登录连接超时或网络不可用，请稍后重试'
+          reject(new Error(message))
+        } else reject(err)
       },
     })
   })
@@ -513,6 +523,16 @@ const visitNoteApi = {
   create: (data) => request('/api/visit-notes', { method: 'POST', data }),
   update: (id, content, attribution = {}) => request(`/api/visit-notes/${id}`, { method: 'PATCH', data: { content, ...attribution } }),
   delete: (id) => request(`/api/visit-notes/${id}`, { method: 'DELETE' }),
+}
+
+const courseRosterApi = {
+  get: (source, id) => request(`/api/class-records/course-roster?activity_source=${encodeURIComponent(source)}&session_id=${encodeURIComponent(id)}`),
+  confirm: (source, id, ids) => request('/api/class-records/course-roster/confirm', {
+    method: 'POST', data: { activity_source: source, session_id: id, customer_ids: ids },
+  }),
+  notes: (source, id) => request(`/api/class-records/participant-notes/list?activity_source=${encodeURIComponent(source)}&session_id=${encodeURIComponent(id)}&course_only=true`),
+  saveNote: data => request('/api/class-records/participant-notes', { method: 'POST', data: { ...data, course_only: true } }),
+  deleteNote: (id, source, sessionId) => request(`/api/class-records/course-roster/notes/${encodeURIComponent(id)}?activity_source=${encodeURIComponent(source)}&session_id=${encodeURIComponent(sessionId)}`, { method: 'DELETE' }),
 }
 
 const activityParticipantNoteApi = {
@@ -654,9 +674,23 @@ const dailyGroupingApi = {
 
 // 客户 API
 const customerApi = {
+  assignmentOptions: () => request('/api/customers/assignment-options'),
+  workspaces: () => request('/api/customers/workspaces'),
+  workspaceSettings: () => request('/api/customers/workspace-settings'),
+  saveWorkspaceSettings: data => request('/api/customers/workspace-settings', { method: 'PUT', data }),
+  acceptHandoff: (id, assignmentId) => request(`/api/customers/${encodeURIComponent(id)}/accept-handoff`, { method: 'POST', data: { assignment_id: assignmentId } }),
+  exportOptions: () => request('/api/customers/export-options'),
+  export: (filters = {}) => {
+    const query = []
+    Object.keys(filters).forEach(key => {
+      const values = Array.isArray(filters[key]) ? filters[key] : [filters[key]]
+      values.forEach(value => { if (value) query.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`) })
+    })
+    return `${BASE_URL}/api/customers/export${query.length ? '?' + query.join('&') : ''}`
+  },
   light: (limit) => request(`/api/customers/light${limit ? '?limit=' + limit : ''}`),
   // 人员选择保留完整可见目录，但不计算到店统计；旧 light 调用保持兼容。
-  selector: () => request('/api/customers/light?purpose=selector'),
+  selector: (params = {}) => request('/api/customers/light?purpose=selector' + Object.entries(params).filter(([, value]) => value).map(([key, value]) => `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join('')),
   detail: (id, date, principalParticipant = false, principalCourse = '', section = '') => {
     const params = []
     if (date) params.push('date=' + encodeURIComponent(date))
@@ -743,7 +777,7 @@ const organizationApi = {
 
 // 会员身份 API
 const memberIdentityApi = {
-  list: () => request('/api/member-identities'),
+  list: (group = 'identity') => request('/api/member-identities?group=' + group),
 }
 
 // 登录 API
@@ -751,12 +785,16 @@ const memberIdentityApi = {
 // 登录请求本身不需要 token，因此绝不等待/依赖 dev-login——
 // 即使 devMode 判断失灵，dev-login 失败也永远无法阻断账号密码登录。
 const authApi = {
+  sessionStatus: () => {
+    const memberOnly = (wx.getStorageSync('currentUser') || {}).role === 'customer'
+    return request(memberOnly ? '/api/client/member-data?section=home&page=1&page_size=1' : '/api/accounts/me/permissions', { timeout: 12000, silent: true })
+  },
   memberData: (section, page = 1) => {
     const memberOnly = (wx.getStorageSync('currentUser') || {}).role === 'customer'
     const path = memberOnly ? '/api/client/member-data' : '/api/accounts/me/member-data'
     return request(`${path}?section=${encodeURIComponent(section)}&page=${page}&page_size=20`, { silent: true })
   },
-  entryLogin: (code, loginCode) => request('/api/wechat/entry-login', { method: 'POST', data: { code, login_code: loginCode }, skipAuth: true, silent: true }),
+  entryLogin: (code, loginCode) => request('/api/wechat/entry-login', { method: 'POST', data: { code, login_code: loginCode }, skipAuth: true, silent: true, timeout: 12000 }),
   switchToManagement: () => request('/api/client/management-login', { method: 'POST', silent: true }),
   checkinCode: (activityKey) => {
     const memberOnly = (wx.getStorageSync('currentUser') || {}).role === 'customer'
@@ -767,8 +805,8 @@ const authApi = {
   confirmCheckin: (code) => request('/api/activity-checkins/confirm', { method: 'POST', data: { code }, silent: true }),
   login: (code) => request('/api/wechat/login', { method: 'POST', data: { code }, skipAuth: true }),
   phoneLogin: (code) => request('/api/wechat/phone-login', { method: 'POST', data: { code }, skipAuth: true }),
-  devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username }, skipAuth: true }),
-  passwordLogin: (username, password) => request('/api/accounts/login', { method: 'POST', data: { username, password }, skipAuth: true }),
+  devLogin: (username) => request('/api/wechat/dev-login', { method: 'POST', data: { username }, skipAuth: true, silent: true, timeout: 12000 }),
+  passwordLogin: (username, password) => request('/api/accounts/login', { method: 'POST', data: { username, password }, skipAuth: true, silent: true, timeout: 12000 }),
   bind: (token, username, password) => request('/api/wechat/bind', { method: 'POST', data: { token, username, password }, skipAuth: true }),
   bindWechat: (code) => request('/api/accounts/bind-wechat', { method: 'POST', data: { code } }),
 }
@@ -784,6 +822,7 @@ const PAYMENT_PROJECT_TYPES = [
   { key: 'energy_knot', label: '深度情绪释放', apiPath: 'energy-knots' },
   { key: 'internal_course', label: '沙龙技能学习', apiPath: 'internal-courses' },
   { key: 'tea_seat_fee', label: '茶位费', apiPath: 'tea-seat-fees' },
+  { key: 'online_tea', label: '线上茶疗', apiPath: 'online-tea' },
   { key: 'offline_course', label: '线下落地课程', apiPath: 'offline-courses' },
   { key: 'other', label: '其他项目', apiPath: 'other-projects' },
 ]
@@ -822,6 +861,7 @@ const paymentApi = {
   energyKnots: _projectApi('/api/energy-knots'),
   internalCourses: _projectApi('/api/internal-courses'),
   teaSeatFees: _projectApi('/api/tea-seat-fees'),
+  onlineTea: _projectApi('/api/online-tea'),
   offlineCourses: _projectApi('/api/offline-courses'),
   otherProjects: Object.assign(_projectApi('/api/other-projects'), {
     getAvailableProjects: (customerId) => request(`/api/other-projects/${customerId}/available-projects`),
@@ -850,6 +890,7 @@ const paymentApi = {
       energy_knot: this.energyKnots,
       internal_course: this.internalCourses,
       tea_seat_fee: this.teaSeatFees,
+      online_tea: this.onlineTea,
       offline_course: this.offlineCourses,
       other: this.otherProjects,
     }
@@ -984,6 +1025,7 @@ const customAnalysisApi = {
 }
 
 module.exports = {
+  activityIconApi: { list: () => request('/api/activity-icons', { silent: true }) },
   dailyReportApi: {
     read: (date, spaceId) => request(`/api/daily-report?date=${encodeURIComponent(date)}&mobile=true&space_id=${encodeURIComponent(spaceId || '')}`),
     finance: (date) => request(`/api/daily-report/finance-sources?date=${encodeURIComponent(date)}&mobile=true`, { silent: true }),
@@ -1022,6 +1064,7 @@ module.exports = {
       return request(`/api/audit-check?${query.join('&')}`)
     },
   },
+  courseRosterApi,
   activityParticipantNoteApi,
   // 客户跟进：自己填过的客户信息 / 跟进点
   customerFollowUpApi: {

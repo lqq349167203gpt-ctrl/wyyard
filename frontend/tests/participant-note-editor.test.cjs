@@ -49,10 +49,10 @@ test('PC 清空本人记录只更新当前备注，保留第三页和他人记�
   assert.equal(groups[0].participants[0].customer_info_entries[0].id, 'other')
 })
 
-function miniHarness(api) {
+function miniHarness(api, activityApi = {}) {
   const file = path.join(root, 'miniprogram/utils/service-teacher-records.js')
   const context = { module: { exports: {} }, require(name) {
-    if (name === './api') return { customerFollowUpApi: api, serviceTeacherApi: {} }
+    if (name === './api') return { customerFollowUpApi: api, activityParticipantNoteApi: activityApi, serviceTeacherApi: {} }
     return require(path.resolve(path.dirname(file), name))
   }, getApp: () => ({ globalData: { currentUser: actor } }), wx: { showToast() {} }, console }
   vm.runInNewContext(readFileSync(file, 'utf8'), context)
@@ -86,6 +86,29 @@ test('小程序清空后保留已加载分页，填写入口与他人内容按�
   assert.equal(saved.customer_info_mine.length, 0)
   assert.equal(saved.customer_info_others[0].id, 'other')
   assert.equal(page.data.participantEditing, null)
+})
+
+test('课程记录参与人没有邀约时也能填写客户反馈', async () => {
+  const writes = []
+  const page = miniHarness({
+    feedbackPeople: async () => ({ current_person: { name: '本人', customer_id: '' }, options: [{ name: '本人', customer_id: '' }] }),
+  }, {
+    list: async () => [],
+    save: async payload => {
+      writes.push(payload)
+      return { id: 'course-note', ...payload, created_by_id: 'me', created_by: '本人', updated_at: '' }
+    },
+  })
+  page.data.participantGroups = [{ participants: [{ visit_id: '', course_id: 'course', activity_type: 'class',
+    course_date: '2026-10-20', customer_id: 'customer', nickname: '小安', customer_feedback_entries: [] }] }]
+  await page.onParticipantOpenEdit({ currentTarget: { dataset: { group: 0, index: 0, field: 'customer_feedback' } } })
+  assert.equal(page.data.participantEditing.activitySource, 'class_record')
+  page.setData({ participantDraft: '愿意再次参加' })
+  await page.saveParticipantEdit()
+  assert.equal(writes.length, 1)
+  assert.equal(writes[0].customer_id, 'customer')
+  assert.equal(writes[0].feedback_person, '本人')
+  assert.equal(page.data.participantGroups[0].participants[0].customer_feedback_mine[0].content, '愿意再次参加')
 })
 
 test('小程序来访需求支持只选标签，跟进点提交完整安排，空白新记录无需造一条空数据', async () => {

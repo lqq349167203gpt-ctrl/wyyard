@@ -63,6 +63,12 @@ Page({
   async loadRemaining() {
     try {
       const res = await clientApi.getRemaining({ silentAuth: true })
+      const app = getApp()
+      if (app.isLoggedIn() && app.globalData.customer.id === res.customer_id) {
+        const customer = { ...app.globalData.customer, member_type: res.member_type || '', card_status: res.card_status || '', card_status_tone: res.card_status_tone || 'neutral' }
+        app.saveLogin(app.globalData.token, customer)
+        this.setData({ customer })
+      }
       const rc = res.remaining
       let remainNum = '0'
       let remainClass = ''

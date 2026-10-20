@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from app.models.base import StrictBaseModel
 from app.services import activity_lock_service, activity_withdrawal_service, customer_access_service
 from app.services.customer_service import get_customer
-from app.utils.record_ownership import ensure_record_creator
+from app.utils.record_ownership import ensure_activity_withdrawal_access
 
 router = APIRouter(prefix="/api/activity-withdrawals", tags=["activity-withdrawals"])
 
@@ -60,7 +60,7 @@ def withdraw_participant(
     if not record:
         raise HTTPException(status_code=404, detail="活动记录不存在")
     activity_lock_service.ensure_record_unlocked(record)
-    ensure_record_creator(request, record, "活动", "activities")
+    ensure_activity_withdrawal_access(request, record)
     customer_access_service.require_new_customer_ids(
         request,
         [data.customer_id],
@@ -126,7 +126,7 @@ def restore_participant(
     if not record:
         raise HTTPException(status_code=404, detail="活动记录不存在")
     activity_lock_service.ensure_record_unlocked(record)
-    ensure_record_creator(request, record, "活动", "activities")
+    ensure_activity_withdrawal_access(request, record)
     customer_access_service.require_new_customer_ids(
         request,
         [customer_id],

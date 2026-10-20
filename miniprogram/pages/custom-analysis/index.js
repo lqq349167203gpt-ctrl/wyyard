@@ -107,7 +107,7 @@ function defaultPlan() {
     metrics: ['total_customers'],
     card_metric: 'total_customers',
     card_dimension: 'none',
-    columns: ['nickname', 'member_type', 'follow_up_status', 'referrer', 'visit_count_period'],
+    columns: ['nickname', 'member_type', 'referrer', 'visit_count_period'],
     sort_by: 'referral_date',
     sort_order: 'desc',
     row_display_mode: 'unique_customers',

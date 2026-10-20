@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
-import { Plus, Tags, X } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { CustomerSearchInput } from "@/components/customer-search-input"
 import { SelectDropdown } from "@/components/select-dropdown"
 import ListView from "./components/list-view"
 import DetailView from "./components/detail-view"
+import { CustomerExportDialog } from "./customer-export-dialog"
 import { customerApi, customerTagApi, memberIdentityApi, spaceApi, statisticsApi, visitApi, type Customer, type CustomerLight, type CustomerTag, type DashboardSummary, type Space } from "@/lib/api"
 import { hasPagePermission } from "@/lib/page-permissions"
 import { usePagePermissions } from "@/hooks/use-page-permissions"
@@ -27,6 +28,8 @@ export default function HealingRecordsPage() {
   const [deleteError, setDeleteError] = useState("")
   const [customers, setCustomers] = useState<CustomerLight[]>([])
   const [identityNames, setIdentityNames] = useState<string[]>([])
+  const [cardStatusNames, setCardStatusNames] = useState<string[]>([])
+  const [searchCardStatus, setSearchCardStatus] = useState("")
   const [availableTags, setAvailableTags] = useState<CustomerTag[]>([])
   const [spaces, setSpaces] = useState<Space[]>([])
   const [spacesLoading, setSpacesLoading] = useState(false)
@@ -47,6 +50,7 @@ export default function HealingRecordsPage() {
   const [searchServiceTeacher, setSearchServiceTeacher] = useState("")
   const [searchQuality, setSearchQuality] = useState("正常")
   const [selectionMode, setSelectionMode] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkField, setBulkField] = useState("customer_quality")
@@ -77,7 +81,7 @@ export default function HealingRecordsPage() {
 
   useEffect(() => {
     customerApi.light().then(setCustomers).catch(() => {})
-    memberIdentityApi.list().then(list => setIdentityNames(list.map(i => i.name).reverse())).catch(() => {})
+    memberIdentityApi.list("all").then(list => { setIdentityNames(list.filter(i => i.group !== "card_status").map(i => i.name).reverse()); setCardStatusNames(list.filter(i => i.group === "card_status").map(i => i.name)) }).catch(() => {})
     customerTagApi.list().then(setAvailableTags).catch(() => setAvailableTags([]))
     loadSummary()
   }, [loadSummary])
@@ -116,6 +120,7 @@ export default function HealingRecordsPage() {
   const handleClear = () => {
     setSearchNickname("")
     setSearchIdentity("")
+    setSearchCardStatus("")
     setSearchReferrer("")
     setSearchReferrerHandler("")
     setSearchServiceTeacher("")
@@ -129,7 +134,7 @@ export default function HealingRecordsPage() {
     setDetailOpen(true)
   }
 
-  useEffect(() => { setSelectedIds([]) }, [searchNickname, searchIdentity, searchReferrer, searchReferrerHandler, searchServiceTeacher, searchQuality, searchTagIds, tagMatch])
+  useEffect(() => { setSelectedIds([]) }, [searchNickname, searchIdentity, searchCardStatus, searchReferrer, searchReferrerHandler, searchServiceTeacher, searchQuality, searchTagIds, tagMatch])
 
   const handleBulkSave = async () => {
     if (!selectedIds.length || bulkSaving) return
@@ -221,26 +226,26 @@ export default function HealingRecordsPage() {
     <div className="min-h-full w-full min-w-0 max-w-full space-y-3 overflow-x-hidden bg-[#f4f5f6] p-4">
       {/* V2 页眉横条：标题 + 统计 */}
       <div className="flex items-center flex-wrap gap-2 rounded-xl bg-white shadow-[0_1px_3px_rgba(33,38,49,.06)] px-5 h-[52px]">
-        <span className="text-[15px] font-medium text-[#212631] whitespace-nowrap">客户资料</span>
-        <span className="text-[11.5px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部客户关系档案</span>
+        <span className="text-[14px] font-medium text-[#212631] whitespace-nowrap">客户资料</span>
+        <span className="text-[12px] text-[#a8b1bd] ml-2.5 whitespace-nowrap">管理与查看全部客户关系档案</span>
         <span className="ml-auto flex items-center flex-wrap gap-y-1">
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="text-[11px] text-[#79838f]"><span className="inline-block w-[7px] h-[7px] rounded-full bg-[#3370ff] mr-1 align-[1px]" />客户总数</span>
+            <span className="text-[12px] text-[#79838f]"><span className="inline-block w-[7px] h-[7px] rounded-full bg-[#3370ff] mr-1 align-[1px]" />客户总数</span>
             <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? summary.total_customers.toLocaleString() : "-"}</span>
           </span>
           <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="text-[11px] text-[#79838f]">本月到店</span>
+            <span className="text-[12px] text-[#79838f]">本月到店</span>
             <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? `${summary.arrived_customers_this_month.toLocaleString()} 人` : "-"}</span>
           </span>
           <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="text-[11px] text-[#79838f]">本月消费额</span>
+            <span className="text-[12px] text-[#79838f]">本月消费额</span>
             <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? `¥${summary.revenue_this_month.toLocaleString()}` : "-"}</span>
           </span>
           <span className="w-px h-3.5 bg-[#f0f0f0] mx-5" />
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="text-[11px] text-[#79838f]">待跟进</span>
+            <span className="text-[12px] text-[#79838f]">待跟进</span>
             <span className="text-[14px] font-medium text-[#212631] tabular-nums">{summary ? `${summary.not_arrived_customers.toLocaleString()} 人` : "-"}</span>
           </span>
         </span>
@@ -249,7 +254,7 @@ export default function HealingRecordsPage() {
       {/* 表格卡：筛选条 + 数据表 */}
       <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-white shadow-[0_2px_4px_rgba(33,38,49,.05)]">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-[#f0f0f0]">
-          <div className="w-[141px] shrink-0">
+          <div className="w-[126px] shrink-0">
             <CustomerSearchInput
               customers={customers}
               value={searchNickname}
@@ -261,7 +266,7 @@ export default function HealingRecordsPage() {
             />
           </div>
           <SelectDropdown
-            className="w-[141px] shrink-0"
+            className="w-[126px] shrink-0"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchIdentity}
@@ -270,30 +275,29 @@ export default function HealingRecordsPage() {
             textColor={searchIdentity ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
             onChange={(v) => { setSearchIdentity(v) }}
           />
-          <div className="w-[141px] shrink-0">
-            <CustomerSearchInput
-              customers={customers}
-              value={searchReferrer}
-              onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : "") }}
-              placeholder="引流人"
-              filterSelected={false}
-              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
-              rounded="7px"
-            />
-          </div>
           <SelectDropdown
-            className="w-[141px] shrink-0"
+            className="w-[126px] shrink-0"
+            buttonClassName="border-[#e1e4e7] bg-white px-2.5"
+            rounded="7px"
+            value={searchCardStatus}
+            options={[{ value: "", label: "全部卡次状态", muted: true }, ...cardStatusNames.map(name => ({ value: name, label: name }))]}
+            placeholder="全部卡次状态"
+            textColor={searchCardStatus ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
+            onChange={setSearchCardStatus}
+          />
+          <SelectDropdown
+            className="w-[126px] shrink-0"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchServiceTeacher}
-            options={[{ value: "", label: "全部服务老师" }, ...serviceTeacherOptions]}
-            placeholder="全部服务老师"
+            options={[{ value: "", label: "全部Sales" }, ...serviceTeacherOptions]}
+            placeholder="全部Sales"
             textColor={searchServiceTeacher ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
             onChange={setSearchServiceTeacher}
           />
           <SelectDropdown
             multi
-            className="w-[141px] shrink-0"
+            className="w-[126px] shrink-0"
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchTagIds}
@@ -304,7 +308,7 @@ export default function HealingRecordsPage() {
           />
           {searchTagIds.length > 1 && (
             <SelectDropdown
-              className="w-[141px] shrink-0"
+              className="w-[126px] shrink-0"
               buttonClassName="border-[#e1e4e7] bg-white px-2.5"
               rounded="7px"
               value={tagMatch}
@@ -312,7 +316,18 @@ export default function HealingRecordsPage() {
               onChange={value => setTagMatch(value as "any" | "all")}
             />
           )}
-          <div className="w-[141px] shrink-0">
+          <div className="w-[126px] shrink-0">
+            <CustomerSearchInput
+              customers={customers}
+              value={searchReferrer}
+              onChange={(v) => { setSearchReferrer(typeof v === "string" ? v : "") }}
+              placeholder="引流人"
+              filterSelected={false}
+              className="border-[#e1e4e7] bg-white px-2.5 placeholder:text-[#a8b1bd]"
+              rounded="7px"
+            />
+          </div>
+          <div className="w-[126px] shrink-0">
             <CustomerSearchInput
               customers={customers}
               value={searchReferrerHandler}
@@ -323,25 +338,26 @@ export default function HealingRecordsPage() {
               rounded="7px"
             />
           </div>
-          <SelectDropdown value={searchQuality} options={[{ value: "", label: "全部质量" }, { value: "正常", label: "正常" }, { value: "忽视", label: "忽视" }]} onChange={setSearchQuality} placeholder="全部质量" triggerLabel={searchQuality ? `客户质量：${searchQuality}` : "全部质量"} hideSelectedStyle className="w-[141px] shrink-0" buttonClassName="!h-8 !rounded-[7px] !border-[#e1e4e7] !text-[12px] [&>span:first-of-type]:!text-[#2b2f36]" />
+          <SelectDropdown value={searchQuality} options={[{ value: "", label: "全部质量" }, { value: "正常", label: "正常" }, { value: "忽视", label: "忽视" }]} onChange={setSearchQuality} placeholder="全部质量" triggerLabel={searchQuality ? `客户质量：${searchQuality}` : "全部质量"} hideSelectedStyle className="w-[126px] shrink-0" buttonClassName="!h-8 !rounded-[7px] !border-[#e1e4e7] !text-[12px] [&>span:first-of-type]:!text-[#2b2f36]" />
           <button
             onClick={handleClear}
-            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-4 text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
+            className="flex h-8 items-center gap-1 rounded-[4px] border border-[#dee0e3] bg-white px-[11px] text-[12px] text-[#4e535a] hover:bg-[#f5f6f7]"
           >
             <X className="h-3.5 w-3.5" />
             清空
           </button>
-          {!isViewOnly && <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
-          {canManageTags && (
+          <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+          {!isViewOnly && canManageTags && (
             <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => navigate("/config/customer-tags")}>
-              <Tags className="mr-1 h-3.5 w-3.5" /> 标签管理
+              标签管理
             </Button>
           )}
-          <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => { setSelectionMode(value => !value); setSelectedIds([]); setBulkError("") }}>{selectionMode ? "退出批量" : "批量操作"}</Button>
-            <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
+          {!isViewOnly && <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => { setSelectionMode(value => !value); setSelectedIds([]); setBulkError("") }}>{selectionMode ? "退出批量" : "批量操作"}</Button>}
+          <Button variant="outline" size="sm" className="h-8 text-[12px] text-[#4e535a]" onClick={() => setExportOpen(true)}>导出</Button>
+            {!isViewOnly && <Button size="sm" className="h-8 bg-[#212631] text-[12px] text-white hover:bg-[#303641]" onClick={handleAddNew}>
               <Plus className="mr-1 h-3.5 w-3.5 text-[#a3c0ff]" /> 新建客户
-            </Button>
-          </div>}
+            </Button>}
+          </div>
         </div>
 
         {selectionMode && <div className="mb-2 flex flex-wrap items-center gap-3 rounded border border-[#eef0f2] bg-[#fafbfc] px-3 py-2 text-[12px] text-[#646a73]">
@@ -357,6 +373,7 @@ export default function HealingRecordsPage() {
           onEditCustomer={handleEditCustomer}
           filterNickname={searchNickname}
           filterIdentity={searchIdentity}
+          filterCardStatus={searchCardStatus}
           filterReferrer={searchReferrer}
           filterReferrerHandler={searchReferrerHandler}
           filterServiceTeacher={searchServiceTeacher}
@@ -376,14 +393,18 @@ export default function HealingRecordsPage() {
           <h2 className="text-[14px] font-medium text-[#1f2329]">批量编辑客户信息</h2>
           <p className="text-[12px] text-[#8f959e]">将修改已勾选的 {selectedIds.length} 位客户，其他信息保持不变。</p>
           <div className="space-y-3 text-[12px]">
-            <div className="flex items-center gap-3"><span className="w-16 shrink-0 text-[#646a73]">修改项目</span><SelectDropdown className="flex-1" value={bulkField} options={[{ value: "customer_quality", label: "客户质量" }, { value: "service_teacher", label: "服务老师" }]} onChange={value => { setBulkField(value); setBulkError("") }} /></div>
-            <div className="flex items-center gap-3"><span className="w-16 shrink-0 text-[#646a73]">{bulkField === "customer_quality" ? "客户质量" : "服务老师"}</span><div className="min-w-0 flex-1">{bulkField === "customer_quality" ? <SelectDropdown value={bulkQuality} options={["正常", "忽视"].map(value => ({ value, label: value }))} onChange={value => setBulkQuality(value as "正常" | "忽视")} /> : <CustomerSearchInput customers={customers} value={bulkTeacher} onChange={value => setBulkTeacher(typeof value === "string" ? value : value[0] || "")} placeholder="搜索姓名或昵称" filterSelected={false} />}</div></div>
-            {bulkField === "service_teacher" && !bulkTeacher && <p className="pl-[76px] text-[#8f959e]">留空保存将清除所选客户的服务老师。</p>}
+            <div className="flex items-center gap-3"><span className="w-16 shrink-0 text-[#646a73]">修改项目</span><SelectDropdown className="flex-1" value={bulkField} options={[{ value: "customer_quality", label: "客户质量" }, { value: "service_teacher", label: "Sales" }]} onChange={value => { setBulkField(value); setBulkError("") }} /></div>
+            <div className="flex items-center gap-3"><span className="w-16 shrink-0 text-[#646a73]">{bulkField === "customer_quality" ? "客户质量" : "Sales"}</span><div className="min-w-0 flex-1">{bulkField === "customer_quality" ? <SelectDropdown value={bulkQuality} options={["正常", "忽视"].map(value => ({ value, label: value }))} onChange={value => setBulkQuality(value as "正常" | "忽视")} /> : <CustomerSearchInput customers={customers} value={bulkTeacher} onChange={value => setBulkTeacher(typeof value === "string" ? value : value[0] || "")} placeholder="搜索姓名或昵称" filterSelected={false} />}</div></div>
+            {bulkField === "service_teacher" && !bulkTeacher && <p className="pl-[76px] text-[#8f959e]">留空保存将清除所选客户的Sales。</p>}
             {bulkError && <p role="alert" className="text-destructive">{bulkError}</p>}
           </div>
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSaving}>取消</Button><Button onClick={handleBulkSave} disabled={bulkSaving}>{bulkSaving ? "保存中…" : "确认修改"}</Button></div>
         </DialogContent>
       </Dialog>
+
+      {exportOpen && <CustomerExportDialog customers={customers} identityNames={identityNames} cardStatusNames={cardStatusNames}
+        initialFilters={{ cardStatus: searchCardStatus, identity: searchIdentity, teacher: searchServiceTeacher, referrer: searchReferrer, handler: searchReferrerHandler }}
+        onClose={() => setExportOpen(false)} />}
 
       {/* 客户详情弹窗 */}
       <Dialog open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) setSelectedCustomerId(null) }}>
@@ -436,7 +457,7 @@ export default function HealingRecordsPage() {
                 filterSelected={false}
               />
             </div>
-            {inviteError && <p className="pl-[76px] text-[11px] text-[#f54a45]">{inviteError}</p>}
+            {inviteError && <p className="pl-[76px] text-[12px] text-[#f54a45]">{inviteError}</p>}
           </div>
           <div className="flex justify-end gap-2 border-t border-[#f0f0f0] px-5 py-3">
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={closeInviteDialog} disabled={inviteSaving}>取消</Button>
@@ -458,7 +479,7 @@ export default function HealingRecordsPage() {
               确定要停用「<span className="font-medium">{deleteTarget?.nickname || deleteTarget?.id}</span>」吗？停用后客户资料将隐藏，历史关联数据保留，可随时恢复。
             </p>
             <div>
-              <label className="text-[11px] text-[#8f959e] mb-1 block">请输入客户昵称确认停用</label>
+              <label className="text-[12px] text-[#8f959e] mb-1 block">请输入客户昵称确认停用</label>
               <Input
                 value={deleteConfirmName}
                 onChange={(e) => { setDeleteConfirmName(e.target.value); setDeleteError("") }}
@@ -466,7 +487,7 @@ export default function HealingRecordsPage() {
                 className="h-8"
               />
             </div>
-            {deleteError && <p className="text-[11px] text-[#f54a45]">{deleteError}</p>}
+            {deleteError && <p className="text-[12px] text-[#f54a45]">{deleteError}</p>}
           </div>
           <div className="flex justify-end gap-2 px-5 py-3 border-t border-[#f0f0f0]">
             <Button variant="outline" size="sm" onClick={() => { setDeleteTarget(null); setDeleteConfirmName(""); setDeleteError("") }}>取消</Button>

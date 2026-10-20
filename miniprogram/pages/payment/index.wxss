@@ -597,13 +597,17 @@
 }
 
 .export-panel {
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  max-height: 85vh;
   background-color: #ffffff;
   border-radius: 16rpx 16rpx 0 0;
   overflow: hidden;
 }
 
 .export-panel-header {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   padding: 28rpx 32rpx 24rpx;
@@ -625,7 +629,10 @@
 }
 
 .export-panel-body {
+  flex: 1;
+  min-height: 0;
   padding: 28rpx 32rpx 32rpx;
+  overflow-y: auto;
 }
 
 .export-field + .export-field {
@@ -717,6 +724,50 @@
   color: #8f959e;
 }
 
+.export-types-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14rpx;
+}
+
+.export-types-heading .export-field-label {
+  margin-bottom: 0;
+}
+
+.export-select-all {
+  color: #3370ff;
+  font-size: 24rpx;
+}
+
+.export-type-options {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.export-type-option {
+  display: flex;
+  align-items: center;
+  width: 50%;
+  min-height: 48rpx;
+  box-sizing: border-box;
+  color: #2b2f36;
+  font-size: 24rpx;
+}
+
+.export-type-option checkbox {
+  margin-right: 6rpx;
+  transform: scale(0.75);
+  transform-origin: left center;
+}
+
+.export-types-hint {
+  display: block;
+  margin-top: 8rpx;
+  color: #8f959e;
+  font-size: 22rpx;
+}
+
 .export-summary {
   margin-top: 28rpx;
   padding: 18rpx 20rpx;
@@ -731,6 +782,7 @@
 }
 
 .export-panel-footer {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   gap: 16rpx;

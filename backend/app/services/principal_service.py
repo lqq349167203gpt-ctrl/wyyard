@@ -194,6 +194,9 @@ def _member_participation_breakdown(member_ids: set[str], start: str, end: str, 
         type_name = (getattr(activity, "course_type", "") or "").strip() or "未分类"
         return _course_key({"name": type_name, "organization": organization})
 
+    from app.services import course_attendance_service
+
+    confirmations = course_attendance_service.snapshot()
     # 每种活动、具体课程、每位成员分别累计次数，人数由成员 ID 去重。
     counts = defaultdict(lambda: [0, 0])
     member_records = defaultdict(list)
@@ -204,7 +207,9 @@ def _member_participation_breakdown(member_ids: set[str], start: str, end: str, 
                 day = valid_day(activity.date)
                 if not day or not start <= day <= end or getattr(activity, "is_deleted", False):
                     continue
-                arrived_members = member_ids & arrived_by_day.get(day, set())
+                arrived_members = member_ids & course_attendance_service.attended_ids(
+                    kind, activity.id, arrived_by_day.get(day, set()), record=activity, confirmations=confirmations,
+                )
                 if not arrived_members:
                     continue
                 owner_ids = _activity_owner_ids(kind, activity)
@@ -382,6 +387,9 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
         return (customers[cid].nickname or customers[cid].name or "未命名") if cid in customers else ""
     today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
     arrived_cache = visit_service.get_arrived_customer_ids_by_date()
+    from app.services import course_attendance_service
+
+    confirmations = course_attendance_service.snapshot()
     coarse_customers = (project_deduction_service.coarse_customer_ids_by_activity()
                         if not metadata_only and permissions["customer_access"]["transaction_access"] != "none" else {})
     for kind, label, loader in COURSE_ACTIVITY_TYPES:
@@ -403,7 +411,10 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
             # 案主单独统计，不重复计入参与者。
             participants -= owner_ids
             roster_ids = participants & course_customers
-            participants = roster_ids & arrived_cache.get(day, set())
+            attended_ids = course_attendance_service.attended_ids(
+                kind, activity.id, arrived_cache.get(day, set()), record=activity, confirmations=confirmations,
+            )
+            participants = roster_ids & attended_ids
             name = _course_activity_name(kind, label, activity)
             key = f"{kind}:{activity.id}"
             if not metadata_only:
@@ -418,7 +429,7 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
                                 parts += 1
                     details["body_part_count"] = parts
                 service_participant_ids = sorted(participants)
-                service_owner_ids = sorted(set(owner_ids) & course_customers & arrived_cache.get(day, set()))
+                service_owner_ids = sorted(set(owner_ids) & course_customers & attended_ids)
                 if course_customer_ids is not None and not service_participant_ids and not service_owner_ids:
                     continue
                 coarse_people = [{"id": cid, "name": customer_name(cid)}
@@ -471,22 +482,29 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
                                "recorded_at": str(getattr(payment, "created_at", "") or "")})
     if metadata_only:
         return organizations, permissions, events, courses
-    attendance = {(e["course_key"], e["customer_id"]): e for e in events if e["kind"] == "attendance"}
-    seen_usage = set()
-    for deduction in project_deduction_service.list_deductions():
-        if deduction.project_name != "粗门次卡" or deduction.is_deleted:
-            continue
-        key = f"{deduction.source_activity_type}:{deduction.source_activity_id}"
-        base = attendance.get((key, deduction.customer_id))
-        if not base or (key, deduction.customer_id) in seen_usage:
-            continue
-        seen_usage.add((key, deduction.customer_id))
-        events.append({**base, "id": f"coarse:{key}:{deduction.customer_id}", "kind": "coarse_usage", "product": "coarse", "subtype": "", "label": "粗门次卡 · " + base["label"],
-                       "settlement_id": deduction.organization_id if deduction.organization_id in org_names else "",
-                       "settlement": org_names.get(deduction.organization_id, "无权查看或未配置"),
-                       "deal_date": valid_day(deduction.deduction_date), "count": deduction.count,
-                       "recorded_at": str(getattr(deduction, "created_at", "") or ""),
-                       "closers": "、".join(str(c.get("name", "")) for c in deduction.closers or []) or deduction.closer_name or ""})
+    # 粗门成交以有效绑定记录为准，不依赖后续课程名单或到场确认。
+    if permissions["customer_access"]["transaction_access"] != "none":
+        for deduction in project_deduction_service.list_deductions():
+            if deduction.project_name != "粗门次卡" or deduction.is_deleted or deduction.cancelled:
+                continue
+            cid = deduction.customer_id
+            source_org = deduction.source_organization_id
+            deal_day = valid_day(deduction.deduction_date)
+            if cid not in customers or source_org not in org_names or not deal_day or deal_day > today:
+                continue
+            if not deduction.source_activity_type or not deduction.source_activity_id:
+                continue
+            key = f"{deduction.source_activity_type}:{deduction.source_activity_id}"
+            events.append({"id": f"coarse:{deduction.id}", "kind": "coarse_usage", "product": "coarse", "subtype": "",
+                           "date": valid_day(deduction.source_activity_date) or deal_day,
+                           "customer_id": cid, "customer": customer_name(cid), "course_key": key,
+                           "organization_id": source_org, "organization": org_names[source_org],
+                           "label": "粗门次卡 · " + (deduction.source_activity_name or "课程"),
+                           "settlement_id": deduction.organization_id if deduction.organization_id in org_names else "",
+                           "settlement": org_names.get(deduction.organization_id, "无权查看或未配置"),
+                           "deal_date": deal_day, "count": deduction.count,
+                           "recorded_at": str(getattr(deduction, "created_at", "") or ""),
+                           "closers": "、".join(str(c.get("name", "")) for c in deduction.closers or []) or deduction.closer_name or ""})
     return organizations, permissions, events, courses
 
 
@@ -723,7 +741,7 @@ def course_participant_rows(courses, organizations, participant_scope="", custom
             rows.append({
                 "id": f'{course["id"]}:participant:{cid}', "customer_id": cid, "course_id": course["id"],
                 "customer": names.get(cid) or (getattr(customer, "nickname", "") or getattr(customer, "name", "")) or "未命名",
-                "member_type": getattr(customer, "member_type", "") or "", "participant_role": "案主" if cid in owner_ids else "参与者",
+                "member_type": getattr(customer, "member_type", "") or "", "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"), "participant_role": "案主" if cid in owner_ids else "参与者",
                 "participant_category": label,
                 "org_participation_count": total_count, "org_participation_hours": round(float(total_hours), 1),
                 **{key: course.get(key, "") for key in ("date", "name", "type", "course_subtype", "organization_id", "organization", "teachers", "hours")},
@@ -753,7 +771,7 @@ def participant_course_cards(rows: list[dict]) -> list[dict]:
         card["participants"].append({
             "id": row.get("id") or "", "customer_id": row.get("customer_id") or "",
             "customer": row.get("customer") or "未命名",
-            "member_type": row.get("member_type") or "", "participant_role": row.get("participant_role") or "参与者",
+            "member_type": row.get("member_type") or "", "card_status": row.get("card_status") or "", "card_status_tone": row.get("card_status_tone") or "neutral", "participant_role": row.get("participant_role") or "参与者",
             "org_participation_count": row.get("org_participation_count") or 0,
             "org_participation_hours": row.get("org_participation_hours") or 0,
         })
@@ -899,7 +917,7 @@ def teacher_follow_up_rows(courses, customers):
 
 
 def _public_rows(rows, columns, *, teacher_feedback=False, participant_context=False):
-    fields = ["id", "customer_id", "course_id", "course_subtype", "product", "subtype", "repeat_times",
+    fields = ["id", "customer_id", "course_id", "course_subtype", "product", "subtype", "repeat_times", "card_status", "card_status_tone",
               "new_people", "old_people", "absent_people", "coarse_people", "order_count", "details", *[key for key, _ in columns]]
     if participant_context:
         fields.append("organization_id")
@@ -1262,7 +1280,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 ):
                     customer_upsell_levels[order["customer_id"]].add(level.get("id") or level["name"])
                     break
-        # 引流客户还能按跟进阶段 / 流量来源 / 客户标签继续筛，这里把这三个字段一起带上
+        # 引流客户按流量来源、客户标签继续筛选
         visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", ""))
         # 到访目的 / 创伤经历 / 当下卡点 / 工作情况 / 其他信息：没有权限的角色连字段都不下发
         sensitive_fields = customer_access_service.get_customer_permissions(
@@ -1314,6 +1332,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 ],
                 # 未配置的归到「未配置」，筛选与人数都可见
                 "identity": (getattr(customer, "member_type", "") or "").strip() or "未配置",
+                "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"),
                 "follow_up_status": (getattr(customer, "follow_up_status", "") or "").strip() or "未配置",
                 "traffic_source": (getattr(customer, "traffic_source", "") or "").strip() or "未配置",
                 "tags": [tag.get("name", "") for tag in visible_tags.get(customer.id, []) if tag.get("name")],
@@ -1441,17 +1460,17 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                     return False
             for pick in picks:
                 prefix, _, value = pick.partition(":")
-                if prefix == exclude_prefix or prefix not in ("traffic", "stage", "source", "tag", "identity", "inviter"):
+                if prefix == exclude_prefix or prefix not in ("traffic", "stage", "source", "tag", "identity", "card_status", "inviter"):
                     continue
                 if prefix == "traffic" and entry["referrer"] != value:
-                    return False
-                if prefix == "stage" and entry["follow_up_status"] != value:
                     return False
                 if prefix == "source" and entry["traffic_source"] != value:
                     return False
                 if prefix == "tag" and value not in entry["tags"]:
                     return False
                 if prefix == "identity" and (entry["identity"] or "") != value:
+                    return False
+                if prefix == "card_status" and entry.get("card_status", "") != value:
                     return False
                 if prefix == "inviter" and value not in entry.get("inviters", []):
                     return False
@@ -1495,7 +1514,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 "customer_id": getattr(visit, "customer_id", ""),
                 "customer": entry.get("name", "") or "未命名客户",
                 "name": entry.get("name", "") or "未命名客户",
-                "identity": entry.get("identity", "") or "未配置",
+                "identity": entry.get("identity", "") or "未配置", "card_status": entry.get("card_status", ""), "card_status_tone": entry.get("card_status_tone", "neutral"),
                 "referrer": entry.get("referrer", ""),
                 "referrer_handler": entry.get("referrer_handler", ""),
                 "follow_up_status": entry.get("follow_up_status", ""),
@@ -1587,7 +1606,6 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
             for item in traffic_facet("upsell", upsell_situations)
         }
         breakdown["traffic_filters"] = {
-            "stage": traffic_facet("stage", lambda entry: [entry["follow_up_status"]] if entry["follow_up_status"] else []),
             "source": traffic_facet("source", lambda entry: [entry["traffic_source"]] if entry["traffic_source"] else []),
             "tag": traffic_facet("tag", lambda entry: entry["tags"]),
             "upsell": [
@@ -1600,6 +1618,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
             ],
             # 会员身份人数：跟着当前所有筛选走（它本身不是筛选项，只是给人看结构）
             "identity": traffic_facet("identity", lambda entry: [entry["identity"]] if entry["identity"] else []),
+            "card_status": traffic_facet("card_status", lambda entry: [entry["card_status"]] if entry.get("card_status") else []),
         }
         breakdown["traffic_upsell_levels"] = [
             {"key": level.get("id") or level["name"], "label": level["name"], "count": 0}
@@ -1691,7 +1710,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 bucket[0] += 1
                 bucket[1] += course.get("hours") or 0
         rows = course_participant_rows(rows, organizations, query.participant_scope, participant_customers, org_history)
-        columns = [("date", "课程日期"), ("customer", "用户"), ("member_type", "会员身份"), ("participant_role", "本场身份"),
+        columns = [("date", "课程日期"), ("customer", "用户"), ("member_type", "会员身份"), ("card_status", "当前卡次"), ("participant_role", "本场身份"),
                    ("name", "课程"), ("type", "活动类型"),
                    ("organization", "课程所属"), ("teachers", "课程老师"), ("hours", "课时数"),
                    ("org_participation_count", "累计课程"), ("org_participation_hours", "累计课时")]

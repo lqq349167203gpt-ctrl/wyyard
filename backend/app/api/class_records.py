@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from app.api.course_roster import router as course_roster_router
 from app.models.activity_participant_note import (
     ActivityParticipantNoteSource,
     ActivityParticipantNoteUpsert,
@@ -24,6 +25,7 @@ from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
     ensure_activity_participant_access,
     ensure_activity_update_access,
+    ensure_activity_withdrawal_access,
     ensure_creator_for_changed_fields,
     ensure_record_creator,
     stamp_creator,
@@ -31,6 +33,9 @@ from app.utils.record_ownership import (
 from app.utils.request_roles import get_request_roles
 
 router = APIRouter(prefix="/api/class-records", tags=["class-records"])
+
+
+router.include_router(course_roster_router)
 
 ACTIVITY_NOTE_CATEGORY_LABELS = {
     "customer_info": "深度需求",
@@ -62,6 +67,8 @@ def _fill_visit_nicknames(visits, visible_ids: set[str] | None = None):
         customer = get_customer(v.customer_id) if v.customer_id else None
         data["nickname"] = customer.nickname if customer else ""
         data["member_type"] = customer.member_type if customer else ""
+        data["card_status"] = customer.card_status if customer else ""
+        data["card_status_tone"] = customer.card_status_tone if customer else "neutral"
         result.append(data)
     return result
 
@@ -341,6 +348,7 @@ def list_activity_participant_notes(
     session_id: str,
     request: Request,
     customer_ids: str = "",
+    course_only: bool = False,
 ):
     roles = get_request_roles(request)
     pages = position_permission_service.get_permissions(roles)
@@ -366,6 +374,7 @@ def list_activity_participant_notes(
         activity_source,
         session_id,
         allowed_ids,
+        course_only=course_only,
     )
     return [_activity_note_response(note, request) for note in notes
             if customer_access_service.can_view_note(roles, note.category)]
@@ -376,7 +385,16 @@ def save_activity_participant_note(
     data: ActivityParticipantNoteUpsert,
     request: Request,
 ):
-    _ensure_activity_note_editable(request)
+    if data.course_only:
+        from app.api.course_roster import _can_edit, _context
+
+        course_context = _context(request, data.activity_source, data.session_id)
+        if not _can_edit(request, course_context["record"]):
+            raise HTTPException(403, "没有填写本场课程记录的权限，或课程已锁定")
+        if data.customer_id in set(getattr(course_context["record"], "withdrawn_participant_ids", []) or []):
+            raise HTTPException(400, "已退课人员不能填写本场记录")
+    else:
+        _ensure_activity_note_editable(request)
     customer_access_service.require_note_access(request, data.category)
     context = _activity_note_context(data.activity_source, data.session_id)
     if data.customer_id not in context["participant_ids"]:
@@ -390,7 +408,7 @@ def save_activity_participant_note(
     from app.api.visit_notes import _follow_up_plan, _resolve_feedback_person
 
     existing = next((note for note in activity_participant_note_service.list_notes(
-        data.activity_source, data.session_id, {data.customer_id},
+        data.activity_source, data.session_id, {data.customer_id}, course_only=data.course_only,
     ) if note.customer_id == data.customer_id and note.category == data.category
         and activity_participant_note_service.can_manage_note(note, actor_id, actor_name)), None)
     if {"feedback_person_id", "feedback_person"}.intersection(data.model_fields_set) or existing is None:
@@ -417,6 +435,7 @@ def save_activity_participant_note(
             feedback_person_id=feedback_person_id,
             feedback_person=feedback_person,
             follow_up_plan=follow_up_plan,
+            course_only=data.course_only,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -708,7 +727,7 @@ def withdraw_participant(record_id: str, data: CourseWithdrawalCreate, request: 
     if not record:
         raise HTTPException(status_code=404, detail="课程记录不存在")
     activity_lock_service.ensure_record_unlocked(record)
-    ensure_record_creator(request, record, "课程", "activities")
+    ensure_activity_withdrawal_access(request, record)
     customer_access_service.require_new_customer_ids(
         request,
         [data.customer_id],
@@ -817,7 +836,7 @@ def cancel_withdrawal(record_id: str, customer_id: str, request: Request):
     if not record:
         raise HTTPException(status_code=404, detail="课程记录不存在")
     activity_lock_service.ensure_record_unlocked(record)
-    ensure_record_creator(request, record, "课程", "activities")
+    ensure_activity_withdrawal_access(request, record)
     customer = get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="客户不存在")
