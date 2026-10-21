@@ -521,7 +521,10 @@ async def update_visit(visit_id: str, data: dict, request: Request):
             collaboration_updates.append((category, content))
 
     try:
-        record = visit_service.update_visit(visit_id, data) if data else old_record
+        record = visit_service.update_visit(
+            visit_id, data,
+            allow_empty_cancel_reason=getattr(request.state, "source", "") == "miniprogram",
+        ) if data else old_record
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not record:

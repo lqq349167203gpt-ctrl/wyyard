@@ -202,6 +202,23 @@ class TestVisitUpdate:
         assert item["cancelled"] is True
         assert item["cancel_reason"] == "客户临时改期"
 
+    @pytest.mark.parametrize("payload", [{"cancelled": True}, {"cancelled": True, "cancel_reason": "   "}])
+    def test_legacy_miniprogram_cancel_without_reason(self, client, created_customer, payload):
+        vid = self._create(client, created_customer)
+        for source in ("pc", "miniprogram-client"):
+            assert client.patch(f"/api/visits/{vid}", json=payload, headers={"X-Client-Type": source}).status_code == 400
+        headers = {"X-Client-Type": "miniprogram"}
+        for invalid in ({"cancelled": True, "cancel_reason": None}, {"cancelled": True, "cancel_reason": "长" * 501}, {"cancelled": True, "goal": "夹带修改"}):
+            assert client.patch(f"/api/visits/{vid}", json=invalid, headers=headers).status_code == 400
+        response = client.patch(f"/api/visits/{vid}", json=payload, headers=headers)
+        assert response.status_code == 200, response.text
+        saved = client.get(f"/api/visits/{vid}").json()
+        assert saved["cancelled"] is True
+        assert saved["cancel_reason"] == ""
+        assert client.patch(f"/api/visits/{vid}", json={"cancelled": False}, headers=headers).status_code == 200
+        assert client.patch(f"/api/visits/{vid}", json={"arrived": True, "arrival_time": "14:00"}).status_code == 200
+        assert client.patch(f"/api/visits/{vid}", json=payload, headers=headers).status_code == 400
+
     def test_cancelled_visit_is_locked_until_restored(self, client, created_customer):
         """已取消记录不可修改或勾选到店，恢复后才可继续编辑"""
         vid = self._create(client, created_customer)
