@@ -299,7 +299,9 @@ async def list_customers(
         items = [c for c in items if referrer.lower() in (c.get("referrer", "") or "").lower()]
     if referrer_handler:
         items = [c for c in items if referrer_handler.lower() in (c.get("referrer_handler", "") or "").lower()]
-    if service_teacher:
+    if service_teacher == "__unconfigured__":
+        items = [c for c in items if not (c.get("service_teacher") or "").strip()]
+    elif service_teacher:
         items = [c for c in items if service_teacher.lower() in (c.get("service_teacher", "") or "").lower()]
     if customer_quality:
         items = [c for c in items if c.get("customer_quality", "正常") == customer_quality]
