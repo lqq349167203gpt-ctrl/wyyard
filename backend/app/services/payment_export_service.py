@@ -8,6 +8,7 @@ from openpyxl.utils import get_column_letter
 
 from app.services import (
     organization_service,
+    project_deduction_service,
 )
 from app.services.payment_sources import fill_effective_remaining, payment_loader
 
@@ -23,6 +24,15 @@ PROJECT_SOURCES = (
     ("offline_course", "线下落地课程", payment_loader("offline-courses")),
     ("other", "其他项目", payment_loader("other-projects")),
 )
+
+
+def _coarse_records():
+    return [record for record in project_deduction_service.list_deductions(project_type="membership-cards")
+            if record.project_name == project_deduction_service.COARSE_DOOR_CARD_TYPE]
+
+
+# 导出独立分类；不改变全部付费列表使用的交易模型。
+EXPORT_SOURCES = (*PROJECT_SOURCES, ("coarse_door_card", "粗门次卡", _coarse_records))
 
 HEADERS = [
     "成交日期",
@@ -62,6 +72,8 @@ def _offline_expiry(item: dict) -> str:
 
 
 def _project_detail(item: dict, project_type: str, type_label: str) -> str:
+    if project_type == "coarse_door_card":
+        return item.get("source_activity_name") or type_label
     if project_type == "membership_card":
         return item.get("card_type") or ""
     if project_type in {"internal_course", "offline_course"}:
@@ -75,6 +87,8 @@ def _project_detail(item: dict, project_type: str, type_label: str) -> str:
 
 
 def _project_quantity(item: dict, project_type: str) -> str:
+    if project_type == "coarse_door_card":
+        return f"{item.get('count') or 0}次"
     if project_type == "membership_card":
         total_count = item.get("total_count")
         return "不限" if total_count is None else f"{total_count}次"
@@ -98,6 +112,9 @@ def _project_quantity(item: dict, project_type: str) -> str:
 
 
 def _remaining_quantity(item: dict, project_type: str) -> str:
+    if project_type == "coarse_door_card":
+        remaining = item.get("remaining_after")
+        return "" if remaining is None else f"{remaining}次"
     if project_type not in {"membership_card", "group_case", "emotional_release", "energy_knot", "other"}:
         return ""
     fill_effective_remaining(item, project_type)
@@ -110,7 +127,7 @@ def _remaining_quantity(item: dict, project_type: str) -> str:
 
 
 def _amount(item: dict, project_type: str) -> float:
-    if project_type == "online_tea":
+    if project_type in {"online_tea", "coarse_door_card"}:
         return ""
     if project_type in {"membership_card", "internal_course"}:
         return float(item.get("price") or 0)
@@ -149,18 +166,20 @@ def _build_rows(
         for organization in organization_service.list_organizations()
     }
     rows = []
-    for project_type, type_label, list_records in PROJECT_SOURCES:
+    for project_type, type_label, list_records in EXPORT_SOURCES:
         if project_types is not None and project_type not in project_types:
             continue
         for record in list_records():
             item = record.model_dump(mode="json")
+            if project_type == "membership_card" and item.get("card_type") == "粗门次卡":
+                continue
             if (
                 allowed_customer_ids is not None
                 and item.get("customer_id") not in allowed_customer_ids
             ):
                 continue
             created_at = item.get("created_at") or ""
-            deal_date = item.get("deal_date") or ""
+            deal_date = item.get("deduction_date" if project_type == "coarse_door_card" else "deal_date") or ""
             normalized_deal_date = str(deal_date)[:10]
             if date_from and (not normalized_deal_date or normalized_deal_date < date_from):
                 continue

@@ -148,7 +148,7 @@ def export_payment_records(
     selected_types = None
     if types is not None:
         selected_types = set(types.split(","))
-        valid_types = {project_type for project_type, _, _ in payment_export_service.PROJECT_SOURCES}
+        valid_types = {project_type for project_type, _, _ in payment_export_service.EXPORT_SOURCES}
         if not selected_types or "" in selected_types or not selected_types <= valid_types:
             raise HTTPException(status_code=400, detail="请选择有效的付费项目类型")
     output, record_count = payment_export_service.build_payment_export(
