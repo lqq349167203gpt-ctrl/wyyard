@@ -1,6 +1,43 @@
 import io
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 from openpyxl import load_workbook
+
+
+def test_export_keeps_coarse_deductions_separate(client, created_customer, monkeypatch):
+    from app.services import payment_export_service as service
+
+    common = {"customer_id": created_customer["id"], "nickname": created_customer["nickname"],
+              "deal_date": "2026-09-01", "created_at": "2026-09-01T10:00:00"}
+    cards = [Mock(model_dump=Mock(return_value={**common, "card_type": name}))
+             for name in ("次卡", "粗门次卡")]
+    deduction = SimpleNamespace(
+        project_name="粗门次卡",
+        model_dump=lambda **kwargs: {**common, "deduction_date": "2026-09-16", "count": 2,
+                                    "source_activity_name": "潜意识绘画", "remaining_after": 3},
+    )
+    monkeypatch.setattr(service.project_deduction_service, "list_deductions", lambda **kwargs: [deduction])
+    monkeypatch.setattr(service, "fill_effective_remaining", lambda item, kind: item.update(effective_remaining=4))
+    monkeypatch.setattr(service, "EXPORT_SOURCES", (
+        ("membership_card", "会员卡", lambda: cards),
+        ("coarse_door_card", "粗门次卡", service._coarse_records),
+    ))
+
+    def exported_rows(**params):
+        response = client.get("/api/payment-exports/export", params=params)
+        assert response.status_code == 200, response.text if response.status_code != 200 else ""
+        return list(load_workbook(io.BytesIO(response.content)).active.iter_rows(values_only=True))[1:]
+
+    rows = exported_rows(types="membership_card")
+    assert [(row[1], row[3]) for row in rows] == [("会员卡", "次卡")]
+    rows = exported_rows(types="coarse_door_card", range_type="day", period="2026-09-16")
+    assert [(row[0], row[1], row[3], row[4], row[5]) for row in rows] == [
+        ("2026-09-16", "粗门次卡", "潜意识绘画", "2次", "3次")]
+    assert len(exported_rows()) == 2
+    response = client.get("/api/payment-exports/export", params={
+        "types": "coarse_door_card", "range_type": "day", "period": "2026-09-01"})
+    assert response.status_code == 404
 
 
 def test_payment_export_contains_all_types_and_sorts_by_deal_date(client, created_customer):

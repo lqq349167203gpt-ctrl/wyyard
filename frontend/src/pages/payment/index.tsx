@@ -26,7 +26,7 @@ const TABS = [
   { key: "offline_course", label: "线下落地课程" },
   { key: "other", label: "其他项目" },
 ]
-const EXPORT_TYPES = TABS.filter(tab => tab.key !== "coarse_door_card")
+const EXPORT_TYPES = TABS
 
 const EXPORT_RANGE_OPTIONS: { value: PaymentExportRangeType; label: string }[] = [
   { value: "day", label: "按天" },

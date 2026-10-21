@@ -210,8 +210,8 @@ Page({
     selectedCourseKey: '',
     exporting: false,
     exportDialogVisible: false,
-    exportTypeOptions: PAYMENT_PROJECT_TYPES.map(item => ({ key: item.key, label: item.label, selected: true })),
-    exportSelectedTypes: PAYMENT_PROJECT_TYPES.map(item => item.key),
+    exportTypeOptions: TABS.map(item => ({ key: item.key, label: item.label, selected: true })),
+    exportSelectedTypes: TABS.map(item => item.key),
     exportRangeOptions: EXPORT_RANGE_OPTIONS,
     exportRangeType: 'month',
     exportDate: TODAY,
@@ -658,7 +658,7 @@ Page({
     const selected = e.detail.value
     this.setData({
       exportSelectedTypes: selected,
-      exportTypeOptions: PAYMENT_PROJECT_TYPES.map(item => ({
+      exportTypeOptions: TABS.map(item => ({
         key: item.key,
         label: item.label,
         selected: selected.includes(item.key),
@@ -667,11 +667,11 @@ Page({
   },
 
   onExportSelectAll() {
-    const allSelected = this.data.exportSelectedTypes.length === PAYMENT_PROJECT_TYPES.length
-    const selected = allSelected ? [] : PAYMENT_PROJECT_TYPES.map(item => item.key)
+    const allSelected = this.data.exportSelectedTypes.length === TABS.length
+    const selected = allSelected ? [] : TABS.map(item => item.key)
     this.setData({
       exportSelectedTypes: selected,
-      exportTypeOptions: PAYMENT_PROJECT_TYPES.map(item => ({
+      exportTypeOptions: TABS.map(item => ({
         key: item.key,
         label: item.label,
         selected: !allSelected,
