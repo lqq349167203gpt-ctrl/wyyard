@@ -143,12 +143,14 @@ def _create_operation_log(
     before_distribution: Counter,
     now: str,
 ) -> None:
+    log_id = str(uuid.uuid4())[:12]
     content = (
         f"一次性修正398卡客户Sales：目标{target_count}位，"
         f"实际修改{changed_count}位，统一为「{TARGET_SALES}」；"
         f"Sales=「{UNCHANGED_SALES}」的客户保持不变"
     )
     log = {
+        "id": log_id,
         "section": LOG_SECTION,
         "content": content,
         "operator": "系统任务",
@@ -172,7 +174,7 @@ def _create_operation_log(
     }
     cur.execute(
         'INSERT INTO operation_logs (id, data) VALUES (%s, %s)',
-        (str(uuid.uuid4())[:12], json.dumps(log, ensure_ascii=False)),
+        (log_id, json.dumps(log, ensure_ascii=False)),
     )
 
 
