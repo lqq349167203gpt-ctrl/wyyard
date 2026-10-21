@@ -719,7 +719,7 @@ def list_basic_visits(customer_ids: set[str] | None = None) -> List[VisitRecord]
     ]
 
 
-def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
+def update_visit(visit_id: str, data: dict, *, allow_empty_cancel_reason: bool = False) -> Optional[VisitRecord]:
     _invalidate_counts_cache()
     with _visit_lock:
         record = _visits.get(visit_id)
@@ -736,6 +736,9 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
             if set(data) != {"cancelled"} or requested_cancelled is not False:
                 raise ValueError("已取消的邀约已锁定，请先恢复邀约")
         elif requested_cancelled is True:
+            # 临时兼容尚未更新的管理端小程序；默认仍要求填写原因。
+            if allow_empty_cancel_reason and "cancel_reason" not in data:
+                data = {**data, "cancel_reason": ""}
             if record.arrived:
                 raise ValueError("已到店的邀约不能取消")
             if set(data) != {"cancelled", "cancel_reason"}:
@@ -743,7 +746,7 @@ def update_visit(visit_id: str, data: dict) -> Optional[VisitRecord]:
             if not isinstance(data.get("cancel_reason"), str):
                 raise ValueError("取消原因必须填写文字")
             reason = data["cancel_reason"].strip()
-            if not reason:
+            if not reason and not allow_empty_cancel_reason:
                 raise ValueError("请填写取消原因")
             if len(reason) > 500:
                 raise ValueError("取消原因不能超过500字")

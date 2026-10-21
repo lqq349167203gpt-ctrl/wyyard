@@ -290,7 +290,7 @@ export default function HealingRecordsPage() {
             buttonClassName="border-[#e1e4e7] bg-white px-2.5"
             rounded="7px"
             value={searchServiceTeacher}
-            options={[{ value: "", label: "全部Sales" }, ...serviceTeacherOptions]}
+            options={[{ value: "", label: "全部Sales" }, { value: "__unconfigured__", label: "未配置" }, ...serviceTeacherOptions]}
             placeholder="全部Sales"
             textColor={searchServiceTeacher ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
             onChange={setSearchServiceTeacher}

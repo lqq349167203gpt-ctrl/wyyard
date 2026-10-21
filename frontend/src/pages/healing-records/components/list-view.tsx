@@ -133,6 +133,7 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                     最近到访<SortArrow field="last_visit_date" sortField={sortField} sortOrder={sortOrder} />
                   </span>
                 </TableHead>
+                <TableHead style={{ width: "7%" }}>Sales</TableHead>
                 <TableHead style={{ width: "11%" }}>引流 / 承接</TableHead>
                 <TableHead style={{ width: "9%" }}>
                   <span className="inline-flex items-center cursor-pointer select-none" onClick={() => handleSort("referral_date")}>
@@ -195,6 +196,11 @@ export default function ListView({ onSelectCustomer, onInviteCustomer, onDeleteC
                 </TableCell>
                 <TableCell className="text-[12px] text-[#8f959e] tabular-nums">
                   {c.last_visit_date ? new Date(c.last_visit_date).toLocaleDateString("zh-CN") : <EmptyValue />}
+                </TableCell>
+                <TableCell className="text-[#2b2f36]">
+                  <span className="block truncate" title={c.service_teacher?.trim() || undefined}>
+                    {c.service_teacher?.trim() || <EmptyValue />}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="flex min-w-0 items-center" title={`${c.referrer || "-"} / ${c.referrer_handler || "-"}`}>
