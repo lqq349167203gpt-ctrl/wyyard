@@ -146,7 +146,7 @@ def test_visit_export_marks_leader_row_yellow(client, created_customer):
         headers = [cell.value for cell in sheet[1]]
         assert "参与次数" not in headers
         assert "组长获得的信息" not in headers
-        assert all(cell.fill.fgColor.rgb == "FFFEFA53" for cell in leader_row)
+        assert all(cell.fill.fgColor.rgb == "FFA2CD62" for cell in leader_row)
         nickname_cell = leader_row[headers.index("客户昵称")]
         assert nickname_cell.font.bold is True
         assert nickname_cell.font.size == 13

@@ -79,7 +79,7 @@ def test_visit_list_and_export_include_visible_customer_tags(client, created_cus
         row = next(row for row in sheet.iter_rows(min_row=2) if row[1].value == created_customer["nickname"])
         assert row[tag_index].value == ("、".join(expected_need_names) or None)
         assert row[tag_index].alignment.wrap_text is True
-        assert all(cell.fill.fgColor.rgb == "FFFEFA53" for cell in row)
+        assert all(cell.fill.fgColor.rgb == "FFA2CD62" for cell in row)
         assert sheet.column_dimensions[row[tag_index].column_letter].width == 24
         assert sheet.column_dimensions[row[headers.index("目标")].column_letter].width == 20
     finally:
