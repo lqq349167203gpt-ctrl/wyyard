@@ -72,6 +72,9 @@ def create_record(data: OnlineTeaCreate, request: Request):
     if position_edit_permission_service.get_permissions(get_request_roles(request))["payments"] == "view":
         raise HTTPException(403, "当前角色只能查看付费记录")
     customer_access_service.require_customer_scope(request, data.customer_id, action="新增付费项目到")
+    from app.utils.default_organization import payment_organization_id
+
+    data.organization_id = payment_organization_id()
     organization = organization_service.get_organization(data.organization_id)
     if not organization or organization.status == "archived":
         raise HTTPException(400, "请选择运营中的成交归属组织")

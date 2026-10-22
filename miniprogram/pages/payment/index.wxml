@@ -71,7 +71,6 @@
           <text class="coarse-record-delete {{coarseDeletingId === item.id ? 'disabled' : ''}}" wx:if="{{item._canDelete}}" catchtap="onCoarseDeleteTap" data-id="{{item.id}}">{{coarseDeletingId === item.id ? '删除中' : '删除'}}</text>
         </view>
       </view>
-      <view class="card-meta"><text class="card-meta-item">成交归属：{{item.organization_name || '—'}}</text></view>
       <text class="coarse-record-course">成交课程：<text wx:if="{{item.source_organization_name}}">（{{item.source_organization_name}}）</text>{{item.source_activity_name || item.reason || '-'}}</text>
       <view class="card-meta"><text class="card-meta-item">课程日期：{{item.source_activity_date || '—'}}</text></view>
       <text class="coarse-record-meta">成交日期：{{item.deduction_date || '-'}}</text>
@@ -136,22 +135,6 @@
           </view>
 
           <view class="filter-section">
-            <view class="filter-section-title">成交归属</view>
-            <view class="tags-wrap">
-              <view
-                class="tag-item {{item.selected ? 'active' : ''}}"
-                wx:for="{{organizationList}}"
-                wx:key="id"
-                bindtap="onToggleOrganization"
-                data-id="{{item.id}}"
-              >
-                <text>{{item.name}}</text>
-              </view>
-            </view>
-            <view class="filter-section-empty" wx:if="{{organizationList.length === 0}}">暂无成交归属</view>
-          </view>
-
-          <view class="filter-section">
             <view class="filter-section-title">成交课程</view>
             <view class="tags-wrap">
               <view
@@ -179,7 +162,7 @@
   <view class="search-welcome" wx:if="{{searchMode && !hasSearched && !loading}}">
     <view class="search-welcome-icon"><view class="search-symbol large"></view></view>
     <text class="search-welcome-title">搜索付费记录</text>
-    <text class="search-welcome-hint">输入客户昵称，或点击右侧按成交归属、成交课程筛选</text>
+    <text class="search-welcome-hint">输入客户昵称，或点击右侧按成交课程筛选</text>
   </view>
 
   <view class="search-result-summary" wx:if="{{!isCoarseDoorTab && searchMode && hasSearched && !loading}}">
@@ -195,7 +178,6 @@
           <text class="card-name">{{item.nickname}}</text>
           <text class="card-status" wx:if="{{item._status}}" style="color: {{item._statusColor}}; background-color: {{item._statusBg}}">{{item._status}}</text>
         </view>
-        <view class="card-meta"><text class="card-meta-item">成交归属：{{item._organizationName || '—'}}</text></view>
         <view class="card-meta">
           <text class="card-meta-item">成交课程：<text wx:if="{{item.deal_course_organization_name}}" class="card-meta-item">（{{item.deal_course_organization_name}}）</text><text class="{{item.deal_course_name ? 'card-meta-item' : 'card-empty'}}">{{item.deal_course_name || '无'}}</text></text>
         </view>
