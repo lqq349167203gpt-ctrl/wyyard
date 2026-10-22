@@ -662,11 +662,11 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
       row.height = Math.max(30, maxLines * 18)
     })
 
-    // 组长行：黄底 + 昵称/“组长”加粗加大（与昵称一致）
+    // 组长行：参考表格绿底 + 昵称/“组长”加粗加大（与昵称一致）
     leaderRowNumbers.forEach(rowNum => {
       const leaderRow = ws.getRow(rowNum)
       leaderRow.eachCell({ includeEmpty: true }, cell => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEFA53" } }
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFA2CD62" } }
       })
       leaderRow.getCell(headers.indexOf("客户昵称") + 1).font = { size: 13, bold: true }
       leaderRow.getCell(headers.indexOf("组长情况") + 1).font = { size: 13, bold: true }

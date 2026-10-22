@@ -378,7 +378,7 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     # 写表头
     header_font = Font(bold=True)
     header_fill = PatternFill(start_color="D0D3D6", end_color="D0D3D6", fill_type="solid")
-    leader_fill = PatternFill(start_color="FFFEFA53", end_color="FFFEFA53", fill_type="solid")
+    leader_fill = PatternFill(start_color="FFA2CD62", end_color="FFA2CD62", fill_type="solid")
     leader_emphasis_font = Font(size=13, bold=True)
     nickname_column = headers.index("客户昵称") + 1
     leader_status_column = headers.index("组长情况") + 1
