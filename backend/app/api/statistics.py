@@ -9,6 +9,7 @@ from app.api.customer_detail import _build_activities, _build_payment_records
 from app.models.customer import customer_referrers
 from app.services import (
     class_record_service,
+    companion_camp_service,
     course_service,
     course_type_service,
     customer_access_service,
@@ -35,6 +36,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.services.sales_access_service import presented
 from app.utils.learning_course_types import ACTIVITY_COURSE_TYPES, PAYMENT_COURSE_TYPES
 from app.utils.payment_types import MEMBERSHIP_CARD_TYPES
 from app.utils.record_ownership import request_actor_customer_ids
@@ -84,10 +86,10 @@ def _payment_record_groups() -> list[list]:
     from app.services.payment_sources import payment_record_groups
 
     # 保留该统计入口原有产品范围和顺序，不因公共读取而增加茶位费。
-    return list(payment_record_groups((
+    return [presented(group) for group in payment_record_groups((
         "membership-cards", "group-cases", "emotional-releases", "energy-knots",
-        "internal-courses", "online-tea", "offline-courses", "oh-card-readings", "other-projects",
-    )))
+        "internal-courses", "online-tea", "companion-camps", "offline-courses", "oh-card-readings", "other-projects",
+    ))]
 
 
 def _record_matches_teacher(record, teacher_id: str, teacher_names: set[str]) -> bool:
@@ -644,7 +646,7 @@ PRODUCT_TYPE_MAP = {
     "oh-card-readings": "OH卡诊断",
     "energy-knots": "深度情绪释放",
     "internal-courses": "沙龙技能学习",
-    "online-tea": "线上茶疗",
+    "online-tea": "线上茶疗", "companion-camps": "陪伴营",
     "offline-courses": "落地课程",
     "other-projects": "其他项目",
 }
@@ -709,6 +711,7 @@ def get_products(
         ("energy-knots", energy_knot_service.list_knots()),
         ("internal-courses", internal_course_service.list_courses()),
         ("online-tea", online_tea_service.list_records()),
+        ("companion-camps", companion_camp_service.list_records()),
         ("offline-courses", offline_course_service.list_courses()),
         ("other-projects", other_project_service.list_projects()),
     ]
@@ -1116,6 +1119,7 @@ def get_product_details(
             ("energy-knots", energy_knot_service.list_knots()),
             ("internal-courses", internal_course_service.list_courses()),
             ("online-tea", online_tea_service.list_records()),
+            ("companion-camps", companion_camp_service.list_records()),
             ("offline-courses", offline_course_service.list_courses()),
             ("other-projects", other_project_service.list_projects()),
         ]
@@ -1126,7 +1130,7 @@ def get_product_details(
             "oh-card-readings": "OH卡诊断",
             "energy-knots": "深度情绪释放",
             "internal-courses": "沙龙技能学习",
-            "online-tea": "线上茶疗",
+            "online-tea": "线上茶疗", "companion-camps": "陪伴营",
             "offline-courses": "落地课程",
             "other-projects": "其他项目",
         }

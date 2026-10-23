@@ -21,6 +21,7 @@ PROJECT_SOURCES = (
     ("internal_course", "沙龙技能学习", payment_loader("internal-courses")),
     ("tea_seat_fee", "茶位费", payment_loader("tea-seat-fees")),
     ("online_tea", "线上茶疗", payment_loader("online-tea")),
+    ("companion_camp", "陪伴营", payment_loader("companion-camps")),
     ("offline_course", "线下落地课程", payment_loader("offline-courses")),
     ("other", "其他项目", payment_loader("other-projects")),
 )
@@ -50,9 +51,10 @@ HEADERS = [
     "备注",
     "创建人",
     "录入时间",
+    "陪伴老师",
 ]
 
-COLUMN_WIDTHS = [13, 16, 16, 30, 14, 14, 14, 13, 13, 24, 14, 18, 30, 14, 20]
+COLUMN_WIDTHS = [13, 16, 16, 30, 14, 14, 14, 13, 13, 24, 14, 18, 30, 14, 20, 16]
 
 
 def _offline_expiry(item: dict) -> str:
@@ -100,7 +102,7 @@ def _project_quantity(item: dict, project_type: str) -> str:
         return f"{(item.get('diagnosis_duration') or 1) * 0.5:g}小时"
     if project_type == "tea_seat_fee":
         return f"{item.get('quantity') or 1}位"
-    if project_type in {"offline_course", "online_tea"}:
+    if project_type in {"offline_course", "online_tea", "companion_camp"}:
         unit = "天" if item.get("validity_unit") == "day" else "个月"
         return f"{item.get('validity_value') or 1}{unit}"
     if project_type == "other":
@@ -127,7 +129,7 @@ def _remaining_quantity(item: dict, project_type: str) -> str:
 
 
 def _amount(item: dict, project_type: str) -> float:
-    if project_type in {"online_tea", "coarse_door_card"}:
+    if project_type in {"online_tea", "companion_camp", "coarse_door_card"}:
         return ""
     if project_type in {"membership_card", "internal_course"}:
         return float(item.get("price") or 0)
@@ -192,6 +194,7 @@ def _build_rows(
                 else (item.get("expiry_date") or "")
             )
             rows.append({
+                "陪伴老师": item.get("companion_teacher", "") if project_type == "companion_camp" else "",
                 "成交日期": deal_date,
                 "付费类型": type_label,
                 "用户昵称": item.get("nickname") or "",

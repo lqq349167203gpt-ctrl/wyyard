@@ -1,9 +1,10 @@
-"""升单配置：若干「大类」（名字 + 一组付费项目），数组顺序即升单先后顺序。"""
+"""客户业务分类：体验、转化、梳理、升单、复购；兼容旧档位配置。"""
 
 import threading
 import uuid
 
 from app.models.upsell_config import PURCHASE_RULE_LABELS, PurchaseRule, UpsellLevel
+from app.services import course_rule_catalog
 from app.services.storage import load_data, save_data
 
 UPSELL_FILE = "upsell_levels.json"
@@ -37,11 +38,11 @@ def rules_configured() -> bool:
 
 def _rule_dict(rule):
     result = rule.model_dump(mode="json")
-    for key, default in (("previous_stage", ""), ("once", False)):
+    for key, default in (("previous_stage", ""), ("once", False), ("count_from", "history")):
         if result[key] == default:
             result.pop(key)
     for condition in result["conditions"]:
-        for key, default in (("products", []), ("count_scope", "subtype"), ("first_purchase", False), ("previous_products", []), ("excluded_previous_products", [])):
+        for key, default in (("event_kind", "purchase"), ("public_welfare_only", False), ("products", []), ("count_scope", "subtype"), ("first_purchase", False), ("previous_products", []), ("excluded_previous_products", [])):
             if condition[key] == default:
                 condition.pop(key)
         if not condition.get("product"):
@@ -51,7 +52,7 @@ def _rule_dict(rule):
 
 def list_rules() -> list[dict]:
     by_key = {rule.key: rule for rule in (_rules or [])}
-    return [_rule_dict(by_key.get(key, PurchaseRule(key=key))) for key in PURCHASE_RULE_LABELS]
+    return course_rule_catalog.normalize_rules([_rule_dict(by_key.get(key, PurchaseRule(key=key))) for key in PURCHASE_RULE_LABELS])
 
 
 def replace_rules(rules: list[PurchaseRule]) -> list[dict]:
@@ -69,38 +70,47 @@ def replace_rules(rules: list[PurchaseRule]) -> list[dict]:
 
 
 def recommended_rules() -> list[dict]:
-    """可预览、保存的业务方案，不自动覆盖数据库中的规则。"""
+    """默认业务方案：先转化、再升单、再复购；读取不覆盖已保存的配置。"""
     from app.utils.payment_types import MEMBERSHIP_CARD_TYPES
 
     big = [f"membership:{name}" for name in MEMBERSHIP_CARD_TYPES if name not in {"次卡", "体验会员"}]
     big += ["group_case", "emotional", "online_tea", "energy", "internal", "offline"]
-    low = ["membership:次卡", "coarse"]
-    entry = ["membership:体验会员"]
+    big.append("companion_camp")
+    entry = ["membership:次卡", "membership:体验会员"]
+    book_club = course_rule_catalog.book_club_key()
     return [
-        {"key": "experience", "conditions": [{"products": low, "operator": "gte", "count": 1,
-            "count_scope": "group", "excluded_previous_products": entry + big}]},
+        {"key": "experience", "conditions": [
+            {"products": ["coarse"], "operator": "gte", "count": 1, "count_scope": "group"},
+            *([{ "event_kind": "attendance", "products": [book_club], "public_welfare_only": True,
+                "operator": "gte", "count": 1, "count_scope": "group"}] if book_club else []),
+        ]},
         {"key": "conversion", "once": True, "conditions": [
             {"products": entry + big, "operator": "eq", "count": 1, "count_scope": "group"},
         ]},
-        {"key": "upsell", "previous_stage": "conversion", "once": True, "conditions": [
+        # OH 卡独立统计，不是升单前置，不占用转化或大单计数。
+        {"key": "assessment", "conditions": [
+            {"products": ["oh"], "operator": "gte", "count": 1, "count_scope": "group"},
+        ]},
+        {"key": "upsell", "previous_stage": "conversion", "count_from": "previous_stage", "once": True, "conditions": [
             {"products": big, "operator": "gte", "count": 1, "count_scope": "group"},
         ]},
-        {"key": "repurchase", "previous_stage": "upsell", "conditions": [
+        {"key": "repurchase", "previous_stage": "upsell", "count_from": "previous_stage", "conditions": [
             {"products": big, "operator": "gte", "count": 1, "count_scope": "group"},
         ]},
     ]
 
 
 def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> None:
-    """先按完整成交历史分类，再由调用方筛选周期；组合计数允许跨项目累计。"""
+    """先按完整购买和上课历史分类，再由调用方筛选周期；组合计数允许跨项目累计。"""
     from collections import defaultdict
 
     counts = defaultdict(int)
     previous_counts = defaultdict(dict)
     group_counts = defaultdict(int)
+    condition_subtype_counts = defaultdict(int)
     customer_counts = defaultdict(int)
     achieved_stages = defaultdict(set)
-    configured = list_rules() if rules is None else rules
+    configured = course_rule_catalog.normalize_rules(list_rules() if rules is None else rules)
     timeline = sorted(events, key=lambda item: (
         (item.get("deal_date") or "") if item.get("kind") == "coarse_usage" else item.get("date", ""),
         item.get("recorded_at", ""), item.get("id", ""),
@@ -112,17 +122,28 @@ def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> N
 
     for event in timeline:
         product, subtype, customer = event["product"], event.get("subtype") or "", event["customer_id"]
-        occurrence = counts[(customer, product, subtype)] + 1
+        event_kind = "attendance" if event.get("kind") == "attendance" else "purchase"
+        if event_kind == "attendance" and product == "class":
+            subtype = course_rule_catalog.resolve_key("class:" + subtype).partition(":")[2]
+        occurrence = counts[(customer, event_kind, product, subtype)] + 1
         matches = []
         for rule_index, rule in enumerate(configured):
             matched = False
+            if rule.get("count_from") == "previous_stage" and rule.get("previous_stage") not in achieved_stages[customer]:
+                continue
             for index, condition in enumerate(rule["conditions"]):
+                if condition.get("event_kind", "purchase") != event_kind:
+                    continue
+                if condition.get("public_welfare_only") and event.get("is_public_welfare") is not True:
+                    continue
                 selected = condition.get("products") or [condition.get("product", "")]
                 if not any(matches_item(item, product, subtype) for item in selected):
                     continue
                 group_key = (customer, rule_index, index)
                 group_counts[group_key] += 1
-                count = group_counts[group_key] if condition.get("count_scope") == "group" else occurrence
+                subtype_key = (*group_key, product, subtype)
+                condition_subtype_counts[subtype_key] += 1
+                count = group_counts[group_key] if condition.get("count_scope") == "group" else condition_subtype_counts[subtype_key]
                 previous = condition.get("previous_products") or []
                 prior_match = not previous or any(
                     times > 0 and any(matches_item(item, prior_product, prior_subtype) for item in previous)
@@ -138,7 +159,7 @@ def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> N
                     continue
                 if prior_match and (count == condition["count"] or (condition["operator"] == "gte" and count >= condition["count"])):
                     matched = True
-            # 仅看此前成交达到的阶段，本笔完成后再更新，避免一笔连跳多个阶段。
+            # 仅看此前记录达到的阶段，本笔完成后再更新，避免一笔连跳多个阶段。
             previous_stage = rule.get("previous_stage")
             if previous_stage and previous_stage not in achieved_stages[customer]:
                 matched = False
@@ -146,40 +167,88 @@ def classify_purchases(events: list[dict], rules: list[dict] | None = None) -> N
                 matched = False
             if matched:
                 matches.append(rule["key"])
+        # 历史配置仍可能存在冲突：明确标记，不能重复计入转化、升单、复购。
+        conflicts = [key for key in matches if key in {"conversion", "upsell", "repurchase"}]
+        if len(conflicts) > 1:
+            matches = [key for key in matches if key not in conflicts]
+        else:
+            conflicts = []
+        event["purchase_rule_conflicts"] = conflicts
         achieved_stages[customer].update(matches)
-        counts[(customer, product, subtype)] += 1
-        previous_counts[customer][(product, subtype)] = occurrence
-        customer_counts[customer] += 1
+        counts[(customer, event_kind, product, subtype)] += 1
+        if event_kind == "purchase":
+            previous_counts[customer][(product, subtype)] = occurrence
+            customer_counts[customer] += 1
         event["repeat_times"] = occurrence
         event["purchase_rule_keys"] = matches
-        event["purchase_rule_labels"] = [PURCHASE_RULE_LABELS[key] for key in matches]
-        event["classification"] = "、".join(event["purchase_rule_labels"]) or "未匹配"
+        event["purchase_rule_labels"] = [PURCHASE_RULE_LABELS[key] for key in matches] + (["规则冲突"] if conflicts else [])
+        event["classification"] = "、".join(event["purchase_rule_labels"]) or ("未匹配" if event_kind == "attendance" else "其他成交")
         event["is_upsell"] = "upsell" in matches
 
 
+
+def classify_visible_events(events: list[dict], *, until: str) -> None:
+    """同一客户的阶段不随查看人权限改变，仅回填可见事件的分类结果。"""
+    from app.services import course_workflow_service
+
+    ids = {e["customer_id"] for e in events}
+    history = [e for e in course_workflow_service.active_events(course_workflow_service.stage_events(), until)
+               if e["customer_id"] in ids]
+    classify_purchases(history)
+
+    def event_key(event):
+        identifier = event["id"].removeprefix("purchase:") if event.get("kind") == "purchase" else event["id"]
+        return event["customer_id"], identifier
+
+    classified = {event_key(e): e for e in history}
+    for event in events:
+        item = classified.get(event_key(event))
+        # 没有有效来源时不能以不完整的可见记录重新推算阶段。
+        event.update({"purchase_rule_keys": [], "purchase_rule_labels": [], "purchase_rule_conflicts": [],
+                      "classification": "未匹配" if event.get("kind") == "attendance" else "其他成交", "is_upsell": False})
+        if item:
+            for field in ("purchase_rule_keys", "purchase_rule_labels", "purchase_rule_conflicts", "classification", "is_upsell", "repeat_times"):
+                event[field] = item[field]
+
+
 def preview_rules(rules: list[dict]) -> list[dict]:
-    """只用模拟购买顺序预览分类，不读取或写入客户业务记录。"""
+    """只用模拟行为顺序预览分类，不读取或写入客户业务记录。"""
     cases = [
-        ("大单 → 大单", ["group_case", "energy"]),
-        ("大单 → 大单 → 大单", ["group_case", "energy", "online_tea"]),
-        ("体验会员 → 体验会员 → 大单", ["membership:体验会员", "membership:体验会员", "energy"]),
+        ("公益读书会", ["attendance:class:读书会"]),
+        ("粗门次卡", ["coarse"]),
+        ("首次买 198 单次", ["membership:次卡"]),
         ("首次买 398", ["membership:体验会员"]),
+        ("首次买陪伴营", ["companion_camp"]),
         ("首次买大单", ["membership:30次卡"]),
-        ("次卡 → 首次买 398", ["membership:次卡", "membership:体验会员"]),
-        ("粗门次卡 → 首次买 398", ["coarse", "membership:体验会员"]),
-        ("次卡 → 首次买大单", ["membership:次卡", "membership:30次卡"]),
+        ("OH卡诊断", ["oh"]),
+        ("OH卡诊断 → 首次买大单", ["oh", "energy"]),
+        ("公益读书会 → 198 单次", ["attendance:class:读书会", "membership:次卡"]),
+        ("198 单次 → 398", ["membership:次卡", "membership:体验会员"]),
+        ("198 单次 → 398 → 大单", ["membership:次卡", "membership:体验会员", "energy"]),
+        ("198 单次 → 大单 → 陪伴营", ["membership:次卡", "energy", "companion_camp"]),
         ("粗门次卡 → 首次买大单", ["coarse", "membership:30次卡"]),
-        ("398 → 首次买大单", ["membership:体验会员", "membership:30次卡"]),
         ("398 → 再买 398", ["membership:体验会员", "membership:体验会员"]),
+        ("398 → OH卡诊断 → 大单", ["membership:体验会员", "oh", "energy"]),
+        ("大单 → 大单", ["group_case", "energy"]),
+        ("大单 → OH卡诊断 → 大单", ["group_case", "oh", "energy"]),
+        ("大单 → 大单 → 大单", ["group_case", "energy", "online_tea"]),
         ("398 → 30 次卡 → 60 次卡", ["membership:体验会员", "membership:30次卡", "membership:60次卡"]),
         ("大单 → 次卡 → 首次买 398", ["membership:30次卡", "membership:次卡", "membership:体验会员"]),
     ]
+    book_club = course_rule_catalog.book_club_key()
+    book_label = next((item["label"] for item in course_rule_catalog.activities() if item["key"] == book_club), "")
+    cases = [(title.replace("读书会", book_label), ["attendance:" + book_club if item == "attendance:class:读书会" else item for item in items])
+             for title, items in cases if book_club or "attendance:class:读书会" not in items]
+    cases.extend(("参加公益课程 · " + item["label"], ["attendance:" + item["key"]])
+                 for item in course_rule_catalog.activities() if item["key"] != book_club)
     rows = []
     for title, items in cases:
         events = []
         for index, item in enumerate(items):
-            product, subtype = parse_item(item)
-            events.append({"id": str(index), "customer_id": "preview", "kind": "purchase",
+            attendance = item.startswith("attendance:")
+            product, subtype = parse_item(item.removeprefix("attendance:"))
+            events.append({"id": str(index), "customer_id": "preview", "kind": "attendance" if attendance else "purchase",
+                           "is_public_welfare": attendance,
                            "product": product, "subtype": subtype, "date": f"2026-01-{index + 1:02d}"})
         classify_purchases(events, rules)
         rows.append({"journey": title, "classification": events[-1]["classification"]})

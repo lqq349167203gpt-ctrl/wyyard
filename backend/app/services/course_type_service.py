@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 
 from app.services.course_service import list_courses
@@ -36,7 +37,18 @@ def _load():
         _save()
 
 
+def _ensure_identity(item):
+    # 旧类型按原名称生成可重复的编号；首次修改时随类型一起持久化。
+    # 不在只读查询中写业务数据，改名之前必须保留原编号。
+    item.setdefault("id", "type-" + uuid.uuid5(uuid.NAMESPACE_URL, "wyyard:course-type:" + item["name"]).hex)
+    if item["name"] == "读书会" and "rule_purpose" not in item:
+        item["rule_purpose"] = "experience_book_club"
+    return item
+
+
 def _save(item_id: str = ""):
+    for item in _types:
+        _ensure_identity(item)
     if item_id:
         save_item(FILENAME, "types", {"types": _types})
     else:
@@ -47,7 +59,7 @@ _load()
 
 
 def list_course_types() -> List[dict]:
-    return list(_types)
+    return [dict(_ensure_identity(item)) for item in _types]
 
 
 def list_course_type_names() -> List[str]:
@@ -58,9 +70,10 @@ def create_course_type(name: str, organization_id: str = "", list_image: str = "
                        detail_images: list[str] | None = None,
                        category: str = "salon") -> dict:
     existing_names = {t["name"] for t in _types}
-    if name in existing_names:
+    if name in existing_names or any(name in t.get("previous_names", []) for t in _types):
         raise ValueError("类型名称已存在")
     item = {
+        "id": "type-" + uuid.uuid4().hex,
         "name": name,
         "organization_id": organization_id,
         "list_image": list_image,
@@ -76,12 +89,16 @@ def rename_course_type(old_name: str, new_name: str) -> bool:
     names = [t["name"] for t in _types]
     if old_name not in names:
         return False
-    current = _types[names.index(old_name)]
+    current = _ensure_identity(_types[names.index(old_name)])
     if current.get("category") == "other":
         raise ValueError("系统内置活动名称不允许修改")
-    if new_name in names and new_name != old_name:
+    if (new_name in names and new_name != old_name) or any(
+        t is not current and new_name in t.get("previous_names", []) for t in _types
+    ):
         raise ValueError("类型名称已存在")
     idx = names.index(old_name)
+    previous_names = list(current.get("previous_names", []))
+    current["previous_names"] = list(dict.fromkeys([*previous_names, old_name]))
     _types[idx]["name"] = new_name
     # 先同步所有下游，成功后再持久化
     try:
@@ -95,6 +112,7 @@ def rename_course_type(old_name: str, new_name: str) -> bool:
         sync_class_records(old_name, new_name)
     except Exception:
         _types[idx]["name"] = old_name  # 回滚内存
+        current["previous_names"] = previous_names
         raise
     _save()
     return True
@@ -128,11 +146,18 @@ def delete_course_type(name: str) -> bool:
         raise ValueError("系统内置活动不允许删除")
 
     # 级联检查：是否有活动记录或沙龙技能学习仍引用该类型
+    from app.models.upsell_config import PURCHASE_RULE_LABELS
+    from app.services import course_rule_catalog, upsell_config_service
     from app.services.class_record_service import list_records
     from app.services.internal_course_service import list_courses as list_internal
     from app.services.internal_course_session_service import list_sessions as list_ics
 
-    refs = []
+    key = "class:" + _ensure_identity(_types[names.index(name)])["id"]
+    refs = ["升单配置·" + PURCHASE_RULE_LABELS[rule["key"]]
+            for rule in upsell_config_service.list_rules()
+            if any(condition.get("event_kind") == "attendance" and
+                   any(course_rule_catalog.resolve_key(value) == key for value in condition.get("products") or [condition.get("product", "")])
+                   for condition in rule["conditions"])]
     for r in list_records():
         if r.course_type == name:
             refs.append(f"活动记录 {r.id}")

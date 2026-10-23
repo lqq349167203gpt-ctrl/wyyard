@@ -273,6 +273,7 @@ def _payment_events() -> list[dict[str, Any]]:
         (payment_loader("energy-knots"), "amount", "深度情绪释放", ""),
         (payment_loader("internal-courses"), "price", "沙龙技能学习", "course_type"),
         (payment_loader("online-tea"), "amount", "线上茶疗", ""),
+        (payment_loader("companion-camps"), "amount", "陪伴营", ""),
         (payment_loader("offline-courses"), "amount", "落地课程", "course_type"),
         (payment_loader("oh-card-readings"), "amount", "OH卡诊断", "reading_type"),
         (payment_loader("tea-seat-fees"), "amount", "茶位费", ""),

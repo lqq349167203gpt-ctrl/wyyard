@@ -21,7 +21,7 @@ const SHARED_READ_RESOURCES = new Set([
   'customer-tags', 'follow-up-statuses', 'visits', 'class-records', 'daily-report',
   'communication-records', 'visit-verifications', 'activity-themes',
   'membership-cards', 'group-cases', 'emotional-releases', 'energy-knots',
-  'internal-courses', 'oh-card-readings', 'other-projects', 'tea-seat-fees', 'online-tea', 'offline-courses',
+  'internal-courses', 'oh-card-readings', 'other-projects', 'tea-seat-fees', 'online-tea', 'companion-camps', 'offline-courses',
 ])
 
 function request(path, options = {}) {
@@ -824,6 +824,7 @@ const PAYMENT_PROJECT_TYPES = [
   { key: 'internal_course', label: '沙龙技能学习', apiPath: 'internal-courses' },
   { key: 'tea_seat_fee', label: '茶位费', apiPath: 'tea-seat-fees' },
   { key: 'online_tea', label: '线上茶疗', apiPath: 'online-tea' },
+  { key: 'companion_camp', label: '陪伴营', apiPath: 'companion-camps' },
   { key: 'offline_course', label: '线下落地课程', apiPath: 'offline-courses' },
   { key: 'other', label: '其他项目', apiPath: 'other-projects' },
 ]
@@ -863,6 +864,7 @@ const paymentApi = {
   internalCourses: _projectApi('/api/internal-courses'),
   teaSeatFees: _projectApi('/api/tea-seat-fees'),
   onlineTea: _projectApi('/api/online-tea'),
+  companionCamp: _projectApi('/api/companion-camps'),
   offlineCourses: _projectApi('/api/offline-courses'),
   otherProjects: Object.assign(_projectApi('/api/other-projects'), {
     getAvailableProjects: (customerId) => request(`/api/other-projects/${customerId}/available-projects`),
@@ -892,6 +894,7 @@ const paymentApi = {
       internal_course: this.internalCourses,
       tea_seat_fee: this.teaSeatFees,
       online_tea: this.onlineTea,
+      companion_camp: this.companionCamp,
       offline_course: this.offlineCourses,
       other: this.otherProjects,
     }

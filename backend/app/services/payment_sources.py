@@ -11,6 +11,7 @@ _LOADERS = {
     "internal-courses": ("internal_course_service", "list_courses"),
     "oh-card-readings": ("oh_card_reading_service", "list_readings"),
     "online-tea": ("online_tea_service", "list_records"),
+    "companion-camps": ("companion_camp_service", "list_records"),
     "offline-courses": ("offline_course_service", "list_courses"),
     "tea-seat-fees": ("tea_seat_fee_service", "list_fees"),
     "other-projects": ("other_project_service", "list_projects"),

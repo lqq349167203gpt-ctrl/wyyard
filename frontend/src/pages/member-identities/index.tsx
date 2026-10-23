@@ -24,7 +24,7 @@ import { LEARNING_PAYMENT_TYPES } from "@/lib/learning-course-types"
 // 与 membership_card.card_type 实际值对齐；新增卡类型时需同步更新
 const CARD_TYPES = MEMBERSHIP_CARD_NAMES
 const COURSE_TYPES = Object.keys(LEARNING_PAYMENT_TYPES)
-const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "深度情绪释放", "OH卡梳理", "沙龙技能学习", "茶位费", "线上茶疗", "线下课程", "其他项目"]
+const PAYMENT_CATEGORIES = ["会员卡", "粗门次卡", "觉醒游戏", "情绪释放", "深度情绪释放", "OH卡梳理", "沙龙技能学习", "茶位费", "线上茶疗", "陪伴营", "线下课程", "其他项目"]
 
 const TYPE_LABELS: Record<string, string> = {
   invitation: "邀约情况",
@@ -42,8 +42,8 @@ const TYPE_LABELS: Record<string, string> = {
 const TEACHER_POSITIONS = [...HEALING_POSITIONS]
 
 const COUNT_OP_LABELS: Record<string, string> = { ">": "大于", "=": "等于", "<": "小于", ">=": "不少于", "<=": "不超过" }
-const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "深度情绪释放", "OH卡诊断", "OH卡梳理", "其他项目", "粗门次卡", "茶位费", "线上茶疗", "线下课程"]
-const RECORD_CATEGORIES = ["粗门次卡", "茶位费", "线上茶疗", "线下课程", "其他项目"]
+const COUNT_CATEGORIES = ["觉醒游戏", "情绪释放", "深度情绪释放", "OH卡诊断", "OH卡梳理", "其他项目", "粗门次卡", "茶位费", "线上茶疗", "陪伴营", "线下课程"]
+const RECORD_CATEGORIES = ["粗门次卡", "茶位费", "线上茶疗", "陪伴营", "线下课程", "其他项目"]
 const COUNT_OPTIONS = Object.entries(COUNT_OP_LABELS).map(([value, label]) => ({ value, label }))
 
 function getPaymentCategories(c: IdentityCondition): string[] {
@@ -659,7 +659,7 @@ export default function MemberIdentitiesPage() {
                             </div>
                           )}
 
-                          {getPaymentCategories(cond).some(cat => ["粗门次卡", "茶位费", "线上茶疗", "线下课程"].includes(cat)) && <p className="text-xs text-muted-foreground">按未删除、未取消的交易记录计笔数，不按扣卡次数；不判断有效期。</p>}
+                          {getPaymentCategories(cond).some(cat => ["粗门次卡", "茶位费", "线上茶疗", "陪伴营", "线下课程"].includes(cat)) && <p className="text-xs text-muted-foreground">按未删除、未取消的交易记录计笔数，不按扣卡次数；不判断有效期。</p>}
                           {/* 有效期（会员卡或沙龙技能学习选中时显示） */}
                           {getPaymentCategories(cond).some((cat: string) => cat === "会员卡" || cat === "沙龙技能学习") && (
                             <div className="flex items-center gap-2">

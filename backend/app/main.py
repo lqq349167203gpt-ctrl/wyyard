@@ -25,6 +25,7 @@ from app.api.class_records import router as class_records_router
 from app.api.client import router as client_router
 from app.api.client_notifications import router as client_notifications_router
 from app.api.communication_records import router as communication_records_router
+from app.api.companion_camp import router as companion_camp_router
 from app.api.consumption_records import router as consumption_records_router
 from app.api.course_types import router as course_types_router
 from app.api.courses import router as courses_router
@@ -141,6 +142,7 @@ app.include_router(other_projects_router)
 app.include_router(tea_seat_fees_router)
 app.include_router(offline_courses_router)
 app.include_router(online_tea_router)
+app.include_router(companion_camp_router)
 app.include_router(emotional_release_sessions_router)
 app.include_router(oh_card_readings_router)
 

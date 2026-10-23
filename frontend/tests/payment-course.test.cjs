@@ -11,6 +11,7 @@ function harness() {
   const toasts = []
   vm.runInNewContext(readFileSync(path.join(root, 'miniprogram/components/payment-form/index.js'), 'utf8'), {
     Component(value) { component = value },
+    getApp: () => ({ globalData: { currentUser: { nickname: "录入人" } } }),
     wx: { showToast(value) { toasts.push(value.title) } },
     require(name) {
       if (name === '../../utils/api') return { paymentApi: { courseOptions(date) {
@@ -37,8 +38,10 @@ test('OH卡新建和编辑都必须选择诊断老师，填写后才能进入确
   for (const isEdit of [false, true]) {
     for (const diagnosis_teacher of [undefined, '', '   ']) {
       const { instance, toasts } = harness()
+      instance.data.closers = [{ id: 'closer-1', nickname: '成交人甲', amount: 0 }]
       Object.assign(instance.data, { type: 'oh_card_reading', isEdit, dealCourseChosen: true,
-        formData: { reading_type: 'OH卡情感梳理', diagnosis_teacher } })
+        organizations: [{ id: 'core', name: '无忧茶院' }], orgIndex: 0,
+        formData: { organization_id: 'core', reading_type: 'OH卡情感梳理', diagnosis_teacher } })
       instance.onSubmit()
       assert.equal(toasts.at(-1), '请选择诊断老师')
       assert.equal(instance.data.confirmVisible, false)
@@ -137,4 +140,42 @@ test('深度情绪释放确认页按部位个数显示，原始购买数量字�
   instance.data.type = 'emotional_release'
   const emotionalRows = instance._buildConfirmRows()
   assert.equal(emotionalRows.find(row => row.label === '购买场次').value, '3 次')
+})
+
+test('陪伴营默认一个月，选择陪伴老师后保存姓名与人员标识，不生成次数', () => {
+  const { instance } = harness()
+  instance.data.type = 'companion_camp'
+  instance._applyTypeDefaults('companion_camp')
+  assert.equal(instance.data.formData.validity_value, '1')
+  assert.equal(instance.data.formData.validity_unit, 'month')
+  instance.data.diagnosisTeachers = [{ id: 'teacher-a', nickname: '陪伴老师甲' }]
+  instance.onCompanionTeacherChange({ detail: { value: '0' } })
+  instance.data.closers = [{ id: 'closer-a', nickname: '成交人甲' }]
+  instance.data.organizations = [{ id: 'core', name: '无忧茶院' }]
+  const payload = instance._buildPayload()
+  assert.equal(payload.companion_teacher, '陪伴老师甲')
+  assert.equal(payload.companion_teacher_id, 'teacher-a')
+  assert.equal(payload.validity_value, 1)
+  assert.equal(payload.validity_unit, 'month')
+  assert.equal(payload.purchase_count, undefined)
+  assert.equal(payload.remaining_count, undefined)
+  assert.equal(payload.amount, undefined)
+})
+
+test('陪伴营新建及编辑均校验陪伴老师，确认页展示有效期与老师', () => {
+  for (const isEdit of [false, true]) {
+    const { instance, toasts } = harness()
+    Object.assign(instance.data, { type: 'companion_camp', isEdit, dealCourseChosen: true,
+      organizations: [{ id: 'core', name: '无忧茶院' }], orgIndex: 0,
+      closers: [{ id: 'closer-a', nickname: '成交人甲' }],
+      formData: { organization_id: 'core', deal_date: '2026-10-23', effective_date: '2026-10-23', validity_value: '1', validity_unit: 'month' } })
+    instance.onSubmit()
+    assert.equal(toasts.at(-1), '请选择陪伴老师')
+    assert.equal(instance.data.confirmVisible, false)
+    instance.data.formData.companion_teacher = '陪伴老师甲'
+    instance.onSubmit()
+    assert.equal(instance.data.confirmVisible, true)
+    assert.ok(instance.data.confirmRows.some(row => row.label === '陪伴老师' && row.value === '陪伴老师甲'))
+    assert.ok(instance.data.confirmRows.some(row => row.label === '有效期' && /1.*月/.test(row.value)))
+  }
 })

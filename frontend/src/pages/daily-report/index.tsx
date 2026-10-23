@@ -564,6 +564,10 @@ export default function DailyReportPage() {
             itemType = "线上茶疗"
             itemName = `${item.validity_value || 1} ${item.validity_unit === "day" ? "天" : "个月"}`
             break
+          case "companion_camp":
+            itemType = "陪伴营"
+            itemName = `${item.validity_value || 1} ${item.validity_unit === "day" ? "天" : "个月"}`
+            break
           case "offline_course":
             itemType = "线下落地课程"
             itemName = item.course_type || item.course_name || ""
@@ -597,6 +601,7 @@ export default function DailyReportPage() {
       for (const item of others as any[]) addItem(item, "other")
       for (const item of teaFees as any[]) addItem(item, "tea_seat_fee")
       for (const item of (sources["online-tea"] || []) as any[]) addItem(item, "online_tea")
+      for (const item of (sources["companion-camps"] || []) as any[]) addItem(item, "companion_camp")
       for (const item of offlineCourses as any[]) addItem(item, "offline_course")
 
       // 构建当日销卡数据

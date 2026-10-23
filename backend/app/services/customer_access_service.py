@@ -306,3 +306,10 @@ def require_new_customer_ids(
     }
     if not added_ids.issubset(allowed_ids):
         raise HTTPException(status_code=403, detail=f"只能{action}可见范围内的客户")
+
+
+def _actor_names(request):
+    from app.services import account_personnel_service, account_service
+
+    account = account_service.get_account(getattr(request.state, "user_id", ""))
+    return account_personnel_service.names_for_account(account) if account else {actor_name(request)}

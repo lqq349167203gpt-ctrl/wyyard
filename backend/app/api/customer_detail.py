@@ -15,6 +15,7 @@ from app.services import (
     activity_followup_service,
     activity_participant_note_service,
     class_record_service,
+    companion_camp_service,
     customer_access_service,
     customer_activity_export_service,
     customer_contact_service,
@@ -40,6 +41,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.services.sales_access_service import presented
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
 
@@ -664,6 +666,15 @@ def _build_purchase_summary(customer_id: str) -> list:
                 "effective_date": record.effective_date, "expiry_date": record.expiry_date,
                 "validity_value": record.validity_value, "validity_unit": record.validity_unit})
 
+    for record in companion_camp_service.list_records():
+        if record.customer_id == customer_id:
+            current = record.effective_date <= today <= record.expiry_date
+            summary.append({"type": "陪伴营", "name": "陪伴营", "companion_teacher": record.companion_teacher, "total_purchased": 1,
+                "total_amount": None, "amount_recorded": False, "remaining": "-", "used": "-",
+                "current_remaining": 1 if current else 0, "current_total": 1 if current else 0,
+                "effective_date": record.effective_date, "expiry_date": record.expiry_date,
+                "validity_value": record.validity_value, "validity_unit": record.validity_unit})
+
     # 线下落地课程
     oc_courses = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]
     oc_attendance_counts = _match_offline_course_attendance(customer_id, oc_courses)
@@ -1194,7 +1205,18 @@ def _build_payment_records(customer_id: str, date: str | None = None) -> list:
                 "created_at": record.created_at.strftime("%Y-%m-%d"), "notes": record.notes})
 
     # 线下落地课程
-    oc = [r for r in offline_course_service.list_courses() if r.customer_id == customer_id]
+    for record in presented(companion_camp_service.list_records()):
+        if record.customer_id == customer_id and (not date or record.deal_date == date):
+            records.append({"source_id": record.id, "source_created_at": record.created_at.isoformat(),
+                "type": "陪伴营", "name": "陪伴营", "companion_teacher": record.companion_teacher,
+                "quantity": f"{record.validity_value}{'天' if record.validity_unit == 'day' else '个月'}",
+                "amount": None, "amount_recorded": False, "deal_date": record.deal_date,
+                "effective_date": record.effective_date, "expiry_date": record.expiry_date,
+                "closer_name": "、".join(c.get("name", "") for c in record.closers) or record.closer_name or "",
+                "created_at": record.created_at.strftime("%Y-%m-%d"), "notes": record.notes})
+
+    # 线下落地课程
+    oc = [r for r in presented(offline_course_service.list_courses()) if r.customer_id == customer_id]
     for r in oc:
         if date and r.deal_date != date:
             continue
