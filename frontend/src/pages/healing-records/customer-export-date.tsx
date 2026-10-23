@@ -4,9 +4,9 @@ import { SelectDropdown } from "@/components/select-dropdown"
 type Mode = "all" | "day" | "month" | "year" | "custom"
 type Range = { date_from: string; date_to: string }
 
-export function CustomerExportDate({ value, onChange, onModeChange }: { value: Range; onChange: (range: Range) => void; onModeChange: (mode: Mode) => void }) {
+export function CustomerExportDate({ value, onChange, onModeChange, initialMode = 'all' }: { value: Range; onChange: (range: Range) => void; onModeChange: (mode: Mode) => void; initialMode?: Mode }) {
   const today = new Date().toLocaleDateString("sv-SE")
-  const [mode, setMode] = useState<Mode>("all")
+  const [mode, setMode] = useState<Mode>(initialMode)
   const [day, setDay] = useState(today)
   const [month, setMonth] = useState(today.slice(0, 7))
   const [year, setYear] = useState(today.slice(0, 4))

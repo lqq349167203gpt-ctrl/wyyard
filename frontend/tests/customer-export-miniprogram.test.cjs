@@ -6,7 +6,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '../..')
 const { dateRange } = require(path.join(root, 'miniprogram/utils/customer-export'))
 
-function fixture() {
+function fixture(saved = {}) {
   const calls = []
   const columns = [
     { key: 'nickname', label: '客户昵称', group: '基础资料', default: true },
@@ -16,6 +16,7 @@ function fixture() {
   const api = { customerApi: {
     selector: async () => [{ nickname: '客户一', member_type: '会员', card_status: '即将用完', service_teacher: '服务甲', referrers: ['引流甲', '引流乙'], referrer_handler: '承接甲' }],
     exportOptions: async () => columns,
+    exportPreferences: async () => saved,
     export: data => { calls.push(data); return '/api/customers/export' },
   }, memberIdentityApi: { list: async () => [] }, downloadFile: async () => '/test/customer.xlsx' }
   let definition
@@ -39,6 +40,16 @@ test('日期按月包含闰年月底，按年包含12月31日，全部不加日�
   assert.deepEqual(dateRange('month', { month: '2024-02' }), { date_from: '2024-02-01', date_to: '2024-02-29' })
   assert.deepEqual(dateRange('year', { year: '2026' }), { date_from: '2026-01-01', date_to: '2026-12-31' })
   assert.deepEqual(dateRange('all', {}), {})
+})
+
+test('恢复账号的导出筛选和日期，但不改变当前工作视图范围', async () => {
+  const { page, calls } = fixture({ columns: ['nickname'], referrers: ['引流甲'], date_from: '2026-10-01', date_to: '2026-10-20' })
+  await page.onLoad({ filters: encodeURIComponent(JSON.stringify({ workspace: 'handoff', handoff_status: 'pending' })) })
+  assert.equal(page.data.mode, 'custom')
+  assert.deepEqual(Array.from(page.data.filters.referrers), ['引流甲'])
+  await page.onExport()
+  assert.equal(calls[0].workspace, 'handoff')
+  assert.equal(calls[0].date_to, '2026-10-20')
 })
 
 test('选项来自完整可见目录，包含多人引流和承接人，默认只勾选服务端推荐列', async () => {
@@ -84,4 +95,19 @@ test('无导出列或日期逆序时不下载，已折叠分组不会被重新�
   await page.onExport()
   assert.match(page.data.error, /日期范围/)
   assert.equal(calls.length, 0)
+})
+
+test('分类全选和清空仅改变本组，重复全选不重复，保留折叠状态', async () => {
+  const { page } = fixture()
+  await page.onLoad({})
+  const event = (title, mode) => ({ currentTarget: { dataset: { title, mode } } })
+  page.onGroupColumnsAll(event('联系来源', 'all'))
+  page.onGroupColumnsAll(event('联系来源', 'all'))
+  assert.deepEqual(Array.from(page.data.selectedColumns), ['nickname', 'card_status', 'referral_date'])
+  assert.equal(page.data.columnGroups.find(group => group.title === '联系来源').expanded, false)
+  page.onGroupColumnsAll(event('基础资料', 'clear'))
+  assert.deepEqual(Array.from(page.data.selectedColumns), ['referral_date'])
+  page.setData({ exporting: true })
+  page.onGroupColumnsAll(event('联系来源', 'clear'))
+  assert.deepEqual(Array.from(page.data.selectedColumns), ['referral_date'])
 })

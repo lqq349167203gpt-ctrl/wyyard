@@ -1,7 +1,8 @@
 """客户资料导出：先筛选可见客户，再生成独立的 Excel 文件。"""
 
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
+from zoneinfo import ZoneInfo
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -35,9 +36,13 @@ COLUMNS = [
     ("communication_records", "沟通记录", "活动课程"), ("activities", "活动记录", "活动课程"),
     ("offline_course_records", "技能训练课程", "活动课程"),
     ("purchase_summary", "卡次统计", "卡次交易"), ("payment_records", "交易记录", "卡次交易"),
+    ("activity_summary", "各类活动次数及最近上课日期", "主表统计"),
+    ("payment_summary", "各类交易笔数", "主表统计"),
+    ("debt_records", "欠卡明细", "卡次交易"),
 ]
 NOTE_COLUMNS = {"visit_need_tags", "visit_need_detail", "customer_info", "follow_up", "customer_feedback", "cancel_reason"}
-RECORD_COLUMNS = NOTE_COLUMNS | {"communication_records", "activities", "offline_course_records", "purchase_summary", "payment_records"}
+RECORD_COLUMNS = NOTE_COLUMNS | {"communication_records", "activities", "offline_course_records", "payment_records", "debt_records"}
+SUMMARY_COLUMNS = {"purchase_summary", "activity_summary", "payment_summary"}
 SECTION_COLUMNS = {"activities": "activities", "offline_course_records": "offline_course",
                    "purchase_summary": "purchase", "payment_records": "payment"}
 
@@ -50,6 +55,11 @@ def available_columns(roles) -> list[dict]:
         denied.update({"transaction_count", "total_payment"})
     if access["transaction_access"] != "detail":
         denied.add("payment_records")
+        denied.add("payment_summary")
+    if not access["detail_tabs"].get("activities"):
+        denied.add("activity_summary")
+    if not access["detail_tabs"].get("card_statistics"):
+        denied.add("debt_records")
     if not customer_access_service.can_view_any_note(permissions=access):
         denied.add("first_visit")
     for column, permission in (("communication_records", "communication"), ("activities", "activities"),
@@ -95,6 +105,17 @@ def prepare_items(customers, items, columns, roles, load_detail, communications=
                 item[key] = detail_for(section)[key]
                 if key == "purchase_summary" and customer_access_service.get_customer_permissions(roles)["transaction_access"] == "none":
                     item[key] = _without_amounts(item[key])
+        if "activity_summary" in selected:
+            item["activity_summary"] = detail_for("activities")["activities"]
+        if "payment_summary" in selected:
+            item["payment_summary"] = detail_for("payment")["payment_records"]
+        if "debt_records" in selected:
+            debts = {}
+            for card in detail_for("purchase")["purchase_summary"]:
+                for debt in card.get("debt_activities", []):
+                    row = {**debt, "type": card.get("type", "")}
+                    debts[str(sorted(row.items()))] = row
+            item["debt_records"] = list(debts.values())
         if "communication_records" in selected:
             item["communication_records"] = [record.model_dump(mode="json") for record in communications
                                              if (record.customer_id == customer.id if record.customer_id
@@ -151,13 +172,71 @@ def select_customers(customers, *, card_statuses=(), member_types=(), service_te
 
 
 def build_workbook(items: list[dict], *, columns: list[dict]) -> bytes:
+    # 统计直接展开到客户主表；一个客户始终只有一行。
+    columns = [dict(column) for column in columns]
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat()
+    expanded = []
+    for column in columns:
+        key = column["key"]
+        if key not in SUMMARY_COLUMNS:
+            expanded.append(column)
+            continue
+        labels = []
+        for item in items:
+            values = {}
+            records = item.get(key, []) or []
+            if key == "purchase_summary":
+                grouped = {}
+                for record in records:
+                    kind = "粗门次卡" if record.get("name") == "粗门次卡" else record.get("type") or "其他卡"
+                    grouped.setdefault(kind, []).append(record)
+                for kind, cards in grouped.items():
+                    # current_remaining、debt_count 在会员卡每条记录里重复，不能累加。
+                    first = cards[0]
+                    remaining = first.get("current_remaining", first.get("effective_remaining", first.get("remaining", 0)))
+                    if kind in {"会员卡", "粗门次卡"}:
+                        active = [c for c in cards if not c.get("voided") and (not c.get("effective_date") or c["effective_date"] <= today)
+                                  and (not c.get("expiry_date") or c["expiry_date"] >= today)]
+                        amounts = [c.get("remaining", 0) for c in active]
+                        remaining = "无限" if any(v is None or v in ("不限", "无限", "不限次数") for v in amounts) else sum(v for v in amounts if isinstance(v, (int, float)))
+                    values[kind + "剩余次数"] = "无限" if remaining is None or remaining in ("不限", "无限", "不限次数") else remaining
+                    values[kind + "已用次数"] = sum(c.get("used", 0) for c in cards if isinstance(c.get("used", 0), (int, float)))
+                    values[kind + "欠卡次数"] = 0 if kind == "粗门次卡" else first.get("debt_count", 0)
+            else:
+                dates = []
+                for record in records:
+                    if key == "activity_summary" and (record.get("withdrawn") or record.get("cancelled") or record.get("participated") is False):
+                        continue
+                    kind = record.get("type") or record.get("activity_type") or "其他"
+                    label = str(kind) + ("参与次数" if key == "activity_summary" else "交易笔数")
+                    values[label] = values.get(label, 0) + 1
+                    day = record.get("date") or record.get("activity_date")
+                    if day and str(day)[:10] <= today:
+                        dates.append(str(day)[:10])
+                if key == "activity_summary":
+                    values["最近上课日期"] = max(dates, default="")
+            for label, value in values.items():
+                if label not in labels:
+                    labels.append(label)
+                item[f"{key}:{label}"] = value
+        if not labels:
+            labels = {"purchase_summary": ["会员卡剩余次数", "会员卡已用次数", "会员卡欠卡次数"],
+                      "activity_summary": ["活动参与次数", "最近上课日期"],
+                      "payment_summary": ["交易笔数"]}[key]
+        for label in labels:
+            field = f"{key}:{label}"
+            expanded.append({"key": field, "label": label})
+            for item in items:
+                item.setdefault(field, "" if "日期" in label else 0)
+    detail_titles = {key: "跟进记录" for key in NOTE_COLUMNS | {"communication_records"}}
+    detail_titles.update({"activities": "活动记录", "offline_course_records": "活动记录", "payment_records": "交易记录", "debt_records": "欠卡明细"})
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "客户资料"
-    sheet.append([column["label"] for column in columns])
+    sheet.append([column["label"] for column in expanded])
     for item in items:
         row = []
-        for column in columns:
+        for column in expanded:
             field = column["key"]
             value = item.get(field, "")
             if field == "customer_tags":
@@ -165,7 +244,7 @@ def build_workbook(items: list[dict], *, columns: list[dict]) -> bytes:
             elif field == "referrer":
                 value = "、".join(customer_referrers(item))
             elif field in RECORD_COLUMNS:
-                value = f"共{len(value or [])}条，详见“{column['label']}”工作表"
+                value = f"共{len(value or [])}条" + (f"，详见“{detail_titles[field]}”工作表" if value else "")
             elif isinstance(value, list):
                 value = "、".join(str(part) for part in value)
             elif isinstance(value, (date,)):
@@ -176,6 +255,7 @@ def build_workbook(items: list[dict], *, columns: list[dict]) -> bytes:
             row.append(value)
         sheet.append(row)
     record_fields = {
+        "record_kind": "记录类型",
         "visit_date": "邀约日期", "date": "日期", "record_date": "记录日期", "deal_date": "成交日期",
         "start_time": "开始时间", "end_time": "结束时间", "type": "项目类型", "name": "名称",
         "course_name": "课程名称", "course_type": "课程类型", "activity_name": "活动名称",
@@ -207,18 +287,17 @@ def build_workbook(items: list[dict], *, columns: list[dict]) -> bytes:
             values = [nickname, *(record.get(key, "") for key in fields)]
             detail_sheet.append([_cell_value(value) for value in values])
 
+    grouped_records = {}
     for column in columns:
         if column["key"] not in RECORD_COLUMNS:
             continue
         records = [(item.get("nickname") or item.get("name") or "", record)
                    for item in items for record in item.get(column["key"], [])]
-        add_record_sheet(column["label"], records)
-        if column["key"] == "purchase_summary":
-            for key, title in (("purchases", "卡次购买明细"), ("debt_activities", "卡次欠卡明细")):
-                children = [(nickname, {"type": record.get("type", ""), "name": record.get("name", ""), **child})
-                            for nickname, record in records for child in record.get(key, [])]
-                if children:
-                    add_record_sheet(title, children)
+        grouped_records.setdefault(detail_titles[column["key"]], []).extend(
+            (nickname, {**record, "record_kind": column["label"]}) for nickname, record in records)
+    for title, records in grouped_records.items():
+        if records:
+            add_record_sheet(title, records)
     for worksheet in workbook:
         worksheet.freeze_panes = "A2"
         worksheet.auto_filter.ref = worksheet.dimensions

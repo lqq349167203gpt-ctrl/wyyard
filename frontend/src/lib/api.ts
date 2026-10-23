@@ -839,6 +839,7 @@ export const customerApi = {
   assignmentOptions: () => request<CustomerLight[]>("/api/customers/assignment-options"),
   list: () => request<Customer[]>("/api/customers"),
   exportOptions: () => request<CustomerExportColumn[]>("/api/customers/export-options"),
+  exportPreferences: () => request<Partial<CustomerExportParams>>("/api/customers/export-preferences"),
   export: async (filters: CustomerExportParams) => {
     const query = new URLSearchParams()
     Object.entries(filters).forEach(([key, value]) => {

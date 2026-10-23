@@ -680,6 +680,7 @@ const customerApi = {
   saveWorkspaceSettings: data => request('/api/customers/workspace-settings', { method: 'PUT', data }),
   acceptHandoff: (id, assignmentId) => request(`/api/customers/${encodeURIComponent(id)}/accept-handoff`, { method: 'POST', data: { assignment_id: assignmentId } }),
   exportOptions: () => request('/api/customers/export-options'),
+  exportPreferences: () => request('/api/customers/export-preferences'),
   export: (filters = {}) => {
     const query = []
     Object.keys(filters).forEach(key => {

@@ -38,8 +38,10 @@ Page({
     const sequence = this._sequence = (this._sequence || 0) + 1
     this.setData({ loading: true, error: '' })
     try {
-      const [customers, identities, columns] = await Promise.all([customerApi.selector(this._workspaceScope), memberIdentityApi.list('all'), customerApi.exportOptions()])
+      const [customers, identities, columns, saved] = await Promise.all([customerApi.selector(this._workspaceScope), memberIdentityApi.list('all'), customerApi.exportOptions(), customerApi.exportPreferences()])
       if (sequence !== this._sequence) return
+      if (saved.columns) this.setData({ filters: Object.fromEntries(fields.map(([key]) => [key, saved[key] || []])),
+        mode: saved.date_from || saved.date_to ? 'custom' : 'all', dateFrom: saved.date_from || '', dateTo: saved.date_to || '' })
       const values = {
         member_types: unique([...identities.filter(item => item.group !== 'card_status').map(item => item.name), ...customers.map(item => item.member_type)]),
         card_statuses: unique([...identities.filter(item => item.group === 'card_status').map(item => item.name), ...customers.map(item => item.card_status)]),
@@ -105,6 +107,16 @@ Page({
   onColumnsAll(event) {
     if (this.data.exporting) return
     this.setData({ selectedColumns: event.currentTarget.dataset.mode === 'all' ? this.data.columns.map(column => column.key) : [] })
+    this.updateColumns()
+  },
+  onGroupColumnsAll(event) {
+    if (this.data.exporting) return
+    const { title, mode } = event.currentTarget.dataset
+    const keys = this.data.columns.filter(column => column.group === title).map(column => column.key)
+    const selectedColumns = mode === 'all'
+      ? [...new Set([...this.data.selectedColumns, ...keys])]
+      : this.data.selectedColumns.filter(key => !keys.includes(key))
+    this.setData({ selectedColumns, error: '' })
     this.updateColumns()
   },
   async onExport() {

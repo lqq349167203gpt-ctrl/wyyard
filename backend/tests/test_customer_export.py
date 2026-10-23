@@ -205,8 +205,8 @@ def test_selected_follow_up_keeps_full_content_author_and_time_in_own_sheet(clie
     response = client.get("/api/customers/export", params=[("columns", "nickname"), ("columns", "follow_up")])
     sheet_rows(response)
     workbook = load_workbook(BytesIO(response.content))
-    assert workbook.sheetnames == ["客户资料", "跟进点"]
-    rows = list(workbook["跟进点"].values)
+    assert workbook.sheetnames == ["客户资料", "跟进记录"]
+    rows = list(workbook["跟进记录"].values)
     assert "反馈人" in rows[0] and "录入时间" in rows[0]
     assert "完整跟进内容" in rows[1] and "反馈人甲" in rows[1] and "记录人乙" in rows[1]
     assert "未勾选的深度需求" not in str(rows)
@@ -221,14 +221,14 @@ def test_card_export_keeps_purchase_details_and_respects_hidden_amounts(client, 
     })
     response = client.get("/api/customers/export", params={"columns": "purchase_summary"})
     workbook = load_workbook(BytesIO(response.content))
-    assert "卡次购买明细" in workbook.sheetnames
-    assert "购买次数" in next(workbook["卡次购买明细"].values)
+    assert workbook.sheetnames == ["客户资料"]
+    assert "会员卡剩余次数" in next(workbook.active.values)
     access = position_edit_permission_service._empty_customer_access()
     access["scope"] = "all"
     access["detail_tabs"]["card_statistics"] = True
     monkeypatch.setattr(customer_access_service, "get_customer_permissions", lambda _: access)
     response = client.get("/api/customers/export", params={"columns": "purchase_summary"})
     workbook = load_workbook(BytesIO(response.content))
-    assert "总金额" not in next(workbook["卡次统计"].values)
-    assert "金额" not in next(workbook["卡次购买明细"].values)
-    assert 12 in list(workbook["卡次统计"].values)[1]
+    assert "总金额" not in next(workbook.active.values)
+    assert workbook.sheetnames == ["客户资料"]
+    assert 12 in list(workbook.active.values)[1]
