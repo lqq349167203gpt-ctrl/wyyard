@@ -12,11 +12,13 @@ from starlette.responses import JSONResponse
 from app.services import storage
 
 COURSE_PATHS = (
+    "/api/companion-camps",
     "/api/class-records", "/api/group-case-sessions", "/api/emotional-release-sessions",
     "/api/energy-knot-sessions", "/api/internal-course-sessions", "/api/visits",
     "/api/project-deductions", "/api/activity-withdrawals", "/api/client/activities", "/api/activity-checkins",
 )
 CACHE_MODULES = (
+    "companion_camp_service",
     "class_record_service", "group_case_session_service", "emotional_release_session_service",
     "energy_knot_session_service", "internal_course_session_service", "visit_service",
     "membership_card_service", "project_deduction_service", "customer_service", "client_notification_service",
@@ -50,7 +52,7 @@ class CourseDeductionConsistencyMiddleware:
 
             active = [deepcopy(row) for row in deductions.list_deductions()
                       if row.project_name == deductions.COARSE_DOOR_CARD_TYPE and row.source_activity_id]
-            if not active and path != "/api/activity-checkins/confirm":
+            if not active and path != "/api/activity-checkins/confirm" and not path.startswith("/api/companion-camps"):
                 return await self.app(scope, receive, send)
             before = {cid: eligible_courses(cid) for cid in {row.customer_id for row in active}}
             snapshots = []

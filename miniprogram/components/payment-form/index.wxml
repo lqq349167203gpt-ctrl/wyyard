@@ -190,7 +190,13 @@
   </view>
 
   <!-- 线下课程 -->
-  <view class="pf-card" wx:if="{{type === 'offline_course' || type === 'online_tea'}}">
+  <view class="pf-card" wx:if="{{type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')}}">
+    <view class="pf-row" wx:if="{{type === 'companion_camp'}}">
+      <text class="pf-label">陪伴老师 *</text>
+      <picker class="pf-picker" range="{{diagnosisTeachers}}" range-key="nickname" value="{{companionTeacherIndex}}" bindchange="onCompanionTeacherChange">
+        <view class="pf-value {{formData.companion_teacher ? '' : 'pf-placeholder'}}">{{formData.companion_teacher || '选择陪伴老师'}}</view>
+      </picker>
+    </view>
     <view class="pf-row" wx:if="{{type === 'offline_course'}}">
       <text class="pf-label">课程类型</text>
       <picker class="pf-picker" range="{{offlineCourseTypes}}" value="{{offlineCourseTypeIndex}}" bindchange="onOfflineCourseTypeChange"><view class="pf-value {{offlineCourseTypeIndex < 0 ? 'pf-placeholder' : ''}}">{{offlineCourseTypeIndex >= 0 ? offlineCourseTypes[offlineCourseTypeIndex] : '选择课程类型'}}</view></picker>
@@ -219,7 +225,7 @@
       <text class="pf-label">有效期</text>
       <view class="pf-inline">
         <input class="pf-input pf-input-short" type="number" placeholder="输入时长" placeholder-class="pf-placeholder" value="{{formData.validity_value}}" bindinput="onFieldInput" data-field="validity_value" />
-        <picker wx:if="{{type === 'online_tea'}}" mode="selector" range="{{durationTypes}}" range-key="label" value="{{formData.validity_unit === 'day' ? 0 : 1}}" bindchange="onOnlineTeaValidityUnitChange">
+        <picker wx:if="{{(type === 'online_tea' || type === 'companion_camp')}}" mode="selector" range="{{durationTypes}}" range-key="label" value="{{formData.validity_unit === 'day' ? 0 : 1}}" bindchange="onOnlineTeaValidityUnitChange">
           <view class="pf-suffix">{{formData.validity_unit === 'day' ? '天' : '月'}} ▾</view>
         </picker>
         <text wx:else class="pf-suffix">个月</text>

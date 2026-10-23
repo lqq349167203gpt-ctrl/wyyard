@@ -405,6 +405,7 @@ export default function DetailView({
   // 次数余量摘要：余量为 0 或已过期的项目不显示；沙龙技能学习按不限次展示
   const remainSummary = (detail?.purchase_summary || [])
     .filter(s => {
+      if (s.type === "陪伴营") return false
       if (s.voided) return false
       if (s.expiry_date && s.expiry_date < todayStr) return false
       if (s.effective_date && s.effective_date > todayStr) return false
@@ -1298,7 +1299,9 @@ export default function DetailView({
                           <div className="flex items-baseline gap-[10px] pb-[7px]">
                             <span className="text-[12px] font-medium text-[#1f2329]">{s.type}</span>
                             <span className="ml-auto text-[12px] text-[#8f959e] tabular-nums">
-                              {s.type === "线下落地课程"
+                              {s.type === "陪伴营"
+                                ? <>陪伴老师：{s.companion_teacher || "—"}</>
+                                : s.type === "线下落地课程"
                                 ? <>已上课<span className="font-medium text-[#1f2329]">{s.attended_count || 0}</span>次</>
                                 : <>当前剩余 <span className="font-medium text-[#1f2329]">{countLabel(currentRemaining)}</span> / 总 <span className="font-medium text-[#1f2329]">{countLabel(currentTotal)}</span>{debtCount > 0 && <> · <span className="text-[#c4506a]">历史欠卡{debtCount}次</span></>}</>
                               }
@@ -1344,7 +1347,7 @@ export default function DetailView({
                                   ? <><b className="text-[12px] font-semibold text-[#212631]">不限</b></>
                                   : s.type === "线下落地课程"
                                     ? <><b className="text-[12px] font-semibold text-[#212631]">{s.validity_value || 1} 个月</b></>
-                                  : s.type === "线上茶疗"
+                                  : (s.type === "线上茶疗" || s.type === "陪伴营")
                                     ? <><b className="text-[12px] font-semibold text-[#212631]">{s.validity_value || 1} {s.validity_unit === "day" ? "天" : "个月"}</b></>
                                   : s.remaining === "不限"
                                     ? <><b className="text-[12px] font-semibold text-[#212631]">不限</b></>
@@ -1355,7 +1358,7 @@ export default function DetailView({
                               <span>
                                 {expired && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#c4506a] bg-[#fdeeee]">已过期</span>}
                                 {notStarted && !expired && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">未生效</span>}
-                                {!expired && !notStarted && s.type === "线下落地课程" && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#157a3c] bg-[#dcf5e4]">生效中</span>}
+                                {!expired && !notStarted && (s.type === "线下落地课程" || s.type === "陪伴营") && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#157a3c] bg-[#dcf5e4]">生效中</span>}
                                 {noCount && !expired && !notStarted && <span className="text-[12px] font-semibold px-2 py-px rounded-full whitespace-nowrap text-[#79838f] bg-[#f1f0ed]">无次数</span>}
                               </span>
                             </div>
@@ -1482,6 +1485,7 @@ export default function DetailView({
                             </div>
                           </div>
                         ) : (r.name || <span className="text-[#d0d3d6]">-</span>)}
+                        {r.companion_teacher && <div className="mt-0.5 text-[12px] text-[#646a73]">陪伴老师：{r.companion_teacher}</div>}
                       </TableCell>
                       <TableCell className={`py-1 text-[12px] ${isCoarseDoorDeduction ? "font-medium text-[#3370ff]" : ""}`}>
                         {isCoarseDoorDeduction ? `扣 ${r.quantity} 次` : r.quantity}

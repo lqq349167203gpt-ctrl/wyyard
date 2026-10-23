@@ -19,12 +19,14 @@ from app.services import (
     organization_service,
     position_edit_permission_service,
     project_deduction_service,
+    project_refund_service,
     upsell_config_service,
     visit_note_service,
     visit_service,
 )
 from app.services.payment_sources import payment_loader
 from app.services.principal_conversion_service import calculate_conversion
+from app.services.sales_access_service import presented
 from app.utils.customer_profile import format_work_info
 from app.utils.request_roles import get_request_roles
 
@@ -51,6 +53,7 @@ PRODUCTS = (
     ("other", "其他项目", payment_loader("other-projects"), "project_name"),
     ("tea", "茶位费", payment_loader("tea-seat-fees"), ""),
     ("online_tea", "线上茶疗", payment_loader("online-tea"), ""),
+    ("companion_camp", "陪伴营", payment_loader("companion-camps"), ""),
     ("offline", "线下课程", payment_loader("offline-courses"), "course_type"),
 )
 
@@ -458,18 +461,22 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
                 courses.append(row)
             for cid in sorted(participants):
                 events.append({"id": f"attendance:{key}:{cid}", "kind": "attendance", "product": kind,
-                               "subtype": getattr(activity, "course_type", "") or "", "date": day,
+                               "subtype": (getattr(activity, "course_type", "") or "").strip(), "date": day,
+                               "is_public_welfare": getattr(activity, "is_public_welfare", False),
                                "customer_id": cid, "customer": customer_name(cid), "organization_id": org_id,
                                "organization": org_names[org_id], "label": name, "course_key": key})
     if permissions["customer_access"]["transaction_access"] != "none":
         for key, label, loader, subtype_field in PRODUCTS:
-            for payment in loader():
+            for payment in presented(loader()):
                 cid, org_id = payment.customer_id, getattr(payment, "organization_id", "")
                 if cid not in customers or org_id not in org_names or getattr(payment, "is_deleted", False) or getattr(payment, "voided", False):
                     continue
                 day = valid_day(getattr(payment, "deal_date", ""))
                 # 无成交日期的历史记录不凭录入日期猜测业务先后。
                 if not day or day > today:
+                    continue
+                from app.services.course_workflow_service import PAYMENT_PROJECT_TYPES
+                if project_refund_service.is_project_refunded(PAYMENT_PROJECT_TYPES[key], payment.id):
                     continue
                 subtype = str(getattr(payment, subtype_field, "") or "") if subtype_field else ""
                 if subtype == "粗门次卡":
@@ -484,7 +491,7 @@ def collect_data(request, *, metadata_only=False, course_customer_ids: set[str] 
         return organizations, permissions, events, courses
     # 粗门成交以有效绑定记录为准，不依赖后续课程名单或到场确认。
     if permissions["customer_access"]["transaction_access"] != "none":
-        for deduction in project_deduction_service.list_deductions():
+        for deduction in presented(project_deduction_service.list_deductions()):
             if deduction.project_name != "粗门次卡" or deduction.is_deleted or deduction.cancelled:
                 continue
             cid = deduction.customer_id
@@ -1061,7 +1068,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         else:
             event["details"] = [f'课程日期｜{event["date"]}｜课程所属｜{event["organization"]}', f'扣卡｜{event["count"]}次｜成交归属｜{event["settlement"]}']
     if upsell_config_service.rules_configured():
-        upsell_config_service.classify_purchases(order_timeline)
+        upsell_config_service.classify_visible_events([*order_timeline, *(e for e in events if e["kind"] == "attendance")], until=today.isoformat())
     ranged_orders = [e for e in purchases if e["organization_id"] in chosen and start <= e["date"] <= end and (not query.product or e["product"] == query.product)]
     # 粗门次卡扣卡按购买算：它也在成交口径里（成交量、成交人数、付费项目拆分都要算上）
     ranged_usages = [u for u in coarse_usages
@@ -1188,7 +1195,7 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
         for order in buy_scope:
             for label in order.get("purchase_rule_labels") or [order["classification"]]:
                 buy_buyers[label].add(order["customer_id"])
-        buy_labels = ("体验", "转化", "升单", "复购", "未匹配") if upsell_config_service.rules_configured() else ("首购", "同类复购", "跨品类首购", "升单")
+        buy_labels = ("体验", "转化", "梳理", "升单", "复购", "其他成交", "规则冲突") if upsell_config_service.rules_configured() else ("首购", "同类复购", "跨品类首购", "升单")
         breakdown["buys"] = [{"key": name, "label": name, "count": buy_counts[name], "buyers": len(buy_buyers[name])}
                              for name in buy_labels if buy_counts.get(name)]
         type_counts = Counter(c["type"] for c in type_scope)
@@ -1280,6 +1287,11 @@ def analyze(request, query: PrincipalQuery, *, export=False, defer_participant_f
                 ):
                     customer_upsell_levels[order["customer_id"]].add(level.get("id") or level["name"])
                     break
+        if upsell_config_service.rules_configured():
+            for event in events:
+                if (event.get("kind") == "attendance" and event["organization_id"] in chosen
+                        and start <= event["date"] <= end):
+                    customer_upsell_levels[event["customer_id"]].update(event.get("purchase_rule_keys") or [])
         # 引流客户按流量来源、客户标签继续筛选
         visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", ""))
         # 到访目的 / 创伤经历 / 当下卡点 / 工作情况 / 其他信息：没有权限的角色连字段都不下发

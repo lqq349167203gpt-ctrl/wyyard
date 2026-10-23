@@ -335,7 +335,7 @@ Page({
         emotions: sources['emotional-releases'] || [], ohs: sources['oh-card-readings'] || [],
         energies: sources['energy-knots'] || [], courses: sources['internal-courses'] || [],
         others: sources['other-projects'] || [], teaFees: sources['tea-seat-fees'] || [],
-        onlineTea: sources['online-tea'] || [], offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [], remainingByCustomer: result.remaining_by_customer || {} }
+        onlineTea: sources['online-tea'] || [], companionCamp: sources['companion-camps'] || [], offlineCourses: sources['offline-courses'] || [], deductions: result.deductions || [], remainingByCustomer: result.remaining_by_customer || {} }
       const assembled = this._assemble(this._report, date)
       for (const key of ['visits', 'activities']) {
         const opened = new Set(this.data[key].filter(row => row.open).map(row => row.id))
@@ -543,6 +543,7 @@ Page({
         case 'tea_seat_fee':
           itemType = '茶位费'; purchaseCount = item.quantity; break
         case 'online_tea': itemType = '线上茶疗'; itemName = `${item.validity_value || 1} ${item.validity_unit === 'day' ? '天' : '个月'}`; break
+        case 'companion_camp': itemType = '陪伴营'; itemName = `${item.validity_value || 1} ${item.validity_unit === 'day' ? '天' : '个月'}`; break
         case 'offline_course':
           itemType = '线下落地课程'; itemName = item.course_name || ''; break
         case 'other':
@@ -584,6 +585,7 @@ Page({
     for (const i of payment.others || []) addItem(i, 'other')
     for (const i of payment.teaFees || []) addItem(i, 'tea_seat_fee')
     for (const i of payment.onlineTea || []) addItem(i, 'online_tea')
+    for (const i of payment.companionCamp || []) addItem(i, 'companion_camp')
     for (const i of payment.offlineCourses || []) addItem(i, 'offline_course')
 
     const total = rows.reduce((s, r) => s + (r.amount || 0), 0)
@@ -910,6 +912,10 @@ Page({
           c1 = '沙龙技能学习'; c2 = item.course_type || ''; quantity = 1; amount = item.price || 0; break
         case 'tea_seat_fee':
           c1 = '茶位费'; quantity = item.quantity; break
+        case 'online_tea':
+          c1 = '线上茶疗'; c2 = `${item.validity_value || 1} ${item.validity_unit === 'day' ? '天' : '个月'}`; amount = item.amount || 0; break
+        case 'companion_camp':
+          c1 = '陪伴营'; c2 = `${item.validity_value || 1} ${item.validity_unit === 'day' ? '天' : '个月'}`; amount = item.amount || 0; break
         case 'offline_course':
           c1 = '线下落地课程'; c2 = item.course_name || ''; break
         case 'other':
@@ -933,6 +939,8 @@ Page({
     for (const i of payment.courses || []) add(i, 'internal_course')
     for (const i of payment.others || []) add(i, 'other')
     for (const i of payment.teaFees || []) add(i, 'tea_seat_fee')
+    for (const i of payment.onlineTea || []) add(i, 'online_tea')
+    for (const i of payment.companionCamp || []) add(i, 'companion_camp')
     for (const i of payment.offlineCourses || []) add(i, 'offline_course')
     return records
   },

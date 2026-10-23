@@ -425,7 +425,7 @@ const SHARED_READ_RESOURCES = new Set([
   "customers", "statistics", "daily-report", "principal", "communication-records", "followup-records", "offline-course-records",
   "group-case-sessions", "emotional-release-sessions", "energy-knot-sessions",
   "positions", "accounts", "position-permissions", "membership-cards", "group-cases",
-  "emotional-releases", "energy-knots", "internal-courses", "oh-card-readings", "tea-seat-fees", "offline-courses", "online-tea", "other-projects",
+  "emotional-releases", "energy-knots", "internal-courses", "oh-card-readings", "tea-seat-fees", "offline-courses", "online-tea", "companion-camps", "other-projects",
   "visits", "class-records", "daily-groupings", "visit-verifications", "consumption-records",
   "activity-orders", "activity-themes", "visit-history", "activity-history",
 ])
@@ -1093,9 +1093,9 @@ export const followUpStatusApi = {
 
 // 升单配置：若干「大类」（名字 + 一组付费项目），数组顺序＝升单先后
 export interface UpsellLevel { id: string; name: string; products: string[] }
-export type PurchaseRuleKey = "experience" | "conversion" | "upsell" | "repurchase"
-export interface PurchaseRule { key: PurchaseRuleKey; previous_stage?: "" | "experience" | "conversion" | "upsell"; once?: boolean; conditions: { product?: string; products?: string[]; operator: "eq" | "gte"; count: number; count_scope?: "subtype" | "group"; first_purchase?: boolean; previous_products?: string[]; excluded_previous_products?: string[] }[] }
-export interface UpsellConfig { recommended_rules?: PurchaseRule[]; levels: UpsellLevel[]; rules: PurchaseRule[]; configured: boolean; products: { key: string; label: string }[] }
+export type PurchaseRuleKey = "experience" | "conversion" | "assessment" | "upsell" | "repurchase"
+export interface PurchaseRule { key: PurchaseRuleKey; previous_stage?: "" | "experience" | "conversion" | "upsell"; once?: boolean; count_from?: "history" | "previous_stage"; conditions: { event_kind?: "purchase" | "attendance"; public_welfare_only?: boolean; product?: string; products?: string[]; operator: "eq" | "gte"; count: number; count_scope?: "subtype" | "group"; first_purchase?: boolean; previous_products?: string[]; excluded_previous_products?: string[] }[] }
+export interface UpsellConfig { recommended_warnings?: string[]; warnings?: string[]; activities?: { key: string; label: string }[]; recommended_rules?: PurchaseRule[]; levels: UpsellLevel[]; rules: PurchaseRule[]; configured: boolean; products: { key: string; label: string }[] }
 export const upsellConfigApi = {
   get: () => request<UpsellConfig>("/api/upsell-config"),
   save: (levels: UpsellLevel[]) =>
@@ -1972,6 +1972,16 @@ export const onlineTeaApi = {
   delete: (id: string) => request<{ message: string }>(`/api/online-tea/${id}`, { method: "DELETE" }),
 }
 
+// 陪伴营：只登记购买，不记录金额。
+export interface CompanionCamp extends Omit<OfflineCourse, "amount" | "course_type"> { expiry_date: string; amount_recorded: false; companion_teacher: string; companion_teacher_id: string }
+export const companionCampApi = {
+  list: () => request<CompanionCamp[]>("/api/companion-camps"),
+  listPaginated: (page: number, pageSize: number, params?: PaymentListParams) => request<PaginatedResponse<CompanionCamp>>(`/api/companion-camps?${paymentListQuery(page, pageSize, params)}`),
+  create: (data: Record<string, unknown>) => request<CompanionCamp>("/api/companion-camps", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Record<string, unknown>) => request<CompanionCamp>(`/api/companion-camps/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => request<{ message: string }>(`/api/companion-camps/${id}`, { method: "DELETE" }),
+}
+
 // Offline Courses
 export interface OfflineCourse {
   course_type?: string
@@ -2656,7 +2666,7 @@ export interface PaymentExportParams {
 export const paymentExportApi = {
   courseOptions: (date: string, customerId = "") => request<Array<{ key: string; name: string; date: string }>>(`/api/payment-exports/course-options?date=${encodeURIComponent(date)}${customerId ? `&customer_id=${encodeURIComponent(customerId)}` : ""}`),
   records: (page: number, pageSize: number, nickname: string, closerName: string) =>
-    request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "online_tea" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
+    request<PaginatedResponse<{ type: "membership_card" | "group_case" | "emotional_release" | "oh_card_reading" | "energy_knot" | "internal_course" | "tea_seat_fee" | "offline_course" | "online_tea" | "companion_camp" | "other"; record: Record<string, unknown> }>>(`/api/payment-exports/records?${new URLSearchParams({ page: String(page), page_size: String(pageSize), nickname, closer_name: closerName })}`),
   download: async (params: PaymentExportParams) => {
     const query = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
@@ -2853,6 +2863,7 @@ export const healingRecordApi = {
 
 // Customer Detail (聚合)
 export interface PurchaseSummaryItem {
+  companion_teacher?: string
   type: string
   total_purchased: number | string
   grand_total?: number
@@ -2935,6 +2946,7 @@ export interface ActivityFollowup {
 }
 
 export interface PaymentRecord {
+  companion_teacher?: string
   cancelled?: boolean
   cancellation_reason?: string
   type: string

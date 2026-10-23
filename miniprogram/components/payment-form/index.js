@@ -96,7 +96,7 @@ function getValidityDetails(type, formData) {
   } else if (type === 'internal_course') {
     durationType = 'month'
     durationValue = formData.validity_value || 12
-  } else if (type === 'offline_course' || type === 'online_tea') {
+  } else if (type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')) {
     durationType = formData.validity_unit || 'month'
     durationValue = formData.validity_value || 1
   }
@@ -155,6 +155,7 @@ Component({
     diagnosisDurationIndex: 0,  // 默认0.5小时
     diagnosisTeachers: [],
     diagnosisTeacherIndex: -1,
+    companionTeacherIndex: -1,
     submitting: false,
     confirmVisible: false,
     confirmRows: [],
@@ -251,10 +252,10 @@ Component({
       } else if (type === 'tea_seat_fee') {
         if (!initData.quantity) initData.quantity = '1'
         if (initData.amount === undefined || initData.amount === '') initData.amount = '68'
-      } else if (type === 'offline_course' || type === 'online_tea') {
+      } else if (type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')) {
         if (!initData.effective_date) initData.effective_date = today()
-        if (!initData.validity_value) initData.validity_value = String(type === 'online_tea' ? 1 : offlineCourseDefaultMonths(initData.course_type))
-        if (type === 'online_tea' && !initData.validity_unit) initData.validity_unit = 'month'
+        if (!initData.validity_value) initData.validity_value = String((type === 'online_tea' || type === 'companion_camp') ? 1 : offlineCourseDefaultMonths(initData.course_type))
+        if ((type === 'online_tea' || type === 'companion_camp') && !initData.validity_unit) initData.validity_unit = 'month'
       } else if (type === 'internal_course') {
         if (!initData.effective_date) initData.effective_date = today()
         if (!initData.validity_value) initData.validity_value = '12'
@@ -322,7 +323,7 @@ Component({
       } else if (type === 'tea_seat_fee') {
         rows.push({ label: '数量', value: (formData.quantity || '1') + ' 位' })
         amountRow = { label: '付费金额', value: '¥' + formatMoney(formData.amount) }
-      } else if (type === 'online_tea') {
+      } else if ((type === 'online_tea' || type === 'companion_camp')) {
         rows.push({ label: '生效日期', value: formData.effective_date || '-' })
       } else if (type === 'offline_course') {
         rows.push({ label: '课程类型', value: formData.course_type || '-' })
@@ -336,6 +337,7 @@ Component({
       const validity = getValidityDetails(type, formData)
       rows.push({ label: '有效期', value: validity.label })
       rows.push({ label: '结束日期', value: validity.expiryDate })
+      if (type === 'companion_camp') rows.push({ label: '陪伴老师', value: formData.companion_teacher || '-' })
       if (!hidePaymentDetails) rows.push(amountRow)
       rows.push({ label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' })
       if (!hidePaymentDetails) {
@@ -505,6 +507,15 @@ Component({
       if (type === 'oh_card_reading' && fd.diagnosis_duration) {
         const idx = DIAGNOSIS_DURATIONS.findIndex(dd => dd.value === fd.diagnosis_duration)
         if (idx >= 0) this.setData({ diagnosisDurationIndex: idx })
+      }
+      // 编辑旧记录时保留原老师显示；禁用身份不重新加入新记录候选列表。
+      const originalTeacher = type === 'companion_camp' ? fd.companion_teacher : type === 'oh_card_reading' ? fd.diagnosis_teacher : ''
+      if (originalTeacher && !this.data.diagnosisTeachers.some(t => t.nickname === originalTeacher)) {
+        this.setData({ diagnosisTeachers: [...this.data.diagnosisTeachers, { id: fd.companion_teacher_id || '', nickname: originalTeacher }] })
+      }
+      if (type === 'companion_camp') {
+        const idx = this.data.diagnosisTeachers.findIndex(t => fd.companion_teacher_id ? t.id === fd.companion_teacher_id : t.nickname === fd.companion_teacher)
+        this.setData({ companionTeacherIndex: idx })
       }
       if (type === 'oh_card_reading' && fd.diagnosis_teacher) {
         const teachers = this.data.diagnosisTeachers
@@ -804,6 +815,13 @@ Component({
       this.setData({ 'formData.agreement_status': e.currentTarget.dataset.value })
     },
 
+    onCompanionTeacherChange(e) {
+      const idx = Number(e.detail.value)
+      const teacher = this.data.diagnosisTeachers[idx]
+      if (teacher) this.setData({ companionTeacherIndex: idx,
+        'formData.companion_teacher': teacher.nickname, 'formData.companion_teacher_id': teacher.id })
+    },
+
     onDiagnosisTeacherChange(e) {
       const idx = parseInt(e.detail.value)
       const teachers = this.data.diagnosisTeachers
@@ -842,14 +860,14 @@ Component({
         ) || undefined
       }
       // 线下课程和线上茶疗按所选单位计算到期日期
-      if ((type === 'offline_course' || type === 'online_tea') && payload.effective_date && payload.validity_value) {
+      if ((type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')) && payload.effective_date && payload.validity_value) {
         payload.expiry_date = calculateExpiryDate(
           payload.effective_date,
           payload.validity_unit || 'month',
           payload.validity_value,
         ) || undefined
       }
-      if (type === 'online_tea') {
+      if ((type === 'online_tea' || type === 'companion_camp')) {
         delete payload.amount; delete payload.price; delete payload.payment_method
         payload.validity_value = Number(payload.validity_value)
       }
@@ -896,7 +914,7 @@ Component({
         else payload.amount = 0
         payload.payment_method = null
       }
-      if (type === 'online_tea') {
+      if ((type === 'online_tea' || type === 'companion_camp')) {
         ;['price', 'amount', 'fee', 'payment_method'].forEach(key => delete payload[key])
       }
       // 成交人独立于金额配置；保留空值，确保编辑时也能清空原成交人。
@@ -920,6 +938,10 @@ Component({
       const hidePaymentDetails = true
       if (!selectedCustomer) {
         wx.showToast({ title: '请选择用户', icon: 'none' })
+        return
+      }
+      if (!closers.some(c => (c.nickname || '').trim())) {
+        wx.showToast({ title: '请选择成交人', icon: 'none' })
         return
       }
       if (type !== 'coarse_door_card' && !this.data.dealCourseChosen) {
@@ -958,8 +980,11 @@ Component({
       if (type === 'membership_card' && formData.card_type === '定制化' && !isEdit && (!Number.isInteger(Number(formData.duration_value)) || Number(formData.duration_value) <= 0 || (!this.data.cardUnlimited && (!Number.isInteger(Number(formData.remaining_count)) || Number(formData.remaining_count) <= 0)))) {
         wx.showToast({ title: '请填写次数和有效期，或选择不限次数', icon: 'none' }); return
       }
-      if (type === 'online_tea' && (!formData.organization_id || !formData.deal_date || !formData.effective_date || !Number.isInteger(Number(formData.validity_value)) || Number(formData.validity_value) < 1 || Number(formData.validity_value) > 1200)) {
+      if ((type === 'online_tea' || type === 'companion_camp') && (!formData.organization_id || !formData.deal_date || !formData.effective_date || !Number.isInteger(Number(formData.validity_value)) || Number(formData.validity_value) < 1 || Number(formData.validity_value) > 1200)) {
         wx.showToast({ title: '请填写日期和1至1200的有效期', icon: 'none' }); return
+      }
+      if (type === 'companion_camp' && !(formData.companion_teacher || '').trim()) {
+        wx.showToast({ title: '请选择陪伴老师', icon: 'none' }); return
       }
       if (type === 'offline_course' && !isEdit && this.data.offlineCourseTypeIndex < 0) {
         wx.showToast({ title: '请选择课程类型', icon: 'none' }); return

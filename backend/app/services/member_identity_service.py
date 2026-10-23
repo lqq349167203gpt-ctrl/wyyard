@@ -251,7 +251,13 @@ def _extra_payment_counts(identities) -> dict:
     categories = {cat for identity in identities for condition in identity.conditions
                   for cat in _get_payment_categories(condition)}
     counts: dict[str, dict[str, int]] = {}
-    from app.services import offline_course_service, online_tea_service, project_deduction_service, tea_seat_fee_service
+    from app.services import (
+        companion_camp_service,
+        offline_course_service,
+        online_tea_service,
+        project_deduction_service,
+        tea_seat_fee_service,
+    )
 
     sources = {}
     if "粗门次卡" in categories:
@@ -261,6 +267,8 @@ def _extra_payment_counts(identities) -> dict:
         sources["茶位费"] = tea_seat_fee_service.list_fees()
     if "线上茶疗" in categories:
         sources["线上茶疗"] = online_tea_service.list_records()
+    if "陪伴营" in categories:
+        sources["陪伴营"] = companion_camp_service.list_records()
     if "线下课程" in categories:
         sources["线下课程"] = offline_course_service.list_courses()
     for category, rows in sources.items():

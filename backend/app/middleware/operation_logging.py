@@ -75,6 +75,7 @@ SECTION_MAP = {
     "/api/visit-history": "邀约",
     "/api/communication-records": "沟通记录",
     "/api/online-tea": "付费项目",
+    "/api/companion-camps": "付费项目",
     "/api/offline-courses": "付费项目",
     "/api/offline-course-records": "落地课程",
     "/api/tea-seat-fees": "付费项目",
@@ -122,6 +123,7 @@ GETTER_MAP = {
     "/api/organizations": ("组织信息", "organization_service", "get_organization"),
     "/api/communication-records": ("沟通记录", "communication_record_service", "get_record"),
     "/api/online-tea": ("付费项目", "online_tea_service", "get_record"),
+    "/api/companion-camps": ("付费项目", "companion_camp_service", "get_record"),
     "/api/offline-courses": ("付费项目", "offline_course_service", "get_course"),
     "/api/offline-course-records": ("落地课程", "offline_course_record_service", "get_record"),
 }
@@ -193,6 +195,7 @@ PAGE_LABELS: dict[str, str] = {
     "activity-history": "课表",
     "visit-history": "邀约",
     "online-tea": "付费项目",
+    "companion-camps": "付费项目",
     "offline-courses": "付费项目",
     "expenses": "支出项",
     "financial-overview": "财务数据",
@@ -993,7 +996,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
     payment_paths = (
         "/api/membership-cards", "/api/group-cases", "/api/emotional-releases",
         "/api/energy-knots", "/api/oh-card-readings", "/api/tea-seat-fees",
-        "/api/online-tea", "/api/offline-courses", "/api/internal-courses", "/api/other-projects",
+        "/api/online-tea", "/api/companion-camps", "/api/offline-courses", "/api/internal-courses", "/api/other-projects",
         "/api/project-deductions",
     )
     if any(path == prefix or path.startswith(prefix + "/") for prefix in payment_paths):
@@ -1199,7 +1202,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "深度情绪释放",
-                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "online-tea": "线上茶疗", "offline-courses": "线下落地课程",
+                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "online-tea": "线上茶疗", "companion-camps": "陪伴营", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)
@@ -1264,7 +1267,7 @@ def build_log_content(method: str, path: str, body: dict, before: dict = None) -
             type_labels = {
                 "membership-cards": "会员卡", "group-cases": "觉醒游戏",
                 "emotional-releases": "情绪释放", "oh-card-readings": "OH卡诊断", "energy-knots": "深度情绪释放",
-                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "online-tea": "线上茶疗", "offline-courses": "线下落地课程",
+                "internal-courses": "沙龙技能学习", "tea-seat-fees": "茶位费", "online-tea": "线上茶疗", "companion-camps": "陪伴营", "offline-courses": "线下落地课程",
                 "other-projects": "其他项目",
             }
             project_name = type_labels.get(project_type, project_type)

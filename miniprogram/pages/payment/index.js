@@ -87,8 +87,8 @@ function buildDetail(item, type) {
     const qty = item.quantity || 1
     return `${qty}位`
   }
-  if (type === 'offline_course' || type === 'online_tea') {
-    return [item.course_type, `${item.validity_value || 1} ${type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月'}`].filter(Boolean).join(' · ')
+  if (type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')) {
+    return [item.course_type, `${item.validity_value || 1} ${(type === 'online_tea' || type === 'companion_camp') && item.validity_unit === 'day' ? '天' : '个月'}`].filter(Boolean).join(' · ')
   }
   // group_case, emotional_release, energy_knot
   const count = item.purchase_count
@@ -112,6 +112,7 @@ function formatPrice(value) {
 }
 
 function buildMetaPrimary(item, type, detail) {
+  if (type === 'companion_camp') return '陪伴老师：' + (item.companion_teacher || '—')
   if (type === 'membership_card' || type === 'internal_course' || type === 'other') return detail
   if (type === 'oh_card_reading') {
     const parts = []
@@ -120,7 +121,7 @@ function buildMetaPrimary(item, type, detail) {
     return parts.join(' · ')
   }
   if (type === 'tea_seat_fee') return '数量：' + (item.quantity || 1) + '位'
-  if (type === 'offline_course' || type === 'online_tea') return '有效期：' + (item.validity_value || 1) + (type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月')
+  if (type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')) return '有效期：' + (item.validity_value || 1) + ((type === 'online_tea' || type === 'companion_camp') && item.validity_unit === 'day' ? '天' : '个月')
   return ''
 }
 
@@ -139,11 +140,11 @@ function decorateItems(raw, type, organizations) {
   const isHealing = ['group_case', 'emotional_release', 'energy_knot'].includes(type)
   const isOhCard = type === 'oh_card_reading'
   const isTeaSeat = type === 'tea_seat_fee'
-  const isOffline = type === 'offline_course' || type === 'online_tea'
+  const isOffline = type === 'offline_course' || (type === 'online_tea' || type === 'companion_camp')
   const isCountProject = isHealing || type === 'membership_card' || type === 'other'
 
   return raw.map(function(item) {
-    var expiry = type === 'online_tea' ? (item.expiry_date || '') : isOffline ? calcOfflineExpiry(item) : (item.expiry_date ? item.expiry_date.slice(0, 10) : '')
+    var expiry = (type === 'online_tea' || type === 'companion_camp') ? (item.expiry_date || '') : isOffline ? calcOfflineExpiry(item) : (item.expiry_date ? item.expiry_date.slice(0, 10) : '')
     var status = calcStatus(item, type, expiry)
     var detail = buildDetail(item, type)
     var price = buildPrice(item, type)
@@ -174,7 +175,7 @@ function decorateItems(raw, type, organizations) {
       _status: status.text,
       _statusColor: status.color,
       _statusBg: status.bg,
-      _validity: isOffline ? '有效期：' + (item.validity_value || 1) + (type === 'online_tea' && item.validity_unit === 'day' ? '天' : '个月') : '',
+      _validity: isOffline ? '有效期：' + (item.validity_value || 1) + ((type === 'online_tea' || type === 'companion_camp') && item.validity_unit === 'day' ? '天' : '个月') : '',
       _quantity: isTeaSeat ? '数量：' + (item.quantity || 1) + '位' : '',
       _duration: isOhCard ? '时长：' + formatDuration(item.diagnosis_duration) : '',
     })

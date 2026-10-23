@@ -115,7 +115,7 @@ ALL_PAGE_KEYS = [
     "payment-deductions", "payment-refunds", "debt-records",
     "payment", "membership-cards", "group-cases",
     "emotional-releases", "oh-card-readings",
-    "energy-knots", "internal-courses", "tea-seat-fees", "online-tea", "offline-courses", "other-projects",
+    "energy-knots", "internal-courses", "tea-seat-fees", "online-tea", "companion-camps", "offline-courses", "other-projects",
     # 信息配置
     "member-identities", "customer-tags", "upsell-config", "healing-identities", "organizations", "spaces",
     # 账号管理

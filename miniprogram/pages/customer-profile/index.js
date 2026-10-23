@@ -64,7 +64,10 @@ function normalizePurchaseItem(item, key) {
   let _specialText = ''
   let _specialCls = ''
 
-  if (isOfflineCourse) {
+  if (item.type === '陪伴营') {
+    _specialText = `${item.validity_value || 1} ${item.validity_unit === 'day' ? '天' : '个月'}`
+    _specialCls = 'remain'
+  } else if (isOfflineCourse) {
     _specialText = `已上课 ${item.attended_count || 0} 次`
     _specialCls = 'remain-used'
   } else if (voided || remaining === '已退费') {

@@ -43,3 +43,17 @@ def ensure_payment_closer_total(data, amount_field: str, existing=None, request=
     current = _as_dict(existing)
     fee = _money(incoming.get(amount_field, current.get(amount_field, 0)), "费用金额")
     _ = fee
+
+
+def ensure_payment_closer_required(data, existing=None) -> None:
+    """新建和编辑都必须留有成交人；旧记录不改动时仍能读取。"""
+    incoming = _as_dict(data)
+    current = _as_dict(existing)
+    closers = incoming.get("closers", current.get("closers")) or []
+    closer_name = incoming.get("closer_name", current.get("closer_name"))
+    valid = isinstance(closers, list) and any(
+        isinstance(item, dict) and str(item.get("name") or "").strip() for item in closers
+    )
+    valid = valid or bool(str(closer_name or "").strip())
+    if not valid:
+        raise HTTPException(status_code=400, detail="请选择成交人")

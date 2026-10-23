@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.middleware.jwt_auth import require_page_permission
 from app.models.operation_log import OperationLogCreate
-from app.models.upsell_config import PURCHASE_RULE_LABELS, UpsellConfigUpdate
+from app.models.upsell_config import PURCHASE_RULE_LABELS, PurchaseRule, UpsellConfigUpdate, configuration_problems
 from app.services import (
+    course_rule_catalog,
     internal_course_service,
     operation_log_service,
     other_project_service,
@@ -28,6 +29,7 @@ PAYMENT_ITEMS = (
     ("emotional", "情绪释放", ""),
     ("oh", "OH卡诊断", "oh"),
     ("online_tea", "线上茶疗", ""),
+    ("companion_camp", "陪伴营", ""),
     ("energy", "深度情绪释放", ""),
     ("internal", "沙龙技能学习", "internal"),
     ("tea", "茶位费", ""),
@@ -70,6 +72,10 @@ def _products() -> list[dict]:
     return items
 
 
+def _activities() -> list[dict]:
+    return course_rule_catalog.activities()
+
+
 def _parent_of(item: str, labels: dict[str, str]) -> str:
     return item.partition(":")[0]
 
@@ -86,7 +92,9 @@ def _rule_snapshot(rules: list[dict], labels: dict[str, str]) -> dict:
     return {PURCHASE_RULE_LABELS[rule["key"]]: [
         {**({"前置阶段": PURCHASE_RULE_LABELS[rule["previous_stage"]]} if rule.get("previous_stage") else {}),
          **({"仅首次达成": True} if rule.get("once") else {}),
-         "付费项目": "、".join(labels.get(product, product) for product in (item.get("products") or [item.get("product", "")])), "购买次数": f"第{item['count']}次{'及以上' if item['operator'] == 'gte' else ''}",
+         **({"计数起点": "前置阶段完成后"} if rule.get("count_from") == "previous_stage" else {}),
+         **({"条件来源": "实际上课", "仅公益场次": item.get("public_welfare_only", False)} if item.get("event_kind") == "attendance" else {}),
+         ("参与课程" if item.get("event_kind") == "attendance" else "付费项目"): "、".join(labels.get(product, product) for product in (item.get("products") or [item.get("product", "")])), ("参与次数" if item.get("event_kind") == "attendance" else "购买次数"): f"第{item['count']}次{'及以上' if item['operator'] == 'gte' else ''}",
          **({"累计方式": "所选项目合计"} if item.get("count_scope") == "group" else {}),
          **({"首次购买": "是"} if item.get("first_purchase") else {}),
          **({"此前未买": "、".join(labels.get(product, product) for product in item["excluded_previous_products"])} if item.get("excluded_previous_products") else {}),
@@ -97,20 +105,29 @@ def _rule_snapshot(rules: list[dict], labels: dict[str, str]) -> dict:
 
 @router.get("")
 def get_config():
-    return {"levels": upsell_config_service.list_levels(), "rules": upsell_config_service.list_rules(), "configured": upsell_config_service.rules_configured(), "products": _products(), "recommended_rules": upsell_config_service.recommended_rules()}
+    rules = upsell_config_service.list_rules()
+    missing = course_rule_catalog.missing_rules(rules)
+    warnings = configuration_problems([PurchaseRule(**rule) for rule in rules])
+    if missing:
+        warnings.append("课程类型已失效，请重新选择：" + "、".join(missing))
+    activities = _activities() + [{"key": key, "label": key.partition(":")[2] + "（已失效）", "parent": "class"} for key in missing]
+    return {"recommended_warnings": [] if course_rule_catalog.book_club_key() else ["未找到读书会课程类型，默认方案仅包含粗门体验；请补选课程类型。"], "warnings": warnings, "activities": activities, "levels": upsell_config_service.list_levels(), "rules": upsell_config_service.list_rules(), "configured": upsell_config_service.rules_configured(), "products": _products(), "recommended_rules": upsell_config_service.recommended_rules()}
 
 
 def _validate_rules(rules, labels):
+    activity_labels = {item["key"]: item["label"] for item in _activities()}
     for rule in rules:
         for condition in rule.conditions:
-            if any(product not in labels for product in [*(condition.products or [condition.product]), *condition.previous_products, *condition.excluded_previous_products]):
-                raise HTTPException(status_code=400, detail="请选择有效的付费项目或子类型")
+            current_labels = activity_labels if condition.event_kind == "attendance" else labels
+            if (any((course_rule_catalog.resolve_key(product) if condition.event_kind == "attendance" else product) not in current_labels for product in (condition.products or [condition.product]))
+                    or any(product not in labels for product in [*condition.previous_products, *condition.excluded_previous_products])):
+                raise HTTPException(status_code=400, detail="请选择有效的付费项目、子类型或参与课程")
 
 
 @router.post("/preview")
 def preview_config(data: UpsellConfigUpdate):
     if data.rules is None:
-        raise HTTPException(status_code=400, detail="请提供四类购买规则")
+        raise HTTPException(status_code=400, detail="请提供五类统计规则")
     _validate_rules(data.rules, {item["key"]: item["label"] for item in _products()})
     return {"items": upsell_config_service.preview_rules([rule.model_dump(mode="json") for rule in data.rules])}
 
@@ -118,24 +135,28 @@ def preview_config(data: UpsellConfigUpdate):
 @router.put("")
 def save_config(data: UpsellConfigUpdate, request: Request):
     labels = {item["key"]: item["label"] for item in _products()}
+    snapshot_labels = {**labels, **{item["key"]: item["label"] for item in _activities()}}
     if data.rules is not None:
         _validate_rules(data.rules, labels)
         previous_rules = upsell_config_service.list_rules()
-        rules = upsell_config_service.replace_rules(data.rules)
+        if data._legacy_rules and any(rule["key"] == "assessment" and rule["conditions"] for rule in previous_rules):
+            raise HTTPException(status_code=409, detail="规则已新增梳理，请刷新页面后再保存")
+        normalized = course_rule_catalog.normalize_rules([rule.model_dump(mode="json") for rule in data.rules])
+        rules = upsell_config_service.replace_rules([PurchaseRule(**rule) for rule in normalized])
         descriptions = []
         for rule in rules:
-            conditions = [f"{entry['付费项目']}·{entry['购买次数']}" for entry in _rule_snapshot([rule], labels)[PURCHASE_RULE_LABELS[rule["key"]]]]
+            conditions = [f"{entry.get('付费项目', entry.get('参与课程'))}·{entry.get('购买次数', entry.get('参与次数'))}" for entry in _rule_snapshot([rule], snapshot_labels)[PURCHASE_RULE_LABELS[rule["key"]]]]
             descriptions.append(f"{PURCHASE_RULE_LABELS[rule['key']]}：{'；'.join(conditions) or '未配置'}")
         request.state.skip_operation_log = True
         operation_log_service.create_log(OperationLogCreate(section="信息配置", content=("更新购买规则：" + " / ".join(descriptions))[:9500]), extra={
             "operator": getattr(request.state, "user_owner", "") or getattr(request.state, "user_name", ""),
             "operator_role": "、".join(get_request_roles(request)), "source": get_client_source(request),
             "method": "PUT", "path": request.url.path, "ip": get_client_ip(request),
-            "before_data": _rule_snapshot(previous_rules, labels), "after_data": _rule_snapshot(rules, labels),
+            "before_data": _rule_snapshot(previous_rules, snapshot_labels), "after_data": _rule_snapshot(rules, snapshot_labels),
         })
         return get_config()
     if upsell_config_service.rules_configured():
-        raise HTTPException(status_code=409, detail="已启用四类购买规则，请刷新配置页面后操作")
+        raise HTTPException(status_code=409, detail="已启用购买规则，请刷新配置页面后操作")
     # 同一个项目只能放一档；「整个会员卡」和「某个卡种」不能同时出现在不同大类里，
     # 但不同卡种（体验会员 → 次卡）可以各占一档，这正是卡种级的升单。
     placed: dict[str, str] = {}
