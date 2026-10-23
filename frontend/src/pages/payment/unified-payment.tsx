@@ -1,3 +1,4 @@
+import { defaultOrganization } from "@/lib/default-organization"
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { MEMBERSHIP_CARD_DEFAULTS as MEMBERSHIP_CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES, offlineCourseDefaultMonths } from "@/lib/payment-types"
@@ -571,7 +572,7 @@ export function UnifiedPaymentContent({
     setFormDealCourse(UNSET_DEAL_COURSE)
     setFormDealCourseName("")
     setFormClosers([])
-    setFormOrganizationId(organizations.find(org => org.status !== "archived")?.id || "")
+    setFormOrganizationId(defaultOrganization(organizations)?.id || "")
     setFormPaymentMethod("")
     setFormNotes("")
     setCloserError(false)
@@ -738,6 +739,7 @@ export function UnifiedPaymentContent({
   // 保存
   const handleSave = () => {
     if (!formCustomerId) return
+    if (!editingItem && !defaultOrganization(organizations)) { window.alert("未找到可用的无忧茶院，请联系管理员检查组织配置"); return }
     setCloserError(false)
     if (!hidePaymentDetails) {
       const amt = getFormAmount()
@@ -751,7 +753,7 @@ export function UnifiedPaymentContent({
     if (formType === "oh_card_reading" && !formReadingType && !editingItem) { window.alert("请选择诊断类型"); return }
     if (formType === "oh_card_reading" && !formDiagnosisTeacher.trim()) { window.alert("请选择诊断老师"); return }
     if (formType === "offline_course" && !formCourseType && !editingItem) { window.alert("请选择课程类型"); return }
-    if (formType === "online_tea" && (!formOrganizationId || !formOfflineEffectiveDate || !formDealDate || !Number.isInteger(Number(formOfflineValidityValue)) || Number(formOfflineValidityValue) < 1 || Number(formOfflineValidityValue) > 1200)) { window.alert("请选择成交归属、日期并填写1至1200的天或月有效期"); return }
+    if (formType === "online_tea" && (!formOrganizationId || !formOfflineEffectiveDate || !formDealDate || !Number.isInteger(Number(formOfflineValidityValue)) || Number(formOfflineValidityValue) < 1 || Number(formOfflineValidityValue) > 1200)) { window.alert("请填写日期和1至1200的天或月有效期"); return }
     if (formType === "tea_seat_fee" && !parseInt(formTeaQuantity)) return
     if (formType === "other" && !formProjectName) return
     setConfirmOpen(true)
@@ -761,7 +763,7 @@ export function UnifiedPaymentContent({
     const closer_id = formClosers[0]?.id || null
     const closer_name = formClosers[0]?.name || null
     const closers = formClosers.map(closer => ({ ...closer, amount: 0 }))
-    const organization_id = formOrganizationId || null
+    const organization_id = editingItem ? formOrganizationId || null : defaultOrganization(organizations)?.id || null
     const deal_date = formDealDate || null
     let createdBy = ""
     try { const u = JSON.parse(localStorage.getItem("currentUser") || "{}"); createdBy = u.owner || u.username || "" } catch {}
@@ -1005,7 +1007,6 @@ export function UnifiedPaymentContent({
     online_tea: [
       { header: "成交日期", key: "deal_date", width: 12, example: "2026-10-19" },
       { header: "用户昵称", key: "nickname", width: 12, example: "张三" },
-      { header: "成交归属", key: "organization", width: 14, example: "无忧茶院" },
       { header: "生效日期", key: "effective_date", width: 12, example: "2026-10-19" },
       { header: "有效期时长", key: "validity_value", width: 12, example: "1" },
       { header: "有效期单位", key: "validity_unit", width: 12, example: "月" },
@@ -1020,7 +1021,6 @@ export function UnifiedPaymentContent({
       { header: "有效期单位", key: "duration_type", width: 10, example: "月" },
       { header: "有效期时长", key: "duration_value", width: 10, example: "6" },
       { header: "次数（不填则无限次数）", key: "remaining_count", width: 16, example: "" },
-      { header: "成交归属", key: "organization", width: 12, example: "" },
     ],
   }
 
@@ -1079,20 +1079,7 @@ export function UnifiedPaymentContent({
         }
       }
 
-      // 成交归属下拉（仅其他项目）
-      if (type === "other" && organizations.length > 0) {
-        const orgCol = cols.findIndex(c => c.key === "organization") + 1
-        if (orgCol > 0) {
-          const orgNames = organizations.map(o => o.name)
-          for (let r = 2; r <= 500; r++) {
-            ws.getCell(r, orgCol).dataValidation = {
-              type: "list",
-              allowBlank: true,
-              formulae: [`"${orgNames.join(",")}"`],
-            }
-          }
-        }
-      }
+
     }
 
     const buffer = await wb.xlsx.writeBuffer()
@@ -1112,7 +1099,7 @@ export function UnifiedPaymentContent({
     const nickname = get("用户昵称")
     const amountStr = get("金额")
     const closerNickname = get("成交人昵称（多个成交人请去页面内录入）") || get("成交人昵称")
-    const orgName = get("成交归属") || get("所属组织")
+    const orgName = defaultOrganization([...orgMap.values()])?.name || ""
     const cardType = type === "membership_card" ? get("会员卡类型") : ""
     const omitPaymentDetails = true
 
@@ -1158,16 +1145,8 @@ export function UnifiedPaymentContent({
       else { closerId = closer.id; closerName = closer.nickname }
     }
 
-    let orgId: string | null = null
-    if (orgName) {
-      const org = orgMap.get(orgName)
-      if (!org) errors.push(`组织"${orgName}"不存在`)
-      else orgId = org.id
-    } else if (type !== "other") {
-      // 非其他项目默认无忧茶院
-      const defaultOrg = orgMap.get("无忧茶院")
-      if (defaultOrg) orgId = defaultOrg.id
-    }
+    if (!orgName) errors.push("未找到可用的无忧茶院")
+    const orgId = defaultOrganization([...orgMap.values()])?.id || null
 
     if (errors.length > 0) return { errors }
 
@@ -1510,7 +1489,6 @@ export function UnifiedPaymentContent({
       rows.push({ label: formType === "energy_knot" ? "部位数" : "购买场次", value: `${formPurchaseCount || "0"} ${formType === "energy_knot" ? "个" : "次"}` })
       if (!hidePaymentDetails) rows.push({ label: "付费金额", value: `¥${parseFloat(formAmount || "0").toLocaleString()}` })
     }
-    rows.push({ label: "成交归属", value: organizations.find(o => o.id === formOrganizationId)?.name || "-" })
     rows.push({ label: "成交人", value: formClosers.length > 0 ? formClosers.map(c => c.name).join("、") : "-" })
     if (needsAgreement) rows.push({ label: "协议签订", value: formAgreementStatus === "signed" ? "已签" : "未签" })
     if (!hidePaymentDetails) {
@@ -1648,9 +1626,7 @@ export function UnifiedPaymentContent({
                   <TableRow key={`${item.type}-${item.id}`} className="group hover:bg-[#f7f8fa]">
                     <TableCell className="pl-4 text-[#2b2f36]">
                       <div className="truncate">{item.deal_date || <EmptyValue />}</div>
-                      <div className="mt-1 truncate text-[12px] text-[#a8adb5]" title={organizations.find(org => org.id === item.organization_id)?.name}>
-                        {organizations.find(org => org.id === item.organization_id)?.name || <EmptyValue />}
-                      </div>
+
                     </TableCell>
                     <TableCell className="text-[#2b2f36] truncate" title={item.nickname}>{item.nickname}</TableCell>
                     {activeType === "oh_card_reading" && <TableCell className="text-[#2b2f36] truncate" title={item.reading_type}>{item.reading_type || <EmptyValue />}</TableCell>}
@@ -1825,17 +1801,6 @@ export function UnifiedPaymentContent({
             <div className="grid grid-cols-[70px_1fr] items-center gap-2">
               <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交日期</span>
               <Input type="date" value={formDealDate} onChange={(e) => { setFormDealDate(e.target.value); setFormDealCourse(UNSET_DEAL_COURSE); setFormDealCourseName("") }} />
-            </div>
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span className="text-[12px] text-[#4e535a] font-light text-right tracking-widest">成交归属</span>
-              <SelectDropdown
-                value={formOrganizationId}
-                options={organizations.filter(org => org.status !== "archived" || (editingItem && org.id === formOrganizationId)).map(o => ({ value: o.id, label: o.name + (o.status === "archived" ? "（已归档）" : "") }))}
-                placeholder="选择组织"
-                placeholderColor="text-[#a8b1bd]"
-                textColor={formOrganizationId ? "text-[#2b2f36]" : undefined}
-                onChange={setFormOrganizationId}
-              />
             </div>
             <div className="border-b border-[#ebedf0] ml-[19px] -mt-[2px]" style={{ borderBottomWidth: "0.5px" }} />
 

@@ -279,9 +279,8 @@ Component({
     },
 
     _buildConfirmRows() {
-      const { type, formData, selectedCustomer, closers, organizations, orgIndex } = this.data
+      const { type, formData, selectedCustomer, closers } = this.data
       if (type === 'coarse_door_card') {
-        const settlementOrganization = organizations[orgIndex]
         const courseOrganization = this.data.coarseCourseOrganizations[this.data.coarseCourseOrganizationIndex]
         const course = this.data.coarseCourses[this.data.coarseCourseIndex]
         return [
@@ -290,7 +289,6 @@ Component({
           { label: '成交课程', value: courseOrganization ? courseOrganization.name : '-' },
           { label: '所扣课程', value: course ? course._label : '-' },
           { label: '抵扣次数', value: course ? `${course.deduction_count}次` : '-' },
-          { label: '成交归属', value: settlementOrganization ? settlementOrganization.name : '-' },
           { label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' },
           { label: '备注', value: formData.notes || '-' },
         ]
@@ -339,8 +337,6 @@ Component({
       rows.push({ label: '有效期', value: validity.label })
       rows.push({ label: '结束日期', value: validity.expiryDate })
       if (!hidePaymentDetails) rows.push(amountRow)
-      const organization = organizations[orgIndex]
-      rows.push({ label: '成交归属', value: organization ? organization.name : '-' })
       rows.push({ label: '成交人', value: closers.map(c => c.nickname).join('、') || '-' })
       if (!hidePaymentDetails) {
         rows.push({ label: '成交人合计', value: '¥' + formatMoney(closers.reduce((sum, closer) => sum + (Number(closer.amount) || 0), 0)) })
@@ -378,11 +374,8 @@ Component({
         const currentOrgId = (this.data.isEdit && this.data.editData ? this.data.editData.organization_id : this.data.formData.organization_id) || ''
         const orgs = (res || []).filter(org => org.status !== 'archived' || (this.data.isEdit && org.id === currentOrgId)).map(org => Object.assign({}, org, { name: org.name + (org.status === 'archived' ? '（已归档）' : '') }))
         const currentIndex = orgs.findIndex(item => item.id === currentOrgId)
-        // 粗门次卡新增：成交归属不预选，必须由录入人自己确认（必填）
-        const needsExplicitChoice = this.data.type === 'coarse_door_card' && !this.data.isEdit
-        const orgIndex = currentIndex >= 0
-          ? currentIndex
-          : (needsExplicitChoice || orgs.length === 0 ? -1 : 0)
+        const defaultIndex = orgs.findIndex(item => ['无忧茶院', '无忧茶苑'].includes(item.name.trim()) && item.status !== 'archived')
+        const orgIndex = this.data.isEdit && currentIndex >= 0 ? currentIndex : defaultIndex
         this.setData({
           organizations: orgs,
           orgIndex,
@@ -933,9 +926,13 @@ Component({
         wx.showToast({ title: '请选择成交课程', icon: 'none' })
         return
       }
+      if (!isEdit && (!formData.organization_id || !this.data.organizations[this.data.orgIndex])) {
+        wx.showToast({ title: '未找到可用的无忧茶院，请检查组织配置', icon: 'none' })
+        return
+      }
       if (type === 'coarse_door_card') {
         if (this.data.orgIndex < 0) {
-          wx.showToast({ title: '请选择成交归属', icon: 'none' })
+          wx.showToast({ title: '未找到可用的无忧茶院，请检查组织配置', icon: 'none' })
           return
         }
         if (this.data.coarseCourseOrganizationIndex < 0) {
@@ -962,7 +959,7 @@ Component({
         wx.showToast({ title: '请填写次数和有效期，或选择不限次数', icon: 'none' }); return
       }
       if (type === 'online_tea' && (!formData.organization_id || !formData.deal_date || !formData.effective_date || !Number.isInteger(Number(formData.validity_value)) || Number(formData.validity_value) < 1 || Number(formData.validity_value) > 1200)) {
-        wx.showToast({ title: '请填写成交归属、日期和1至1200的有效期', icon: 'none' }); return
+        wx.showToast({ title: '请填写日期和1至1200的有效期', icon: 'none' }); return
       }
       if (type === 'offline_course' && !isEdit && this.data.offlineCourseTypeIndex < 0) {
         wx.showToast({ title: '请选择课程类型', icon: 'none' }); return

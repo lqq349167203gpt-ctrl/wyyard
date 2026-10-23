@@ -26,7 +26,7 @@
     <view class="card" wx:if="{{columns.length}}">
       <view class="columns-head"><text class="title">导出内容</text><text class="hint">已选 {{selectedColumns.length}} 项</text><text class="clear" bindtap="onColumnsAll" data-mode="all">全选</text><text class="clear" bindtap="onColumnsAll" data-mode="clear">清空</text></view>
       <view wx:for="{{columnGroups}}" wx:key="title" wx:for-item="group" class="column-group">
-        <view class="group-head" bindtap="onGroupExpand" data-title="{{group.title}}"><text>{{group.title}}</text><view class="group-meta"><text class="hint">{{group.count}}/{{group.columns.length}}</text><view class="chevron {{group.expanded ? 'expanded' : ''}}"></view></view></view>
+        <view class="group-head" bindtap="onGroupExpand" data-title="{{group.title}}"><text>{{group.title}}</text><view class="group-meta"><text class="hint">{{group.count}}/{{group.columns.length}}</text><text class="clear" catchtap="onGroupColumnsAll" data-title="{{group.title}}" data-mode="all">全选</text><text class="clear" catchtap="onGroupColumnsAll" data-title="{{group.title}}" data-mode="clear">清空</text><view class="chevron {{group.expanded ? 'expanded' : ''}}"></view></view></view>
         <checkbox-group wx:if="{{group.expanded}}" class="checkboxes" bindchange="onColumnsChange" data-title="{{group.title}}">
           <label wx:for="{{group.columns}}" wx:for-item="column" wx:key="key" class="checkbox"><checkbox value="{{column.key}}" checked="{{column.selected}}" disabled="{{exporting}}" color="#3370ff"/><text>{{column.label}}</text></label>
         </checkbox-group>

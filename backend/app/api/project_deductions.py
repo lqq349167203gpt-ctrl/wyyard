@@ -21,7 +21,7 @@ class CoarseDoorCourseDeductionCreate(PaymentCourseFields, StrictBaseModel):
     customer_id: str
     record_type: str
     record_id: str
-    # organization_id 兼容旧版客户端，旧版仍按课程组织处理并作为结算组织。
+    # organization_id 兼容旧版客户端，旧版仍按课程组织处理，结算组织统一使用无忧茶院。
     organization_id: str = ""
     course_organization_id: str = ""
     settlement_organization_id: str = ""
@@ -69,7 +69,9 @@ def create_coarse_door_course(data: CoarseDoorCourseDeductionCreate, request: Re
     customer_access_service.require_customer_scope(request, data.customer_id, action="销卡")
     _, actor_name = get_request_actor(request)
     course_organization_id = data.course_organization_id or data.organization_id
-    settlement_organization_id = data.settlement_organization_id or course_organization_id
+    from app.utils.default_organization import payment_organization_id
+
+    settlement_organization_id = payment_organization_id()
     from app.services.payment_course_service import normalize_course
 
     normalize_course(data, request=request)

@@ -465,7 +465,22 @@ def accept_customer_handoff(customer_id: str, data: AcceptHandoffRequest, reques
 
 @router.get("/export-options", dependencies=[Depends(require_page_permission("healing-records"))])
 def customer_export_options(request: Request):
-    return customer_export_service.available_columns(get_request_roles(request))
+    columns = customer_export_service.available_columns(get_request_roles(request))
+    saved = customer_export_preferences(request)
+    if "columns" in saved:
+        for column in columns:
+            column["default"] = column["key"] in saved["columns"]
+    return columns
+
+
+@router.get("/export-preferences", dependencies=[Depends(require_page_permission("healing-records"))])
+def customer_export_preferences(request: Request):
+    from app.services.storage import load_item
+    saved = load_item(customer_workspace_service.PREFERENCES_FILE, "export:" + request.state.user_id) or {}
+    allowed = {column["key"] for column in customer_export_service.available_columns(get_request_roles(request))}
+    if "columns" in saved:
+        saved = {**saved, "columns": [key for key in saved["columns"] if key in allowed]}
+    return saved
 
 
 @router.get("/export", dependencies=[Depends(require_page_permission("healing-records"))])
@@ -515,6 +530,10 @@ def export_customers(
         lambda customer_id, section: get_customer_detail(customer_id, request, section=section), communications,
     )
     content = customer_export_service.build_workbook(items, columns=selected_columns)
+    from app.services.storage import save_item
+    save_item(customer_workspace_service.PREFERENCES_FILE, "export:" + request.state.user_id,
+              {**filters, "columns": selected, "date_from": date_from.isoformat() if date_from else "",
+               "date_to": date_to.isoformat() if date_to else ""})
     labels = {"card_statuses": "卡次状态", "member_types": "会员身份", "service_teachers": "Sales",
               "referrers": "引流人", "referrer_handlers": "承接人"}
     summary = {labels[key]: "、".join(values) for key, values in filters.items() if values}

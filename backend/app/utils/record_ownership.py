@@ -243,6 +243,9 @@ def ensure_activity_update_access(request: Request, record, data: dict) -> None:
 
 def stamp_payment_creator(data, request: Request):
     """付费项目创建人始终由服务端按当前账号写入。"""
+    from app.utils.default_organization import payment_organization_id
+
+    data = data.model_copy(update={"organization_id": payment_organization_id()})
     actor_id, actor_name = get_request_actor(request)
     return data.model_copy(update={"created_by_id": actor_id, "created_by": actor_name})
 

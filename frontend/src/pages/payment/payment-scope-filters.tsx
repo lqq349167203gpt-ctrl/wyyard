@@ -4,12 +4,9 @@ import { NO_DEAL_COURSE_LABEL } from "@/components/payment-course-select"
 export const UNASSIGNED_COURSE = "__none__"
 
 export function PaymentScopeFilters({
-  organizationId,
   courseKey,
-  organizations,
   courses,
   includeUnassignedCourse = false,
-  onOrganizationChange,
   onCourseChange,
 }: {
   organizationId: string
@@ -22,22 +19,6 @@ export function PaymentScopeFilters({
 }) {
   return (
     <>
-      <div className="w-[148px]">
-        <SelectDropdown
-          className="w-[148px]"
-          buttonClassName="border-[#e1e4e7] bg-white px-2.5"
-          rounded="7px"
-          value={organizationId}
-          options={[
-            { value: "all", label: "全部成交归属" },
-            ...organizations.map(org => ({ value: org.id, label: org.name })),
-          ]}
-          textColor={organizationId !== "all" ? "text-[#2b2f36]" : "text-[#a8b1bd]"}
-          onChange={onOrganizationChange}
-          dropdownWidth={180}
-          placeholder="全部成交归属"
-        />
-      </div>
       <div className="w-[172px]">
         <SelectDropdown
           className="w-[172px]"

@@ -51,9 +51,11 @@ export function CustomerExportDialog({ customers, identityNames, cardStatusNames
     setColumnsLoading(true)
     setColumnsError("")
     try {
-      const result = await customerApi.exportOptions()
+      const [result, saved] = await Promise.all([customerApi.exportOptions(), customerApi.exportPreferences()])
       setColumns(result)
       setSelectedColumns(result.filter(column => column.default).map(column => column.key))
+      setFilters(current => ({ ...current, ...saved }))
+      setDateMode(saved.date_from || saved.date_to ? 'custom' : 'all')
     } catch (failure) {
       setColumnsError(failure instanceof Error ? failure.message : "导出信息加载失败")
     } finally { setColumnsLoading(false) }
@@ -104,7 +106,7 @@ export function CustomerExportDialog({ customers, identityNames, cardStatusNames
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <fieldset disabled={exporting} className="min-w-0 space-y-4 px-5 py-4">
-        <CustomerExportDate value={{ date_from: filters.date_from || "", date_to: filters.date_to || "" }} onChange={update} onModeChange={setDateMode} />
+        <CustomerExportDate key={columnsLoading ? 'loading' : 'ready'} initialMode={dateMode === 'all' ? 'all' : 'custom'} value={{ date_from: filters.date_from || "", date_to: filters.date_to || "" }} onChange={update} onModeChange={setDateMode} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           {([
             ["member_types", "会员身份"], ["card_statuses", "卡次状态"],
@@ -127,7 +129,19 @@ export function CustomerExportDialog({ customers, identityNames, cardStatusNames
           {columnsLoading && <p className="text-[12px] text-[#8f959e]">加载中…</p>}
           {columnsError && <p role="alert" className="text-[12px] text-[#f54a45]">{columnsError}<button type="button" className="ml-2 underline" onClick={() => void loadColumns()}>重试</button></p>}
           {columnGroups.map(group => <details key={group} open={group === "基础资料" ? true : undefined} className="rounded-[4px] border border-[#e8eaed] px-3">
-            <summary className="cursor-pointer py-2 text-[12px] text-[#646a73]">{group}<span className="ml-2 text-[#a8b1bd]">{columns.filter(column => column.group === group && selectedColumns.includes(column.key)).length}/{columns.filter(column => column.group === group).length}</span></summary>
+            <summary className="cursor-pointer py-2 text-[12px] text-[#646a73]">{group}<span className="ml-2 text-[#a8b1bd]">{columns.filter(column => column.group === group && selectedColumns.includes(column.key)).length}/{columns.filter(column => column.group === group).length}</span>
+              <span className="float-right inline-flex gap-3">
+                <button type="button" aria-label={`${group}全选`} onClick={event => {
+                  event.preventDefault(); event.stopPropagation()
+                  setSelectedColumns(current => [...new Set([...current, ...columns.filter(column => column.group === group).map(column => column.key)])])
+                }}>全选</button>
+                <button type="button" aria-label={`${group}清空`} onClick={event => {
+                  event.preventDefault(); event.stopPropagation()
+                  const keys = new Set(columns.filter(column => column.group === group).map(column => column.key))
+                  setSelectedColumns(current => current.filter(key => !keys.has(key)))
+                }}>清空</button>
+              </span>
+            </summary>
             <div className="grid grid-cols-3 gap-x-3 gap-y-2 pb-3">
               {columns.filter(column => column.group === group).map(column => <label key={column.key} className="flex cursor-pointer items-start gap-1.5 text-[12px] text-[#4e535a]">
                 <input type="checkbox" className="mt-0.5 accent-[#3370ff]" checked={selectedColumns.includes(column.key)} onChange={event => setSelectedColumns(current => event.target.checked ? [...current, column.key] : current.filter(key => key !== column.key))} />

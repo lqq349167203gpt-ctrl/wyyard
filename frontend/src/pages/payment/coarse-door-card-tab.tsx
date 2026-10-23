@@ -1,3 +1,4 @@
+import { defaultOrganization } from "@/lib/default-organization"
 import { useEffect, useMemo, useState } from "react"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 
@@ -43,7 +44,7 @@ interface CoarseDoorCardTabProps {
 
 export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false, showHeader = true, onSaved, onCancel }: CoarseDoorCardTabProps = {}) {
   const editPermissions = useEditPermissions()
-  const { organizations: settlementOrganizations, loading: loadingOrganizations } = useOrganizations()
+  const { organizations: settlementOrganizations } = useOrganizations()
   const currentUser = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("currentUser") || "{}") }
     catch { return {} }
@@ -56,7 +57,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
   const [closers, setClosers] = useState<Closer[]>(editRecord?.closers || [])
   const [notes, setNotes] = useState(editRecord?.notes || "")
   const [courseOrganizationId, setCourseOrganizationId] = useState("")
-  const [settlementOrganizationId, setSettlementOrganizationId] = useState(editRecord?.organization_id || "")
+  const settlementOrganizationId = editRecord?.organization_id || defaultOrganization(settlementOrganizations)?.id || ""
   const [courseKey, setCourseKey] = useState("")
   const [courseOrganizations, setCourseOrganizations] = useState<{ id: string; name: string }[]>([])
   const [courses, setCourses] = useState<CoarseDoorCourseOption[]>([])
@@ -241,22 +242,12 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
           <DialogTitle className="text-base">{editRecord ? "编辑粗门次卡" : "新增粗门次卡"}</DialogTitle>
         </DialogHeader>}
         <div className="space-y-4 px-6 py-5">
-          <p className="text-[12px] text-[#8f959e]">成交归属记录本次结算归属，成交课程用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
+          <p className="text-[12px] text-[#8f959e]">成交课程用于筛选课程；抵扣后会返还原会员卡的对应次数</p>
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交日期</span>
             <Input type="date" value={dealDate} onChange={event => setDealDate(event.target.value)} className="h-8 text-[12px]" />
           </div>
-          <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-            <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">成交归属</span>
-            <SelectDropdown value={settlementOrganizationId} options={settlementOrganizations.filter(org => org.status !== "archived" || (editRecord && org.id === settlementOrganizationId)).map(item => ({ value: item.id, label: item.name + (item.status === "archived" ? "（已归档）" : "") }))} onChange={value => { setSettlementOrganizationId(value); setOrgMissing(false) }} disabled={!!editRecord || loadingOrganizations || settlementOrganizations.length === 0} placeholder={loadingOrganizations ? "加载中" : "请选择成交归属"} />
-          </div>
-          {/* 成交归属是业绩归属依据：默认不预选，点了保存又没选时才提示 */}
-          {orgMissing && !settlementOrganizationId && (
-            <div className="grid grid-cols-[70px_1fr] items-center gap-2">
-              <span />
-              <span className="text-[11px] text-[#c4506a]">{settlementOrganizations.length === 0 ? "暂无可选组织，请先到组织管理里添加" : "成交归属为必填，请选择本次结算归属的组织"}</span>
-            </div>
-          )}
+          {orgMissing && !settlementOrganizationId && <p className="text-[11px] text-[#c4506a]">未找到可用的无忧茶院，请检查组织配置</p>}
           <div className="ml-[19px] border-b border-[#ebedf0]" style={{ borderBottomWidth: "0.5px" }} />
           <div className="grid grid-cols-[70px_1fr] items-center gap-2">
             <span className="text-right text-[12px] font-light tracking-widest text-[#4e535a]">用户</span>
@@ -337,7 +328,7 @@ export function CoarseDoorCardTab({ presetCustomer, editRecord, formOnly = false
               <TableRow key={record.id} className="group">
                 <TableCell className="pl-4 text-[12px]">
                   <div className="truncate">{record.deduction_date || <EmptyValue />}</div>
-                  <div className="mt-1 truncate text-[12px] text-[#a8adb5]" title={record.organization_name}>{record.organization_name || <EmptyValue />}</div>
+
                 </TableCell>
                 <TableCell className="truncate text-[12px]" title={record.nickname}>{record.nickname}</TableCell>
                 <TableCell className="text-[12px]">

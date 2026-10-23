@@ -1,3 +1,4 @@
+import { defaultOrganization } from "@/lib/default-organization"
 import { MemberLabels } from "@/components/member-labels"
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
@@ -638,7 +639,6 @@ export default function PrincipalPage() {
   const [rules, setRules] = useState<SavedConversionRule[]>([])
   // 转化分析的条件（规则 + 范围 + 周期）留在浏览器里：离开页面再回来不会被重置
   const [entryScope] = useState(() => new URLSearchParams(window.location.search))
-  const [includeArchived, setIncludeArchived] = useState(() => entryScope.get("include_archived") === "1")
   const conversionDraft = loadConversionDraft()
   const [ruleId, setRuleId] = useState(conversionDraft?.rule_id ?? "")
   const [query, setQuery] = useState<PrincipalQuery>(() => ({
@@ -654,17 +654,13 @@ export default function PrincipalPage() {
   const scopeTypes = metadata?.scope_types ?? ["organization", "person"]
   const effectiveScope = scopeTypes.includes(overviewScopeType) ? overviewScopeType : scopeTypes[0]
   const personalScope = query.tab === "overview" && effectiveScope === "person"
+  const teaOrganization = defaultOrganization(metadata?.organizations ?? [])
   const statisticsReady = !!metadata && scopeTypes.includes(query.tab === "overview" ? effectiveScope : "organization")
-  const organizationOptions = [{ value: "", label: "全部" }, ...(metadata?.organizations || [])
-    .filter(org => includeArchived || org.status !== "archived" || org.id === query.organization_id)
-    .map(org => ({ value: org.id, label: org.name + (org.status === "archived" ? "（已归档）" : "") }))]
-  const archivedScopeControl = <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-[#8f959e]">
-    <input type="checkbox" checked={includeArchived || metadata?.organizations.some(org => org.id === query.organization_id && org.status === "archived") || false}
-      onChange={event => {
-        setIncludeArchived(event.target.checked)
-        if (!event.target.checked && metadata?.organizations.some(org => org.id === query.organization_id && org.status === "archived")) update({ organization_id: "" })
-      }} className="h-3 w-3 accent-[#646a73]" />包含已归档
-  </label>
+    && (personalScope || (!!teaOrganization && query.organization_id === teaOrganization.id))
+  useEffect(() => {
+    if (!teaOrganization) return
+    setQuery(current => current.organization_id === teaOrganization.id ? current : { ...current, organization_id: teaOrganization.id })
+  }, [teaOrganization?.id, query.organization_id])
   const scopeKey = personalScope ? `person:${selectedReferrerId}` : "organization"
   // 当前结果属于哪个 tab：转化分析没点「查询」前不显示旧数据
   const [resultTab, setResultTab] = useState<PrincipalQuery["tab"] | "">("")
@@ -1373,16 +1369,16 @@ export default function PrincipalPage() {
   }, [breakdown?.invite_inviters, breakdownPicks])
   const inviteInitiatedTotal = inviteInitiatorRows.reduce((sum, item) => sum + item.initiated_count, 0)
   const inviteInitiatedPeople = overviewMetrics?.initiated_people ?? 0
-  // 邀约到店按所选日期内的次统计，三种状态互斥且合计等于总次。
+  // 人数按客户 ID 去重；各状态可能包含同一客户，不能相加作为总人数。
   const overviewCards = [
     { id: "traffic", group: "traffic" as const, title: "引流人数（效果）", value: `${result?.summary["引流人数"] ?? "—"}`, unit: "人",
       sub: `${(breakdown?.traffic ?? []).filter(item => item.key !== "未配置").length} 位引流人 · 成交 ${(breakdown?.traffic ?? []).reduce((sum, item) => sum + (item.deal_count ?? 0), 0)} 笔`, help: <>按照引流日期进行统计</> },
-    { id: "invite", group: "invite" as const, title: "邀约到店", value: `${trafficVisitStats.invitedCount}`, unit: "次",
-      sub: `取消 ${trafficVisitStats.cancelledCount} · 未到场 ${trafficVisitStats.noShowCount} · 已到场 ${trafficVisitStats.arrivedCount}`,
-      help: <>统计周期内邀约页面里的客户总数</> },
-    { id: "participation", group: "participation" as const, title: "活动参与", value: `${result?.summary["活动参与次数"] ?? "—"}`, unit: "次",
-      sub: `案主 ${result?.summary["活动案主次数"] ?? "—"} 次 · 参与者 ${result?.summary["活动参与者次数"] ?? "—"} 次`,
-      help: <>{personalScope ? "按所选个人的全部引流客户" : "按所选组织所属引流人的全部客户"}统计所选时间内实际到场参与活动的次数，不限制客户引流日期，包含跨组织活动。沙龙活动、沙龙技能学习只统计参与者；其他活动区分案主与参与者。老师等其他身份不计入。多场逐场累计，重叠人员不重复计算。</> },
+    { id: "invite", group: "invite" as const, title: "邀约到店", value: `${trafficVisitStats.invitedPeople}`, unit: "人",
+      sub: `取消 ${trafficVisitStats.cancelledPeople} · 未到场 ${trafficVisitStats.noShowPeople} · 已到场 ${trafficVisitStats.arrivedPeople}`,
+      help: <>统计周期内有邀约记录的客户人数，同一客户只算一人。取消、未到场、已到场分别去重，各项人数不可直接相加。</> },
+    { id: "participation", group: "participation" as const, title: "活动参与", value: `${breakdown?.participation?.overall.people ?? "—"}`, unit: "人",
+      sub: `案主 ${breakdown?.participation?.overall.owner_people ?? "—"} 人 · 参与者 ${breakdown?.participation?.overall.participant_people ?? "—"} 人`,
+      help: <>{personalScope ? "按所选个人的全部引流客户" : "按所选组织所属引流人的全部客户"}统计所选时间内实际到场参与活动的人数，不限制客户引流日期，包含跨组织活动。沙龙活动、沙龙技能学习只统计参与者；其他活动区分案主与参与者。老师等其他身份不计入。同一客户参加多场只算一人；案主与参与者分别去重，总人数合并去重。</> },
     { id: "courses", group: "courses" as const, title: "课程数据", value: `${result?.summary["课程数"] ?? "—"}`, unit: "场",
       sub: `总 ${result?.summary["课时数"] ?? "—"} 课时`,
       help: personalScope ? <>统计所选时间内引流客户实际到场的课程。同一场课程有多位客户参加只计一场，人数、名单与成交仅统计这些引流客户。</> : null },
@@ -1406,8 +1402,6 @@ export default function PrincipalPage() {
     secondaryCourseDeal?: { label: string; text: string; value: "same_day" | "related" }
   }[] = overviewGroup === "participation"
     ? [
-      { label: "活动参与次数", text: `${participationTotals?.count ?? 0} 次`,
-        sub: <div className="flex flex-wrap gap-x-4 gap-y-1">{showParticipationOwners && <span>案主 {participationTotals?.owner_count ?? 0} 次</span>}<span>参与者 {participationTotals?.participant_count ?? 0} 次</span></div> },
       { label: "活动参与人数", text: `${participationTotals?.people ?? 0} 人`,
         sub: <div className="flex flex-wrap gap-x-4 gap-y-1">{showParticipationOwners && <span>案主 {participationTotals?.owner_people ?? 0} 人</span>}<span>参与者 {participationTotals?.participant_people ?? 0} 人</span></div>,
         help: <>同一成员多次参与只算一人。{showParticipationOwners && <>案主人数、参与者人数分别去重；同一成员有过两种身份时，总人数只算一人。</>}</> },
@@ -1417,48 +1411,38 @@ export default function PrincipalPage() {
       { label: "成交量", text: `${scopeNumber("成交量", result?.summary["交易笔数"])} 笔` },
       { label: "总成交人数", text: `${scopeNumber("成交人数", result?.summary["成交人数"])} 人` },
       { label: "升单人数", text: `${scopeNumber("升单人", 0)} 人`, help: <>「升单配置」页面配置，同一人多次升单，仅记作一次</>, pick: "buy:升单" },
-      { label: "升单量", text: `${scopeNumber("升单量", 0)} 次`, help: <>同一人多次升单，按升单次数重复统计</>, pick: "buy:升单" },
     ]
     : overviewGroup === "courses"
       ? [
         { label: "课程数", text: `${scopeNumber("课程数", result?.summary["课程数"])} 场`,
           sub: <>总 {scopeNumber("课时数", result?.summary["课时数"])} 课时</> },
-        { label: "上课人次", text: `${scopeNumber("上课人次", result?.summary["到场人次"])} 次`,
-          sub: <>上课人数 {scopeNumber("上课人数", result?.summary["到场人数"])} 人</> },
-        { label: "服务人次", text: `${scopeNumber("服务人次", result?.summary["服务人次"])} 人次`,
-          sub: <>案主 {scopeNumber("服务案主人次", result?.summary["服务案主人次"])} · 参与者 {scopeNumber("服务参与人次", result?.summary["服务参与人次"])}</>,
-          help: <>与课程记录的服务总人次一致：案主人次＋参与人次，同一人参与多堂课程分别累计。</> },
+        { label: "上课人数", text: `${scopeNumber("上课人数", result?.summary["到场人数"])} 人`,
+          help: <>所选范围内按客户去重，同一客户上多堂课只算一人。</> },
+        { label: "服务人数", text: `${scopeNumber("服务总人数", result?.summary["服务总人数"])} 人`,
+          sub: <>案主 {scopeNumber("服务案主人数", result?.summary["服务案主人数"])} 人 · 参与者 {scopeNumber("服务参与者人数", result?.summary["服务参与者人数"])} 人</>,
+          help: <>案主和参与者分别去重；总人数合并去重，同一客户只算一人。</> },
       ]
       : overviewGroup === "invite"
         ? [
-          { label: "邀约到店总次", text: `${trafficVisitStats.invitedCount} 次`,
-            sub: <>{trafficVisitStats.invitedPeople} 人</>,
-            help: <>已取消 + 未到店 + 已到店；次按记录累加，人数同一人只算一次</> },
-          { label: "取消", text: `${trafficVisitStats.cancelledCount} 次`,
-            sub: <>{trafficVisitStats.cancelledPeople} 人</> },
-          { label: "未到店", text: `${trafficVisitStats.noShowCount} 次`,
-            sub: <>{trafficVisitStats.noShowPeople} 人</>,
+          { label: "邀约人数", text: `${trafficVisitStats.invitedPeople} 人`,
+            help: <>同一客户只算一人。各状态分别去重，人数不可直接相加。</> },
+          { label: "取消", text: `${trafficVisitStats.cancelledPeople} 人` },
+          { label: "未到店", text: `${trafficVisitStats.noShowPeople} 人`,
             help: <>既未取消也未到店</> },
-          { label: "已到店", text: `${trafficVisitStats.arrivedCount} 次`,
-            sub: <>{trafficVisitStats.arrivedPeople} 人</> },
-          { label: "发起邀约次", text: `${inviteInitiatedTotal} 次`,
-            sub: <>{inviteInitiatedPeople} 人</>,
-            help: <>按邀约记录的创建日期统计，所选时间段内每创建一条邀约记 1 次</> },
+          { label: "已到店", text: `${trafficVisitStats.arrivedPeople} 人` },
+          { label: "发起邀约人数", text: `${inviteInitiatedPeople} 人`,
+            help: <>按邀约记录的创建日期统计，所选时间内同一客户只算一人</> },
         ]
         : overviewGroup === "traffic"
         ? [
-          { label: "邀约到店", text: `${trafficVisitStats.invitedCount} 次`,
-            sub: <>{trafficVisitStats.invitedPeople} 人</>,
+          { label: "邀约到店", text: `${trafficVisitStats.invitedPeople} 人`,
             filter: { kind: "initiated", label: "有邀约（含取消）" },
-            help: <>按所选日期内的邀约记录统计，含已取消记录，同一人多次分别计数；下方三种状态合计等于总次</> },
-          { label: "已取消", text: `${trafficVisitStats.cancelledCount} 次`,
-            sub: <>{trafficVisitStats.cancelledPeople} 人</>,
+            help: <>按所选日期内的邀约记录统计，含已取消记录，同一客户只算一人；各状态分别去重，不直接相加</> },
+          { label: "已取消", text: `${trafficVisitStats.cancelledPeople} 人`,
             filter: { kind: "cancel", label: "有取消邀约" } },
-          { label: "未到场", text: `${trafficVisitStats.noShowCount} 次`,
-            sub: <>{trafficVisitStats.noShowPeople} 人</>,
+          { label: "未到场", text: `${trafficVisitStats.noShowPeople} 人`,
             help: <>既未取消也未到店</> },
-          { label: "已到场", text: `${trafficVisitStats.arrivedCount} 次`,
-            sub: <>{trafficVisitStats.arrivedPeople} 人</>,
+          { label: "已到场", text: `${trafficVisitStats.arrivedPeople} 人`,
             filter: { kind: "arrive", label: "有到店" } },
         ]
         : []
@@ -1766,16 +1750,7 @@ export default function PrincipalPage() {
             onChange={({ date_from, date_to }) => update({ date_from: date_from || null, date_to: date_to || null })}
             leading={<>
               <span className="text-[11px] font-medium text-[#4e535a]">组织/俱乐部</span>
-              <SelectDropdown
-                size="sm"
-                className="w-[160px]"
-                value={query.organization_id}
-                options={organizationOptions}
-                onChange={organization_id => update({ organization_id })}
-                buttonClassName="!h-7 !rounded-[4px] !border !border-[#e1e4e7] !bg-white !px-2 !text-[11px] !shadow-none"
-                placeholderColor="text-[#8f959e]"
-              />
-              {archivedScopeControl}
+              <span className="text-[11px] text-[#4e535a]">无忧茶院</span>
             </>}
           />
         ) : (
@@ -1804,17 +1779,7 @@ export default function PrincipalPage() {
                   placeholder={metadata ? "暂无有引流人数的个人" : "加载中…"}
                   onChange={value => { resetPanel(); setSelectedReferrerId(value) }}
                   buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2 !text-[11px] !shadow-none"
-                /> :
-                <SelectDropdown
-                  size="sm"
-                  className="w-[150px]"
-                  value={query.organization_id}
-                  options={organizationOptions}
-                  onChange={organization_id => update({ organization_id })}
-                  buttonClassName="!h-7 !rounded-[4px] !border !border-[#dee0e3] !bg-white !px-2 !text-[11px] !shadow-none"
-                  placeholderColor="text-[#8f959e]"
-                />}
-                {!personalScope && archivedScopeControl}
+                /> : null}
                 {/* 经营概况那边的付费项目筛选已经挪到展开面板里，这里只留给「交易记录」用 */}
                 {query.tab === "orders" && (
                   <SelectDropdown
@@ -2005,7 +1970,7 @@ export default function PrincipalPage() {
           <p role="alert" className="text-[12px] text-[#b94a58]">{error || pagination.error}</p>
         </div>
       )}
-      {metadata && !metadata.organizations.length && (
+      {metadata && !personalScope && !teaOrganization && (
         <div className="mt-3 rounded-[4px] bg-[#f7f8fa] px-3 py-2">
           <p className="text-[12px] text-[#8f959e]">没有可查看的组织。请检查账号归属人与组织成员配置；同名归属人需先消除歧义。</p>
         </div>
@@ -2186,7 +2151,7 @@ export default function PrincipalPage() {
                         : item.courseDeal
                           ? () => update({ course_deal: active ? "" : item.courseDeal })
                           : undefined
-                    const isInitiatedMetric = item.label === "发起邀约次"
+                    const isInitiatedMetric = item.label === "发起邀约人数"
                     const chipClass = `min-w-[104px] flex-1 border-r border-[#f2f3f5] px-4 py-2.5 text-left last:border-r-0 ${
                       clickable ? "cursor-pointer hover:bg-[#f7f8fa]" : "cursor-default"
                     } ${active ? "bg-[#f0f5ff]" : isInitiatedMetric ? "bg-[#f0f2f5]" : ""}`
