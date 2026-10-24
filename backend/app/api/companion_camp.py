@@ -10,6 +10,7 @@ from app.services import (
     position_edit_permission_service,
     sales_access_service,
 )
+from app.utils.customer_search import masked_customer_phone, matches_customer_search
 from app.utils.payment_list import payment_list_response
 from app.utils.payment_validation import ensure_payment_closer_required
 from app.utils.record_ownership import ensure_payment_record_manager, stamp_payment_creator
@@ -47,9 +48,9 @@ def list_records(
 def search_customers(request: Request, q: str = ""):
     customer_access_service.require_transaction_access(request, detail=True)
     people = [
-        {"id": c.id, "nickname": c.nickname, "name": c.name}
+        {"id": c.id, "nickname": c.nickname, "name": c.name, "phone_masked": masked_customer_phone(c)}
         for c in customer_service.list_customers()
-        if q and (q in c.nickname or q in (c.name or ""))
+        if q.strip() and matches_customer_search(c, q)
     ]
     return customer_access_service.filter_customer_search_results(request, people)
 

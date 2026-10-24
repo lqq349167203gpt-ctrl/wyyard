@@ -383,3 +383,11 @@
 }
 
 .activity-heading{display:flex;align-items:flex-start;gap:16rpx;margin:12rpx 0 24rpx;font-size:30rpx;font-weight:500;line-height:44rpx}.activity-heading text{flex:1;min-width:0;word-break:break-word}
+
+/* 搜索候选：姓名为主、脱敏号码为辅，长昵称可换行。 */
+.search-person-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4rpx; padding-right: 12rpx; }
+.search-person-copy > text { white-space: normal; word-break: break-all; }
+.search-person-phone { font-size: 24rpx; color: #646a73; line-height: 32rpx; font-variant-numeric: tabular-nums; }
+.search-match-count { padding: 12rpx 32rpx; font-size: 24rpx; color: #646a73; }
+
+.search-person-name { margin-left: 8rpx; font-size: 24rpx; font-weight: normal; color: #646a73; }

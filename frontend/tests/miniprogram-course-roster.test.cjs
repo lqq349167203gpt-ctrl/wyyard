@@ -22,7 +22,8 @@ function harness(name, api, extra = {}) {
   const helperMock = { ...helper, markCoursePagesDirty: () => events.push('dirty') }
   vm.runInNewContext(fs.readFileSync(path.join(root, 'miniprogram/pages', name, 'index.js'), 'utf8'), {
     Page: p => { definition = p }, wx, getApp: () => app, console,
-    require: module => module.endsWith('/api') ? { courseRosterApi: api, activityWithdrawalApi: extra.withdrawApi || {}, PAYMENT_PROJECT_TYPES: [{ key: 'online_tea', label: '线上茶疗' }] }
+    require: module => module.endsWith('/customer-search') ? require('../../miniprogram/utils/customer-search')
+      : module.endsWith('/api') ? { courseRosterApi: api, activityWithdrawalApi: extra.withdrawApi || {}, PAYMENT_PROJECT_TYPES: [{ key: 'online_tea', label: '线上茶疗' }] }
       : module.endsWith('/course-roster') ? helperMock
       : module.endsWith('/note-permissions') ? { noteVisibility: () => ({ customer_info: true, follow_up: true, customer_feedback: true }) }
       : module.endsWith('/feedback-person') ? feedback : assert.fail(module),
@@ -114,4 +115,16 @@ test('完整资料和交易入口保留学员及草稿，只读账号不能提�
   assert.equal(page.data.fields[0].value, '尚未保存的内容')
   page.data.canEdit = false
   await page.onSave(event())
+})
+
+test('课程名单可以按手机尾号搜索，不改变已退课隐藏规则', async () => {
+  const data = course()
+  data.participants.forEach(person => { person.phone_suffix = '0017' })
+  data.participants.push({ ...person('c', '已退课'), phone_suffix: '0017', withdrawn: true })
+  const { page } = harness('course-roster', { get: async () => data, notes: async () => [] })
+  page.source = 'class_record'; page.sessionId = 'lesson'; await page.load()
+  page.onSearch(event({}, '0017'))
+  assert.deepEqual(Array.from(page.data.visiblePeople, item => item.id), ['a', 'b'])
+  page.onToggleWithdrawn()
+  assert.deepEqual(Array.from(page.data.visiblePeople, item => item.id), ['a', 'b', 'c'])
 })

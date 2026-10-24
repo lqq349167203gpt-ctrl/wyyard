@@ -148,10 +148,10 @@
     <view class="picker-search">
       <input class="picker-search-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
+    <view class="search-match-count" wx:if="{{pickerKeyword && pickerList.length}}">匹配 {{pickerList.length}} 人</view>
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-nickname="{{item.nickname}}">
-        <text class="picker-item-name">{{item.nickname}}</text>
-        <member-labels wx:if="{{(item.member_type || item.card_status) && pickerField !== 'referrer'}}" identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
+        <view class="search-person-copy"><text class="picker-item-name">{{item.nickname}}<text class="search-person-name" wx:if="{{item.name && item.name !== item.nickname}}">（{{item.name}}）</text></text><text class="search-person-phone" wx:if="{{item.phone_masked || item.phone_suffix}}">{{item.phone_masked || ('****' + item.phone_suffix)}}</text></view>
         <view class="referrer-check-area" wx:if="{{pickerField === 'referrer'}}">
           <view class="referrer-checkbox {{item.selected ? 'referrer-checkbox-checked' : ''}}"><view class="referrer-checkmark" wx:if="{{item.selected}}"></view></view>
         </view>

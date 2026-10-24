@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const { courseRosterApi, activityWithdrawalApi } = require('../../utils/api')
 const { decorateRoster, markCoursePagesDirty } = require('../../utils/course-roster')
 
@@ -38,7 +39,7 @@ Page({
   filter() {
     const word = this.data.keyword.trim().toLowerCase()
     this.setData({ visiblePeople: this.data.people.filter(p => (this.data.showWithdrawn || !p.withdrawn)
-      && (!word || p.nickname.toLowerCase().includes(word))).map(p => ({ ...p, selected: this.data.selectedIds.includes(p.id) })) })
+      && matchesCustomerSearch(p, word)).map(p => ({ ...p, selected: this.data.selectedIds.includes(p.id) })) })
   },
   onSearch(e) { this.setData({ keyword: e.detail.value, selectedIds: [], selectedCount: 0 }); this.filter() },
   onToggleWithdrawn() { this.setData({ showWithdrawn: !this.data.showWithdrawn, selectedIds: [], selectedCount: 0 }); this.filter() },

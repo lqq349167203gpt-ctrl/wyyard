@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const { paymentApi, customerApi, organizationApi } = require('../../utils/api')
 const { beginRead, disposeReads } = require('../../utils/read-scope')
 const { CARD_TYPES, OFFLINE_COURSE_TYPES, OH_READING_TYPES, offlineCourseDefaultMonths } = require('../../utils/payment-types')
@@ -580,8 +581,7 @@ Component({
       const q = keyword.toLowerCase()
       this.setData({
         pickerList: this.data.allCustomers.filter(c => (
-          (c.nickname || '').toLowerCase().includes(q)
-          || (c.name || '').toLowerCase().includes(q)
+          matchesCustomerSearch(c, q)
         )),
       })
     },
@@ -627,8 +627,7 @@ Component({
       if (keyword) {
         const q = keyword.toLowerCase()
         list = list.filter(c => (
-          (c.nickname || '').toLowerCase().includes(q)
-          || (c.name || '').toLowerCase().includes(q)
+          matchesCustomerSearch(c, q)
         ))
       }
       this.setData({ pickerKeyword: keyword, pickerList: list })

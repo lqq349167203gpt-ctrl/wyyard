@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from app.models.project_deduction import ProjectDeduction, ProjectDeductionCreate
 from app.services import customer_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.customer_record_search import customer_record_matcher
 
 FILENAME = "project_deductions.json"
 COARSE_DOOR_CARD_TYPE = "粗门次卡"
@@ -37,8 +38,8 @@ def list_deductions(customer_id: Optional[str] = None, nickname: Optional[str] =
     if customer_id:
         results = [d for d in results if d.customer_id == customer_id]
     if nickname:
-        q = nickname.lower()
-        results = [d for d in results if q in (d.nickname or "").lower()]
+        matches = customer_record_matcher(nickname)
+        results = [d for d in results if matches({"customer_id": d.customer_id, "nickname": d.nickname})]
     if project_type:
         results = [d for d in results if d.project_type == project_type]
     results.sort(key=lambda d: d.created_at, reverse=True)

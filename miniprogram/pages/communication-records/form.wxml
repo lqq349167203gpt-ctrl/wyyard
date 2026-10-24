@@ -38,6 +38,7 @@
     <view class="picker-search">
       <input class="picker-search-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
+    <view class="search-match-count" wx:if="{{pickerKeyword && pickerMatchCount}}">匹配 {{pickerMatchCount}} 人<text wx:if="{{pickerMatchCount > 50}}">，显示前 50 人，请继续输入缩小范围</text></view>
     <scroll-view class="picker-list" scroll-y>
       <view
         class="picker-item"
@@ -46,7 +47,7 @@
         bindtap="onPickerSelect"
         data-nickname="{{item.nickname}}"
       >
-        <text class="picker-item-name">{{item.nickname}}</text>
+        <view class="search-person-copy"><text class="picker-item-name">{{item.nickname}}<text class="search-person-name" wx:if="{{item.name && item.name !== item.nickname}}">（{{item.name}}）</text></text><text class="search-person-phone" wx:if="{{item.phone_masked || item.phone_suffix}}">{{item.phone_masked || ('****' + item.phone_suffix)}}</text></view>
       </view>
       <view class="picker-empty" wx:if="{{pickerList.length === 0}}">
         <text>无匹配数据</text>

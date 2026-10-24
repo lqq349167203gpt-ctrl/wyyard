@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const { visitApi, spaceApi, customerApi, visitVerificationApi, isOperationCancelled } = require('../../utils/api')
 const { canEditRecord, isAreaViewOnly } = require('../../utils/record-ownership')
 const { readSource, retrySources } = require('../../utils/source-state')
@@ -191,7 +192,7 @@ Page({
     const list = this.data.allCustomers.filter(c => {
       if (!keyword) return true
       const kw = keyword.toLowerCase()
-      return c.nickname.toLowerCase().includes(kw) || (c.name && c.name.toLowerCase().includes(kw))
+      return matchesCustomerSearch(c, kw)
     })
     this.setData({ pickerKeyword: keyword, pickerList: list })
   },

@@ -25,7 +25,7 @@ Component({
     onInput(e) {
       invalidateRead(this, 'search')
       const keyword = e.detail.value
-      this.setData({ keyword, searchError: '' })
+      this.setData({ keyword, results: [], searchError: '' })
       if (keyword.trim()) {
         this.setData({ searching: true, showDropdown: true })
         this._search(keyword.trim())
@@ -35,7 +35,7 @@ Component({
     },
 
     onFocus() {
-      if (this.data.keyword.trim() && this.data.results.length > 0) {
+      if (this.data.keyword.trim()) {
         this.setData({ showDropdown: true })
       }
     },

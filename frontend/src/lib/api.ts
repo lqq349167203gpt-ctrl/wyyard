@@ -775,6 +775,7 @@ export interface Customer {
 export type CustomerCreate = Omit<Customer, "id" | "created_at" | "updated_at">
 
 export interface CustomerLight {
+  phone_masked?: string; phone_suffix?: string
   id: string
   visit_count?: number
   gender?: string
@@ -1246,7 +1247,7 @@ export interface NextFollowUpPlan {
   next_follow_up_date?: string
 }
 
-export interface FollowUpPerson { id: string; nickname: string; name: string }
+export interface FollowUpPerson { id: string; nickname: string; name: string; phone_masked?: string; phone_suffix?: string }
 
 export interface VisitNoteSummary extends NextFollowUpPlan {
   need_tags?: Array<{ id: string; name: string }>

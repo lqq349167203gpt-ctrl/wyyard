@@ -23,6 +23,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.utils.customer_record_search import customer_record_matcher
 from app.utils.record_ownership import request_actor_customer_ids
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
@@ -338,7 +339,8 @@ def list_course_participants(
     identity_groups = ["新人", "老人"]
     needle = keyword.strip().casefold()
     if needle:
-        rows = [row for row in rows if needle in (row["nickname"] or "").casefold()]
+        matches_customer = customer_record_matcher(needle)
+        rows = [row for row in rows if matches_customer(row)]
     if member_type:
         rows = [row for row in rows if row["member_type"] == member_type]
     if identity_group:

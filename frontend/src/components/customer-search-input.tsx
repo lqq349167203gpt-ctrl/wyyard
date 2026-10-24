@@ -1,4 +1,4 @@
-import { MemberLabels } from "@/components/member-labels"
+import { matchesCustomerSearch, customerMaskedPhone } from "@/lib/customer-search"
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Check, X } from "lucide-react"
@@ -42,9 +42,9 @@ export interface CustomerSearchInputProps {
   onBlur?: (value: string) => void
   /** Portal container for dropdown */
   portalContainer?: HTMLElement | null
-  /** Custom right-side label per customer ID (overrides member_type) */
+  /** @deprecated 搜索候选统一只显示昵称、姓名和脱敏手机号；保留参数兼容旧调用。 */
   rightLabelMap?: Record<string, string>
-  /** Customer IDs whose right label should be red */
+  /** @deprecated 候选项不再展示业务标签。 */
   warnLabelIds?: string[]
   /** Show clear X button in single-select mode (default true) */
   showClear?: boolean
@@ -73,8 +73,6 @@ export function CustomerSearchInput({
   onNoResultsClick,
   onBlur,
   portalContainer,
-  rightLabelMap,
-  warnLabelIds,
   showClear = true,
   selectionOnly = false,
   dropdownWidth,
@@ -160,9 +158,7 @@ export function CustomerSearchInput({
       if (positionFilter && !(c.positions || []).includes(positionFilter)) return false
       if (filterSelected && selectedNames.includes(c.nickname)) return false
       if (seen.has(c.nickname)) return false
-      const nicknameMatch = c.nickname.toLowerCase().includes(q)
-      const nameMatch = c.name && c.name.toLowerCase().includes(q)
-      if (nicknameMatch || nameMatch) {
+      if (matchesCustomerSearch(c, q)) {
         seen.add(c.nickname)
         return true
       }
@@ -182,7 +178,7 @@ export function CustomerSearchInput({
       if (!customer.nickname || seen.has(customer.nickname)) return false
       if (excludeIds.includes(customer.id)) return false
       if (positionFilter && !(customer.positions || []).includes(positionFilter)) return false
-      if (query && !customer.nickname.toLowerCase().includes(query) && !(customer.name || "").toLowerCase().includes(query)) return false
+      if (!matchesCustomerSearch(customer, query)) return false
       seen.add(customer.nickname)
       return true
     }).sort((a, b) => {
@@ -397,6 +393,7 @@ export function CustomerSearchInput({
                   </span>
                   <span className={compactSearch ? "min-w-0 truncate" : "whitespace-nowrap"}>{customer.nickname}</span>
                   {compactSearch && customer.name && customer.name !== customer.nickname && <span className="min-w-0 truncate text-[11px] text-[#8f959e]">（{customer.name}）</span>}
+                  {compactSearch && customerMaskedPhone(customer) && <span className="ml-auto shrink-0 text-[11px] tabular-nums text-[#646a73]">{customerMaskedPhone(customer)}</span>}
                 </button>
               )
             })}
@@ -404,7 +401,7 @@ export function CustomerSearchInput({
               <div className={`${compactSearch ? "" : "col-span-3"} py-4 text-center text-[12px] text-[#8f959e]`}>无匹配结果</div>
             )}
           </div>
-          {compactSearch && compactOptions.length > MAX_VISIBLE && <div className="shrink-0 border-t border-[#f0f0f0] px-2 py-1.5 text-[11px] text-[#8f959e]">共 {compactOptions.length} 人，输入姓名或昵称缩小范围</div>}
+          {compactSearch && search && compactOptions.length > 0 && <div role="status" className="shrink-0 px-2 py-1.5 text-[11px] text-[#646a73]">匹配 {compactOptions.length} 人{compactOptions.length > MAX_VISIBLE ? `，显示前 ${MAX_VISIBLE} 人，请继续输入缩小范围` : ""}</div>}
         </div>,
         portalContainer || document.body
       )}
@@ -421,21 +418,18 @@ export function CustomerSearchInput({
             if (filtered.length === 0 && !showCreate) return null
             return (
               <div className="bg-white border border-[#dee0e3] overflow-y-auto" style={{ ...pos, borderRadius: radiusValue }}>
+                <div role="status" className="px-2 py-1 text-[11px] text-[#646a73]">匹配 {filtered.length} 人{filtered.length > MAX_VISIBLE ? `，显示前 ${MAX_VISIBLE} 人，请继续输入缩小范围` : ""}</div>
                 {filtered.slice(0, MAX_VISIBLE).map(c => {
-                  const q = search.toLowerCase()
-                  const nameMatch = c.name && c.name.toLowerCase().includes(q) && !c.nickname.toLowerCase().includes(q)
                   return (
                     <div
                       key={c.id}
-                      className="px-2 py-1.5 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex items-center gap-2"
+                      className="px-2 py-1.5 text-[12px] text-[#2b2f36] hover:bg-[#f7f8fa] cursor-pointer flex flex-wrap items-center gap-x-2 gap-y-0.5"
                       onMouseDown={(e) => e.preventDefault()}
                       onMouseUp={(e) => { e.preventDefault(); selectItem(c) }}
                     >
-                      <span>{c.nickname}</span>
-                      {nameMatch && <span className="text-[10px] text-[#8f959e]">（{c.name}）</span>}
-                      {(rightLabelMap?.[c.id] || c.member_type || c.card_status) && (
-                        <span className={`text-[10px] ml-auto ${warnLabelIds?.includes(c.id) ? "text-[#e02020]" : "text-[#8f959e]"}`}>{rightLabelMap?.[c.id] || <MemberLabels customer={c} />}</span>
-                      )}
+                      <span className="min-w-0 break-words">{c.nickname}</span>
+                      {c.name && c.name !== c.nickname && <span className="text-[11px] text-[#646a73]">（{c.name}）</span>}
+                      {customerMaskedPhone(c) && <span className="shrink-0 text-[11px] tabular-nums text-[#646a73]">{customerMaskedPhone(c)}</span>}
                     </div>
                   )
                 })}

@@ -143,6 +143,7 @@
         <text class="picker-close" bindtap="onTypePickerClose">关闭</text>
       </view>
     </view>
+    <view class="search-match-count" wx:if="{{pickerKeyword && pickerList.length}}">匹配 {{pickerList.length}} 人</view>
     <scroll-view class="picker-list" scroll-y>
       <!-- 第一步：选择类型 -->
       <block wx:if="{{typePickerStep === 1}}">
@@ -217,9 +218,10 @@
     <view class="picker-search">
       <input class="picker-search-input" placeholder="搜索" value="{{pickerKeyword}}" bindinput="onPickerSearch" />
     </view>
+    <view class="search-match-count" wx:if="{{pickerKeyword && pickerList.length}}">匹配 {{pickerList.length}} 人</view>
     <scroll-view class="picker-list" scroll-y>
       <view class="picker-item {{item._selected ? 'selected' : ''}}" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
-        <text class="picker-item-name">{{item.nickname}}</text>
+        <view class="search-person-copy"><text class="picker-item-name">{{item.nickname}}<text class="search-person-name" wx:if="{{item.name && item.name !== item.nickname}}">（{{item.name}}）</text></text><text class="search-person-phone" wx:if="{{item.phone_masked || item.phone_suffix}}">{{item.phone_masked || ('****' + item.phone_suffix)}}</text></view>
         <text class="picker-item-check" wx:if="{{item._selected}}">✓</text>
       </view>
       <view class="picker-empty" wx:if="{{pickerList.length === 0}}">

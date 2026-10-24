@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 from app.models.visit import ActivityInfo, CustomerSearchResult, VisitRecord, VisitRecordCreate
 from app.services.customer_service import get_customer, list_customers
 from app.services.storage import delete_item, load_data, save_data, save_item
+from app.utils.customer_search import masked_customer_phone, matches_customer_search
 
 logger = logging.getLogger(__name__)
 
@@ -1079,10 +1080,11 @@ def search_customers(keyword: str) -> List[CustomerSearchResult]:
     customers = list_customers()
     results = []
     for c in customers:
-        if keyword in c.nickname or (c.name and keyword in c.name):
+        if matches_customer_search(c, keyword):
             results.append(CustomerSearchResult(
                 id=c.id,
                 nickname=c.nickname,
+                phone_masked=masked_customer_phone(c),
                 name=c.name or "",
                 member_type=c.member_type or "",
                 card_status=c.card_status,

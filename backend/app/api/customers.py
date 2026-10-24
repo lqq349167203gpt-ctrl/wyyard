@@ -45,6 +45,7 @@ from app.services.visit_service import (
     customer_visit_summary,
     get_last_visit_date,
 )
+from app.utils.customer_search import masked_customer_phone, matches_customer_search, phone_suffix
 from app.utils.pagination import paginate
 from app.utils.request_context import get_client_ip, get_client_source
 from app.utils.request_roles import get_request_roles
@@ -144,7 +145,7 @@ def _customer_list_base(customer) -> dict:
         "basic_info", "assessment", "other_info", "tracking_plan",
         "created_at", "created_by", "space_id", "position_sort_orders",
     )
-    return {key: getattr(customer, key, None) for key in _SLIM_FIELDS}
+    return {**{key: getattr(customer, key, None) for key in _SLIM_FIELDS}, "phone_suffix": phone_suffix(customer), "phone_masked": masked_customer_phone(customer)}
 
 
 def _build_payment_totals() -> dict[str, float]:
@@ -285,8 +286,7 @@ async def list_customers(
         items = [
             customer
             for customer in items
-            if keyword in (customer.get("nickname", "") or "").lower()
-            or keyword in (customer.get("name", "") or "").lower()
+            if matches_customer_search(customer, keyword)
         ]
     if member_type:
         items = [c for c in items if c.get("member_type") == member_type]
@@ -599,6 +599,8 @@ async def list_customers_light(request: Request, purpose: Literal['full', 'selec
             "id": c.id,
             "nickname": c.nickname,
             "name": c.name or "",
+            "phone_suffix": phone_suffix(c),
+            "phone_masked": masked_customer_phone(c),
             "gender": c.gender or "",
             "member_type": c.member_type or "", "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             **({"visit_count": len(visit_days.get(c.id, set()))} if purpose == 'full' else {}),
@@ -628,6 +630,8 @@ async def batch_customers(data: BatchRequest, request: Request):
             "id": c.id,
             "nickname": c.nickname,
             "name": c.name or "",
+            "phone_suffix": phone_suffix(c),
+            "phone_masked": masked_customer_phone(c),
             "member_type": c.member_type or "", "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             "positions": c.positions or [],
             "space_id": c.space_id or "",
@@ -691,6 +695,8 @@ async def list_disabled_customers(request: Request):
             "id": c.id,
             "nickname": c.nickname,
             "name": c.name or "",
+            "phone_suffix": phone_suffix(c),
+            "phone_masked": masked_customer_phone(c),
             "member_type": c.member_type or "", "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             "phone": c.phone or "",
             "deleted_at": c.deleted_at.isoformat() if c.deleted_at else "",

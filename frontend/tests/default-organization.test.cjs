@@ -22,7 +22,8 @@ function mini(editing, orgs = organizations, type = 'membership_card') {
   let definition
   vm.runInNewContext(fs.readFileSync(path.join(root, 'miniprogram/components/payment-form/index.js'), 'utf8'), {
     Component: value => { definition = value },
-    require: name => name === '../../utils/api' ? { organizationApi: { list: async () => orgs } }
+    require: name => name === '../../utils/customer-search' ? require('../../miniprogram/utils/customer-search')
+      : name === '../../utils/api' ? { organizationApi: { list: async () => orgs } }
       : require(path.resolve(root, 'miniprogram/components/payment-form', name)),
   })
   const instance = { ...definition.methods, data: { ...structuredClone(definition.data), type, isEdit: !!editing,

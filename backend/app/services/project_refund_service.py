@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 from app.models.project_refund import ProjectRefund, ProjectRefundCreate
 from app.services import customer_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.customer_record_search import customer_record_matcher
 
 FILENAME = "project_refunds.json"
 _refunds: Dict[str, ProjectRefund] = {}
@@ -37,8 +38,8 @@ def list_refunds(customer_id: Optional[str] = None, nickname: Optional[str] = No
     if customer_id:
         results = [r for r in results if r.customer_id == customer_id]
     if nickname:
-        q = nickname.lower()
-        results = [r for r in results if q in (r.nickname or "").lower()]
+        matches = customer_record_matcher(nickname)
+        results = [r for r in results if matches({"customer_id": r.customer_id, "nickname": r.nickname})]
     if project_type:
         results = [r for r in results if r.project_type == project_type]
     results.sort(key=lambda r: r.created_at, reverse=True)

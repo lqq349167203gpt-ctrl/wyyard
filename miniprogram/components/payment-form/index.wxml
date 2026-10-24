@@ -368,9 +368,10 @@
     <view class="pf-popup-search">
       <input class="pf-popup-input" placeholder="搜索姓名或昵称" value="{{pickerKeyword}}" bindinput="onPickerSearch" focus="{{showPicker}}" />
     </view>
+    <view class="search-match-count" wx:if="{{pickerKeyword && pickerList.length}}">匹配 {{pickerList.length}} 人</view>
     <scroll-view class="pf-popup-list" scroll-y>
       <view class="pf-popup-item" wx:for="{{pickerList}}" wx:key="id" bindtap="onPickerSelect" data-id="{{item.id}}" data-nickname="{{item.nickname}}">
-        <text>{{item.nickname}}</text>
+        <view class="search-person-copy"><text>{{item.nickname}}<text class="search-person-name" wx:if="{{item.name && item.name !== item.nickname}}">（{{item.name}}）</text></text><text class="search-person-phone" wx:if="{{item.phone_masked || item.phone_suffix}}">{{item.phone_masked || ('****' + item.phone_suffix)}}</text></view>
         <text class="pf-popup-check" wx:if="{{pickerField === 'closer' && closerIdMap[item.id]}}">✓</text>
       </view>
       <view class="pf-popup-empty" wx:if="{{pickerList.length === 0}}">

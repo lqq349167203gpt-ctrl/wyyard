@@ -20,6 +20,7 @@ from app.services import (
     position_permission_service,
 )
 from app.services.customer_service import get_customer, list_all_customers
+from app.utils.customer_search import matches_customer_search
 from app.utils.pagination import paginate
 from app.utils.record_ownership import (
     ACTIVITY_CREATOR_ONLY_FIELDS,
@@ -816,7 +817,7 @@ def list_withdrawals(
             if customer
             else item.get("customer_name") or "已删除客户"
         )
-        if nickname and nickname.strip() not in item["nickname"]:
+        if nickname and not matches_customer_search(customer or {"nickname": item["nickname"]}, nickname):
             continue
         if status and status != "all" and item["status"] != status:
             continue

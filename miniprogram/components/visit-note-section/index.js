@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const { visitNoteApi, customerApi, customerTagApi } = require('../../utils/api')
 const { pickerData, attributionFromPicker } = require('../../utils/feedback-person')
 const { beginRead, invalidateRead, disposeReads } = require('../../utils/read-scope')
@@ -196,9 +197,7 @@ Component({
 
     filterFollowUpPeople() {
       const query = this.data.followUpSearch.trim().toLowerCase()
-      const matches = this.data.followUpPeople.filter(person => !query
-        || (person.nickname || '').toLowerCase().includes(query)
-        || (person.name || '').toLowerCase().includes(query))
+      const matches = this.data.followUpPeople.filter(person => matchesCustomerSearch(person, query))
       this.setData({ followUpMatches: matches.slice(0, 50), followUpMatchCount: matches.length })
     },
 

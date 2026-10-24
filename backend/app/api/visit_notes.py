@@ -270,11 +270,15 @@ def get_feedback_people(request: Request):
 
 
 @router.get("/follow-up-people")
-def follow_up_people():
-    """指派跟进只提供全平台有效人员的昵称/姓名，不附带客户隐私或业务数据。"""
+def follow_up_people(request: Request = None):
+    """指派人员保留全平台姓名；仅可见客户补手机尾号供搜索。"""
     from app.services import customer_service
+    from app.utils.customer_search import masked_customer_phone, phone_suffix
 
-    return [{"id": c.id, "nickname": c.nickname or c.name, "name": c.name}
+    visible_ids = customer_access_service.visible_customer_ids(request, customer_service.list_customers()) if request else set()
+    return [{"id": c.id, "nickname": c.nickname or c.name, "name": c.name,
+             "phone_suffix": phone_suffix(c) if c.id in visible_ids else "",
+             "phone_masked": masked_customer_phone(c) if c.id in visible_ids else ""}
             for c in customer_service.list_customers() if not c.is_deleted and (c.nickname or c.name)]
 
 

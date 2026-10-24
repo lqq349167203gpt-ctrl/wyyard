@@ -14,6 +14,7 @@ function harness() {
     getApp: () => ({ globalData: { currentUser: { nickname: "录入人" } } }),
     wx: { showToast(value) { toasts.push(value.title) } },
     require(name) {
+      if (name === '../../utils/customer-search') return require(path.join(root, 'miniprogram/utils/customer-search.js'))
       if (name === '../../utils/api') return { paymentApi: { courseOptions(date) {
         return new Promise((resolve, reject) => requests.push({ date, resolve, reject }))
       } } }
@@ -178,4 +179,19 @@ test('陪伴营新建及编辑均校验陪伴老师，确认页展示有效期�
     assert.ok(instance.data.confirmRows.some(row => row.label === '陪伴老师' && row.value === '陪伴老师甲'))
     assert.ok(instance.data.confirmRows.some(row => row.label === '有效期' && /1.*月/.test(row.value)))
   }
+})
+
+test('小程序付费客户及成交人按尾号筛选，仍选择原客户ID', () => {
+  const { instance } = harness()
+  instance.data.allCustomers = [{ id: 'a', nickname: '甲', phone_suffix: '0017' },
+    { id: 'b', nickname: '乙', phone_suffix: '0017' }, { id: 'c', nickname: '丙', phone_suffix: '1799' }]
+  instance.onPickerSearch({ detail: { value: '0017' } })
+  assert.deepEqual(Array.from(instance.data.pickerList, item => item.id), ['a', 'b'])
+  instance._updateCloserPickerList('0017')
+  assert.deepEqual(Array.from(instance.data.pickerList, item => item.id), ['a', 'b'])
+  instance.data.pickerField = 'customer'
+  instance._loadDealCourses = () => {}
+  instance.onPickerSelect({ currentTarget: { dataset: { id: 'a', nickname: '甲' } } })
+  assert.equal(instance.data.formData.customer_id, 'a')
+  assert.equal(instance.data.selectedCustomer.nickname, '甲')
 })

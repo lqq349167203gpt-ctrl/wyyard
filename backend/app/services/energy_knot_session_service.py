@@ -8,6 +8,7 @@ from app.services import customer_service, energy_knot_service
 from app.services.project_refund_service import exclude_refunded
 from app.services.storage import load_data, save_data, save_item
 from app.utils.activity_withdrawal import ensure_withdrawn_customers_retained
+from app.utils.customer_search import masked_customer_phone, matches_customer_search
 
 FILENAME = "energy_knot_sessions.json"
 _sessions: Dict[str, EnergyKnotSession] = {}
@@ -180,11 +181,12 @@ def search_customers(keyword: str, date: str = "") -> list:
         customers = [c for c in customers if c.id in invited_ids]
     results = []
     for c in customers:
-        if not keyword or keyword in c.nickname or (c.name and keyword in c.name):
+        if matches_customer_search(c, keyword):
             remaining = get_usable_remaining_count(c.id)
             results.append({
                 "id": c.id,
                 "nickname": c.nickname,
+                "phone_masked": masked_customer_phone(c),
                 "name": c.name,
                 "member_type": c.member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
                 "remaining": remaining,

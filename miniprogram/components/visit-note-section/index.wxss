@@ -307,7 +307,7 @@
 .plan-date-value { padding: 0 10rpx; color: #2b2f36; font-size: 24rpx; line-height: 50rpx; white-space: nowrap; }
 .plan-placeholder { color: #c0c4cc; }
 .plan-search-results { margin: 0 28rpx 16rpx; padding: 4rpx 0; border: 1rpx solid #e8eaed; border-radius: 8rpx; background: #fff; }
-.plan-person-option { display: flex; height: 64rpx; box-sizing: border-box; align-items: center; gap: 16rpx; padding: 12rpx 20rpx; color: #2b2f36; font-size: 26rpx; line-height: 40rpx; }
+.plan-person-option { display: flex; flex-wrap: wrap; min-height: 80rpx; box-sizing: border-box; align-items: center; gap: 16rpx; padding: 12rpx 20rpx; color: #2b2f36; font-size: 26rpx; line-height: 40rpx; }
 .plan-person-name { color: #8f959e; font-size: 22rpx; }
 .plan-search-state { padding: 14rpx 20rpx; color: #a8b1bd; font-size: 22rpx; line-height: 1.5; }
 
@@ -328,3 +328,5 @@
 .need-tag { padding: 10rpx 20rpx; border: 1rpx solid #e5e7eb; border-radius: 8rpx; background: #fff; color: #646a73; font-size: 24rpx; }
 .need-tag-selected { border-color: #adc4f5; background: #f2f6ff; color: #3370ff; }
 .need-tags-state { display: block; margin-top: 12rpx; font-size: 22rpx; color: #a8b1bd; }
+
+.search-person-phone { font-size: 24rpx; color: #646a73; line-height: 32rpx; }

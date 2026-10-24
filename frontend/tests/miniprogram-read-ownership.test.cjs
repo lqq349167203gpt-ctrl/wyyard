@@ -440,3 +440,27 @@ test('付费项目导出只传勾选类型，未选择时阻止导出',async()=>
   await p.onExportConfirm()
   assert.equal(toasts.at(-1).title,'请至少选择一项付费项目')
 })
+
+test('手机尾号候选切换搜索立即清空，选中仍提交客户身份', async () => {
+  const calls = []
+  const p = fixture('miniprogram/components/customer-picker/index.js', { visitApi: {
+    searchCustomers: word => { const d = deferred(); calls.push({ ...d, word }); return d.promise },
+  } })
+  p._search = word => { p.pending = p.doSearch(word) }
+  p.data.results = [{ id: 'old', nickname: '旧客户' }]
+  p.onInput({ detail: { value: '17' } })
+  assert.equal(p.data.results.length, 0)
+  const candidates = [{ id: 'a', nickname: '甲', phone_masked: '138****0017' },
+    { id: 'b', nickname: '乙', phone_masked: '137****0017' }]
+  calls[0].resolve(candidates); await p.pending
+  assert.equal(p.data.results.length, 2)
+  const events = []; p.triggerEvent = (name, detail) => events.push({ name, detail })
+  p.onSelect({ currentTarget: { dataset: { customer: candidates[1] } } })
+  assert.equal(events[0].detail.customer.id, 'b')
+  assert.equal(events[0].detail.customer.nickname, '乙')
+  p.onInput({ detail: { value: '99' } })
+  calls[1].resolve([]); await p.pending
+  assert.equal(p.data.searching, false)
+  assert.equal(p.data.showDropdown, true)
+  assert.equal(p.data.results.length, 0)
+})

@@ -1,4 +1,5 @@
 """协议以每张会员卡为单位，沿用客户范围、交易明细与付费编辑权限。"""
+
 from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.jwt_auth import require_page_permission
 from app.models.base import SafeBaseModel
 from app.services import customer_access_service, membership_card_service, organization_service
+from app.utils.customer_record_search import customer_record_matcher
 from app.utils.pagination import paginate
 from app.utils.record_ownership import ensure_payment_record_manager
 
@@ -32,8 +34,9 @@ def list_agreements(request: Request, tab: Literal["unsigned", "signed"] = "unsi
     organizations = {o.id: o.name for o in organization_service.list_organizations()}
     counts = {"unsigned": 0, "signed": 0}
     rows = []
+    matches_customer = customer_record_matcher(nickname)
     for item in visible:
-        if nickname.strip().lower() not in (item.get("nickname") or "").lower():
+        if not matches_customer(item):
             continue
         card = membership_card_service.get_card(item["id"])
         period = membership_card_service.agreement_period(card, today)

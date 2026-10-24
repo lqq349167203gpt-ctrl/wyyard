@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from app.models.internal_course import InternalCourse, InternalCourseCreate
 from app.services import customer_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.customer_search import masked_customer_phone, matches_customer_search
 
 DEFAULT_LEARNING_MONTHS = 12
 
@@ -174,10 +175,11 @@ def search_customers(keyword: str) -> list:
     customers = customer_service.list_customers()
     results = []
     for c in customers:
-        if keyword in c.nickname or (c.name and keyword in c.name):
+        if matches_customer_search(c, keyword):
             results.append({
                 "id": c.id,
                 "nickname": c.nickname,
+                "phone_masked": masked_customer_phone(c),
                 "name": c.name,
                 "member_type": c.member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
             })

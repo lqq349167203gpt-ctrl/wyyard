@@ -170,8 +170,8 @@ def get_feedback_people_for_follow_ups(request: Request):
 
 
 @router.get("/follow-up-people")
-def get_follow_up_people_for_participants():
-    return follow_up_people()
+def get_follow_up_people_for_participants(request: Request):
+    return follow_up_people(request)
 
 
 @router.get("/need-tags")

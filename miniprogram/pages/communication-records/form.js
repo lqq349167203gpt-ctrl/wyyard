@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const { communicationRecordApi, customerApi } = require('../../utils/api')
 
 Page({
@@ -75,11 +76,10 @@ Page({
     const kw = (keyword || '').toLowerCase()
     const filtered = kw
       ? allCustomers.filter(c => (
-        (c.nickname || '').toLowerCase().includes(kw)
-        || (c.name || '').toLowerCase().includes(kw)
+        matchesCustomerSearch(c, kw)
       ))
       : allCustomers
-    this.setData({ pickerList: filtered.slice(0, 50) })
+    this.setData({ pickerMatchCount: filtered.length, pickerList: filtered.slice(0, 50) })
   },
 
   async loadCustomers() {

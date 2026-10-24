@@ -20,6 +20,7 @@ function setup(notes = []) {
   vm.runInNewContext(readFileSync(path.join(root, 'miniprogram/components/visit-note-section/index.js'), 'utf8'), {
     Component(value) { component = value }, wx: { showToast() {} },
     require(name) {
+      if (name === '../../utils/customer-search') return require(path.join(root, 'miniprogram/utils/customer-search.js'))
       if (name === '../../utils/api') return { visitNoteApi: api, customerTagApi: { list: async () => [{ id: 'a', name: '关系' }, { id: 'b', name: '工作' }] } }
       if (name === '../../utils/feedback-person') return { attributionFromPicker: () => ({ feedback_person: '甲' }) }
       if (name === '../../utils/read-scope') return require(path.join(root, 'miniprogram/utils/read-scope.js'))

@@ -92,8 +92,8 @@
     <view class="plan-search-results" wx:if="{{followUpSearchOpen}}">
       <view class="plan-search-state" wx:if="{{followUpPeopleLoading}}">人员加载中…</view>
       <view class="plan-search-state" wx:elif="{{followUpPeopleError}}" bindtap="loadFollowUpPeople">{{followUpPeopleError}} · 点击重试</view>
-      <scroll-view class="plan-results-scroll" scroll-y style="height:{{followUpMatches.length > 4 ? 256 : followUpMatches.length * 64}}rpx" wx:elif="{{followUpMatches.length}}">
-        <view class="plan-person-option" wx:for="{{followUpMatches}}" wx:key="id" data-id="{{item.id}}" catchtap="onSelectFollowUpPerson"><text>{{item.nickname}}</text><text class="plan-person-name" wx:if="{{item.name && item.name !== item.nickname}}">{{item.name}}</text></view>
+      <scroll-view class="plan-results-scroll" scroll-y style="height:{{followUpMatches.length > 4 ? 320 : followUpMatches.length * 80}}rpx" wx:elif="{{followUpMatches.length}}">
+        <view class="plan-person-option" wx:for="{{followUpMatches}}" wx:key="id" data-id="{{item.id}}" catchtap="onSelectFollowUpPerson"><text>{{item.nickname}}</text><text class="plan-person-name" wx:if="{{item.name && item.name !== item.nickname}}">{{item.name}}</text><text class="search-person-phone" wx:if="{{item.phone_masked || item.phone_suffix}}">{{item.phone_masked || ('****' + item.phone_suffix)}}</text></view>
       </scroll-view>
       <view class="plan-search-state" wx:else>暂无匹配人员</view>
       <view class="plan-search-state" wx:if="{{!followUpPeopleLoading && !followUpPeopleError && followUpMatchCount > 50}}">共{{followUpMatchCount}}位，继续输入可缩小范围</view>

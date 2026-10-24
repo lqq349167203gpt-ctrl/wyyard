@@ -1,3 +1,4 @@
+import { matchesCustomerSearch, customerMaskedPhone } from "@/lib/customer-search"
 import { useEffect, useState, useRef, useMemo, useCallback, memo, startTransition } from "react"
 import { useNavigate } from "react-router-dom"
 import { useEnterToNext } from "@/hooks/use-enter-to-next"
@@ -297,7 +298,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
-                  remainingMap[c.id] !== undefined && ((c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
+                  remainingMap[c.id] !== undefined && matchesCustomerSearch(c, kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
                   const sa = isDepleted(ra) ? 1 : 0
@@ -317,6 +318,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
                           disabled={isDepleted}
+                          title={isDepleted ? "剩余次数不足" : undefined}
                           onClick={() => {
                             if (isDepleted) return
                             setFormOwnerId(c.id)
@@ -324,10 +326,7 @@ const GcsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                             setSearchKeyword("")
                             setOwnerRemaining(remaining !== undefined ? remaining : null)
                           }}>
-                          <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
-                          <span className={`text-[#8f959e] ${isDepleted ? "text-red-500" : ""}`}>
-                            {remaining !== undefined ? (remaining === -1 ? "" : `余${remaining}`) : ""}
-                          </span>
+                          <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}{c.name && c.name !== c.nickname && <span className="ml-1 text-[11px] text-[#646a73]">（{c.name}）</span>}{customerMaskedPhone(c) && <span className="ml-2 inline-block text-[11px] tabular-nums text-[#646a73]">{customerMaskedPhone(c)}</span>}</span>
                         </button>
                       )
                     })
@@ -533,7 +532,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
-                  remainingMap[c.id] !== undefined && ((c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
+                  remainingMap[c.id] !== undefined && matchesCustomerSearch(c, kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
                   const sa = isDepleted(ra) ? 1 : 0
@@ -553,6 +552,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${isDepleted ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
                           disabled={isDepleted}
+                          title={isDepleted ? "剩余次数不足" : undefined}
                           onClick={() => {
                             if (isDepleted) return
                             setFormOwnerId(c.id)
@@ -560,10 +560,7 @@ const ErsDialog = memo(({ open, date, spaces, allCustomers, session, defaultSpac
                             setSearchKeyword("")
                             setOwnerRemaining(remaining !== undefined ? remaining : null)
                           }}>
-                          <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
-                          <span className={`text-[#8f959e] ${isDepleted ? "text-red-500" : ""}`}>
-                            {remaining !== undefined ? (remaining === -1 ? "" : `余${remaining}`) : ""}
-                          </span>
+                          <span className={isDepleted ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}{c.name && c.name !== c.nickname && <span className="ml-1 text-[11px] text-[#646a73]">（{c.name}）</span>}{customerMaskedPhone(c) && <span className="ml-2 inline-block text-[11px] tabular-nums text-[#646a73]">{customerMaskedPhone(c)}</span>}</span>
                         </button>
                       )
                     })
@@ -832,7 +829,7 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
               {searchKeyword.trim().length > 0 && (() => {
                 const kw = searchKeyword.trim().toLowerCase()
                 const filtered = allCustomers.filter(c =>
-                  remainingMap[c.id] !== undefined && ((c.nickname || "").toLowerCase().includes(kw) || (c.name || "").toLowerCase().includes(kw))
+                  remainingMap[c.id] !== undefined && matchesCustomerSearch(c, kw)
                 ).sort((a, b) => {
                   const ra = remainingMap[a.id]; const rb = remainingMap[b.id]
                   const sa = isDepleted(ra) ? 1 : 0
@@ -853,14 +850,12 @@ const EksDialog = memo(({ open, date, spaces, allCustomers, hostCustomers, sessi
                         <button key={c.id}
                           className={`flex items-center justify-between w-full px-3 py-2 text-[12px] ${dep || alreadySelected ? "cursor-not-allowed" : "hover:bg-[#f7f8fa]"}`}
                           disabled={dep || alreadySelected}
+                          title={alreadySelected ? "已添加" : dep ? "剩余次数不足" : undefined}
                           onClick={() => {
                             if (dep || alreadySelected) return
                             selectOwner(c)
                           }}>
-                          <span className={dep || alreadySelected ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}</span>
-                          <span className={`text-[#8f959e] ${dep ? "text-red-500" : ""}`}>
-                            {alreadySelected ? "已添加" : remaining !== undefined ? (remaining === -1 ? "" : `余${remaining}`) : ""}
-                          </span>
+                          <span className={dep || alreadySelected ? "text-[#b0b5bb]" : ""}>{c.nickname || c.name}{c.name && c.name !== c.nickname && <span className="ml-1 text-[11px] text-[#646a73]">（{c.name}）</span>}{customerMaskedPhone(c) && <span className="ml-2 inline-block text-[11px] tabular-nums text-[#646a73]">{customerMaskedPhone(c)}</span>}</span>
                         </button>
                       )
                     })

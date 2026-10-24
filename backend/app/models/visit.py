@@ -82,6 +82,7 @@ class VisitRecord(VisitRecordBase):
 
 
 class CustomerSearchResult(SafeBaseModel):
+    phone_masked: str = ""
     id: str
     nickname: str
     name: str = ""

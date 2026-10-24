@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.models.communication_record import CommunicationRecordCreate
 from app.services import communication_record_service, customer_access_service, customer_service
+from app.utils.customer_search import matches_customer_search
 from app.utils.pagination import paginate
 from app.utils.request_roles import get_request_roles
 
@@ -104,8 +105,11 @@ def list_communication_records(
     creators = sorted({r.creator.strip() for r in records if r.creator and r.creator.strip()})
     creator_counts = Counter(r.creator.strip() for r in records if r.creator and r.creator.strip())
     identities = {c.nickname: c.member_type or "" for c in visible_customers}
+    matched_ids = {c.id for c in visible_customers if matches_customer_search(c, nickname)}
+    matched_names = {c.nickname for c in visible_customers if c.id in matched_ids}
     records = [r for r in records if (
-        (not nickname or nickname.lower() in r.customer_nickname.lower() or nickname.lower() in customer_names.get(r.customer_nickname, "").lower())
+        (not nickname or r.customer_id in matched_ids or (not r.customer_id and r.customer_nickname in matched_names)
+         or nickname.lower() in r.customer_nickname.lower())
         and (not member_type or identities.get(r.customer_nickname, "") == member_type)
         and (not creator or r.creator == creator)
         and (not isinstance(creator_names, list) or not creator_names or r.creator in creator_names)

@@ -14,6 +14,7 @@ from app.services import (
     visit_verification_service,
 )
 from app.services.customer_service import get_customer
+from app.utils.customer_search import masked_customer_phone, phone_suffix
 from app.utils.pagination import paginate
 from app.utils.record_ownership import ensure_creator_for_changed_fields, ensure_record_creator, stamp_creator
 from app.utils.request_roles import get_request_roles
@@ -236,7 +237,11 @@ async def list_visits_light(
         need_map, note_map = _visit_note_maps(request, visit_ids, notes=notes)
         summaries = daily_customer_note_service.visit_summaries(visit_ids, notes=notes)
         first_arrivals = visit_service.first_arrival_dates({item["customer_id"] for item in items})
+        people = {c.id: c for c in customer_service.list_customers()}
         for item in items:
+            item["name"] = getattr(people.get(item["customer_id"]), "name", "") or ""
+            item["phone_suffix"] = phone_suffix(people.get(item["customer_id"]))
+            item["phone_masked"] = masked_customer_phone(people.get(item["customer_id"]))
             first_arrival = first_arrivals.get(item["customer_id"], "")
             item["is_new_customer"] = not first_arrival or first_arrival >= item["visit_date"]
             item["needs"] = need_map.get(str(item.get("id") or ""), "")

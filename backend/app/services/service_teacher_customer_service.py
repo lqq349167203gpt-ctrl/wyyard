@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
 from app.services import account_service, visit_note_service, visit_service
+from app.utils.customer_record_search import customer_record_matcher
 
 FOLLOW_UP_CATEGORY_LABELS = {
     "visit_need": "来访需求",
@@ -201,9 +202,10 @@ def list_teacher_customers(
     }
     search = nickname.strip().casefold()
     if search:
+        matches_customer = customer_record_matcher(search)
         rows = [
             row for row in rows
-            if search in row["nickname"].casefold() or search in row["name"].casefold()
+            if matches_customer({"customer_id": row["id"], "nickname": row["nickname"]})
         ]
     if follow_up_filter == "inactive":
         rows = [row for row in rows if not row["is_active"]]

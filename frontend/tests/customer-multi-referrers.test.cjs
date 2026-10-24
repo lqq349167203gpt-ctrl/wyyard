@@ -73,6 +73,7 @@ function compactPicker(searchable = true) {
   vm.runInNewContext(ts.transpileModule(readFileSync(path.join(root, 'frontend/src/components/customer-search-input.tsx'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX },
   }).outputText, { exports: exported, document: { body: {} }, requestAnimationFrame: fn => fn(), require(name) {
+    if (name === '@/lib/customer-search') { const result = {}; vm.runInNewContext(ts.transpileModule(readFileSync(path.join(root, 'frontend/src/lib/customer-search.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: result }); return result }
     if (name === 'react') return { useState(initial) { const index = stateIndex++; if (!(index in states)) states[index] = initial; return [states[index], value => { states[index] = value }] },
       useRef: () => ({ current: null }), useMemo: fn => fn(), useCallback: fn => fn, useEffect() {} }
     if (name === 'react-dom') return { createPortal: child => child }
@@ -144,4 +145,19 @@ test('PC 顶部显示全部已选人员，搜索无匹配时仍可直接取消�
   view.nodes(view.render(), node => node.props?.['aria-label'] === '取消选择已有引流人')[0].props.onClick()
   assert.deepEqual(Array.from(view.props.value), [])
   assert.equal(view.nodes(view.render(), node => node.props?.['aria-label'] === '已选人员').length, 0)
+})
+
+test('PC 多选输入手机尾号保留同尾号候选，选择后仍保存昵称', () => {
+  const view = compactPicker()
+  view.props.customers = [{ id: 'a', nickname: '甲', name: '', phone_suffix: '0017', phone_masked: '138****0017' },
+    { id: 'b', nickname: '乙', name: '', phone_suffix: '0017', phone_masked: '137****0017' }, { id: 'c', nickname: '丙', phone_suffix: '1799' }]
+  const input = view.nodes(view.render(), node => node.type === 'input')[0]
+  input.props.onChange({ target: { value: '17' } })
+  const options = view.nodes(view.render(), node => node.type === 'button' && node.props['aria-pressed'] !== undefined)
+  assert.deepEqual(options.map(node => node.props.title), ['甲', '乙'])
+  assert.equal(view.nodes(options[0], node => node.type === 'span' && node.props.children === '138****0017').length, 1)
+  assert.equal(view.nodes(options[1], node => node.type === 'span' && node.props.children === '137****0017').length, 1)
+  assert.ok(!JSON.stringify(options).includes('13855550017'))
+  options[0].props.onClick()
+  assert.deepEqual(Array.from(view.props.value), ['已有引流人', '甲'])
 })

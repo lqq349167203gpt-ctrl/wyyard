@@ -22,10 +22,11 @@
 
   <!-- 搜索结果下拉 -->
   <view wx:if="{{searchError}}" class="search-box" bindtap="retrySearch">{{searchError}}</view>
-  <view class="dropdown" wx:if="{{showDropdown && (results.length > 0 || searching)}}">
+  <view class="dropdown" wx:if="{{showDropdown && !searchError}}">
     <view class="dropdown-loading" wx:if="{{searching}}">
       <text>搜索中...</text>
     </view>
+    <view class="search-match-count" wx:if="{{!searching && results.length}}">匹配 {{results.length}} 人</view>
     <view
       wx:for="{{results}}"
       wx:key="id"
@@ -33,9 +34,7 @@
       bindtap="onSelect"
       data-customer="{{item}}"
     >
-      <text class="item-name">{{item.nickname}}</text>
-      <member-labels wx:if="{{item.member_type || item.card_status}}" identity="{{item.member_type}}" status="{{item.card_status}}" tone="{{item.card_status_tone}}" />
-      <text class="item-count" wx:if="{{item.visit_count}}">{{item.visit_count}}次</text>
+      <view class="search-person-copy"><text class="item-name">{{item.nickname}}<text class="search-person-name" wx:if="{{item.name && item.name !== item.nickname}}">（{{item.name}}）</text></text><text class="search-person-phone" wx:if="{{item.phone_masked || item.phone_suffix}}">{{item.phone_masked || ('****' + item.phone_suffix)}}</text></view>
     </view>
     <view class="dropdown-empty" wx:if="{{!searching && results.length === 0}}">
       <text>无匹配结果</text>

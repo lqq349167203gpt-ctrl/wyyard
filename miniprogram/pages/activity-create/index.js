@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const {
   classRecordApi, courseTypeApi, spaceApi, organizationApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
@@ -373,7 +374,7 @@ Page({
       .filter(c => {
         if (!keyword) return true
         const kw = keyword.toLowerCase()
-        return (c.nickname || '').toLowerCase().includes(kw) || (c.name || '').toLowerCase().includes(kw)
+        return matchesCustomerSearch(c, kw)
       })
       .map(function(c) {
         return Object.assign({}, c, {
@@ -443,6 +444,9 @@ Page({
       const visitors = (visits || []).map(v => ({
         id: v.customer_id || '',
         nickname: v.customer_nickname || v.nickname || '',
+        name: v.name || '',
+        phone_suffix: v.phone_suffix || '',
+        phone_masked: v.phone_masked || '',
       })).filter(v => v.id)
       const ownerStillInvited = visitors.some(v => v.id === this.data.ownerId)
       this.setData({

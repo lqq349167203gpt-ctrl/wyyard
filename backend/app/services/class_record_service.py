@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from app.models.class_record import ClassRecord, ClassRecordCreate, CourseWithdrawalEntry
 from app.services import customer_service, membership_card_service
 from app.services.storage import load_data, save_data, save_item
+from app.utils.customer_search import masked_customer_phone, matches_customer_search
 
 FILENAME = "class_records.json"
 _records: Dict[str, ClassRecord] = {}
@@ -584,10 +585,11 @@ def search_customers(keyword: str) -> list:
     customers = customer_service.list_customers()
     results = []
     for c in customers:
-        if keyword in c.nickname or (c.name and keyword in c.name):
+        if matches_customer_search(c, keyword):
             results.append({
                 "id": c.id,
                 "nickname": c.nickname,
+                "phone_masked": masked_customer_phone(c),
                 "name": c.name,
                 "member_type": c.member_type, "card_status": getattr(c, "card_status", ""), "card_status_tone": getattr(c, "card_status_tone", "neutral"),
                 "remaining": _get_card_remaining(c.id),

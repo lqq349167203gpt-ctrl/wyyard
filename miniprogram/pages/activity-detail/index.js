@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const {
   classRecordApi, courseTypeApi, spaceApi, organizationApi, customerApi, visitApi,
   groupCaseSessionApi, emotionalReleaseSessionApi,
@@ -257,6 +258,9 @@ Page({
       const visitors = (visits || []).map(v => ({
         id: v.customer_id || '',
         nickname: v.customer_nickname || v.nickname || '',
+        name: v.name || '',
+        phone_suffix: v.phone_suffix || '',
+        phone_masked: v.phone_masked || '',
       })).filter(v => v.id)
       const ownerStillInvited = visitors.some(v => v.id === this.data.ownerId)
       this.setData({
@@ -538,7 +542,7 @@ Page({
       baseList = this.getFilteredCustomers(position)
     }
     const list = baseList
-      .filter(c => !keyword || (c.nickname || '').toLowerCase().includes(keyword.toLowerCase()) || (c.name || '').toLowerCase().includes(keyword.toLowerCase()))
+      .filter(c => matchesCustomerSearch(c, keyword))
       .map(function(c) {
         return Object.assign({}, c, {
           _selected: pickerMode === 'owner' ? c.id === this.data.ownerId

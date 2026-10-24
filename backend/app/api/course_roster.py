@@ -17,6 +17,7 @@ from app.services import (
     visit_note_service,
     visit_service,
 )
+from app.utils.customer_search import masked_customer_phone, phone_suffix
 from app.utils.record_ownership import can_request_edit_activity_content, ensure_activity_withdrawal_access
 from app.utils.request_roles import get_request_roles
 
@@ -85,6 +86,8 @@ def roster(request: Request, activity_source: ActivityParticipantNoteSource, ses
         entry = confirmations.get(customer.id, {})
         people.append({
             "id": customer.id, "nickname": customer.nickname or customer.name or "未命名客户",
+            "name": customer.name or "",
+            "phone_suffix": phone_suffix(customer), "phone_masked": masked_customer_phone(customer),
             "member_type": customer.member_type, "card_status": getattr(customer, "card_status", ""), "card_status_tone": getattr(customer, "card_status_tone", "neutral"), "role": "案主" if customer.id == getattr(record, "owner_id", "") else "参与者",
             "withdrawn": customer.id in withdrawn,
             "attended": course_attendance_service.is_current(entry, record, customer.id) and customer.id not in withdrawn,
@@ -97,7 +100,7 @@ def roster(request: Request, activity_source: ActivityParticipantNoteSource, ses
             "mode": getattr(record, "activity_mode", "线下"), "participants": people,
             "can_confirm": can_edit, "can_withdraw": can_withdraw,
             "can_edit_notes": can_edit, "feedback_people": _feedback_people(request),
-            "follow_up_people": follow_up_people()}
+            "follow_up_people": follow_up_people(request)}
 
 
 class ConfirmAttendance(StrictBaseModel):

@@ -1,3 +1,4 @@
+const { matchesCustomerSearch } = require('../../utils/customer-search')
 const { customerApi, customerTagApi } = require('../../utils/api')
 const { isAreaViewOnly } = require('../../utils/record-ownership')
 const { readSource, retrySources } = require('../../utils/source-state')
@@ -365,7 +366,7 @@ Page({
     const list = this.data.allCustomers.filter(c => {
       if (c.nickname === this.data.nickname) return false
       if (!keyword) return true
-      return c.nickname.includes(keyword) || (c.name && c.name.includes(keyword))
+      return matchesCustomerSearch(c, keyword)
     })
     this.setData({ pickerKeyword: keyword, pickerList: list.map(c => ({ ...c, selected: this.data.pickerField === 'referrer' && this.data.referrers.includes(c.nickname) })) })
   },
