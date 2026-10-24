@@ -1298,6 +1298,7 @@ export interface VisitRecord {
   activity_count: number
   welfare_count: number
   remaining_count: number | null  // -999=不限次, null=不限次, 0=无卡/已用完, >0=剩余次数
+  membership_remaining_count?: number | "unlimited"  // 当前有效会员卡合计，不含沙龙技能学习权益
   activities: ActivityInfo[]
   experience: string
   feedback: string

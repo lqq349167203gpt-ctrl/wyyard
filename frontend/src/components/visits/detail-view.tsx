@@ -563,6 +563,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
         "客户昵称": v.nickname,
         "预计时间": v.visit_time || "",
         "会员身份": v.member_type || "",
+        "会员卡剩余卡次": v.membership_remaining_count === "unlimited" ? "不限次" : v.membership_remaining_count ?? 0,
         ...(canViewNotePart(editPermissions.customer_access, "visit_need_tags")
           ? { "来访标签": (v.visit_need_tags || []).join("、") } : {}),
         "当前卡次": v.card_status || "",
@@ -576,7 +577,7 @@ export default function DetailView({ externalDate, onExternalDateChange, hideDat
     if (!rows.length) return
 
     const headers = Object.keys(rows[0])
-    const widthByHeader: Record<string, number> = { "引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "当前卡次": 14,
+    const widthByHeader: Record<string, number> = { "引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "会员卡剩余卡次": 16, "当前卡次": 14,
       "来访标签": 24, "来访需求": 40, "组长情况": 10, "邀约人": 10, "接待人": 10, "目标": 20 }
     const colWidths = headers.map(header => widthByHeader[header])
 

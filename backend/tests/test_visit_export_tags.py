@@ -73,7 +73,8 @@ def test_visit_list_and_export_include_visible_customer_tags(client, created_cus
         headers = [cell.value for cell in sheet[1]]
         tag_index = headers.index("来访标签")
         assert "客户标签" not in headers
-        assert tag_index == headers.index("会员身份") + 1
+        assert headers[headers.index("会员身份") + 1] == "会员卡剩余卡次"
+        assert tag_index == headers.index("会员身份") + 2
         assert headers[tag_index + 1] == "当前卡次"
         assert headers[tag_index + 2] == "来访需求"
         row = next(row for row in sheet.iter_rows(min_row=2) if row[1].value == created_customer["nickname"])
@@ -91,7 +92,8 @@ def test_empty_visit_export_keeps_visit_need_tag_header(client):
     assert response.status_code == 200, response.text
     sheet = load_workbook(BytesIO(response.content)).active
     headers = [cell.value for cell in sheet[1]]
-    assert headers[headers.index("会员身份") + 1] == "来访标签"
+    assert headers[headers.index("会员身份") + 1] == "会员卡剩余卡次"
+    assert headers[headers.index("会员身份") + 2] == "来访标签"
     assert sheet.max_row == 1
 
 
@@ -147,3 +149,74 @@ def test_visit_tags_stay_on_their_own_visit_and_deduplicate_visible_notes(client
     assert text.count("本次标签") == 1
     assert "其他日期的标签" not in str(list(sheet.values))
     assert "已删除标签" not in str(list(sheet.values))
+
+
+@pytest.mark.parametrize("card_state,expected", [("counted", 33), ("unlimited", "不限次"), ("empty", 0)])
+def test_visit_export_membership_remaining_is_current_and_membership_only(
+    client, created_customer, monkeypatch, card_state, expected,
+):
+    from datetime import timedelta
+
+    from app.models.internal_course import InternalCourse
+    from app.models.membership_card import MembershipCard
+    from app.models.project_deduction import ProjectDeduction
+    from app.services import internal_course_service, membership_card_service, project_deduction_service
+
+    now = datetime.now(timezone.utc)
+    today = datetime.now().date()
+    start = (today - timedelta(days=10)).isoformat()
+    end = (today + timedelta(days=30)).isoformat()
+    customer_id = created_customer["id"]
+
+    def card(identifier, total=30, **overrides):
+        return MembershipCard(**{
+            "id": identifier, "customer_id": customer_id, "nickname": created_customer["nickname"],
+            "card_type": "30次卡", "price": 0, "effective_date": start, "expiry_date": end,
+            "total_count": total, "remaining_count": total, "created_at": now, "updated_at": now,
+            **overrides,
+        })
+
+    cards = {}
+    if card_state != "empty":
+        cards = {
+            "first": card("first"), "second": card("second", 10),
+            "expired": card("expired", expiry_date=(today - timedelta(days=1)).isoformat()),
+            "future": card("future", effective_date=(today + timedelta(days=1)).isoformat()),
+            "voided": card("voided", voided=True), "deleted": card("deleted", is_deleted=True),
+        }
+    if card_state == "unlimited":
+        cards["unlimited"] = card("unlimited", total=None)
+    monkeypatch.setattr(membership_card_service, "_cards", cards)
+    monkeypatch.setattr(membership_card_service, "_deductions", {
+        customer_id: [{"card_id": "first"} for _ in range(4)],
+    })
+    monkeypatch.setattr(project_deduction_service, "_deductions", {
+        "manual": ProjectDeduction(id="manual", customer_id=customer_id, nickname=created_customer["nickname"],
+            project_type="membership-cards", project_id="second", project_name="30次卡", count=3,
+            deduction_date=today.isoformat(), created_at=now),
+    })
+    # 有效学习权益会让原邀约“剩余次数”显示不限次，但不能改变新增的会员卡专用列。
+    monkeypatch.setattr(internal_course_service, "list_courses", lambda: [
+        InternalCourse(id="learning", customer_id=customer_id, nickname=created_customer["nickname"],
+            course_type="OH卡技能梳理：三阶洞察力", price=0, effective_date=start, expiry_date=end,
+            created_at=now, updated_at=now),
+    ])
+    day = "2099-10-24"
+    result = client.post("/api/visits", json={"visit_date": day, "customer_id": customer_id})
+    assert result.status_code == 200, result.text
+    for params in ({"date": day}, {"date": day, "page": 1, "page_size": 10}):
+        listed = client.get("/api/visits", params=params)
+        assert listed.status_code == 200, listed.text
+        rows = listed.json() if "page" not in params else listed.json()["items"]
+        item = next(row for row in rows if row["id"] == result.json()["id"])
+        assert item["membership_remaining_count"] == ("unlimited" if card_state == "unlimited" else expected)
+        if card_state == "empty":
+            assert item["remaining_count"] == -999
+    exported = client.get("/api/visits/export", params={"date": day})
+    assert exported.status_code == 200, exported.text
+    sheet = load_workbook(BytesIO(exported.content)).active
+    headers = [cell.value for cell in sheet[1]]
+    column = headers.index("会员卡剩余卡次")
+    assert column == headers.index("会员身份") + 1
+    row = next(row for row in sheet.iter_rows(min_row=2) if row[1].value == created_customer["nickname"])
+    assert row[column].value == expected
