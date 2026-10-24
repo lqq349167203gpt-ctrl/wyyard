@@ -8,6 +8,7 @@ from app.services import (
     customer_access_service,
     customer_service,
     customer_tag_service,
+    membership_card_service,
     visit_note_service,
     visit_service,
     visit_verification_service,
@@ -197,10 +198,12 @@ async def list_visits(
     need_map, note_map = _visit_note_maps(request, visit_ids, notes=notes)
     summaries = daily_customer_note_service.visit_summaries(visit_ids, notes=notes)
     first_arrivals = visit_service.first_arrival_dates({record.customer_id for record in records})
+    membership_remaining = membership_card_service.list_current_card_remaining({record.customer_id for record in records})
     visible_tags = customer_tag_service.visible_tags_by_customer(getattr(request.state, "user_id", "") if request else "")
     items = []
     for record in records:
         item = _fill_member_type(record, need_map.get(record.id, ""), shared_summary=summaries.get(record.id, {}), first_arrivals=first_arrivals)
+        item["membership_remaining_count"] = membership_remaining.get(record.customer_id, 0)
         item["customer_tags"] = visible_tags.get(record.customer_id, [])
         item["visit_notes"] = note_map.get(record.id, [])
         item = customer_access_service.protect_note_fields(item, get_request_roles(request) if request else ["超级管理员"])
@@ -331,6 +334,7 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
     items = [_fill_member_type(record, need_map.get(record.id, ""), first_arrivals=first_arrivals) for record in active_records]
     items = [customer_access_service.protect_note_fields({**item, "visit_notes": note_map.get(item["id"], [])},
               get_request_roles(request) if request else ["超级管理员"]) for item in items]
+    membership_remaining = membership_card_service.list_current_card_remaining({record.customer_id for record in active_records})
     # 构建组长映射（复用 PC 端逻辑）
     role_map = {}
     for r in items:
@@ -345,6 +349,7 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
             "客户昵称": v.get("nickname") or "",
             "预计时间": v.get("visit_time") or "",
             "会员身份": v.get("member_type") or "",
+            "会员卡剩余卡次": "不限次" if membership_remaining.get(v["customer_id"]) == "unlimited" else membership_remaining.get(v["customer_id"], 0),
             "当前卡次": v.get("card_status") or "",
             "来访标签": "、".join(visit_note_service.visit_need_tag_names(v.get("visit_notes", []))),
             "来访需求": v.get("needs") or "",
@@ -358,12 +363,12 @@ async def export_visits(date: str = None, space_id: str = None, request: Request
         # 空表也返回有效 xlsx（只有表头）
         rows = []
 
-    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "来访标签", "当前卡次", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
+    headers = ["引流人", "客户昵称", "预计时间", "会员身份", "会员卡剩余卡次", "来访标签", "当前卡次", "来访需求", "组长情况", "邀约人", "接待人", "目标"]
     if not customer_access_service.can_view_detail_tab(get_request_roles(request) if request else ["超级管理员"], "visit_need_tags"):
         headers.remove("来访标签")
     if not customer_access_service.can_view_note(get_request_roles(request) if request else ["超级管理员"], "visit_need"):
         headers.remove("来访需求")
-    col_widths = {"引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "当前卡次": 14, "来访标签": 24,
+    col_widths = {"引流人": 10, "客户昵称": 12, "预计时间": 10, "会员身份": 12, "会员卡剩余卡次": 16, "当前卡次": 14, "来访标签": 24,
                   "来访需求": 40, "组长情况": 10, "邀约人": 10, "接待人": 10, "目标": 20}
 
     wb = Workbook()
